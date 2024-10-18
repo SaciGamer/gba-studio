@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Launcher</title>
+</head>
+<body>
+  <h1>Launcher</h1>
+  <button id="executeProgram">Executar Programa</button>
+
+  <script>
+    document.getElementById('executeProgram').addEventListener('click', () => {
+        console.log('Button clicked');
+        window.electron.ipcRenderer.send('open-project-window');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+# Dependências da Node.js
+node_modules/
+
+# Dependências do npm
+npm-debug.log*
+
+# Dependências do Yarn
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs
+*.log
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db
+
+# IDE/Editor
+.vscode/
+.idea/
+
+# Build
+dist/
+build/
+
+# Testes
+coverage/
+
+# Ambiente
+.env
+.env.local
+.env.*.local
+
+# Dependências
+node_modules/
+package-lock.json
+
+# Diretórios de Build e Dependências Internas
+frontend/build/
+frontend/node_modules/
+gba-project/build/

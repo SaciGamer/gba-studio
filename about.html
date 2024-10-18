@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+        -webkit-user-select: none; /* Para navegadores Webkit */
+        -moz-user-select: none;    /* Para navegadores Gecko */
+        -ms-user-select: none;     /* Para Internet Explorer/Edge */
+        user-select: none;         /* Padrão */
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            text-align: center;
+        }
+        img {
+            cursor: pointer;
+            height: 45%;
+            width: 45%
+        }
+    </style>
+     <script>
+        window.ipcRenderer = require('electron').ipcRenderer;
+    
+        window.ipcRenderer.on('change-theme', (event, newTheme) => {
+          document.body.className = `theme-${newTheme}`;
+        });
+      </script>
+</head>
+<body>
+    <div class="container theme-systemDefault">
+        <img src="icon/defaultImgIcon.png" alt="GBA Studio com link do site" id="redirect-image">
+        <h3 class="mb-2">GBA Studio 0.0.1</h3>
+        <h4 class="mb-2">Engine Game Boy Advance</h4>
+        <p class="text.size=10">Distributed under MIT license.</p>
+        <p>electron    : {versionElectron}</p>
+        <p>node        : {versionNode}</p>
+    </div>
+
+    <script>
+       document.getElementById('redirect-image').addEventListener('click', () => {
+            open('https://google.com.br');
+        });
+    </script>
+</body>
+</html>
