@@ -1,11 +1,15 @@
-import { app, BrowserWindow, Menu, ipcMain } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, dialog, shell } from 'electron';
+// import Store from 'electron-store';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import isDev from 'electron-is-dev';
 import { spawn } from 'child_process';
 import { compileGBA } from './scripts/compile-gba.mjs';
 import menuTemplate from './menuTemplate.mjs'
+
+import { configurarPreferenceHandlers, getPreferences, updatePreferences } from './handlers/preferenceHandlers.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,17 +17,17 @@ const __dirname = path.dirname(__filename);
 let launcherWindow;
 let mainWindow;
 let aboutWindow;
-let currentTheme = 'systemDefault';
+let currentTheme = getPreferences().theme;
 
 // Laucher
-function createLauncherWindow() {
+function createLauncherWindow(selectTab) {
   launcherWindow = new BrowserWindow({
     width: 660,
     height: 460,
     resizable: false,
     icon: path.join(__dirname, 'icon/defaultImgIcon.png'),
     webPreferences: {
-      // preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false, // Importante para segurança
       contextIsolation: true, // Importante para segurança
     },
@@ -32,18 +36,23 @@ function createLauncherWindow() {
   launcherWindow.setMenu(null);
 
   // Carregar modo de desenvolvedor
-  if (isDev) {
-    launcherWindow.webContents.openDevTools();
-  }
+  // if (isDev) {
+  //   launcherWindow.webContents.openDevTools();
+  // }
 
-  launcherWindow.loadFile('launcher.html');
+  launcherWindow.loadURL(
+    isDev
+      ? `http://localhost:3000/launcher?tab=${encodeURI(selectTab)}`
+      : `file://${path.join(__dirname, `frontend/build/launcher.html?tab=${encodeURI(selectTab)}`)}`
+    );
+
   launcherWindow.on('closed', () => {
     launcherWindow = null;
   });
 }
 
 // Criar Janela Programa
-function createProjectWindow() {
+function createProjectWindow(filePath) {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -62,9 +71,9 @@ function createProjectWindow() {
   // mainWindow.loadURL( `file://${path.join(__dirname, 'frontend/build/index.html')}`);
   mainWindow.loadURL(
     isDev
-      ? 'http://localhost:3000'
-      : `file://${path.join(__dirname, 'frontend/build/index.html')}`
-    );
+    ? `http://localhost:3000/engine?file=${encodeURIComponent(filePath)}`
+    : `file://${path.join(__dirname, `frontend/build/engine.html?file=${encodeURIComponent(filePath)}`)}`
+  );
 
   // Carregar modo de desenvolvedor
   if (isDev) {
@@ -103,61 +112,52 @@ const createAboutWindow = () => {
 
 };
 
-// SAVE AS -------------------------------------------------------------
-/*const saveProjectAs = (projectData) => {
-  const filePath = dialog.showSaveDialogSync(mainWindow, {
-    title: 'Save Project As',
-    defaultPath: path.join(app.getPath('documents'), 'NewProject.gbasproj'),
-    filters: [{ name: 'GBA Studio Project', extensions: ['gbasproj'] }]
-  });
-  
-  if (filePath) {
-    fs.writeFileSync(filePath, JSON.stringify(projectData), 'utf-8');
-  }
-};*/
-
-// OPEN PROJECT -------------------------------------------------------
-/*const loadProject = () => {
-  const filePath = dialog.showOpenDialogSync(mainWindow, {
-    title: 'Open Project',
-    filters: [{ name: 'GBA Studio Project', extensions: ['gbasproj'] }]
-  });
-  
-  if (filePath && filePath.length > 0) {
-    const projectData = JSON.parse(fs.readFileSync(filePath[0], 'utf-8'));
-    mainWindow.webContents.send('load-project', projectData);
-  }
-};*/
-
 // Função para trocar temas
 function changeTheme(theme) {
   currentTheme = theme;
-  console.log("..: Função changeTheme chamada: %s", theme);
+  // console.log("..: Função changeTheme chamada: %s", theme);
   mainWindow.webContents.send('change-theme', theme);
+  updatePreferences('theme', currentTheme)
 }
 
 app.whenReady().then(() => {
-  createProjectWindow();
-  const menu = Menu.buildFromTemplate(menuTemplate(createAboutWindow, changeTheme));
+  // createProjectWindow();
+  // const menu = Menu.buildFromTemplate(menuTemplate(createAboutWindow, changeTheme));
+  // Definir o menu da aplicação
+  // Menu.setApplicationMenu(menu)
+  createLauncherWindow();
+});
+
+// IPC para comunicação entre janelas
+ipcMain.on('load-project-window', (event, filePath) => {
+  
+  if (launcherWindow) {
+    console.log('..: Fechando Launcher')
+    launcherWindow.close();
+  }
+
+  // Criar o menu a partir do template
+  const menu = Menu.buildFromTemplate(menuTemplate(createLauncherWindow, createAboutWindow, changeTheme));
   // Definir o menu da aplicação
   Menu.setApplicationMenu(menu)
-  // createLauncherWindow();
 
-  
-  // IPC para comunicação entre janelas
-  ipcMain.on('open-project-window', () => {
-    console.log('IPC event received');
-    if (launcherWindow) {
-      launcherWindow.close();
-    }
+  // Cria a janela
+  console.log('..: IPC event received filePath:', filePath);
 
-    // Criar o menu a partir do template
-   ;
+  let file = path.basename(filePath);
+  let directory = path.dirname(filePath);
 
-    // Cria a janela
-    //createMainWindow();
-    createProjectWindow();
-  });
+  if(path.extname(file) !== '.gbaproj') {
+    file = file + '.gbaproj';
+    directory = filePath;
+  }
+
+  console.log('..: File: ', file);
+  console.log('..: Directory: ', directory);
+
+  updatePreferences('recentProjects', { title: file  , path: directory});
+
+  createProjectWindow(filePath);
 });
 
 app.on('window-all-closed', () => {
@@ -168,8 +168,7 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-     createProjectWindow();
-    //createLauncherWindow();
+    createLauncherWindow();
   }
 });
 
@@ -193,6 +192,83 @@ function launchEmulator(romPath) {
   emulator.on('close', (code) => {
     console.log(`Emulator exited with code ${code}`);
   });
+}
+
+function createProjectStruct(basePath) {
+  console.log('..: createProjectStruct basePath: ', basePath);
+  const projectName = basePath.split(path.sep).filter(Boolean).pop();
+  console.log('..: createProjectStruct projectName: ', projectName);
+  const userName = os.userInfo().username;
+  const versionApplication = getApplicationVersion();
+
+  const defaultContentProjectJson = { 
+    "_resourceType": "project", 
+    "name": projectName, 
+    "author": userName, 
+    "notes": "", 
+    "_version": versionApplication, 
+    "_release": "1" };
+
+  const folders = ['assets', 'plugins', 'project']; 
+  const assets = ['avatars', 'backgrounds', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui'];
+  const projects = ['backgrounds', 'emotes', 'fonts', 'musics', 'palettes', 'sprites'];
+  const files = ['.gitignore', `${projectName}.gbaproj`]; 
+  console.log('..: Criando estrutura de pastas :..');
+  
+  folders.forEach(folder => { const folderPath = path.join(basePath, folder); 
+    if (!fs.existsSync(folderPath)) { 
+      fs.mkdirSync(folderPath, { recursive: true }); 
+      console.log(`..: Pasta criada: ${folderPath}`); 
+    } 
+  }); 
+
+  function getApplicationVersion() { 
+    // Caminho do package.json no diretório de saída após o build 
+    const packageJsonPath = path.resolve('dist', 'package.json'); 
+    // Verifique se o arquivo existe no caminho do build 
+    if (!fs.existsSync(packageJsonPath)) { 
+      // Se não existir, use o caminho de desenvolvimento 
+      console.warn('Arquivo package.json não encontrado no diretório de build. Usando o caminho de desenvolvimento.'); 
+      return JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf-8')).version; 
+    } 
+    // Se existir, use o caminho de build 
+    return JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')).version; 
+  }
+
+  assets.forEach(assets => { const assetsPath = path.join(basePath, folders[0], assets); 
+    if (!fs.existsSync(assetsPath)) { 
+      fs.mkdirSync(assetsPath, { recursive: true }); 
+      console.log(`..: Pasta do assets criada: ${folders[0]}\\${assetsPath}`); 
+    } 
+  }); 
+
+  projects.forEach(projects => { const assetsPath = path.join(basePath, folders[2], projects); 
+    if (!fs.existsSync(assetsPath)) { 
+      fs.mkdirSync(assetsPath, { recursive: true }); 
+      console.log(`..: Pasta do project criada: ${folders[0]}\\${assetsPath}`); 
+    } 
+  }); 
+
+  files.forEach(file => { const filePath = path.join(basePath, file); 
+    if (!fs.existsSync(filePath)) { 
+      if (filePath.search(projectName))
+        fs.writeFileSync(filePath, JSON.stringify(defaultContentProjectJson, null, 2));
+      else 
+        fs.writeFileSync(filePath, ''); 
+
+      console.log(`..: Arquivo criado: ${filePath}`); 
+    } 
+  });
+
+  console.log('..: Criando estrutura de pastas - END :..');
+}
+
+function getCaminhoAppData() {
+  const appDataPath = path.join(os.homedir(), 'AppData', 'Local', 'gbaStudio'); 
+  if (!fs.existsSync(appDataPath)) { 
+    fs.mkdirSync(appDataPath, { recursive: true }); 
+  } 
+  return appDataPath;
 }
 
 ipcMain.on('run-project', (event) => {
@@ -244,6 +320,89 @@ ipcMain.handle('load-file', async (event, filePath) => {
   }
 });
 
-// ipcMain.handle('check-file-exists', async (event, filePath) => {
-//   return fs.existsSync(filePath);
-// });
+// SAVE AS -------------------------------------------------------------
+/*const saveProjectAs = (projectData) => {
+  const filePath = dialog.showSaveDialogSync(mainWindow, {
+    title: 'Save Project As',
+    defaultPath: path.join(app.getPath('documents'), 'NewProject.gbasproj'),
+    filters: [{ name: 'GBA Studio Project', extensions: ['gbasproj'] }]
+  });
+  
+  if (filePath) {
+    fs.writeFileSync(filePath, JSON.stringify(projectData), 'utf-8');
+  }
+};*/
+
+// OPEN PROJECT -------------------------------------------------------
+/*const loadProject = () => {
+  const filePath = dialog.showOpenDialogSync(mainWindow, {
+    title: 'Open Project',
+    filters: [{ name: 'GBA Studio Project', extensions: ['gbasproj'] }]
+  });
+  
+  if (filePath && filePath.length > 0) {
+    const projectData = JSON.parse(fs.readFileSync(filePath[0], 'utf-8'));
+    mainWindow.webContents.send('load-project', projectData);
+  }
+};*/
+
+// Handle IPC requests //Abrir Project
+ipcMain.on('open-project-window', async (event) => {
+  console.log("..: chamado abertura de projeto");
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'GBA Projects', extensions: ['gbaproj'] }],
+    });
+
+    if (result.canceled) {
+      console.log('..: Project file selected - canceled');
+    } else if (!result.canceled && result.filePaths.length > 0) {
+      const filePath = result.filePaths[0];
+      console.log('..: Project file selected:', filePath);
+
+      const file = path.basename(filePath);
+      const directory = path.dirname(filePath);
+      updatePreferences('recentProjects', { title: file, path: directory});
+
+      event.sender.send('selected-project-file', filePath);
+    }
+  } catch (error) {
+    console.error('Error opening project file dialog:', error);
+  }
+});
+
+ipcMain.handle('check-project-file', async (event, projectPath) => {
+  return fs.existsSync(projectPath);
+});
+
+ipcMain.handle('create-project-path', async (event, projectPath) => {
+  const normalizedPath = projectPath.replace(/[/\\]/g, path.sep);
+
+  console.log('..: Create project path request: ', normalizedPath);
+  /*const response = */fs.mkdirSync(normalizedPath, { recursive: true });
+  // console.log('..: Create project path response: ', response);
+  createProjectStruct(normalizedPath);
+  return normalizedPath;
+});
+
+// Handle opening documentation link
+ipcMain.on('open-documentation', async () => {
+  const url = 'https://www.google.com/?documentation'; // Substitua pelo URL da documentação
+  await shell.openExternal(url); 
+});
+
+// Handle select folder to save project
+ipcMain.handle('select-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory']
+  });
+  if (result.canceled) {
+    return { filePath: '' };
+  } else {
+    return { filePath: result.filePaths[0] };
+  }
+});
+
+// Funções com handle
+configurarPreferenceHandlers();

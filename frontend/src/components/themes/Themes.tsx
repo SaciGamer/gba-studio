@@ -1,4 +1,5 @@
 import { theme } from 'antd'
+
 const { defaultAlgorithm, darkAlgorithm } = theme;
 
 const Themes = {
@@ -7,7 +8,6 @@ const Themes = {
       colorPrimary: '#ffa500',
       // colorTextBase: '#000000',
       colorBgBase: '#ffffff',
-      // colorBackground: '#ffffff',
       // borderRadius: '4px',
       // colorSuccess: '#52c41a',
       // colorWarning: '#faad14',
@@ -17,6 +17,7 @@ const Themes = {
       // colorBgElevated: '#ffffff',
       // colorTextPlaceholder: '#000000', // Placeholder cinza
       // colorBorder: '#000000',
+      controlHeightLG: '50px', // Define a altura dos componentes grandes
       algorithm: defaultAlgorithm,
     },
   },
@@ -26,7 +27,6 @@ const Themes = {
       // colorText: '#ffffff', // não pega todos os textos
       colorTextBase: '#ffffff',
       colorBgBase: '#353535',
-      colorBackground: '#1a1a1a',
       // borderRadius: '4px',
       // colorSuccess: '#52c41a',
       // colorWarning: '#faad14',
@@ -35,7 +35,11 @@ const Themes = {
       // colorBgContainerDisabled: '#505050',
       colorBgElevated: '#353535',
       // colorTextPlaceholder: '#ffffff', // Placeholder cinza
-      algorithm: darkAlgorithm,
+      controlHeightLG: '50px', // Define a altura dos componentes grandes
+      // paddingXXS: '4px', // Define o padding extra pequeno
+      // borderRadiusSM: '14px', // Define o border radius pequeno
+
+      algorithm: [theme.darkAlgorithm, theme.compactAlgorithm]
     },
   },
   gamecube: {
@@ -43,17 +47,21 @@ const Themes = {
       colorPrimary: '#6A5ACD',
       colorTextBase: '#F8D030',
       colorBgBase: '#483D8B',
-      // colorBackground: '#483D8B',
       borderRadius: '20px',
       colorSuccess: '#78C850', // Verde
       colorWarning: '#F8D030', // Amarelo
-      colorError: '#F08030', // Vermelho
-      colorBgContainer: '#088A08',
+      colorError: '#ff3333', // Vermelho
+      // colorBgContainer: '#088A08',
       colorBgContainerDisabled: '#2c2c2c',
-      colorBgElevated: '#6a5acd',
+      colorBgElevated: '#04B45F',
       colorFill: '#e60012',
       // colorTextPlaceholder: '#ffffff',
-      colorBorder: '#F8D030',
+      colorBorder: '#ff3333 ',
+      controlHeightLG: '50px', // Aumenta a altura dos botões grandes
+      // paddingXXS: '4px',
+      // borderRadiusSm: '4px',
+      // controlHeightSM: '32px', // Aumenta a altura dos botões pequenos
+      // controlHeight: '50px', // Aumenta a altura dos botões padrão
     },
   },
   nintendo: {
@@ -61,13 +69,12 @@ const Themes = {
       colorPrimary: '#e60012', // Cor primaria
       colorTextBase: '#FFFFFF', // Cor textos
       colorBgBase: '#D8D8D8',
-      // colorBackground: '#808080',
       borderRadius: '0px', // Mais quadrado
       colorSuccess: '#52c41a',
       colorWarning: '#faad14',
       colorError: '#f5222d',
-      colorBgContainer: '#000000', // Cor de fundo dos botões e inputs
-      colorBgContainerDisabled: '#505050', // Cor de fundo desabilitada dos botões e inputs
+      colorBgContainer: '#505050', // Cor de fundo dos botões e inputs
+      colorBgContainerDisabled: '#D8D8D8', // Cor de fundo desabilitada dos botões e inputs
       colorBgElevated: '#000000', // Cor de fundo dos menus suspensos
       colorTextPlaceholder: '#FFFFFF', // Placeholder cinza
       colorFill: '#e60012',
@@ -79,7 +86,6 @@ const Themes = {
     token: {
       colorPrimary: '#007BFF',
       colorTextBase: '#ffffff',
-      // colorBackground: '#0056b3',
       colorBgBase: '#0080FF',
       borderRadius: '6px',
       colorSuccess: '#52c41a',
@@ -87,7 +93,7 @@ const Themes = {
       colorError: '#f5222d',
       colorBgContainer: '#0489B1',
       colorBgContainerDisabled: '#003f7f',
-      colorBgElevated: '#0489B1',
+      colorBgElevated: '#045FB4',
       // colorTextPlaceholder: '#ffffff',
     },
   },
@@ -102,7 +108,7 @@ const Themes = {
       colorError: '#f5222d',
       colorBgContainer: '#E0E0E0',
       colorBgContainerDisabled: '#B0B0B0',
-      colorBgElevated: '#E0E0E0',
+      colorBgElevated: '#6E6E6E',
       // colorTextPlaceholder: '#000000',
     },
   },

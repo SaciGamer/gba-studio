@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DownOutlined, RightOutlined, PlusOutlined, SearchOutlined, CaretRightOutlined, CaretRightFilled, CaretDownFilled, DollarCircleOutlined, CodeSandboxOutlined, PaperClipOutlined, JavaScriptOutlined, FileOutlined, FileTextOutlined, RadarChartOutlined, AppstoreAddOutlined, AppstoreOutlined, BuildOutlined } from '@ant-design/icons';
-import { Input, Layout, Splitter, Flex } from 'antd';
+import { Input, Layout, Splitter, Flex, theme, Collapse, CollapseProps, Affix, Slider } from 'antd';
 import { useBlockContext } from './BlockContext.tsx';
+import { AntdToken } from '../components/common/AntDToken.ts';
+import CollapsePanel from 'antd/es/collapse/CollapsePanel';
+import Panel from 'antd/es/splitter/Panel';
 
 const { Header, Sider, Content } = Layout;
 
@@ -26,6 +29,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ selectBlock, selectedBlockId }) =
 
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const searchInputRef = useRef<any>(null);
+  const { token } = AntdToken();
 
   const toggleSection = (section: string) => {
     switch (section) {
@@ -61,29 +65,49 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ selectBlock, selectedBlockId }) =
     }
   }, [isSearchVisible]); 
 
+  const [sizes, setSizes] = useState([30, 10, 10]); // Tamanhos iniciais dos Splitter Panels
+
+  const handleDragEnd = (newSizes: any) => {
+    console.log("..: Resize do Splitter %d, painel1: %s, painel2: %s", newSizes, newSizes[1], newSizes[2]);
+    setSizes(newSizes);
+    if (newSizes[0] <= 6) { // Verificar se o primeiro painel atingiu o mínimo
+      toggleSection('scene'); // Chamar a função de colapsar
+    }
+    if (newSizes[1] <= 6) { // Verificar se o segundo painel atingiu o mínimo
+      toggleSection('scripts'); // Chamar a função de colapsar
+    }
+    if (newSizes[2] <= 6) { // Verificar se o terceiro painel atingiu o mínimo
+      toggleSection('variables'); // Chamar a função de colapsar
+    }
+  };
+
   return (
-    <Content className='dark-mode'>
-      <Splitter style={{ height: '100%' }} layout="vertical">
-        <Splitter.Panel defaultSize="8%" min="8%" max="90%">
-          <Content>
-            <div className="p-2 text-mode flex justify-between items-center">
+      <Splitter style={{ height: '100%', background: token.colorBgBase }} layout="vertical" onResizeEnd={handleDragEnd}>
+        <Splitter.Panel defaultSize="30%" min="6%" max="95%">
+          <Affix offsetTop={65}>
+            <div className="p-2 text-mode" style={{ position: 'sticky', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: token.colorBgMask}}>
               <div className="flex items-center" onClick={() => toggleSection('scenes')}>
                 {isScenesOpen ? <CaretDownFilled /> : <CaretRightFilled />}
                 <h2 className="font-bold ml-2">SCENES</h2>
               </div>
               <div className="flex items-center">
                 <PlusOutlined className="ml-2 cursor-pointer" onClick={(e) => { e.stopPropagation(); addBlockToGrid(-1, "New Scene Block Left Panel") }} />
-                <SearchOutlined className={`ml-2 p-1 ${isSearchVisible ? 'bg-blue-300 bordArredondada' : ''}`} onClick={handleSearchClick}/>
+                <SearchOutlined className={`ml-2 p-1`} style={{backgroundColor: isSearchVisible ? token.colorPrimary : 'transparent'}} onClick={handleSearchClick}/>
               </div>
-              
             </div>
-            
-            <div className="p-2 text-mode" >
+          </Affix>
+          <Content style={{ overflowY: 'auto', height: 'calc(100% - 35px)' }}>  {/* Ajustando contêiner de rolagem */}
+          <div className="p-2 text-mode" >
               {isScenesOpen && (
                 <div>
-                  {isSearchVisible && <Input placeholder="Search scenes" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="mb-2 mt-2" style={{ borderRadius: `15px`}}/>}
+                  {isSearchVisible && <Input placeholder="Search scenes" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="mb-2" style={{ borderRadius: token.borderRadius }}/>}
                   {filteredBlocks.map(block => (
-                    <div key={block.id} onClick={() => selectBlock(block.id)} className={`${selectedBlockId === block.id ? 'bg-blue-300 bordArredondada' : ''}`}>
+                    <div key={block.id} onClick={() => selectBlock(block.id)} 
+                      style={{
+                        backgroundColor: selectedBlockId === block.id ? token.colorPrimary : token.colorBgBase, 
+                        borderRadius: token.borderRadius
+                      }}
+                    >
                       <CaretRightFilled /><BuildOutlined className='mr-1'/><span>{block.title}</span>
                     </div>
                   ))}
@@ -92,19 +116,19 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ selectBlock, selectedBlockId }) =
             </div> 
           </Content>
         </Splitter.Panel>
-        <Splitter.Panel defaultSize="8%" min="8%" max="90%">
+        <Splitter.Panel defaultSize="10%" min="6%" max="90%">
           <Content>
-            <div className="p-2 text-mode">
-              <div className="flex justify-between items-center">
+            <div className="p-2 text-mode" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: token.colorBgMask}}>
                 <div className="flex items-center" onClick={() => toggleSection('scripts')}>
-                  {isScenesOpen ? <CaretDownFilled /> : <CaretRightFilled />}
+                  {isScriptsOpen ? <CaretDownFilled /> : <CaretRightFilled />}
                   <h2 className="font-bold ml-2">SCRIPTS</h2>
                 </div>
                 <div className="flex items-center">
                   <PlusOutlined className="ml-2" />
                   <SearchOutlined className={`ml-2 p-1`}/>
                 </div>
-              </div>
+            </div>
+            <div className="p-2 text-mode">
               {isScriptsOpen && (
                 <div>
                   {/* Add script list items here */}
@@ -115,18 +139,21 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ selectBlock, selectedBlockId }) =
             </div>
           </Content>
         </Splitter.Panel>
-        <Splitter.Panel defaultSize="8%" min="8%" max="90%">
-            <Content>
-              <div className="p-2 text-mode">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center" onClick={() => toggleSection('variables')}>
-                    {isScenesOpen ? <CaretDownFilled /> : <CaretRightFilled />}
-                    <h2 className="font-bold ml-2">VARIABLES</h2>
-                  </div>
-                  <div className="flex items-center">
-                    <SearchOutlined className={`ml-2 p-1`}/>
-                  </div>
+        <Splitter.Panel defaultSize="10%" min="6%" max="90%">
+            {/* <Content> */}
+            <Collapse bordered={false}>
+              <div className="p-2 text-mode" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: token.colorBgMask}}>
+                <div className="flex items-center" onClick={() => toggleSection('variables')}>
+                  {isVariablesOpen ? <CaretDownFilled /> : <CaretRightFilled />}
+                  <h2 className="font-bold ml-2">VARIABLES</h2>
                 </div>
+                <div className="flex items-center">
+                  <SearchOutlined className={`ml-2 p-1`}/>
+                </div>
+              </div>
+            </Collapse>
+              
+              <div className="p-2 text-mode">
                 {isVariablesOpen && (
                   <div>
                     {/* Add variable list items here */}
@@ -135,10 +162,9 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ selectBlock, selectedBlockId }) =
                   </div>
                 )}
               </div>
-            </Content>
+            {/* </Content> */}
         </Splitter.Panel>
       </Splitter>
-    </Content>
   );
 };
 

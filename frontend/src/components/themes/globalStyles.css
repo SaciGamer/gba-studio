@@ -1,6 +1,10 @@
 :root {
   /* --primary-color: #ffa500; */
-  --background-color: #e4e4e4;
+  --background-color: #353535;
+  --ant-control-height-lg: 50px; /* Define a altura dos componentes grandes */
+  --ant-padding-xxs: 8px;
+  --ant-border-radius-sm: 14px;
+
   /* --text-color: #000000; */
   /* --border-radius: 6px; */
 }
@@ -42,9 +46,14 @@
 }
 
 body, html {
-  /* background-color: var(--background-color); */
+  background-color: var(--background-color);
   /* color: var(--text-color); */
   /* border-radius: var(--border-radius); */
+
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* IE10+/Edge */
+  user-select: none; /* Standard */
 }
 
 
@@ -64,3 +73,14 @@ body, html {
 .ant-input-search-button {
   color: var(--search-button-text) !important;
 }
+
+/* .ant-float-btn-square {
+  height: var(--ant-control-height-lg);
+  width: var(--ant-control-height-lg);
+}
+
+.ant-float-btn-group-square-shadow .ant-float-btn-square .ant-float-btn-body {
+  width: calc(var(--ant-control-height-lg) - var(--ant-padding-xxs) * 2); 
+  height: calc(var(--ant-control-height-lg) - var(--ant-padding-xxs) * 2); 
+  border-radius: var(--ant-border-radius-sm);
+}  */

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { Select, Input, Divider } from 'antd';
+import { Select, Input, Divider, Typography } from 'antd';
 import { useBlockContext } from './BlockContext.tsx'; 
+import { Content } from 'antd/es/layout/layout';
+import Paragraph from 'antd/es/typography/Paragraph';
+import { AntdToken } from './common/AntDToken.ts';
 
 interface RightPanelProps {
   selectedBlockId: number | null;
@@ -11,6 +14,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedBlockId }) => {
   const selectedBlock = blocks.find(block => block.id === selectedBlockId);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [newTitle, setNewTitle] = useState(selectedBlock ? selectedBlock.title : '');
+  const { token } = AntdToken();
 
   const handleTitleClick = () => {
     setIsEditingTitle(true);
@@ -18,6 +22,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedBlockId }) => {
   };
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("..: teste mudança: %s", e.target.value);
     setNewTitle(e.target.value);
   };
 
@@ -34,9 +39,20 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedBlockId }) => {
   const sceneTypes = ['Top Down', 'Platformer', 'Adventure', 'Shoot Em\'Up', 'Point Click', 'Logo'];
 
   return (
-    <div className="dark-mode p-4">
+    <Content className="p-4">
       {selectedBlock ? (
         <div>
+        {/* <Paragraph
+          editable={{
+            tooltip: 'click to edit text',
+            // onChange: (string => handleTitleChange),
+            triggerType: ['text'],
+            icon: null
+            // enterIcon: null,
+          }}
+        >
+            {newTitle}
+        </Paragraph> */}
           {isEditingTitle ? (
             <Input
               autoFocus
@@ -46,9 +62,9 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedBlockId }) => {
               onPressEnter={handleTitleBlur}
             />
           ) : (
-            <h2 className="font-bold mb-2 highlight editable-element" onClick={handleTitleClick}>
+            <Typography.Title level={5} style={{ margin: 0 }} onClick={handleTitleClick} >
               {selectedBlock.title}
-            </h2>
+            </Typography.Title>
           )}
           <Divider className="my-4"/>
           <div className="mb-4">
@@ -70,7 +86,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedBlockId }) => {
           <h2 className="font-bold mb-2">Selecione um elemento para ver suas propriedades</h2>
         </div>
       )}
-    </div>
+    </Content>
   );
 };
 

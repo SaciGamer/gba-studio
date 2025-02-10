@@ -27,6 +27,7 @@
     "react-dom": "^18.2.0",
     "react-draggable": "^4.4.6",
     "react-grid-layout": "^1.4.4",
+    "react-router-dom": "^6.27.0",
     "react-scripts": "5.0.1",
     "react-split": "^2.0.14",
     "react-zoom-pan-pinch": "^3.6.1",

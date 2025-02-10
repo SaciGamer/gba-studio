@@ -6,6 +6,7 @@ import DragAndDrop from './DragAndDrop.tsx'
 import Grid from './Grid.tsx';
 import GameElement from './GameElement.tsx';
 import { App, Button } from 'antd';
+import { AntdToken } from '../common/AntDToken.ts';
 
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 
@@ -14,6 +15,8 @@ const titleHeight = 82; // Altura do Titulo
 const leftLimite = 106
 
 const GameWorld = () => {
+  const { token } = AntdToken();
+
   const [elements, setElements] = useState<IElement[]>([]);
   const [selectedElement, setSelectedElement] = useState(null);
   const [worldSize, setWorldSize] = useState({ width: 800, height: 800 });
@@ -272,10 +275,10 @@ const GameWorld = () => {
         }}
         pinch={{ disabled: false }}
       >
-        
         <TransformComponent>
-        
-          <div  className="game-world" /*onMouseDown={handleMouseDown}*/ style={{/*background: 'lightblue',*/overflow: 'scroll', width: worldSize.width, height: worldSize.height, }}>
+          <div  className="game-world" /*onMouseDown={handleMouseDown}*/ 
+            style={{background: token.colorBgContainer, overflow: 'scroll', width: worldSize.width, height: worldSize.height, }}
+          >
               <DragAndDrop onDrop={(event) => handleDrop(event, state.scale)} height={worldSize.height + titleHeight} width={worldSize.width + leftLimite} />
               {elements.map((element) => (
                 <GameElement 

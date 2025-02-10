@@ -1,38 +1,14 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-
-/*
-body {
-  @apply bg-light-primary text-light-secondary;
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+body, html {
+    -webkit-user-select: none; /* Safari */
+    -moz-user-select: none; /* Firefox */
+    -ms-user-select: none; /* IE10+/Edge */
+    user-select: none; /* Standard */
 }
 
-.dark-mode body {
-  @apply bg-dark-primary text-dark-secondary;
+html, body, #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    /* padding: 0; */
+    overflow: hidden;
 }
-
-.theme-gamecube body {
-  @apply bg-gamecube-primary text-gamecube-secondary;
-}
-
-.theme-nintendo body {
-  @apply bg-nintendo-primary text-nintendo-secondary;
-}
-
-.theme-blue body {
-  @apply bg-blue-primary text-blue-secondary;
-}
-
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-}
-    
-*/

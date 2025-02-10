@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
-import { Menu, Dropdown, Input, Button, Tooltip } from 'antd';
+import { Menu, Dropdown, Input, Button, Tooltip, Layout } from 'antd';
 import { DownOutlined, FolderOpenOutlined, ExportOutlined, PlaySquareOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useZoomContext } from './ZoomContext.tsx';
+import { AntdToken } from '../components/common/AntDToken.ts';
+
+const { Header } = Layout;
 
 const TopBar: React.FC = () => {
+  const { token } = AntdToken();
+
   const { zoomLevel, setZoomLevel } = useZoomContext(); 
 
   const resetZoom = () => {
@@ -47,7 +52,7 @@ const TopBar: React.FC = () => {
   );
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', padding: '10px', justifyContent: 'space-between' }}>
+    <Header style={{ display: 'flex', alignItems: 'center', padding: '10px', justifyContent: 'space-between', backgroundColor: token.colorBgBase }}>
       <div>
         <Dropdown overlay={menu} placement="bottomLeft" trigger={['click']}>
           <Button style={{ width: '150px', display: 'flex', justifyContent: 'space-between' }}>
@@ -56,7 +61,7 @@ const TopBar: React.FC = () => {
           </Button>
         </Dropdown>
       </div>
-      <div style={{ marginLeft: '5px', display: 'flex', alignItems: 'center' }}>
+      <div style={{ marginLeft: '5px', display: 'flex', alignItems: 'center', justifyContent: 'start' }}>
         <Tooltip title="Zoom Out">
           <Button onClick={() => handleZoomChange(-10)}>-</Button>
         </Tooltip>
@@ -91,7 +96,7 @@ const TopBar: React.FC = () => {
           <Button icon={<PlaySquareOutlined />} style={{ marginLeft: '15px', padding: '10px' }}></Button>
         </Tooltip>
       </div>
-    </div>
+    </Header >
   );
 };
 

@@ -35,7 +35,7 @@ const FlexibleGrid: React.FC<FlexibleGridProps> = ({ blocks = [], setBlocks, sel
             {blocks.map((block, index) => (
               <Draggable key={block.id} draggableId={block.id.toString()} index={index}>
                 {(provided) => (
-                  <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} className={`p-4 rounded shadow ${selectedBlockId === block.id ? 'bg-blue-300' : 'dark-mode'}`}>
+                  <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} className={`p-4 rounded shadow ${selectedBlockId === block.id ? 'bg-blue-300' : 'bg-gray-800'}`}>
                     {block.title}
                   </div>
                 )}

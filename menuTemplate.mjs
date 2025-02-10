@@ -1,16 +1,38 @@
 import { exec } from 'child_process';
+import { BrowserWindow } from 'electron';
 
 let isShowCollisionsChecked = true;
 let isShowNavigatorChecked = true;
 
 // Criar um template de menu personalizado
-const menuTemplate = (createAboutWindow, changeTheme) => [
+const menuTemplate = (createLauncherWindow, createAboutWindow, changeTheme) => [
     {
         label: 'File',
         submenu: [
-            { label: 'New Project', click: () => { console.log('..: New Project clicado'); } },
-            { label: 'Open...', click: () => { console.log('..: Open clicado'); } },
-            { label: 'Switch Project', click: () => { console.log('..: Switch Project clicado'); } },
+            { 
+                label: 'New Project', 
+                click: () => { 
+                    // console.log('..: New Project clicado'); 
+                    BrowserWindow.getAllWindows().forEach(window => window.close());
+                    createLauncherWindow('new_project');
+                } 
+            },
+            { 
+                label: 'Open...', 
+                click: () => { 
+                    console.log('..: Open clicado'); 
+                    BrowserWindow.getAllWindows().forEach(window => window.close());
+                    window.electronAPI.send('open-project-window', filePath);
+                } 
+            },
+            { 
+                label: 'Switch Project', 
+                click: () => { 
+                    // console.log('..: Switch Project clicado'); 
+                    BrowserWindow.getAllWindows().forEach(window => window.close());
+                    createLauncherWindow('recent_project');
+                } 
+            },
             { label: 'Save', click: () => { console.log('..: save clicado'); } },
             { label: 'Save As...', click: () => { console.log('..: Save As clicado'); } },
             { type: 'separator' },
@@ -80,7 +102,7 @@ const menuTemplate = (createAboutWindow, changeTheme) => [
             { type: 'separator' },
             { 
             label: 'Theme', submenu: [
-                { label: 'System Default', type: 'checkbox', checked: true, click: (menuItem) => { updateTheme(menuItem, 'systemDefault', changeTheme); } },
+                { label: 'System Default', type: 'checkbox', checked: false, click: (menuItem) => { updateTheme(menuItem, 'systemDefault', changeTheme); } },
                 { type: 'separator' },
                 { label: 'Light', type: 'checkbox', checked: false, click: (menuItem) => { updateTheme(menuItem, 'light', changeTheme); } },
                 { label: 'Dark', type: 'checkbox', checked: false, click: (menuItem) => { updateTheme(menuItem, 'dark', changeTheme); } },
