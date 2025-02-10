@@ -18,7 +18,7 @@ const CentralEditor: React.FC<CentralEditorProps> = ({ selectedBlockId }) => {
   const { blocks, setBlocks } = useBlockContext();
 
   return (
-    <Content className='dark-mode'>
+    <Content>
       {/* <Sider>
         <FloatButttonsGW />
       </Sider> */}

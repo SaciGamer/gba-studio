@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Flex, Splitter, Typography, Layout, notification, Affix } from 'antd';
+import { Flex, Splitter, Typography, Layout, notification, Affix, Slider } from 'antd';
 
 // import Layout from './components/Layout.tsx';
 import TopBar from './components/TopBar.tsx';
@@ -22,6 +22,8 @@ import FloatButttonsGW from './components/FloatButtonsGW.tsx';
 // import { ipcRenderer } from 'electron';
 
 // import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+
+import { AntdToken } from './components/common/AntDToken.ts';
 
 const { Header, Sider, Content, Footer } = Layout;
 
@@ -77,11 +79,13 @@ const App: React.FC = () => {
 
   const [top, setTop] = React.useState<number>(80);
 
+  const { token } = AntdToken();
+
   return (
     <ConfigProvider theme={theme}>
       <AntDApp>
         <ZoomProvider>
-          <div>
+        <Layout>
             <div>
               {/* <button style={{ width: '150px', display: 'flex', justifyContent: 'space-between' }} onClick={handleCompile}>
                 Compilar Projeto
@@ -93,9 +97,12 @@ const App: React.FC = () => {
               <TopBar />
               <BlockProvider>
                 <Layout style={{ height: '100%', boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)' }}>
+                {/* <Sider  style={{ background: token.colorBgContainer }}>
+                  
+                </Sider> */}
                   <Splitter style={{ height: '100%' }}>
                     <Splitter.Panel defaultSize="25%" min="15%" max="40%">
-                        <LeftPanelWrapper selectBlock={setSelectedBlockId} selectedBlockId={selectedBlockId} />
+                      <LeftPanelWrapper selectBlock={setSelectedBlockId} selectedBlockId={selectedBlockId} />
                     </Splitter.Panel>
                     <Splitter.Panel>
                       <Splitter layout="vertical">
@@ -105,10 +112,13 @@ const App: React.FC = () => {
                               <FloatButttonsGW />
                             </Affix>
                           </Sider>
+                          {/* <Layout style={{ padding: '0 24px 24px' }}> */}
                           <Content>
                               <GameWorld />
                           </Content>
-                          {/* <CentralEditor selectedBlockId={selectedBlockId} /> */}
+                          {/* </Layout> */}
+                          
+                          <CentralEditor selectedBlockId={selectedBlockId} />
                         </Splitter.Panel>
                         <Splitter.Panel defaultSize="25%" min="25%" max="60%">
                           {/* <Footer> */}
@@ -118,16 +128,14 @@ const App: React.FC = () => {
                       </Splitter>
                     </Splitter.Panel>
                     <Splitter.Panel defaultSize="16%" min="16%" max="40%">
-                      <Sider>
-                        <RightPanel selectedBlockId={selectedBlockId} />
-                      </Sider>
+                      <RightPanel selectedBlockId={selectedBlockId} />
                     </Splitter.Panel>
                   </Splitter>
                 </Layout>
               </BlockProvider>
               {/* <EmulatorView /> */}
             </div>
-          </div>
+        </Layout>
         </ZoomProvider>
         {/* </TransformWrapper> */}
       </AntDApp>
