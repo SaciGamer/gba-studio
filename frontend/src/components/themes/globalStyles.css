@@ -1,6 +1,6 @@
 :root {
   /* --primary-color: #ffa500; */
-  --background-color: #353535;
+  /* --background-color: #353535; */
   --ant-control-height-lg: 50px; /* Define a altura dos componentes grandes */
   --ant-padding-xxs: 8px;
   --ant-border-radius-sm: 14px;
@@ -46,7 +46,7 @@
 }
 
 body, html {
-  background-color: var(--background-color);
+  /* background-color: var(--background-color); */
   /* color: var(--text-color); */
   /* border-radius: var(--border-radius); */
 
@@ -84,3 +84,23 @@ body, html {
   height: calc(var(--ant-control-height-lg) - var(--ant-padding-xxs) * 2); 
   border-radius: var(--ant-border-radius-sm);
 }  */
+
+/* .ant-tree.custom-tree .ant-tree-switcher-noop {
+  display: none;
+} */
+
+.custom-tree .ant-tree-treenode {
+  padding: 5 !important;
+}
+
+.custom-tree .ant-tree-switcher-noop {
+  display: none !important;
+}
+
+/* .ant-collapse-content-box {
+  background-color: #1aeb2ca3;
+} */
+
+/* .ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background-color: #1aeb2ca3;
+} */

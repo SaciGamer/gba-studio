@@ -17,13 +17,10 @@ interface RecentProjectListProps {
   projects: Project[];
   handleRemoveProject: (title: string, path: string) => void;
   handleSelectProject: (path: string) => void;
-  selectedProject: string | null;
 }
 
-const RecentProjectList: React.FC<RecentProjectListProps> = ({ projects, handleRemoveProject, handleSelectProject, selectedProject, }) => {
-  const {
-    token: { colorPrimary, colorTextLabel, colorBgContainer, borderRadiusLG, fontSize },
-  } = AntdToken();
+const RecentProjectList: React.FC<RecentProjectListProps> = ({ projects, handleRemoveProject, handleSelectProject, }) => {
+  const { token } = AntdToken();
 
   const [listHoveredItem, setlistHoveredItem] = useState<number | null>(null);
   
@@ -39,6 +36,11 @@ const RecentProjectList: React.FC<RecentProjectListProps> = ({ projects, handleR
     }
   };
 
+  useEffect(() => {
+    // Salvar a aba "lastUsedSplashTab"
+    window.electronAPI.saveLastSplashTab('recent_project');
+  }, []);
+
   return (
     <Content style={{ height: 'calc(100vh - 10px)', overflowY: 'auto' }}>
       <List
@@ -48,7 +50,7 @@ const RecentProjectList: React.FC<RecentProjectListProps> = ({ projects, handleR
         renderItem={(item: Project, index) => (
         <List.Item 
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = colorPrimary;
+            e.currentTarget.style.backgroundColor = token.colorPrimary;
             setlistHoveredItem(index);
           }}
           onMouseLeave={(e) => {
@@ -60,7 +62,8 @@ const RecentProjectList: React.FC<RecentProjectListProps> = ({ projects, handleR
             // textSizeAdjust: '50%',
             display: 'flex', 
             alignItems: 'center',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            borderBlockEndColor: token.colorBgBase,
           }}
           actions={[]}
           onClick={() => handleProjectClick(index)}
@@ -92,7 +95,7 @@ const RecentProjectList: React.FC<RecentProjectListProps> = ({ projects, handleR
                 e.stopPropagation(); // Evita que o clique no botão "X" propague para o List.Item
                 handleRemoveProject(item.title, item.path);
               }}
-              style={{ backgroundColor: 'transparent', top: 0, right: 0, border: 'none', boxShadow: 'none' }}
+              style={{ backgroundColor: token.colorBgBase, top: -15, right: -10, border: 'none', boxShadow: 'none' }}
             />
           )}
         </List.Item>

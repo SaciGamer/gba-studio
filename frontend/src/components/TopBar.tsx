@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Dropdown, Input, Button, Tooltip, Layout } from 'antd';
+import { Menu, Dropdown, Input, Button, Tooltip, Layout, Space } from 'antd';
 import { DownOutlined, FolderOpenOutlined, ExportOutlined, PlaySquareOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useZoomContext } from './ZoomContext.tsx';
 import { AntdToken } from '../components/common/AntDToken.ts';
@@ -52,7 +52,7 @@ const TopBar: React.FC = () => {
   );
 
   return (
-    <Header style={{ display: 'flex', alignItems: 'center', padding: '10px', justifyContent: 'space-between', backgroundColor: token.colorBgBase }}>
+    <Space style={{ display: 'flex', alignItems: 'center', paddingInline: '10px', paddingBlock: '5px', justifyContent: 'space-between', backgroundColor: token.colorBgBase }}>
       <div>
         <Dropdown overlay={menu} placement="bottomLeft" trigger={['click']}>
           <Button style={{ width: '150px', display: 'flex', justifyContent: 'space-between' }}>
@@ -96,7 +96,7 @@ const TopBar: React.FC = () => {
           <Button icon={<PlaySquareOutlined />} style={{ marginLeft: '15px', padding: '10px' }}></Button>
         </Tooltip>
       </div>
-    </Header >
+    </Space >
   );
 };
 

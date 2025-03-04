@@ -10,22 +10,54 @@ import { compileGBA } from './scripts/compile-gba.mjs';
 import menuTemplate from './menuTemplate.mjs'
 
 import { configurarPreferenceHandlers, getPreferences, updatePreferences } from './handlers/preferenceHandlers.mjs';
+import windowStateKeeper from 'electron-window-state';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+let splashWindow;
 let launcherWindow;
 let mainWindow;
 let aboutWindow;
 let currentTheme = getPreferences().theme;
 
+// Splash
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 660,
+    height: 460,
+    frame: false,
+    transparent: true,
+    icon: path.join(__dirname, 'icon/defaultIcon.ico'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js')
+    }
+  });
+
+  splashWindow.loadURL(
+    isDev
+      ? `http://localhost:3000/splash`
+      : `file://${path.join(__dirname, `frontend/build/splash.html?`)}`
+    );
+
+   // Após um tempo, fechar a splash screen e mostrar a janela principal
+   setTimeout(() => {
+    splashWindow.close();
+    launcherWindow.setAlwaysOnTop(true); // Garantir que a janela principal esteja sempre no topo
+    launcherWindow.show();
+    launcherWindow.focus();
+    launcherWindow.setAlwaysOnTop(false); // Desabilitar a configuração após trazer a janela para o topo
+  }, 3000); // 3 segundos
+}
+
 // Laucher
-function createLauncherWindow(selectTab) {
+export function createLauncherWindow(selectTab, isSplash) {
   launcherWindow = new BrowserWindow({
     width: 660,
     height: 460,
+    show: isSplash? false : true, // Não mostrar a janela principal inicialmente
     resizable: false,
-    icon: path.join(__dirname, 'icon/defaultImgIcon.png'),
+    icon: path.join(__dirname, 'icon/defaultIcon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false, // Importante para segurança
@@ -46,6 +78,17 @@ function createLauncherWindow(selectTab) {
       : `file://${path.join(__dirname, `frontend/build/launcher.html?tab=${encodeURI(selectTab)}`)}`
     );
 
+
+  // Detecta quando a janela perde o foco
+  launcherWindow.on('blur', () => {
+    launcherWindow.webContents.send('window-blurred');
+  });
+
+  // Detecta quando a janela ganha o foco
+  launcherWindow.on('focus', () => {
+    launcherWindow.webContents.send('window-focused');
+  });
+
   launcherWindow.on('closed', () => {
     launcherWindow = null;
   });
@@ -53,9 +96,21 @@ function createLauncherWindow(selectTab) {
 
 // Criar Janela Programa
 function createProjectWindow(filePath) {
+  // Carregar o estado anterior da janela
+  const engineWindowState = windowStateKeeper({
+    defaultWidth: 1200,
+    defaultHeight: 800
+  });
+
+
+  // Criar a janela usando o estado
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    // Inserindo tamanho salvo da tela
+    x: engineWindowState.x,
+    y: engineWindowState.y,
+    width: engineWindowState.width,
+    height: engineWindowState.height,
+
     icon: path.join(__dirname, 'icon/defaultImgIcon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -67,6 +122,9 @@ function createProjectWindow(filePath) {
     minWidth: 800,  // Largura mínima
     minHeight: 600, // Altura mínima
   });
+
+  // Registrar a janela com o windowStateKeeper
+  engineWindowState.manage(mainWindow);
 
   // mainWindow.loadURL( `file://${path.join(__dirname, 'frontend/build/index.html')}`);
   mainWindow.loadURL(
@@ -80,13 +138,23 @@ function createProjectWindow(filePath) {
     mainWindow.webContents.openDevTools();
   }
 
+  // Detecta quando a janela perde o foco
+  mainWindow.on('blur', () => {
+    mainWindow.webContents.send('window-blurred');
+  });
+
+  // Detecta quando a janela ganha o foco
+  mainWindow.on('focus', () => {
+    mainWindow.webContents.send('window-focused');
+  });
+
   mainWindow.once('ready-to-show', () => {
     mainWindow.show(); // Show the window when the content has been loaded
   });
 }
 
 // Criar Janela de About
-const createAboutWindow = () => {
+export function createAboutWindow() {
   aboutWindow = new BrowserWindow({
     width: 418,
     height: 438,
@@ -101,43 +169,75 @@ const createAboutWindow = () => {
 
   aboutWindow.setMenu(null);
 
-  aboutWindow.webContents.once('dom-ready', () => {
+  aboutWindow.webContents.once('ready', () => {
     aboutWindow.webContents.send('change-theme', currentTheme);
   });
+
+  // // Detecta quando a janela perde o foco
+  // aboutWindow.on('blur', () => {
+  //   aboutWindow.webContents.send('window-blurred');
+  // });
+
+  // // Detecta quando a janela ganha o foco
+  // aboutWindow.on('focus', () => {
+  //   aboutWindow.webContents.send('window-focused');
+  // });
 
   aboutWindow.loadFile('about.html');
   aboutWindow.on('closed', () => {
     aboutWindow = null;
   });
-
 };
 
 // Função para trocar temas
-function changeTheme(theme) {
+export function changeTheme(theme) {
   currentTheme = theme;
-  // console.log("..: Função changeTheme chamada: %s", theme);
-  mainWindow.webContents.send('change-theme', theme);
+  console.log("..: Função changeTheme chamada: %s", currentTheme);
+
+  // Envia o evento para todas as janelas ativas
+  BrowserWindow.getAllWindows().forEach((window) => {
+    window.webContents.send('change-theme', theme);
+  });
+
   updatePreferences('theme', currentTheme)
 }
+
+ipcMain.on('change-theme', (event, theme) => {
+  console.log("..: Entrando evento %s", theme);
+  changeTheme(theme);
+});
 
 app.whenReady().then(() => {
   // createProjectWindow();
   // const menu = Menu.buildFromTemplate(menuTemplate(createAboutWindow, changeTheme));
   // Definir o menu da aplicação
   // Menu.setApplicationMenu(menu)
-  createLauncherWindow();
+  createSplashWindow();
+  createLauncherWindow(null, true);
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createLauncherWindow();
+  }
 });
 
 // IPC para comunicação entre janelas
 ipcMain.on('load-project-window', (event, filePath) => {
-  
+  loadProject(filePath);
+});
+
+function loadProject(filePath) {
   if (launcherWindow) {
     console.log('..: Fechando Launcher')
     launcherWindow.close();
+  } else if (mainWindow) {
+    console.log('..: Fechando mainWindow')
+    mainWindow.close();
   }
 
   // Criar o menu a partir do template
-  const menu = Menu.buildFromTemplate(menuTemplate(createLauncherWindow, createAboutWindow, changeTheme));
+  const menu = Menu.buildFromTemplate(menuTemplate());
   // Definir o menu da aplicação
   Menu.setApplicationMenu(menu)
 
@@ -158,17 +258,11 @@ ipcMain.on('load-project-window', (event, filePath) => {
   updatePreferences('recentProjects', { title: file  , path: directory});
 
   createProjectWindow(filePath);
-});
+};
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
-  }
-});
-
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createLauncherWindow();
   }
 });
 
@@ -365,7 +459,7 @@ ipcMain.on('open-project-window', async (event) => {
       const directory = path.dirname(filePath);
       updatePreferences('recentProjects', { title: file, path: directory});
 
-      event.sender.send('selected-project-file', filePath);
+      loadProject(filePath);
     }
   } catch (error) {
     console.error('Error opening project file dialog:', error);

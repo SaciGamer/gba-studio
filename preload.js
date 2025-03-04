@@ -7,7 +7,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   send: (channel, data) => ipcRenderer.send(channel, data),
   removeListener: (channel, listener) => ipcRenderer.removeListener(channel, listener),
   // Customized ------------------------------------------
-  changeTheme: (theme) => ipcRenderer.send('change-theme', theme),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   createProjectPath: (projectPath) => ipcRenderer.invoke('create-project-path', projectPath),
   checkProjectFile: (projectPath) => ipcRenderer.invoke('check-project-file', projectPath),
@@ -15,6 +14,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removePreferences: (key, value) => ipcRenderer.invoke('removePreferences', key, value),
   loadLastUsedPath: () => ipcRenderer.invoke('loadLastUsedPath'),
   saveLastUsedPath: (lastPath) => ipcRenderer.invoke('lastUsedPath', lastPath),
+  loadLastSplashTab: () => ipcRenderer.invoke('loadLastUsedSplashTab'),
+  saveLastSplashTab: (lastSplashTab) => ipcRenderer.invoke('lastUsedSplashTab', lastSplashTab),
+  saveLastPositionSplitters: (lastPositionSplitters) => ipcRenderer.invoke('lastPositionSplitters', lastPositionSplitters),
+  loadLastPositionSplitters: () => ipcRenderer.invoke('loadLastPositionSplitters'),
 });
 
 // contextBridge.exposeInMainWorld('api', {

@@ -15,9 +15,7 @@ const templates = [
 ];
 
 const NewProjectForm = () => {
-  const {
-    token: { colorBgContainer, borderRadiusLG, colorSuccess, colorPrimary },
-  } = AntdToken();
+  const { token } = AntdToken();
     
   const [form] = Form.useForm();
 //   const [selectedTemplate, setSelectedTemplate] = useState(templates[0].value);
@@ -43,8 +41,12 @@ const NewProjectForm = () => {
   };
 
   useEffect(() => {
+    // Salvar a aba "lastUsedSplashTab"
+    window.electronAPI.saveLastSplashTab('new_project');
+
+    // Carregar o último caminho utilizado
     window.electronAPI.loadLastUsedPath().then(lastPath => {
-      console.log('..: newProject tab lastPath: %s', lastPath)
+      console.log('..: newProject tab lastPath: ', lastPath)
       setPathForm(lastPath);
       form.setFieldsValue({ path: lastPath });
 
@@ -91,8 +93,8 @@ const NewProjectForm = () => {
         <Form.Item label="Template" name="template" rules={[{ required: true, message: 'Please select the template!' }]} style={{ marginBottom: '0px' }}>
           <Space size="middle">
             {templates.map(template => (
-              <div key={template.value} onClick={() => handleTemplateSelect(template.value)} style={{ border: selectedTemplate === template.value ? `3px solid ${colorPrimary}` : '3px solid transparent', borderRadius: borderRadiusLG, cursor: 'pointer', }}>
-                <img src={template.imgSrc} alt={template.value} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: borderRadiusLG }} />
+              <div key={template.value} onClick={() => handleTemplateSelect(template.value)} style={{ border: selectedTemplate === template.value ? `3px solid ${token.colorPrimary}` : '3px solid transparent', borderRadius: token.borderRadiusLG, cursor: 'pointer', }}>
+                <img src={template.imgSrc} alt={template.value} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: token.borderRadiusLG, }} />
                 {/* {selectedTemplate === template.value && <CheckCircleOutlined style={{ position: 'absolute', top: 5, right: 5, color: colorSuccess }} />} */}
               </div>
             ))}
@@ -103,7 +105,7 @@ const NewProjectForm = () => {
           {templates.find(template => template.value === selectedTemplate)?.description}
         </Form.Item>
         <Form.Item>
-          <Button loading={creating} disabled={creating} type="primary" htmlType="submit">
+          <Button loading={creating} disabled={creating} type="primary" htmlType="submit" style={{ border: 'none', boxShadow: 'none' }}>
             {creating ? 'Creating' : 'Create Project' } 
           </Button>
         </Form.Item>

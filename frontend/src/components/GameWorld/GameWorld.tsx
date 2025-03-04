@@ -5,16 +5,18 @@ import { IElement } from './interfaces/IElements.tsx';
 import DragAndDrop from './DragAndDrop.tsx'
 import Grid from './Grid.tsx';
 import GameElement from './GameElement.tsx';
-import { App, Button } from 'antd';
+import { Affix, App, Button, Row, Space } from 'antd';
 import { AntdToken } from '../common/AntDToken.ts';
 
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import Sider from 'antd/es/layout/Sider';
+import FloatButttonsGW from '../FloatButtonsGW.tsx';
 
 let gridValue = 15;
 const titleHeight = 82; // Altura do Titulo
 const leftLimite = 106
 
-const GameWorld = () => {
+const GameWorld: React.FC<{ resetPanelSize, setShowFloatButton, showFloatButton}> = ({ resetPanelSize, setShowFloatButton, showFloatButton }) => {
   const { token } = AntdToken();
 
   const [elements, setElements] = useState<IElement[]>([]);
@@ -256,6 +258,12 @@ const GameWorld = () => {
 
   return (  
     <DndContext onDragStart={handleMoveBackStart} onDragEnd={handleDragEnd}>
+      <Row >
+        <Affix offsetTop={65} onChange={(affixed) => console.log('AFIXADO:: ' + affixed)} >
+          <FloatButttonsGW onResetPanelSize={resetPanelSize} onShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton}/>
+        </Affix>
+      </Row>
+        
       <TransformWrapper
         initialScale={ 1 }
         minScale={ 0.5 } // Ajuste o nível mínimo de zoom out
@@ -290,7 +298,6 @@ const GameWorld = () => {
               ))}
           </div>
           <Grid size={gridValue} width={worldSize.width} height={worldSize.height} marginTop={titleHeight - 33} marginLeft={leftLimite} />
-         
         </TransformComponent>
       </TransformWrapper>
     </DndContext>

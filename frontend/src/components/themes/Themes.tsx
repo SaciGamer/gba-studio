@@ -1,4 +1,4 @@
-import { theme } from 'antd'
+import { theme, Tree } from 'antd'
 
 const { defaultAlgorithm, darkAlgorithm } = theme;
 
@@ -16,7 +16,7 @@ const Themes = {
       // colorBgContainerDisabled: '#d9d9d9',
       // colorBgElevated: '#ffffff',
       // colorTextPlaceholder: '#000000', // Placeholder cinza
-      // colorBorder: '#000000',
+      colorBorder: '#808080',
       controlHeightLG: '50px', // Define a altura dos componentes grandes
       algorithm: defaultAlgorithm,
     },
@@ -38,6 +38,27 @@ const Themes = {
       controlHeightLG: '50px', // Define a altura dos componentes grandes
       // paddingXXS: '4px', // Define o padding extra pequeno
       // borderRadiusSM: '14px', // Define o border radius pequeno
+
+      Tree: {
+        nodeSelectedBg: '#ffa500',
+        nodeHoverBg: '#353535',
+      },
+      
+      Collapse: {
+        // headerBg: '#6E6E6E', // Caso não use a config no painel
+        contentBg:'#353535', // caso precise trocar a cor do fundo do colapse
+        padding: 10,
+      },
+
+      // Splitter: {
+      //   splitBarDraggableSize: 100,
+      //   splitBarSize: 10,
+      //   splitTriggerSize: 100
+      // },
+
+      // floatBtnDefault: '#78C850',
+      // floatBtnBody: '#78C850',
+      // floatBtnIcon: '#78C850',
 
       algorithm: [theme.darkAlgorithm, theme.compactAlgorithm]
     },
@@ -80,6 +101,8 @@ const Themes = {
       colorFill: '#e60012',
       fontSize: 18,
       colorBorder: '#000000',
+
+      controlHeightLG: '50px',
     },
   },
   blue: {
@@ -95,6 +118,8 @@ const Themes = {
       colorBgContainerDisabled: '#003f7f',
       colorBgElevated: '#045FB4',
       // colorTextPlaceholder: '#ffffff',
+
+      controlHeightLG: '50px',
     },
   },
   silver: {
@@ -109,7 +134,10 @@ const Themes = {
       colorBgContainer: '#E0E0E0',
       colorBgContainerDisabled: '#B0B0B0',
       colorBgElevated: '#6E6E6E',
+      colorBorder: '#808080',
       // colorTextPlaceholder: '#000000',
+
+      controlHeightLG: '50px',
     },
   },
 };

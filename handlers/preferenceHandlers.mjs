@@ -5,9 +5,8 @@ const __store = new Store();
 
 // Defina um objeto de preferência padrão 
 const defaultPreferences = { 
-  __lastUsedPath: '',
   theme: 'systemDefault', 
-  language: 'pt-BR', 
+  language: 'pt_BR', 
   recentProjects: [],
 };
 
@@ -90,9 +89,40 @@ function saveLastUsedPath(lastPath) {
 }
 // LAST USED PATH END ---------------------------------------------
 
+// LAST USED SPLASH TAB -------------------------------------------------
+function getLastUsedSplashTab() {
+  return __store.get('__lastUsedSplashTab', ''); 
+}
+
+function saveUsedSplashTab(lastSplashTab) {
+  // console.log('..: saveUsedSplashTab lastSplashTab: %s', lastSplashTab);
+  __store.set('__lastUsedSplashTab', lastSplashTab);
+}
+// LAST USED SPLASH TAB END ---------------------------------------------
+
+// LAST POSITION SPLITTERS -------------------------------------------------
+function saveLastPositionSplitters(lastPositionSplitters) {
+  // console.log('..: saveLastPositionSplitters lastPositionSplitters: %s', lastPositionSplitters);
+  __store.set('navigatorSidebarWidth', lastPositionSplitters[0]);
+  __store.set('worldSidebarWidth', lastPositionSplitters[1]);
+  __store.set('filesSidebarWidth', lastPositionSplitters[2]);
+}
+
+function getLastPositionSplitters() {
+  return [__store.get('navigatorSidebarWidth', 200), __store.get('worldSidebarWidth', 200), __store.get('filesSidebarWidth', 200)];
+}
+// LAST POSITION SPLITTERS END ---------------------------------------------
+
 export function configurarPreferenceHandlers() {
   ipcMain.handle('loadPreferences', () => getPreferences());
   ipcMain.handle('removePreferences', (event, key, value) => deletePreference(key, value));
+  //--
   ipcMain.handle('loadLastUsedPath', () => getLastUsedPath());
   ipcMain.handle('lastUsedPath', (event, lastPath) => saveLastUsedPath(lastPath));
+  //--
+  ipcMain.handle('loadLastUsedSplashTab', () => getLastUsedSplashTab());
+  ipcMain.handle('lastUsedSplashTab', (event, lastSplashTab) => saveUsedSplashTab(lastSplashTab));
+  //--
+  ipcMain.handle('lastPositionSplitters', (event, lastPositionSplitters) => saveLastPositionSplitters(lastPositionSplitters));
+  ipcMain.handle('loadLastPositionSplitters', () => getLastPositionSplitters());
 }
