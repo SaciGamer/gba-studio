@@ -1,41 +1,101 @@
 {
   "name": "gba-studio",
-  "version": "1.0.0",
+  "author": "GBA Studio",
+  "productName": "GBA Studio",
   "description": "Project for creating and compiling GBA",
-  "main": "main.mjs",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
   "type": "module",
+  "main": "./dist/main/main.js",
+  "_moduleAliases": {
+    "@": "./dist/main"
+  },
+  "workspaces": [
+    "src/renderer/frontend",
+    "src/main"
+  ],
   "build": {
-    "icon": "icon/defaultImgIcon.png",
+    "appId": "com.gba-studio.app",
+    "productName": "GBA Studio",
+    "directories": {
+      "output": "release",
+      "buildResources": "icon"
+    },
+    "files": [
+      "dist/**/*",
+      "icon/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "icon": "icon/defaultIcon.icns",
+      "target": "dmg"
+    },
     "win": {
-      "icon": "icon/defaultIcon.ico"
-    }
+      "icon": "icon/defaultIcon.ico",
+      "target": [
+        "nsis"
+      ],
+      "signAndEditExecutable": false
+    },
+    "linux": {
+      "icon": "icon/defaultImgIcon.png"
+    },
+    "asar": true,
+    "asarUnpack": []
   },
+  "files": [
+    "dist/**/*",
+    "icon/**/*",
+    "package.json"
+  ],
   "scripts": {
-    "start": "concurrently \"cd frontend && npm start\" \"wait-on http://localhost:3000 && electron . --enable-logging\"",
-    "start:react": "cd frontend && npm start",
-    "build": "cd frontend && npm run build",
-    "electron": "wait-on http://localhost:3000 && electron .",
-    "test": "cd frontend && npm test",
-    "eject": "cd frontend && npm run eject",
+    "start": "concurrently \"yarn workspace @gba-studio/frontend dev\" \"wait-on --httpTimeout 5000 http://localhost:5173 && electron .\"",
+    "dev": "concurrently \"yarn workspace @gba-studio/frontend dev\" \"wait-on --httpTimeout 5000 http://localhost:5173 && electron .\"",
+    "build": "rm -rf dist && yarn build:main && yarn build:renderer && electron-builder",
+    "build:main": "yarn workspace @gba-studio/main build",
+    "build:renderer": "yarn workspace @gba-studio/frontend build",
+    "preview": "yarn workspace @gba-studio/frontend preview && electron .",
     "build-gba": "cd gba-project && make rebuild && cd .."
-  },
-  "keywords": [],
-  "author": "sacigamer.dev@gmail.com",
-  "license": "ISC",
-  "devDependencies": {
-    "autoprefixer": "^10.4.20",
-    "concurrently": "^9.1.2",
-    "electron": "^34.1.1",
-    "wait-on": "^8.0.2"
   },
   "dependencies": {
     "antd": "^5.24.0",
+    "assert": "^2.1.0",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.0",
     "electron-is-dev": "^3.0.1",
-    "electron-store": "^10.0.0",
+    "electron-store": "^10.0.1",
     "electron-window-state": "^5.0.3",
-    "os": "^0.1.2",
-    "path-browserify": "^1.0.1",
+    "https-browserify": "^1.0.0",
+    "os-browserify": "^0.3.0",
     "process": "^0.11.10",
-    "react-scripts": "^5.0.1"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "stream-browserify": "^3.0.0",
+    "stream-http": "^3.2.0",
+    "url": "^0.11.4",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@babel/preset-react": "^7.24.7",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "@types/electron-store": "^3.2.0",
+    "@types/node": "^20.11.19",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.2",
+    "customize-cra": "^1.0.0",
+    "electron": "^34.1.1",
+    "electron-builder": "^24.9.1",
+    "postcss": "^8.4.23",
+    "react-app-rewired": "^2.2.1",
+    "tailwindcss": "^3.3.2",
+    "typescript": "^5.2.2",
+    "vite": "^5.1.0",
+    "wait-on": "^8.0.2"
   }
 }
