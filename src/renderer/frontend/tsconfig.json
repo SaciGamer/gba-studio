@@ -1,0 +1,20 @@
+{
+    "extends": "../../../tsconfig.json",
+    "compilerOptions": {
+      "moduleResolution": "bundler",
+      "baseUrl": ".",
+      "composite": true,
+      "skipLibCheck": true,
+      "noEmit": true,
+      "allowSyntheticDefaultImports": true,
+      "types": ["vite/client", "node"],
+      "paths": {
+        "@/*": ["./*"] 
+      }
+    },
+    "include": [
+      "vite.config.ts",
+      "global.d.ts",
+      "./src/**/*",
+    ],
+  }

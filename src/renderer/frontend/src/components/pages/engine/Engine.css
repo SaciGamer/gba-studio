@@ -1,0 +1,198 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/*
+body {
+  @apply bg-light-primary text-light-secondary;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.dark-mode body {
+  @apply bg-dark-primary text-dark-secondary;
+}
+
+.theme-gamecube body {
+  @apply bg-gamecube-primary text-gamecube-secondary;
+}
+
+.theme-nintendo body {
+  @apply bg-nintendo-primary text-nintendo-secondary;
+}
+
+.theme-blue body {
+  @apply bg-blue-primary text-blue-secondary;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+    
+*/
+
+
+/* App.css ou styles.css */
+
+body, html {
+  background-color: #ececec;
+  color: #ffffff;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* IE10+/Edge */
+  user-select: none; /* Standard */
+}
+
+/* Permite seleção de texto em campos de entrada */
+input, textarea {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+.App {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.h-screen {
+  height: 100vh;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
+.text-white {
+  color: white;
+}
+
+.left-panel, .right-panel {
+  flex: 0 0 auto;
+  width: 250px; /* Ajuste conforme necessário */
+  /* background-color: #f0f0f0; */
+}
+
+.central-editor {
+  flex: 1;
+  overflow: auto;
+  /* background-color: #fff; */
+}
+
+.bottom-panel {
+  height: 100px; /* Ajuste conforme necessário */
+  /* background-color: #ddd; */
+}
+
+/* Estilos específicos para o modo dark */
+.dark-mode {
+  background-color: #4e4e4e;
+  color: #ffffff;
+}
+
+.dark-mode .bg-gba-dark {
+  background-color: #555555;
+}
+
+.dark-mode .text-mode {
+  color: #ffffff;
+}
+
+.dark-mode .left-panel, .dark-mode .right-panel {
+  background-color: #1e1e1e;
+}
+
+.dark-mode .central-editor {
+  background-color: #2e2e2e;
+}
+
+.dark-mode .bottom-panel {
+  background-color: #1e1e1e;
+}
+/* ---------------------------- */
+
+/* Estilos específicos para o modo light */
+.light-mode {
+  background-color: #ffffff;
+  color: #ffffff;
+}
+
+.light-mode .bg-gba-light {
+  background-color: #cacaca;
+}
+
+.light-mode .text-mode {
+  color: #030303;
+}
+
+.light-mode .left-panel, .light-mode .right-panel {
+  background-color: #ffffff;
+}
+
+.light-mode .central-editor {
+  background-color: #cfcfcf;
+}
+
+.light-mode .bottom-panel {
+  background-color: #cfcfcf;
+}
+/* ---------------------------- */
+
+.editable-element {
+  cursor: text;
+}
+
+h2.highlight {
+  border-radius: 5px;
+  padding: 5px;
+  transition: background-color 0.3s, color 0.3s, font-weight 0.3s, border-radius 0.3s;
+}
+
+h2.highlight:hover {
+  /*color: blue; /* Muda a cor do texto */
+  background-color: lightgray; /* Muda a cor de fundo */
+  font-weight: bold; /* Muda o peso da fonte */
+  /* cursor: pointer; /* Muda o cursor para um ponteiro */
+}
+
+.bordArredondada {
+  border-radius: 3px;
+}
+
+.game-world {
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  overflow: hidden;
+}
+
+.handle {
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  padding: 5px;
+  cursor: move;
+}
+
+.selected {
+  outline: 2px solid blue;
+}

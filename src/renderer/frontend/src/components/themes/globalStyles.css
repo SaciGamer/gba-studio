@@ -1,0 +1,106 @@
+:root {
+  /* --primary-color: #ffa500; */
+  /* --background-color: #353535; */
+  --ant-control-height-lg: 50px; /* Define a altura dos componentes grandes */
+  --ant-padding-xxs: 8px;
+  --ant-border-radius-sm: 14px;
+
+  /* --text-color: #000000; */
+  /* --border-radius: 6px; */
+}
+
+[data-theme='dark'] {
+  /* --primary-color: #ffa500; */
+  --background-color: #353535;
+  /* --text-color: #ffffff; */
+  /* --border-radius: 4px; */
+}
+
+[data-theme='nintendo'] {
+  /* --primary-color: #e60012; */
+  --background-color: #808080;
+  /* --text-color: #ffffff; */
+  /* --border-radius: 0px; */
+  /* --search-button-bg: #E60012; // Cor de fundo do botão de pesquisa */
+}
+
+[data-theme='gamecube'] {
+  /* --primary-color: #6A5ACD; */
+  --background-color: #483D8B;
+  /* --text-color: #ffffff; */
+  /* --border-radius: 8px; */
+}
+
+[data-theme='blue'] {
+  /* --primary-color: #007BFF; */
+  --background-color: #0056b3;
+  /* --text-color: #ffffff; */
+  /* --border-radius: 6px; */
+}
+
+[data-theme='silver'] {
+  /* --primary-color: #b84f4f; */
+  --background-color: #bdbdbd;
+  /* --text-color: #000000; */
+  /* --border-radius: 4px; */
+}
+
+body, html {
+  /* background-color: var(--background-color); */
+  /* color: var(--text-color); */
+  /* border-radius: var(--border-radius); */
+
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* IE10+/Edge */
+  user-select: none; /* Standard */
+}
+
+
+/* CASO  for usar no elemento individual */
+.pixel-art {
+  image-rendering: optimizeSpeed;           /* Optimizando para velocidade (não suavizado) */
+  image-rendering: -moz-crisp-edges;        /* Firefox */
+  image-rendering: -o-crisp-edges;          /* Opera */
+  image-rendering: -webkit-optimize-contrast;/* Safari */
+  image-rendering: optimize-contrast;       /* CSS3 e Safari */
+  image-rendering: crisp-edges;             /* CSS4 */
+  image-rendering: pixelated;               /* CSS4 */
+  -ms-interpolation-mode: nearest-neighbor; /* IE */
+}
+
+/* Estilo específico para Input.Search */
+.ant-input-search-button {
+  color: var(--search-button-text) !important;
+}
+
+/* .ant-float-btn-square {
+  height: var(--ant-control-height-lg);
+  width: var(--ant-control-height-lg);
+}
+
+.ant-float-btn-group-square-shadow .ant-float-btn-square .ant-float-btn-body {
+  width: calc(var(--ant-control-height-lg) - var(--ant-padding-xxs) * 2); 
+  height: calc(var(--ant-control-height-lg) - var(--ant-padding-xxs) * 2); 
+  border-radius: var(--ant-border-radius-sm);
+}  */
+
+/* .ant-tree.custom-tree .ant-tree-switcher-noop {
+  display: none;
+} */
+
+.custom-tree .ant-tree-treenode {
+  padding: 5 !important;
+}
+
+.custom-tree .ant-tree-switcher-noop {
+  display: none !important;
+}
+
+/* .ant-collapse-content-box {
+  background-color: #1aeb2ca3;
+} */
+
+/* .ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background-color: #1aeb2ca3;
+} */
