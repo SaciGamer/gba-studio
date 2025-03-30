@@ -3,6 +3,7 @@ import { useDraggable } from '@dnd-kit/core';
 
 import { AntdToken } from '../common/AntDToken';
 import { elementStyle, titleStyle } from './GameElement.styles';
+import { Content } from 'antd/es/layout/layout';
 
 const GameElement = ({ id, title, background, x, y, width, height, isSelected, onSelect }: {
   id: any;
@@ -10,30 +11,38 @@ const GameElement = ({ id, title, background, x, y, width, height, isSelected, o
   background: any;
   x: any;
   y: any;
-  width: any;
-  height: any;
+  width?: any;
+  height?: any;
   isSelected: any;
   onSelect: any;
 }) => {
+    const { token } = AntdToken();
     // State para mouse sobre o elemento
     const [isHovered, setIsHovered] = useState(false);
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
     // State para armazenar o tamanho da imagem
     const [elementSize, setElementSize] = useState({ width: 0, height: 0 });
-    const { token } = AntdToken();
 
-    const computedElementStyle: CSSProperties = elementStyle(transform, background, elementSize.width || width, elementSize.height || height, x, y, isSelected, token);
+    const computedElementStyle: CSSProperties = elementStyle(transform, background, width || elementSize.width, height || elementSize.height, x, y, isSelected, token);
     const computedTitleStyle: CSSProperties = titleStyle(isSelected, isHovered, token);
 
     // Pegando informacoes da imagem
     useEffect(() => {
-        const img = new Image();
-        img.src = background;
-        img.onload = () => {
-          const { width, height } = img;
-          setElementSize({ width, height });
-        };
-      }, [background]);
+      const img = new Image();
+      console.log('..: GameElement criando image:', background);
+
+      img.src = background;
+      img.onload = () => {
+        const { width, height } = img;
+        setElementSize({ width, height });
+      };
+
+      img.onerror = () => {
+        setElementSize({ width: 240, height: 160 });
+        console.error(`Erro ao carregar a imagem: ${background}`);
+      };
+    
+    }, [background]);
 
     const contentListNoTitle: Record<string, React.ReactNode> = {
       article: <p>article content</p>,
@@ -70,7 +79,7 @@ const GameElement = ({ id, title, background, x, y, width, height, isSelected, o
     //   />
     // </Card>
       
-      <div 
+      <Content
         ref={setNodeRef} 
         className="game-element"
         style={computedElementStyle} 
@@ -80,13 +89,17 @@ const GameElement = ({ id, title, background, x, y, width, height, isSelected, o
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <div {...listeners} className="handle" style={computedTitleStyle}>
+        <Content {...listeners} className="handle-game-element" style={computedTitleStyle}>
           {title}
-        </div>
-        <div style={{...computedTitleStyle, bottom: '-4.5vh', borderTopLeftRadius: '0px', borderTopRightRadius: '0px', borderBottomLeftRadius: '15px', borderBottomRightRadius: '15px'}}>
-          <p>A: X/10 S: XX/96 T: X/30</p>
-        </div>
-      </div>
+        </Content>
+        {isSelected &&
+          <Content style={{...computedTitleStyle, bottom: height - 32, borderTopLeftRadius: '0px', borderTopRightRadius: '0px', borderBottomLeftRadius: token.borderRadius, borderBottomRightRadius: token.borderRadius}}>
+            A: X/10
+            S: XX/96 
+            T: X/30
+          </Content>
+        }
+      </Content>
     );
   };
 

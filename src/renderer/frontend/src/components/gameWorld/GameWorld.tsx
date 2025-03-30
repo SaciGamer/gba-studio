@@ -1,19 +1,21 @@
-import React, { useState, useCallback, useRef, useEffect, Component } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DndContext } from '@dnd-kit/core';
 import { v4 as uuidv4 } from 'uuid';
 import { IElement } from './interfaces/IElements';
 import DragAndDrop from './DragAndDrop'
 import Grid from './Grid';
 import GameElement from './GameElement';
-import { Affix, App, Button, Row, Space } from 'antd';
+import { Affix, App, Layout, Row, Space } from 'antd';
 import { AntdToken } from '../common/AntDToken';
 
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import FloatButttonsGW from '../FloatButtonsGW';
 import { Content } from 'antd/es/layout/layout';
-import { SmileOutlined } from '@ant-design/icons';
+import { CheckCircleFilled, IeCircleFilled, InfoCircleFilled, MinusCircleFilled, MinusCircleOutlined, SmileOutlined } from '@ant-design/icons';
 
-let gridValue = 15;
+import imgPlaceholder from '@/img/placeholder.png';
+
+let gridValue = 16;
 const titleHeight = 82; // Altura do Titulo
 const leftLimite = 106
 
@@ -28,6 +30,11 @@ interface IGameWorld {
   showFloatButton: boolean;
 }
 
+interface IBackgrounds {
+  images: string[];
+  localPath: string;
+}
+
 const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, showFloatButton }) => {
   const { token } = AntdToken();
 
@@ -38,12 +45,16 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   const [isMovedBackground, setIsMovedBackground] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [activeSubButton, setActiveSubButton] = useState<IActiveButton>({ activeButton: '', activeSubButton: '' });
+  const [backgrounds, setBackgrounds] = useState<IBackgrounds>();
+
+  let isDeleting = false;
 
   // Efeito deletar Elemento
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Delete' && selectedElement != null) {
-        console.log("..: Confirme deletando elemento!!")
+      if (event.key === 'Delete' && selectedElement != null && !isDeleting) {
+        console.log("..: Confirme deletando elemento!!", isDeleting)
+        isDeleting = true;
         showConfirm(selectedElement);
       }
     };
@@ -56,6 +67,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
 
   // Lógica para confirmação para deletar elemento
   const showConfirm = (id: string) => {
+    console.log("..: Show modal elemento!!", isDeleting)
     modal.confirm({
       title: 'Do you want to delete this item?',
       content: 'This action cannot be undone.',
@@ -66,9 +78,11 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
         notification.success({ message: 'Scene: ' + `${element[0].title}` + ' Deleted' });
         setElements(prevElements => prevElements.filter(el => el.id !== id));
         setSelectedElement(null);
+        isDeleting = false;
       },
       onCancel() {
         console.log('Cancel');
+        isDeleting = false;
       },
     });
   };
@@ -186,36 +200,113 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   //   }
   // }, []);
 
+  const handleImageUpload = async (file: File) => {
+    const isImage = file.type.startsWith("image/");
+    const fileName = file.name;
+
+    if (isImage) {
+      console.log("O arquivo é uma imagem.");
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          if (e.target && typeof e.target.result === 'string') {
+            
+            const data = e.target.result.split(',')[1]; // Remove o prefixo "data:image/..."
+          
+            console.log('..: Imagem fileName:', fileName);
+            console.log('..: Imagem base64:', data);
+            
+            const response = await window.electronAPI.saveImage(null, fileName, data);
+    
+            if (response.status === 'success') {
+              // alert(response.message);
+              notification.open({
+                message: `Saving image`,
+                description:
+                  `Image copied successfully: ${response.message}`,
+                  icon: <CheckCircleFilled style={{ color: token.colorSuccess }} />,
+              });
+            } else {
+              // alert(response.message);
+              notification.open({
+                message: `Saving image - ${response.message}`,
+                description:
+                  'Something went wrong',
+                  icon: <InfoCircleFilled style={{ color: token.colorError }} />,
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error trying to save image:', error);
+          message.error(`Error trying to save image: ${fileName}`);
+        }
+      };
+    
+      reader.readAsDataURL(file);
+    } else {
+      console.log("Tipo de arquivo inválido:", file.type);
+      message.error(`Invalid file type ${fileName}`);
+    }
+  };
+
   // Lógica para dropar imagem no projeto
   const handleDrop = (event: DragEvent, zoomScale: number) => {
     event.preventDefault(); // Previne o comportamento padrão de impedir o drop
+    
     const { clientX, clientY } = event;
     // Calcula a posição relativa ao GameWorld
     const gameWorldRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const relativeX = (clientX - gameWorldRect.left) / zoomScale;
-    const relativeY = (clientY - gameWorldRect.top) / zoomScale;
+    let relativeX = (clientX - gameWorldRect.left) / zoomScale;
+    let relativeY = (clientY - gameWorldRect.top) / zoomScale;
+
+    // Garante que as coordenadas fiquem dentro da grid
+    relativeX = Math.max(leftLimite, relativeX - (240 / 2));
+    relativeY = Math.max(titleHeight - 33, relativeY - (160 / 2));
 
     const files = event?.dataTransfer?.files != null ? Array.from(event.dataTransfer.files) : null;
 
-    files?.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target && typeof e.target.result === 'string') {
-          const newElement = {
-            id: uuidv4(), // Gerar UUID para cada novo elemento
-            title: 'SCENE ' + elements.length,
-            background: e.target.result,
-            x: relativeX, // Coordenada X do mouse
-            y: relativeY, // Coordenada Y do mouse
-            width: 0,
-            height: 0
-          };
-          setElements(prev => [...prev, newElement]);
-          message.success('SCENE ' + elements.length + ' adicionado!');
-        }
+    if(files && files.length > 0) {
+      files?.forEach(file => {
+        handleImageUpload(file);
+        // const reader = new FileReader();
+        // reader.onload = (e) => {
+        //   if (e.target && typeof e.target.result === 'string') {
+        //     const newElement = {
+        //       id: uuidv4(), // Gerar UUID para cada novo elemento
+        //       title: 'SCENE ' + elements.length,
+        //       background: e.target.result,
+        //       x: relativeX, // Coordenada X do mouse
+        //       y: relativeY, // Coordenada Y do mouse
+        //       width: 0,
+        //       height: 0
+        //     };
+        //     setElements(prev => [...prev, newElement]);
+        //     message.success('SCENE ' + elements.length + ' adicionado!');
+        //   }
+        // };
+        // reader.readAsDataURL(file);
+      });
+     
+    } else {
+      // Caso não seja drop criar nova scena
+      const index = elements.length === 0 ? 0 : elements[elements.length - 1].index + 1;
+      console.log('..: files backgrounds', backgrounds);
+      console.log('..: path backgrounds', `${backgrounds?.localPath.replace(/\\/g, '/')}/${backgrounds?.images[0]}`);
+      const background = backgrounds?.images.length != 0 ? `${backgrounds?.localPath.replace(/\\/g, '/')}/${backgrounds?.images[0]}` : imgPlaceholder;
+      const newElement = {
+        id: uuidv4(),
+        index: index,
+        title: 'SCENE ' + index,
+        background: background, // pegar imagem ou imagem padrão
+        x: relativeX,
+        y: relativeY,
+        width: 0,
+        height: 0
       };
-      reader.readAsDataURL(file);
-    });
+
+      setElements((prev) => [...prev, newElement]);
+    }
+
   };
 
   // ZOOOM ------------------------------------------
@@ -269,7 +360,6 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     }
   };
 
-
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(
     null
   );
@@ -281,25 +371,61 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       const rectX = e.nativeEvent.offsetX - 120*1.5; // Centraliza o retângulo
       const rectY = e.nativeEvent.offsetY - 80*1.5;  // Centraliza o retângulo
       setMousePos({ x: rectX, y: rectY });
+
+      // const contentRect = e.currentTarget.getBoundingClientRect();
+      // setMousePos({
+      //   x: e.clientX - contentRect.left * 2,
+      //   y: e.clientY - contentRect.top * 2,
+      // });
     }
   };
 
-  const handleMouseClick = () => {
+  const handleMouseClick = (event: any) => {
     if (mousePos && activeSubButton.activeSubButton === "Scene") {
+      event.stopPropagation();
       console.log("Scene criada em:", mousePos);
-      // Aqui você pode adicionar a lógica para criar a nova scene
+
+      handleDrop(event, state.scale)
+
       notification.open({
         message: 'Create New Scene',
-        description:
-          'Implementation is NOk in this moment',
-        icon: <SmileOutlined style={{ color: token.colorWarning }} />,
+        description: 'New Scene created!',
+        icon: <CheckCircleFilled style={{ color: token.colorSuccess }} />,
       });
+    } else {
+      handleClickOutside(event);
     }
   };
 
   const handleMouseLeave = () => {
     setMousePos(null); // Remove a silhueta quando o mouse sai da área
   };
+
+  useEffect(() => {
+    const startFetchBackgrounds = async () => {
+      try {
+        const response = await window.electronAPI.fetchImages('backgrounds');
+        if (response.status === 'success') {
+          console.log('..: Response fetchBackgrounds:', response);
+          // Atualize a interface com as imagens
+          setBackgrounds({ images: response.fileImages, localPath: response.localPath });
+        } else {
+          console.error('Error fetchBackgrounds:', response.message);
+        }
+      } catch (error) {
+        console.error('Error catch fetchBackgrounds:', error);
+      }
+    };
+
+    startFetchBackgrounds();
+
+    // Configurar listener para atualizações
+    window.electronAPI.onUpdateImages((updatedImages: any) => {
+      console.log('..: onUpdateImages backgrounds chegando:', updatedImages);
+      setBackgrounds(updatedImages); // Atualizar lista de imagens
+    });
+
+  }, []);
 
   return (
     <DndContext onDragStart={handleMoveBackStart} onDragEnd={handleDragEnd}>
@@ -338,15 +464,19 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
             height: "100%",
             position: "relative",
             backgroundColor: token.colorBgContainer,
-            overflow: "hidden",
+            // overflow: "hidden",
+            // pointerEvents: activeSubButton.activeSubButton === "Scene" ? "none" : "auto",
           }}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
-          onClick={handleMouseClick}
+          onClick={(event) => handleMouseClick(event)}
         >
+          <Grid size={gridValue} marginTop={titleHeight - 33} marginLeft={leftLimite} />
+          <DragAndDrop onDrop={(event) => handleDrop(event, state.scale)} /*height={worldSize.height + titleHeight} width={worldSize.width + leftLimite}*/ />
+
           {/* Retângulo que segue o mouse */}
           {mousePos && activeSubButton.activeSubButton === "Scene" && (
-            <div
+            <Content
               style={{
                 position: "absolute",
                 width: 240*1.5+`px`,
@@ -357,9 +487,22 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
                 backgroundColor: `${token.colorBgMask}`, // Silhueta semitransparente
                 border: `2px dashed ${token.colorPrimary}`, // Bordas destacadas
                 pointerEvents: "none", // Ignora interação com o retângulo
+                zIndex: 6,
               }}
             />
           )}
+
+          <Content style={{ backgroundColor: 'red', pointerEvents: activeSubButton.activeSubButton === "Scene" ? "none" : "auto", }}>
+            {elements.map((element) => (
+              <GameElement
+                key={element.id}
+                {...element}
+                isSelected={element.id === selectedElement}
+                onSelect={handleSelect}
+              />
+            ))}
+          </Content>
+
         </Content>
         <TransformComponent>
           <Space className="game-world" /*onMouseDown={handleMouseDown}*/
@@ -379,7 +522,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
               />
             ))} */}
           </Space>
-          <Grid size={gridValue} width={worldSize.width} height={worldSize.height} marginTop={titleHeight - 33} marginLeft={leftLimite} />
+          {/* <Grid size={gridValue} width={worldSize.width} height={worldSize.height} marginTop={titleHeight - 33} marginLeft={leftLimite} /> */}
         </TransformComponent>
       </TransformWrapper>
     </DndContext>

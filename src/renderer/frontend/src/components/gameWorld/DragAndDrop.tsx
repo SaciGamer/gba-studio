@@ -1,6 +1,6 @@
 import React from 'react';
 
-const DragAndDrop: React.FC<{ onDrop: (event: DragEvent) => void, height: number, width: number }> = ({ onDrop, height, width }) => {
+const DragAndDrop: React.FC<{ onDrop: (event: DragEvent) => void, height?: number, width?: number }> = ({ onDrop, height, width }) => {
   const handleDragOver = (e: any) => {
     e.preventDefault();
   };
@@ -16,7 +16,7 @@ const DragAndDrop: React.FC<{ onDrop: (event: DragEvent) => void, height: number
     <div 
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      style={{ /*background: 'red', */position: 'absolute', top: 0, left: 0, height: `${height}px`, width: `${width}px` }}
+      style={{ position: 'absolute', top: 0, left: 0, height: height? `${height}px` : '100%', width: width? `${width}px` : '100%' }}
     >
       {/* Arraste a imagem aqui */}
     </div>
