@@ -1,5 +1,6 @@
 export interface IElement {
   id: string;
+  index: number;
   title: string;
   background: string;
   x: number;

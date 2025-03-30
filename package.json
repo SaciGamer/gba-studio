@@ -3,7 +3,7 @@
   "author": "GBA Studio",
   "productName": "GBA Studio",
   "description": "Project for creating and compiling GBA",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -36,7 +36,7 @@
       "target": [
         "nsis"
       ],
-      "signAndEditExecutable": false
+      "signAndEditExecutable": true
     },
     "linux": {
       "icon": "icon/defaultImgIcon.png"

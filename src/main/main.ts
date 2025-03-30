@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, dialog, shell, protocol } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -16,6 +16,7 @@ import { loadSettings } from './services/loadSettingsService';
 import compileGBA from './utils/gbaCompiler/compile-gba';
 import initializeIpcHandlers from './controllers/HandlerController';
 import { SettingsUtilsManager } from './managers/SettingsUtilsManager';
+import { startWatch, stopAllWatchers } from './services/imagemService';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,6 +25,19 @@ const preloadPath = path.join(__dirname, 'preload', 'preload.js');
 const iconPath = path.join(app.getAppPath(), 'icon', 'defaultImgIcon.png');
 
 let mainWindowIsClosing = false;
+let currentTheme: string = getPreferences().theme;
+export let directoryPathProject: any;
+
+// Registrar esquema personalizado como privilegiado
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'local',
+    privileges: {
+      secure: true, // Marca o esquema como seguro
+      standard: true, // Habilita APIs padrão, como carregamento de arquivos
+    },
+  },
+]);
 
 interface Windows {
   splash: BrowserWindow | null;
@@ -39,9 +53,6 @@ const windows: Windows = {
   main: null,
   about: null
 };
-
-let currentTheme: string = getPreferences().theme;
-let directoryPathProject: any;
 
 // Splash
 function createSplashWindow() {
@@ -268,6 +279,42 @@ export function changeTheme(theme: string) {
 }
 
 app.whenReady().then(() => {
+  // Manipular requisições do esquema 'local://'
+  protocol.handle('local', async (request) => {
+    const url = decodeURIComponent(request.url.replace('local://', ''));
+    let filePath = path.normalize(url); // Normalizar caminhos com barras corretas
+    if (/^[a-zA-Z](\\|\/)/.test(filePath)) {
+      // Adiciona ":" se faltar no caminho (drive letter Windows)
+      filePath = filePath.replace(/^([a-zA-Z])(\\|\/)/, '$1:\\')
+    }
+
+    console.log('Processed file path:', filePath); 
+
+    try {
+      // Ensure the file exists before returning it
+      if (fs.existsSync(filePath)) {
+        const fileBuffer = fs.readFileSync(filePath);
+
+        return new Response(fileBuffer, {
+          status: 200, // Success
+          headers: { 'Content-Type': 'image/png' },
+        });
+      } else {
+        return new Response('File not found', {
+          status: 404, // Not Found
+          headers: { 'Content-Type': 'text/plain' },
+        });
+      }
+    } catch (error) {
+      console.error('Error serving file:', error);
+
+      return new Response('Internal Server Error', {
+        status: 500, // Internal Server Error
+        headers: { 'Content-Type': 'text/plain' },
+      });
+    }
+  });
+
   createSplashWindow();
   createLauncherWindow(null, true);
 });
@@ -315,6 +362,9 @@ async function loadProject(filePath: string) {
     }
     windows.main.close();
   }
+  
+  stopAllWatchers();
+  // cleanAllTargetDir();
 
   // Criar o menu a partir do template
   const menu = Menu.buildFromTemplate(menuTemplate());
@@ -556,6 +606,38 @@ ipcMain.handle('get-versions', () => ({
   projectVersion: packageJson.version,
 }));
 
+// Recebendo o arquivo do frontend
+ipcMain.handle('save-image', async (event, { filePath, fileName, data }) => {
+  try {
+    const pathToSave = filePath || directoryPathProject;
+    const uploadDir = path.join(pathToSave, 'assets', 'backgrounds'); // Diretório de destino
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir);
+    }
+
+    const destinationPath = path.join(uploadDir, fileName);
+
+    // Escreve o arquivo no disco
+    fs.writeFileSync(destinationPath, data, 'base64');
+    return { status: 'success', message: destinationPath };
+  } catch (error) {
+    console.error('Error saving image:', error);
+    return { status: 'error', message: 'Error saving image.' };
+  }
+});
+
+// Pegar caminho das imagens do projeto
+ipcMain.handle('fetch-images', async (event, folderName) => {
+  const assetsPath = path.join(directoryPathProject, 'assets', folderName);
+
+  if (!fs.existsSync(assetsPath)) {
+    return { status: 'error', message: 'Directory not found.' };
+  }
+
+  // const targetUserDir = createUserPathTargetDir(folderName);
+  return startWatch(windows.main, assetsPath/*, targetUserDir*/);
+});
+
 initializeIpcHandlers();
 // ## Handle Preferences END ###########################################
 
@@ -587,4 +669,3 @@ initializeIpcHandlers();
   }
 };*/
 // ## OPEN PROJECT END #################################################
-

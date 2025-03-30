@@ -158,7 +158,8 @@ const Launcher = () => {
                 e.currentTarget.style.transform = 'scale(1)';
               }}
             />
-            <div>GBA Studio 0.1.0</div>
+            {/* TODO get version from BE */}
+            <div>GBA Studio 0.2.0</div>
           </Content>
           <Menu
             mode="inline"

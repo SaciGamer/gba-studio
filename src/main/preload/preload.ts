@@ -22,7 +22,11 @@ const electronAPI = {
   loadLastPositionSplitters: () => ipcRenderer.invoke('loadLastPositionSplitters'),
   // Settings --------------------------------------------
   getSettingsByType: (type: string) => ipcRenderer.invoke('getSettings', type),
-  updateSettings: (typeToSave:string, settings: any) => ipcRenderer.invoke('updateSettings', typeToSave, settings)
+  updateSettings: (typeToSave:string, settings: any) => ipcRenderer.invoke('updateSettings', typeToSave, settings),
+  // Images --------------------------------------------
+  saveImage: (filePath: string, fileName: string, data: any) => ipcRenderer.invoke('save-image', { filePath, fileName, data }),
+  fetchImages: (folderName: string) => ipcRenderer.invoke('fetch-images', folderName),
+  onUpdateImages: (callback: any) => ipcRenderer.on('update-images', (event: any, localPath: string, images: string) => callback({ localPath, images })),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
