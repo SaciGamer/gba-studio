@@ -34,8 +34,8 @@ const Launcher = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   const [recentProjects, setRecentProjects] = useState(projectsData);
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const location = useLocation();
+  const [versionAPI, setVersionAPI] = useState('');
 
   const [lastTabSelected, setLastTabSelected] = useState<string | null>(null);
 
@@ -138,6 +138,13 @@ const Launcher = () => {
     );
   }
 
+  const fetchVersions = async () => {
+    const fetchedVersions = await window.electronAPI.getVersionsAPI();
+    setVersionAPI(fetchedVersions.projectVersion);
+  };
+
+  fetchVersions();
+
   return (
     <AntDApp>
       <Layout hasSider style={{ minHeight: '100vh', /*width: '100vw', */overflow: 'hidden' }}>
@@ -158,8 +165,7 @@ const Launcher = () => {
                 e.currentTarget.style.transform = 'scale(1)';
               }}
             />
-            {/* TODO get version from BE */}
-            <div>GBA Studio 0.2.0</div>
+            <div>GBA Studio {versionAPI}</div>
           </Content>
           <Menu
             mode="inline"

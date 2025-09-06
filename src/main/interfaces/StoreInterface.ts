@@ -1,15 +1,15 @@
-export interface Preferences {
+export interface IPreferences {
     theme: string;
     language: string;
-    recentProjects: RecentProject[];
+    recentProjects: IRecentProject[];
 }
-export interface RecentProject {
+export interface IRecentProject {
     path: string;
     name: string;
     lastOpened: Date;
 }
-export interface StoreData {
-    preferences: Preferences;
+export interface IStoreData {
+    preferences: IPreferences;
     __lastUsedPath: string;
     __lastUsedSplashTab: string;
     navigatorSidebarWidth: number;

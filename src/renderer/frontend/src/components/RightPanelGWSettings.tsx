@@ -1,55 +1,53 @@
 import React, { useEffect, useState } from "react";
 import { Form, Input, InputNumber, Select, Radio, Checkbox, Button, Divider, theme, Spin, Space } from "antd";
 import { CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled } from "@ant-design/icons";
+import { useBackgroundContext, useProjectContext, useSceneContext, useSettingsContext, useSettingsUtilsContext } from "@/providers/contexts/AppContexts";
+import { IProjectSettings } from "@/providers/contexts/interfaces/IProjectElement";
+import { EColorMode, IMainSettings } from "@/providers/contexts/interfaces/ISettingElement";
+import imgPlaceholder from '@/img/placeholder.png';
 
 const { useToken } = theme;
-
-// User Settings Interface
-interface IUserSettings {
-  name: string;
-  author: string;
-  startSceneId: string;
-}
 
 const UserSettingsForm: React.FC = () => {
   const [form] = Form.useForm();
   const { token } = useToken();
-  const [loading, setLoading] = useState(true);
+  // const [loading, setLoading] = useState(true);
+  const { project, setProject } = useProjectContext();
 
-  useEffect(() => {
-    // Load settings when component mounts
-    const loadLocalSettings = async () => {
-      try {
-        const settings = await window.electronAPI.getSettingsByType('project');
-        console.log('..: UserSettingsForm loaded: ', JSON.stringify(settings));
-        form.setFieldsValue(settings);
-        setLoading(false);
-      } catch (error) {
-        console.error('..: Erro loading UserSettingsForm:', error);
-        setLoading(false);
-      }
-    };
+  // useEffect(() => {
+  //   // Load settings when component mounts
+  //   const loadLocalSettings = async () => {
+  //     try {
+  //       console.log('..: ProjectSettingsForm loaded:', project);
+  //       setLoading(project ? false : true);
+  //     } catch (error) {
+  //       console.error('..: Erro loading UserSettingsForm:', error);
+  //       setLoading(false);
+  //     }
+  //   };
 
-    loadLocalSettings();
-  }, [form]);
+  //   loadLocalSettings();
+  // }, [project!]);
 
-  const handleBasicValuesChange = async (changedValues: Partial<IUserSettings>, allValues: IUserSettings) => {
+  const handleBasicValuesChange = async (changedValues: Partial<IProjectSettings>, allValues: IProjectSettings) => {
     try {
-      const updatedSettings = await window.electronAPI.updateSettings('project', allValues);
-      console.log('..: Settings updated:', updatedSettings);
+      setProject({ ...project, ...allValues, _saved: false });
+      // const updatedSettings = await window.electronAPI.updateSettings('project', project);
+      // console.log('..: Settings updated:', updatedSettings);
     } catch (error) {
       console.error('..: Error updating settings:', error);
     }
   };
 
-  if (loading) {
-    return <Spin />;
-  }
+  // if (loading) {
+  //   return <Spin />;
+  // }
 
   return (
     <Form
       form={form}
       layout="vertical"
+      initialValues={project!}
       onValuesChange={handleBasicValuesChange}
     >
       {/* Project Name */}
@@ -82,35 +80,10 @@ const UserSettingsForm: React.FC = () => {
         <Input />
       </Form.Item>
 
-      <Divider style={{ margin: `${token.margin}px 0` }} />
-
-      <Form.Item name="startSceneId" label="Starting Scene" style={{ flex: 1, textAlign: 'center' }}>
-        <Select
-          onDropdownVisibleChange={(open) => {
-            console.log('..: Abriu drop de animation: ', open);
-          }}
-        >
-        </Select>
-      </Form.Item>
+      <Divider style={{ margin: `${token.margin}px 0` }} />      
     </Form>
   );
 };
-
-// Interface centralizada
-enum EColorMode {
-  Mono = "mono",
-  Mixed = "mixed",
-}
-
-// Game Settings Interface
-interface IGameSettings {
-  startX: number;
-  startY: number;
-  startDirection: string;
-  startMoveSpeed: number | string;
-  startAnimSpeed: number;
-  colorMode: EColorMode;
-}
 
 interface IGameSettingsForm {
   controllerView: (value: number) => void
@@ -119,10 +92,15 @@ interface IGameSettingsForm {
 const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
   const { token } = useToken();
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(true);
+  // const [loading, setLoading] = useState(true);
   const [customSpeed, setCustomSpeed] = useState(true);
   const [animDropDownOpen, setAnimDropdownOpen] = useState(false);
   const [moveDropdownOpen, setMoveDropdownOpen] = useState(false);
+  const { settings, setSettings } = useSettingsContext();
+  const { scenes, setScenes } = useSceneContext();
+  const { backgrounds, setBackgrounds } = useBackgroundContext();
+  const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
+
   const optionsMoveSpeed = [
     { value: 0.25, label: "Speed ¼ (Slower)", ppf: "0.25 PPF" },
     { value: 0.5, label: "Speed ½", ppf: "0.5 PPF" },
@@ -142,16 +120,8 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
     { value: 7, label: "Speed 7", fps: "30 FPS" },
     { value: 8, label: "Speed 8 (Faster)", fps: "60 FPS" },
   ];
-  const defaultSettings: IGameSettings = {
-    startX: 5,
-    startY: 9,
-    startDirection: "down",
-    startMoveSpeed: 1,
-    startAnimSpeed: 4,
-    colorMode: EColorMode.Mono
-  };
 
-  const handleValuesChange = (changedValues: Partial<IGameSettings>, allValues: IGameSettings) => {
+  const handleValuesChange = (changedValues: Partial<IMainSettings>, allValues: IMainSettings) => {
     if ('colorMode' in changedValues) {
       const updatedColorMode = changedValues.colorMode
         ? EColorMode.Mixed
@@ -161,10 +131,11 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
 
       console.log("..: Updated Color Mode Enum:", updatedColorMode);
     }
-    console.log("..: Settings Alterações:", JSON.stringify(changedValues));
-    console.log("..: Settings Valores atuais:", JSON.stringify(allValues));
+    console.log("..: Settings Alterações:", changedValues);
+    console.log("..: Settings Valores atuais:", allValues);
 
-    window.electronAPI.updateSettings('settings', allValues);
+    // window.electronAPI.updateSettings('settings', allValues);
+    setSettings({ ...settings, ...allValues, _saved: false });
   };
 
   const handleCustomUpdate = (newValues: any) => {
@@ -184,41 +155,61 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
     // Load settings when component mounts
     const loadLocalSettings = async () => {
       try {
-        const settings = await window.electronAPI.getSettingsByType('settings');
-        console.log('..: UserSettingsForm loaded: ', JSON.stringify(settings));
+        console.log('..: UserSettingsForm loaded: ', settings);
 
         // Converter colorMode para boolean
         const transformedSettings = {
           ...settings,
-          colorMode: settings.colorMode === 'mixed',
+          colorMode: settings?.colorMode === 'mixed',
         };
 
-        setCustomSpeed(!optionsMoveSpeed.map((values) => values.value).includes(transformedSettings.startMoveSpeed));
+        setCustomSpeed(!optionsMoveSpeed.map((values) => values.value).includes(transformedSettings?.startMoveSpeed as number));
 
         console.log('..: GameSettingsForm customSpeed %s, convertendo colorModo após loading: ', customSpeed, transformedSettings);
 
         form.setFieldsValue(transformedSettings);
-        setLoading(false);
+        // setLoading(settings ? false : true);
       } catch (error) {
         console.error('..: Erro loading UserSettingsForm:', error);
-        setLoading(false);
+        // setLoading(false);
       }
     };
 
     loadLocalSettings();
-  }, [form]);
+  }, []);
 
-  if (loading) {
-    return <Spin />;
-  }
+  // if (loading) {
+  //   return <Spin />;
+  // }
 
   return (
     <Form
       form={form}
       layout="vertical"
-      initialValues={defaultSettings}
+      initialValues={settings}
       onValuesChange={handleValuesChange} // Captura mudanças em tempo real
     >
+      <Form.Item name="startSceneId" label="Starting Scene" style={{ flex: 1, textAlign: 'center' }}>
+        <Select
+          showSearch
+          optionFilterProp="label"
+          options={scenes.filter(sf => !sf._deleted).map(scene => ({
+            value: scene.id, // ID único da cena
+            label: (
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <img 
+                    src={`${backgrounds.find(b => b.id == scene.backgroundId)?.filename ? settingUtils.localImagePath+'/'+backgrounds.find(b => b.id == scene.backgroundId)?.filename : imgPlaceholder}`} // Caminho da imagem da miniatura
+                    alt={scene.name} 
+                    style={{ width: 24, height: 24, marginRight: 8 }}
+                  />
+                  {scene.name} {/* Nome da cena */}
+              </div>
+            ),
+          }))}
+        >
+        </Select>
+      </Form.Item>
+      
       {/* Checkbox and More Settings */}
       <Space style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Form.Item name="colorMode" valuePropName="checked" style={{ marginBottom: 0 }}>

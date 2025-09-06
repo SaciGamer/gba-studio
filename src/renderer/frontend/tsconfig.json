@@ -8,9 +8,6 @@
       "noEmit": true,
       "allowSyntheticDefaultImports": true,
       "types": ["vite/client", "node"],
-      "paths": {
-        "@/*": ["./*"] 
-      }
     },
     "include": [
       "vite.config.ts",

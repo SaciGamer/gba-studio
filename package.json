@@ -4,7 +4,7 @@
   "productName": "GBA Studio",
   "description": "Project for creating and compiling GBA",
   "version": "0.2.0",
-  "license": "MIT",
+  "license": "GPL-2.0 license",
   "private": true,
   "type": "module",
   "main": "./dist/main/main.js",

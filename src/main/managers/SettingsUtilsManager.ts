@@ -1,50 +1,40 @@
-import { SettingsUtils } from '@/interfaces/MainSettingsInterface';
-import { BaseManager as BaseManager } from './BaseManager';
+import { ISettingsUtils } from '@/interfaces/MainSettingsInterface';
+import { ABaseSettingsManager } from './ABaseSettingsManager';
+import { defaultSettingsUtils } from '@/structs/defaultValuesInterface';
 
-const defaultSettingsUtils: SettingsUtils = {
-    _resourceType: 'main',
-    saved: true,
-    projectPathFile: null,
-    projectDirectory: null,
-    baseTitle: 'GBA Studio'
-};
+export abstract class SettingsUtilsManager extends ABaseSettingsManager<any> {
+    protected localSettingsUtils: ISettingsUtils = defaultSettingsUtils;
 
-export class SettingsUtilsManager extends BaseManager<SettingsUtils> {
-    protected static instance: SettingsUtilsManager | null = null;
-
-    private constructor() {
-        super(defaultSettingsUtils);
-    }
-
-    public static getInstance(): SettingsUtilsManager {
-        if (!SettingsUtilsManager.instance) {
-            SettingsUtilsManager.instance = new SettingsUtilsManager();
-        }
-        return SettingsUtilsManager.instance;
+    protected getLocalSettingsUtils(): ISettingsUtils {
+        return this.localSettingsUtils;
     }
 
     public isSaved(): boolean {
-        return this.data.saved;
+        return this.localSettingsUtils.saved;
+    }
+
+    public setIsSaved(isSaved: boolean) {
+        this.localSettingsUtils.saved = isSaved;
     }
 
     public getProjectFile(): string | null {
-        return this.data.projectPathFile;
+        return this.localSettingsUtils.projectPathFile;
     }
 
     public setProjectFile(file: string): string | null {
-        return this.data.projectPathFile = file;
+        return this.localSettingsUtils.projectPathFile = file;
     }
 
     public setProjectDirectory(path: string): string | null {
-        return this.data.projectDirectory = path;
+        return this.localSettingsUtils.projectDirectory = path;
     }
 
     public getProjectDirectory(): string | null {
-        return this.data.projectDirectory;
+        return this.localSettingsUtils.projectDirectory;
     }
 
     public getBaseTitle(): string {
-        return this.data.baseTitle;
+        return this.localSettingsUtils.baseTitle;
     }
 
 }
