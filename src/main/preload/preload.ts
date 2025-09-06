@@ -20,13 +20,19 @@ const electronAPI = {
   saveLastSplashTab: (lastSplashTab: any) => ipcRenderer.invoke('lastUsedSplashTab', lastSplashTab),
   saveLastPositionSplitters: (lastPositionSplitters: any) => ipcRenderer.invoke('lastPositionSplitters', lastPositionSplitters),
   loadLastPositionSplitters: () => ipcRenderer.invoke('loadLastPositionSplitters'),
+  updateTitle: (baseTitle: string, projectName: string, isSaved: boolean) => ipcRenderer.invoke('updateTitle', baseTitle, projectName, isSaved),
   // Settings --------------------------------------------
-  getSettingsByType: (type: string) => ipcRenderer.invoke('getSettings', type),
+  loadSettings: (filePath: string) => ipcRenderer.invoke('loadSettings', filePath),
   updateSettings: (typeToSave:string, settings: any) => ipcRenderer.invoke('updateSettings', typeToSave, settings),
-  // Images --------------------------------------------
+  deleteSettings: (typeToDelete: string, id: string) => ipcRenderer.invoke('deleteSettings', typeToDelete, id),
+  fetchSettings: (typeToFetch: string) => ipcRenderer.invoke('fetchSettings', typeToFetch),
+  // Images ----------------------------------------------
   saveImage: (filePath: string, fileName: string, data: any) => ipcRenderer.invoke('save-image', { filePath, fileName, data }),
   fetchImages: (folderName: string) => ipcRenderer.invoke('fetch-images', folderName),
   onUpdateImages: (callback: any) => ipcRenderer.on('update-images', (event: any, localPath: string, images: string) => callback({ localPath, images })),
+  // Save Project  ---------------------------------------
+  onRequestProjectToSave: (callback: any) => ipcRenderer.on('get-data', (event: any, requestToSave: string) => callback(requestToSave)),
+  responseProjectToSave: (dataToSave: any) => ipcRenderer.invoke('send-data', dataToSave),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

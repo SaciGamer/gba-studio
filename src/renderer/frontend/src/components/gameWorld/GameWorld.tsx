@@ -1,11 +1,10 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { DndContext } from '@dnd-kit/core';
 import { v4 as uuidv4 } from 'uuid';
-import { IElement } from './interfaces/IElements';
 import DragAndDrop from './DragAndDrop'
 import Grid from './Grid';
 import GameElement from './GameElement';
-import { Affix, App, Layout, Row, Space } from 'antd';
+import { Affix, App, Button, Layout, Row, Space } from 'antd';
 import { AntdToken } from '../common/AntDToken';
 
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
@@ -14,15 +13,13 @@ import { Content } from 'antd/es/layout/layout';
 import { CheckCircleFilled, IeCircleFilled, InfoCircleFilled, MinusCircleFilled, MinusCircleOutlined, SmileOutlined } from '@ant-design/icons';
 
 import imgPlaceholder from '@/img/placeholder.png';
+import { ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
+import { useBackgroundContext, useElementContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
+import path from 'path';
 
 let gridValue = 16;
 const titleHeight = 82; // Altura do Titulo
 const leftLimite = 106
-
-interface IActiveButton {
-  activeButton: string | number;
-  activeSubButton: string | number;
-}
 
 interface IGameWorld {
   resetPanelSize: any;
@@ -30,32 +27,27 @@ interface IGameWorld {
   showFloatButton: boolean;
 }
 
-interface IBackgrounds {
-  images: string[];
-  localPath: string;
-}
-
 const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, showFloatButton }) => {
   const { token } = AntdToken();
-
-  const [elements, setElements] = useState<IElement[]>([]);
-  const [selectedElement, setSelectedElement] = useState(null);
-  const [worldSize, setWorldSize] = useState({ width: 800, height: 800 });
   const { message, notification, modal } = App.useApp();
+  const { scenes, setScenes } = useSceneContext();
+  const { backgrounds, setBackgrounds } = useBackgroundContext();
+  const { settingUtils, setSettingUtils, settingUtilsRef } = useSettingsUtilsContext();
+  const { elementSelected, setElementSelected } = useElementContext();
+
+  const [worldSize, setWorldSize] = useState({ width: 800, height: 800 });
   const [isMovedBackground, setIsMovedBackground] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [activeSubButton, setActiveSubButton] = useState<IActiveButton>({ activeButton: '', activeSubButton: '' });
-  const [backgrounds, setBackgrounds] = useState<IBackgrounds>();
 
   let isDeleting = false;
 
-  // Efeito deletar Elemento
+  // Deletar Elemento
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Delete' && selectedElement != null && !isDeleting) {
+      if (event.key === 'Delete' && elementSelected != null && !isDeleting) {
         console.log("..: Confirme deletando elemento!!", isDeleting)
         isDeleting = true;
-        showConfirm(selectedElement);
+        showConfirm(elementSelected);
       }
     };
 
@@ -63,21 +55,60 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedElement]);
+  }, [elementSelected]);
+
+  // Carregar Elementos do BE
+  // useEffect(() => {
+    // const startFetchElements = async () => {
+    //   try {
+    //     const response = await window.electronAPI.fetchSettings('scene');
+    //     if (response.status === 'success') {
+    //       console.log('..: Response fetchElements:', response.settings);
+    //       // Atualize a interface com os elementos
+    //       setScenes(response.settings as ISceneSettings[]);
+    //     } else {
+    //       console.error('Error fetchElements:', response.message);
+    //     }
+    //   } catch (error) {
+    //     console.error('Error catch fetchElements:', error);
+    //   }
+    // };
+
+    // startFetchElements();
+
+    // Configurar listener para atualizações
+    // window.electronAPI.updateSettings((updatedSettings: any) => {
+    //   console.log('..: onUpdateSettings scenes chegando:', updatedSettings);
+    //   setScenes(updatedSettings); // Atualizar lista de elementos
+    // });
+  // }, []);
 
   // Lógica para confirmação para deletar elemento
-  const showConfirm = (id: string) => {
+  const showConfirm = (elementDelete: ISceneSettings) => {
     console.log("..: Show modal elemento!!", isDeleting)
     modal.confirm({
-      title: 'Do you want to delete this item?',
+      title: `Do you want to delete ${elementDelete.name} item?`,
       content: 'This action cannot be undone.',
       onOk() {
-        console.log("..: Id do elemento deletado: " + id);
-        let element = elements.filter(el => el.id == id);
-        // console.log("..: Elemento " + element[0].title);
-        notification.success({ message: 'Scene: ' + `${element[0].title}` + ' Deleted' });
-        setElements(prevElements => prevElements.filter(el => el.id !== id));
-        setSelectedElement(null);
+        console.log("..: Id do elemento deletado digitalmente: ", elementDelete.id);
+        // let element = scenes.filter(el => el.id == elementDelete.id);
+        // setScenes(prevElements => prevElements.filter(el => el.id !== elementDelete.id));
+        // Marca como deletado digitalmente
+        setScenes(prevElements =>
+          prevElements.map(el =>
+            el.id === elementDelete.id
+              ? { ...el, _saved: false, _deleted: true }
+              : el
+          )
+        );
+        setElementSelected(null);
+        
+        // window.electronAPI.deleteSettings('scene', elementDelete.id);
+        
+        notification.success({ 
+          message: 'Scene: ' + `${elementDelete.name}` + ' Deleted',
+          showProgress: true,
+        });
         isDeleting = false;
       },
       onCancel() {
@@ -90,16 +121,17 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   // Lógica para deselecionar quando clicar fora do elemento
   const handleClickOutside = (event: any) => {
     if (!event.target.closest('.game-element')) {
-      setSelectedElement(null);
+      setElementSelected(null);
     }
   };
 
   // Lógica selecionar Objeto
-  const handleSelect = useCallback((id: any) => {
-    if (id !== selectedElement) {
-      setSelectedElement(id);
+  const handleSelect = useCallback((scene: any) => {
+    if (scene.id !== elementSelected?.id) {
+      console.log("..: HandleSelect:", scene);
+      setElementSelected(scene)
     }
-  }, [selectedElement]);
+  }, [elementSelected?.id]);
 
   // Movendo tela de trabalho
   const handleMoveBackStart = () => {
@@ -110,7 +142,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   // Lógica arranste do elemento
   const handleDragEnd = useCallback((event: any) => {
     const { active, delta } = event;
-    const draggedElement = elements.find(el => el.id === active.id);
+    const draggedElement = scenes.find(el => el.id === active.id);
     if (draggedElement) {
       const newX = draggedElement.x + (delta.x / state.scale);
       const newY = draggedElement.y + (delta.y / state.scale);
@@ -121,7 +153,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       const snappedY = Math.max(titleHeight, Math.round(newY / gridSize) * gridSize);
 
       // Verifica se há elementos além dos novos limites
-      const elementsBeyondLimits = elements.some(el =>
+      const elementsBeyondLimits = scenes.some(el =>
         el.id !== active.id && (
           el.x + el.width > snappedX ||
           el.y + el.height > snappedY
@@ -129,16 +161,22 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       );
 
       // Ajusta o tamanho do mundo baseado na posição do elemento arrastado e se há elementos além dos limites
-      const newWorldWidth = Math.max(800, snappedX + draggedElement.width + 100, ...elements.filter(el => el.id !== active.id).map(el => el.x + el.width));
-      const newWorldHeight = Math.max(800, snappedY + draggedElement.height + 100, ...elements.filter(el => el.id !== active.id).map(el => el.y + el.height));
+      const newWorldWidth = Math.max(800, snappedX + draggedElement.width + 100, ...scenes.filter(el => el.id !== active.id).map(el => el.x + el.width));
+      const newWorldHeight = Math.max(800, snappedY + draggedElement.height + 100, ...scenes.filter(el => el.id !== active.id).map(el => el.y + el.height));
 
       // // Verifique se precisamos expandir o mundo
       // const newWorldWidth = Math.max(800, snappedX + draggedElement.width + 200);
       // const newWorldHeight = Math.max(800, snappedY + draggedElement.height + 200);
 
-      setElements(prev => prev.map(el =>
-        el.id === active.id ? { ...el, x: snappedX, y: snappedY } : el
-      ));
+      // Ajusta a posição do elemento arrastado e pede atualização no BE
+      setScenes(prev => prev.map(el => {
+        if (el.id === active.id) {
+          const elementUpdated = { ...el, x: snappedX, y: snappedY, _saved: false };
+          // window.electronAPI.updateSettings('scene', elementUpdated);
+          return { ...elementUpdated };
+        }
+        return el;
+      }));
 
       if (newWorldWidth !== worldSize.width || newWorldHeight !== worldSize.height) {
         setWorldSize({ width: newWorldWidth, height: newWorldHeight });
@@ -147,7 +185,11 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       setIsMovedBackground(false);
       console.log("..: teste quantas vezes entra isMovedBackRef: ", isMovedBackground);
     }
-  }, [elements, worldSize]);
+  }, [scenes, worldSize]);
+
+  useEffect(() => {
+    console.log('Scenes atualizado GameWorld.tsx:', scenes);
+  }, [scenes]);
 
   // Lógica para mover barras de rolagem com botão esquerdo do mouse
   // const handleMouseDown = useCallback((event) => {
@@ -220,19 +262,22 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     
             if (response.status === 'success') {
               // alert(response.message);
-              notification.open({
+              notification.success({
                 message: `Saving image`,
                 description:
                   `Image copied successfully: ${response.message}`,
-                  icon: <CheckCircleFilled style={{ color: token.colorSuccess }} />,
+                  // icon: <CheckCircleFilled style={{ color: token.colorSuccess }} />,
+                showProgress: true,
+                onClick: () => handleOpenProjectFolderWithPath(response.message),
               });
             } else {
               // alert(response.message);
-              notification.open({
+              notification.error({
                 message: `Saving image - ${response.message}`,
                 description:
                   'Something went wrong',
-                  icon: <InfoCircleFilled style={{ color: token.colorError }} />,
+                  // icon: <InfoCircleFilled style={{ color: token.colorError }} />,
+                showProgress: true,
               });
             }
           }
@@ -250,7 +295,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   };
 
   // Lógica para dropar imagem no projeto
-  const handleDrop = (event: DragEvent, zoomScale: number) => {
+  const handleDropOrCreate = (event: DragEvent, zoomScale: number) => {
     event.preventDefault(); // Previne o comportamento padrão de impedir o drop
     
     const { clientX, clientY } = event;
@@ -268,6 +313,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     if(files && files.length > 0) {
       files?.forEach(file => {
         handleImageUpload(file);
+        // TODO talvez fazer um drop de imagem criando cena
         // const reader = new FileReader();
         // reader.onload = (e) => {
         //   if (e.target && typeof e.target.result === 'string') {
@@ -286,25 +332,31 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
         // };
         // reader.readAsDataURL(file);
       });
-     
     } else {
       // Caso não seja drop criar nova scena
-      const index = elements.length === 0 ? 0 : elements[elements.length - 1].index + 1;
-      console.log('..: files backgrounds', backgrounds);
-      console.log('..: path backgrounds', `${backgrounds?.localPath.replace(/\\/g, '/')}/${backgrounds?.images[0]}`);
-      const background = backgrounds?.images.length != 0 ? `${backgrounds?.localPath.replace(/\\/g, '/')}/${backgrounds?.images[0]}` : imgPlaceholder;
+      const index = scenes.length === 0 ? 0 : scenes[scenes.length - 1]._index + 1;
+      console.log('..: files images', settingUtils.images);
+      console.log('..: path backgrounds', `${settingUtils.localImagePath?.replace(/\\/g, '/')}/${settingUtils.images?.[0]}`);
+      const background = settingUtils.images?.length != 0 ? `${settingUtils.localImagePath?.replace(/\\/g, '/')}/${settingUtils.images?.[0]}` : imgPlaceholder;
+      const nameImageDefault = settingUtils.images ? settingUtils.images[0] : imgPlaceholder;
       const newElement = {
         id: uuidv4(),
-        index: index,
-        title: 'SCENE ' + index,
-        background: background, // pegar imagem ou imagem padrão
+        _resourceType: 'scene',
+        _index: index,
+        _saved: false,
+        _deleted: false,
+        name: 'SCENE ' + index,
+        backgroundId: backgrounds.filter(b => b.filename == nameImageDefault).map(response => response.id)[0],
+        background: background, // caminho da imagem
         x: relativeX,
         y: relativeY,
         width: 0,
-        height: 0
+        height: 0,
       };
 
-      setElements((prev) => [...prev, newElement]);
+      setScenes((prev) => [...prev, newElement]);
+
+      return newElement;
     }
 
   };
@@ -366,7 +418,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     // console.log('..: handleMouseMove activeSubButton:', activeSubButton);
-    if (activeSubButton.activeSubButton === "Scene") {
+    if (settingUtils.activeSubButton === "Scene") {
       // Calcula as coordenadas do retângulo
       const rectX = e.nativeEvent.offsetX - 120*1.5; // Centraliza o retângulo
       const rectY = e.nativeEvent.offsetY - 80*1.5;  // Centraliza o retângulo
@@ -381,51 +433,140 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   };
 
   const handleMouseClick = (event: any) => {
-    if (mousePos && activeSubButton.activeSubButton === "Scene") {
+    if (mousePos && settingUtils.activeSubButton === "Scene") {
       event.stopPropagation();
       console.log("Scene criada em:", mousePos);
 
-      handleDrop(event, state.scale)
+      const newScene = handleDropOrCreate(event, state.scale);
 
-      notification.open({
+      notification.success({
         message: 'Create New Scene',
-        description: 'New Scene created!',
-        icon: <CheckCircleFilled style={{ color: token.colorSuccess }} />,
+        description: `${newScene?.name} created!`,
+        showProgress: true,
       });
     } else {
       handleClickOutside(event);
     }
   };
 
+  const handleOpenProjectFolderWithPath = (path:string) => {
+    console.log(`..: Open Project Folder: ${path}`);
+    window.electronAPI.send('open-project-folder', path);
+  }
+
   const handleMouseLeave = () => {
     setMousePos(null); // Remove a silhueta quando o mouse sai da área
   };
 
+  // Primeiro useEffect - Gerencia atualizações dos backgrounds
+  useEffect(() => {
+    const createNewBackgrounds = () => {
+      if (!settingUtils.images) {
+        console.log('⚠️ Sem imagens para processar');
+        return;
+      }
+      
+      console.log('🔍 Verificando backgrounds para:', settingUtils.images);
+      
+      // Processa todos os backgrounds de uma vez
+      const pendingBackgrounds = settingUtils.images.filter(image => {
+        const name = image.split('.')[0];
+        return !backgrounds.some(bg => bg.name === name);
+      });
+
+      if (pendingBackgrounds.length > 0) {
+        console.log('✨ Criando novos backgrounds:', pendingBackgrounds);
+        
+        const newBackgrounds = pendingBackgrounds.map(image => ({
+          _resourceType: 'background' as const,
+          id: uuidv4(),
+          autoColor: false,
+          name: image.split('.')[0],
+          filename: image,
+          imageWidth: 0,
+          imageHeight: 0,
+          tileColors: '',
+          _saved: false,
+          _deleted: false,
+        }));
+
+        setBackgrounds(prev => [...prev, ...newBackgrounds]);
+      }
+
+      // Separa a extensão das imagens
+      const validNames = settingUtils.images.map(image => image.split('.')[0]);
+
+      // Marca digitalmente como deletados os backgrounds que não existem mais nas imagens
+      const updatedBackgrounds = backgrounds.map(bg => {
+        if (!validNames.includes(bg.name)) {
+          return { ...bg, _deleted: true, _saved: false };
+        }
+        return bg;
+      });
+
+      // Se houve alguma alteração, atualiza o estado
+      if (
+        backgrounds.some(bg => !validNames.includes(bg.name) && !bg._deleted) ||
+        backgrounds.length !== updatedBackgrounds.length
+      ) {
+        setBackgrounds(updatedBackgrounds);
+      }
+    };
+
+    createNewBackgrounds();
+  }, [settingUtils.images]);
+
+  // Segundo useEffect - Gerencia fetch inicial e listener
   useEffect(() => {
     const startFetchBackgrounds = async () => {
       try {
         const response = await window.electronAPI.fetchImages('backgrounds');
         if (response.status === 'success') {
-          console.log('..: Response fetchBackgrounds:', response);
-          // Atualize a interface com as imagens
-          setBackgrounds({ images: response.fileImages, localPath: response.localPath });
-        } else {
-          console.error('Error fetchBackgrounds:', response.message);
+          console.log('📥 Recebido backgrounds:', response);
+          setSettingUtils(prev => ({ 
+            ...prev, 
+            images: response.fileImages, 
+            localImagePath: response.localPath 
+          }));
         }
       } catch (error) {
-        console.error('Error catch fetchBackgrounds:', error);
+        console.error('❌ Erro ao buscar backgrounds:', error);
       }
     };
 
     startFetchBackgrounds();
 
-    // Configurar listener para atualizações
+    // Listener para atualizações
     window.electronAPI.onUpdateImages((updatedImages: any) => {
-      console.log('..: onUpdateImages backgrounds chegando:', updatedImages);
-      setBackgrounds(updatedImages); // Atualizar lista de imagens
+      console.log('🔄 Novos backgrounds chegando:', updatedImages);
+      setSettingUtils(prev => ({ 
+        ...prev, 
+        images: updatedImages.images, 
+        localImagePath: updatedImages.localPath 
+      }));
+      console.log('📥 images setada:', settingUtilsRef.current.images);
     });
 
   }, []);
+
+  // function getImageInfo(imagePath:) {
+  //   return new Promise((resolve, reject) => {
+  //       const img = new Image(); // Cria um objeto de imagem
+  //       img.src = imagePath; // Define o caminho da imagem
+
+  //       // Quando a imagem for carregada com sucesso
+  //       img.onload = () => {
+  //           resolve({
+  //               filename: imagePath.split('/').pop(), // Extrai o nome do arquivo do caminho
+  //               imageWidth: img.width, // Largura da imagem
+  //               imageHeight: img.height, // Altura da imagem
+  //           });
+  //       };
+
+  //       // Em caso de erro ao carregar a imagem
+  //       img.onerror = (err) => reject(`Erro ao carregar a imagem: ${err}`);
+  //   });
+  // }
 
   return (
     <DndContext onDragStart={handleMoveBackStart} onDragEnd={handleDragEnd}>
@@ -434,8 +575,8 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
           <FloatButttonsGW 
             onResetPanelSize={resetPanelSize} 
             onShowFloatButton={setShowFloatButton} 
-            showFloatButton={showFloatButton} 
-            updateActiveSubButton={setActiveSubButton}/>
+            showFloatButton={showFloatButton}
+          />
         </Affix>
       </Row>
 
@@ -472,10 +613,10 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
           onClick={(event) => handleMouseClick(event)}
         >
           <Grid size={gridValue} marginTop={titleHeight - 33} marginLeft={leftLimite} />
-          <DragAndDrop onDrop={(event) => handleDrop(event, state.scale)} /*height={worldSize.height + titleHeight} width={worldSize.width + leftLimite}*/ />
+          <DragAndDrop onDrop={(event) => handleDropOrCreate(event, state.scale)} /*height={worldSize.height + titleHeight} width={worldSize.width + leftLimite}*/ />
 
           {/* Retângulo que segue o mouse */}
-          {mousePos && activeSubButton.activeSubButton === "Scene" && (
+          {mousePos && settingUtils.activeSubButton === "Scene" && (
             <Content
               style={{
                 position: "absolute",
@@ -492,13 +633,13 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
             />
           )}
 
-          <Content style={{ backgroundColor: 'red', pointerEvents: activeSubButton.activeSubButton === "Scene" ? "none" : "auto", }}>
-            {elements.map((element) => (
+          <Content style={{ backgroundColor: 'red', pointerEvents: settingUtils.activeSubButton === "Scene" ? "none" : "auto", }}>
+            {scenes.map((scene) => (
+             scene._deleted ? '' : 
               <GameElement
-                key={element.id}
-                {...element}
-                isSelected={element.id === selectedElement}
-                onSelect={handleSelect}
+                element={scene}
+                isSelected={scene.id === elementSelected?.id}
+                onSelect={() => handleSelect(scene)}
               />
             ))}
           </Content>

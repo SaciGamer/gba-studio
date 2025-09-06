@@ -1,32 +1,29 @@
-import React, { CSSProperties, Dispatch, SetStateAction, useEffect, useState } from 'react';
+import React, { CSSProperties, Dispatch, SetStateAction, useContext, useEffect, useState } from 'react';
 import { AppstoreAddOutlined, AuditOutlined, BgColorsOutlined, BlockOutlined, BorderInnerOutlined, ClearOutlined, CloseSquareOutlined, EditFilled, ExpandOutlined, ExperimentOutlined, FormatPainterFilled, FormatPainterOutlined, InsertRowAboveOutlined, LayoutFilled, PicLeftOutlined, PictureFilled, PlusSquareFilled, SelectOutlined, VerticalAlignMiddleOutlined, } from '@ant-design/icons';
 import { FloatButton, Dropdown, Row, Popover, Tooltip } from 'antd';
 import { AntdToken } from '../components/common/AntDToken';
-
-interface IActiveButtons {
-  activeButton: string | number;
-  activeSubButton: string | number;
-}
+import { useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
 
 interface IFloatButttonsGW {
   onResetPanelSize: () => void;
   onShowFloatButton: (show: boolean) => void;
   showFloatButton: boolean;
-  updateActiveSubButton: Dispatch<SetStateAction<IActiveButtons>>;
 }
 
-const FloatButttonsGW: React.FC<IFloatButttonsGW> = ({ onResetPanelSize, onShowFloatButton, showFloatButton, updateActiveSubButton }) => {
+const FloatButttonsGW: React.FC<IFloatButttonsGW> = ({ onResetPanelSize, onShowFloatButton, showFloatButton/*, updateActiveSubButton */}) => {
   const { token } = AntdToken();
 
   // const [activeButton, setActiveButton] = useState('select');
-  const [activeButtons, setActiveButtons] = useState<IActiveButtons>({activeButton: 'select', activeSubButton: ''});
+  const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
+  // const [activeButtons, setActiveButtons] = useState<IActiveButtons>({activeButton: 'select', activeSubButton: ''});
   const [numberNofity, setNumberNofity] = useState<string | number>('0');
 
   useEffect(() => {
-    if (activeButtons) {
-      updateActiveSubButton(activeButtons);
+    if (settingUtils) {
+      handleButtonClick(settingUtils.activeButton, settingUtils.activeSubButton);
     }
-  }, [activeButtons]);
+    console.log('..: handleButtonClick ActiveButtons:', settingUtils.activeButton, settingUtils.activeSubButton);
+  }, [settingUtils.activeButton, settingUtils.activeSubButton]);
 
   const handleButtonClick = (activeButtonKey: number | string, subButtonKey?: number | string) => {
     setEraseMenu(false);
@@ -54,7 +51,11 @@ const FloatButttonsGW: React.FC<IFloatButttonsGW> = ({ onResetPanelSize, onShowF
       setNumberNofity(0);
     }
 
-    setActiveButtons({ activeButton: activeButtonKey, activeSubButton: subButtonKey ? subButtonKey : 0 });
+    setSettingUtils(prev => ({
+      ...prev, 
+      activeButton: activeButtonKey, 
+      activeSubButton: subButtonKey ? subButtonKey : 0
+    }));
   };
 
   // Menus Superiores
@@ -127,7 +128,7 @@ const FloatButttonsGW: React.FC<IFloatButttonsGW> = ({ onResetPanelSize, onShowF
           </Row>
         </Tooltip>
       ),
-      style: { backgroundColor: activeButtons?.activeButton === 'Actor' ? token.colorPrimary : 'transparent' },
+      style: { backgroundColor: settingUtils.activeButton === 'Actor' ? token.colorPrimary : 'transparent' },
     },
     {
       key: 'Trigger',
@@ -139,7 +140,7 @@ const FloatButttonsGW: React.FC<IFloatButttonsGW> = ({ onResetPanelSize, onShowF
           </Row>
         </Tooltip>
       ),
-      style: { backgroundColor: activeButtons?.activeButton === 'Trigger' ? token.colorPrimary : 'transparent' },
+      style: { backgroundColor: settingUtils.activeButton === 'Trigger' ? token.colorPrimary : 'transparent' },
     },
     {
       key: 'Scene',
@@ -151,7 +152,7 @@ const FloatButttonsGW: React.FC<IFloatButttonsGW> = ({ onResetPanelSize, onShowF
           </Row>
         </Tooltip>
       ),
-      style: { backgroundColor: activeButtons?.activeButton === 'Scene' ? token.colorPrimary : 'transparent' },
+      style: { backgroundColor: settingUtils.activeButton === 'Scene' ? token.colorPrimary : 'transparent' },
     },
   ];
 
@@ -208,17 +209,17 @@ const FloatButttonsGW: React.FC<IFloatButttonsGW> = ({ onResetPanelSize, onShowF
           <FloatButton
             // tooltip={'Select (v)'} 
             icon={<EditFilled style={{ ...baseIconStyle()/*, color: activeButton === 'select' ? token.colorPrimary : token.colorTextBase */ }} />}
-            style={{ ...baseButtonStyle, backgroundColor: activeButtons.activeButton === 'select' ? token.colorPrimary : token.colorBgElevated, }}
+            style={{ ...baseButtonStyle, backgroundColor: settingUtils.activeButton === 'select' ? token.colorPrimary : token.colorBgElevated, }}
             onClick={() => handleButtonClick('select')}
           />
         </Tooltip>
-        <Tooltip >
+        <Tooltip placement="right" title={'Multi Add'} color={token.colorBorder}>
           <Dropdown menu={menu} trigger={['click']} >
             <FloatButton
               badge={{ showZero: false, dot: notification, count: numberNofity, color: token.colorInfo }}
-              // tooltip={'Add (a)'}
+              // tooltip={'Multi Add (a)'}
               icon={<AppstoreAddOutlined style={{ ...baseIconStyle() }} />}
-              style={{ ...baseButtonStyle, backgroundColor: activeButtons.activeButton === 'add' ? token.colorPrimary : token.colorBgElevated }}
+              style={{ ...baseButtonStyle, backgroundColor: settingUtils.activeButton === 'add' ? token.colorPrimary : token.colorBgElevated }}
               onMouseOver={() => setNotification(false)}
               onMouseLeave={() => setNotification(true)}
             />
@@ -228,7 +229,7 @@ const FloatButttonsGW: React.FC<IFloatButttonsGW> = ({ onResetPanelSize, onShowF
           <FloatButton
             // tooltip={'Eraser (e)'}
             icon={<ClearOutlined style={{ ...baseIconStyle()/*, color: activeButton === 'eraser' ? token.colorPrimary : token.colorTextBase */ }} />}
-            style={{ ...baseButtonStyle, backgroundColor: activeButtons.activeButton === 'eraser' ? token.colorPrimary : token.colorBgElevated, }}
+            style={{ ...baseButtonStyle, backgroundColor: settingUtils.activeButton === 'eraser' ? token.colorPrimary : token.colorBgElevated, }}
             onClick={() => handleButtonClick('eraser')}
           />
         </Tooltip>
@@ -236,7 +237,7 @@ const FloatButttonsGW: React.FC<IFloatButttonsGW> = ({ onResetPanelSize, onShowF
           <FloatButton
             // tooltip={'Collisions (c)'}
             icon={<InsertRowAboveOutlined style={{ ...baseIconStyle()/*, color: activeButton === 'collisions' ? token.colorPrimary : token.colorTextBase*/ }} />}
-            style={{ ...baseButtonStyle, backgroundColor: activeButtons.activeButton === 'collisions' ? token.colorPrimary : token.colorBgElevated }}
+            style={{ ...baseButtonStyle, backgroundColor: settingUtils.activeButton === 'collisions' ? token.colorPrimary : token.colorBgElevated }}
             onClick={() => handleButtonClick('collisions')}
           />
         </Tooltip>
@@ -244,7 +245,7 @@ const FloatButttonsGW: React.FC<IFloatButttonsGW> = ({ onResetPanelSize, onShowF
           <FloatButton
             // tooltip={'Colorize (Z)'}
             icon={<FormatPainterFilled style={{ ...baseIconStyle()/*, color: activeButton === 'colorize' ? token.colorPrimary : token.colorTextBase*/ }} />}
-            style={{ ...baseButtonStyle, backgroundColor: activeButtons.activeButton === 'colorize' ? token.colorPrimary : token.colorBgElevated }}
+            style={{ ...baseButtonStyle, backgroundColor: settingUtils.activeButton === 'colorize' ? token.colorPrimary : token.colorBgElevated }}
             onClick={() => handleButtonClick('colorize')}
           />
         </Tooltip>
@@ -270,7 +271,7 @@ const FloatButttonsGW: React.FC<IFloatButttonsGW> = ({ onResetPanelSize, onShowF
                 onClick={() => handleButtonClick('eraser', index)}
                 style={{
                   ...applyFormatButtonStyles(index, eraseMenuButtons.length, horizontalButtonStyle), ...button.style,
-                  backgroundColor: activeButtons.activeButton === 'eraser' && activeButtons.activeSubButton === index ? token.colorPrimary : token.colorBgElevated
+                  backgroundColor: settingUtils.activeButton === 'eraser' && settingUtils.activeSubButton === index ? token.colorPrimary : token.colorBgElevated
                 }}
               />
             </Popover>
@@ -288,7 +289,7 @@ const FloatButttonsGW: React.FC<IFloatButttonsGW> = ({ onResetPanelSize, onShowF
                 onClick={() => handleButtonClick('collisions', index)}
                 style={{
                   ...applyFormatButtonStyles(index, collisionMenuButtons.length, horizontalButtonStyle), ...button.style,
-                  backgroundColor: activeButtons.activeButton === 'collisions' && activeButtons.activeSubButton === index ? token.colorPrimary : token.colorBgElevated
+                  backgroundColor: settingUtils.activeButton === 'collisions' && settingUtils.activeSubButton === index ? token.colorPrimary : token.colorBgElevated
                 }}
               />
             </Popover>
@@ -306,7 +307,7 @@ const FloatButttonsGW: React.FC<IFloatButttonsGW> = ({ onResetPanelSize, onShowF
                 onClick={() => handleButtonClick('colorize', index)}
                 style={{
                   ...applyFormatButtonStyles(index, colorizeMenuButtons.length, horizontalButtonStyle), ...button.style,
-                  backgroundColor: activeButtons.activeButton === 'colorize' && activeButtons.activeSubButton === index ? token.colorPrimary : token.colorBgElevated
+                  backgroundColor: settingUtils.activeButton === 'colorize' && settingUtils.activeSubButton === index ? token.colorPrimary : token.colorBgElevated
                 }}
               />
             </Tooltip>

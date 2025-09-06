@@ -1,17 +1,15 @@
-export interface BaseSettings {
+export interface IBaseSettings {
     _resourceType: string;
 }
 
-export interface SettingsUtils extends BaseSettings {
-    _resourceType: 'main';
+export interface ISettingsUtils extends IBaseSettings {
     saved: boolean;
     projectPathFile: string | null;
     projectDirectory: string | null;
     baseTitle: string;
 }
 
-export interface MainSettings extends BaseSettings {
-    _resourceType: 'settings';
+export interface IMainSettings extends IBaseSettings {
     startSceneId: string;
     startX: number;
     startY: number;
@@ -21,14 +19,13 @@ export interface MainSettings extends BaseSettings {
     colorMode: string;
 }
 
-export interface ProjectSettings extends FileSettings {
-    _resourceType: 'project';
+export interface IProjectSettings extends IFileSettings {
     name: string | null;
     author: string;
     notes: string;
 }
 
-export interface FileSettings extends BaseSettings {
+export interface IFileSettings extends IBaseSettings {
     _version: string | null;
     _release: string;
 }

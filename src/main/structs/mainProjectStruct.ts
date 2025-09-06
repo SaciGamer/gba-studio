@@ -1,33 +1,28 @@
 import path from 'path';
 import fs from 'fs';
-import { createProjectSettingsStruct } from './projectSettingsStruct';
-import { ProjectManager } from '@/managers/ProjectManager';
-import { SettingsController } from '@/controllers/SettingsController';
+import { createGenericSettingsStruct } from './projectSettingsStruct';
 import { packageJson } from '@/main';
+import { defaultMainSettings, defaultProjectSettings } from './defaultValuesInterface';
+import { SettingsController } from '@/controllers/SettingsController';
+import { IProjectSettings } from '@/interfaces/MainSettingsInterface';
 
 // Controllers
-const settingsController = SettingsController.getInstance();
-const projectController = settingsController.getSettings('project') as ProjectManager;
-
+let projectSettings = defaultProjectSettings;
 const defaultContentGit = `build/\ncache/\n\n*.bak\n*.sav\n*.icloud\n\nuser_settings.gbasres`;
-
-export function getMainFile() {
-  return `${projectController.getProjectName()}.gbaproj`;
-}
 
 export function createProjectStruct(basePath: string): void {
   console.log('..: createProjectStruct basePath: ', basePath);
   const projectName = basePath.split(path.sep).filter(Boolean).pop() || '';
-  projectController.setProjectName(projectName);
-  projectController.updateData({ _version: packageJson.version });
-  console.log('..: createProjectStruct projectName: ', projectController.getProjectName());
-  
+  projectSettings.name = projectName;
+  projectSettings._version = packageJson.version;
+  console.log('..: createProjectStruct projectName: ', projectSettings.name);
+
   console.log('..: Criando estrutura de pastas :..');
   // Estrutura de pastas
   const folders = ['assets', 'plugins', 'project'];
   const assets = ['avatars', 'backgrounds', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui'];
   const projects = ['backgrounds', 'emotes', 'fonts', 'musics', 'palettes', 'sprites'];
-  const files = ['.gitignore', `${projectController.getProjectName()}.gbaproj`];
+  const files = ['.gitignore', `${projectSettings.name}.gbaproj`];
 
   // Criação de pastas
   folders.forEach(folder => {
@@ -58,21 +53,17 @@ export function createProjectStruct(basePath: string): void {
 
   // Criação de arquivo de settings
   const settingsPath = path.join(basePath, folders[2]);
-  createProjectSettingsStruct(settingsPath);
+  createGenericSettingsStruct(settingsPath, 'settings', defaultMainSettings);
 
   // Criação de arquivo do projeto e gitignore
   files.forEach(file => {
-    const filePath = path.join(basePath, file);
-    if (!fs.existsSync(filePath)) {
-      if (file.endsWith('.gbaproj'))
-        fs.writeFileSync(filePath, JSON.stringify(projectController.getData(), null, 2));
-      else if (file.endsWith('.gitignore'))
-        fs.writeFileSync(filePath, defaultContentGit);
-      else
-        fs.writeFileSync(filePath, '');
-
-      console.log(`..: Arquivo criado: ${filePath}`);
+    if (file.endsWith('.gbaproj'))
+      createGenericSettingsStruct(basePath, file, projectSettings);
+    else if (file.endsWith('.gitignore')) {
+      createGenericSettingsStruct(basePath, file, null, defaultContentGit);
     }
+    else
+      createGenericSettingsStruct(basePath, file);
   });
 
   console.log('..: Criando estrutura de pastas - END :..');

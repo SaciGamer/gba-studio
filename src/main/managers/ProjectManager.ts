@@ -1,19 +1,10 @@
-import os from 'os';
-import { ProjectSettings } from '@/interfaces/MainSettingsInterface';
+import { defaultProjectSettings } from '@/structs/defaultValuesInterface';
 import { BaseManager } from './BaseManager';
+import { IProjectSettings } from '@/interfaces/MainSettingsInterface';
 
-let userProjectSettingDefault: ProjectSettings = {
-    _resourceType: "project",
-    name: null,
-    author: os.userInfo().username,
-    notes: "",
-    _version: "", // pegar versão do sistema versionApplication
-    _release: "1"
-};
-
-export class ProjectManager extends BaseManager<ProjectSettings> {
+export class ProjectManager extends BaseManager<IProjectSettings> {
     protected constructor() {
-        super(userProjectSettingDefault);
+        super(defaultProjectSettings);
     }
 
     public static getInstance(): ProjectManager {
@@ -24,11 +15,13 @@ export class ProjectManager extends BaseManager<ProjectSettings> {
     }
 
     public setProjectName(name: string): string | null {
-        return this.data.name = name;
+        let response = this.getData();
+        return response ? response.name = name : null;
     }
 
     public getProjectName(): string | null {
-        return this.data.name;
+        let response = this.getData();
+        return response ? response.name : null;
     }
 
 }

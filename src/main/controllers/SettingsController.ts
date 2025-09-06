@@ -1,16 +1,6 @@
-import { MainSettings, ProjectSettings, SettingsUtils } from "@/interfaces/MainSettingsInterface";
-import { MainSettingsManager } from "@/managers/MainSettingsManager";
-import { ProjectManager } from "@/managers/ProjectManager";
 import { SettingsUtilsManager } from "@/managers/SettingsUtilsManager";
 
-export class SettingsController {
-    private static instance: SettingsController | null = null;
-    private projectManager = ProjectManager.getInstance();
-    private mainSettingsManager = MainSettingsManager.getInstance();
-    private settingsUtilsManager = SettingsUtilsManager.getInstance();
-
-    private constructor() {}
-
+export class SettingsController extends SettingsUtilsManager {
     public static getInstance(): SettingsController {
         if (!SettingsController.instance) {
             SettingsController.instance = new SettingsController();
@@ -18,47 +8,37 @@ export class SettingsController {
         return SettingsController.instance;
     }
 
-    public updateSettings<T>(type: 'main' | 'settings' | 'project', newData: Partial<T>): T {
-        switch (type) {
-            case 'main':
-                this.settingsUtilsManager.updateData(newData as Partial<SettingsUtils>);
-                return this.settingsUtilsManager.getData() as unknown as T;
-            case 'settings':
-                this.mainSettingsManager.updateData(newData as Partial<MainSettings>);
-                return this.mainSettingsManager.getData() as unknown as T;
-            
-            case 'project':
-                this.projectManager.updateData(newData as Partial<ProjectSettings>);
-                return this.projectManager.getData() as unknown as T;
-
-            default:
-                throw new Error('..: updateSettings invalid settings type');
-        }
+    public addNewItem<T>(newItem: T): void {
+        this.addItem(newItem);
     }
 
-    public getSettings<T>(type: 'main' | 'settings' | 'project'): T {
+    public updateSettings<T>(newData: Partial<T>): T {
+        return this.update(newData) as unknown as T;
+    }
+
+    public getSettingsData<T>(type: 'main' | 'settings' | 'project' | 'scene' | 'all'): T | T[] {
         switch (type) {
             case 'main':
-                return this.settingsUtilsManager as unknown as T;
+                return this.getLocalSettingsUtils() as unknown as T;
             case 'settings':
-                return this.mainSettingsManager as unknown as T;
             case 'project':
-                return this.projectManager as unknown as T;
+                return this.getDataByType(type) as unknown as T;
+            case 'scene':
+                return this.getAllDataByType(type) as unknown as T[];
+            case 'all':
+                return this.getDataArray() as unknown as T[];
             default:
                 throw new Error('..: getSettings invalid settings type');
         }
     }
 
-    public getSettingsData<T>(type: 'main' | 'settings' | 'project'): T {
+    public deleteSettings(type: 'scene', idOrResourceType: string): boolean {
         switch (type) {
-            case 'main':
-                return this.settingsUtilsManager.getData() as unknown as T;
-            case 'settings':
-                return this.mainSettingsManager.getData() as unknown as T;
-            case 'project':
-                return this.projectManager.getData() as unknown as T;
+            case 'scene':
+                return this.removeItemByIdOrResourceType(idOrResourceType);
             default:
-                throw new Error('..: getSettings invalid settings type');
+                throw new Error('..: deleteSettings invalid settings type');
         }
     }
+
 }

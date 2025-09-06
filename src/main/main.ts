@@ -9,24 +9,30 @@ import { spawn } from 'child_process';
 
 import windowStateKeeper from 'electron-window-state';
 import { getPreferences, updatePreferences } from './handlers/preferenceHandlers';
-import { saveChanges, setProjectDirectory, setProjectFile, updateWindowTitle } from './services/saveSettingsService';
+import { requestSaveChanges, setProjectDirectory, setProjectFile } from './services/saveSettingsService';
 import { createProjectStruct } from './structs/mainProjectStruct';
 import menuTemplate from './menuTemplate';
-import { loadSettings } from './services/loadSettingsService';
+// import { loadSettings } from './services/loadSettingsService';
 import compileGBA from './utils/gbaCompiler/compile-gba';
 import initializeIpcHandlers from './controllers/HandlerController';
-import { SettingsUtilsManager } from './managers/SettingsUtilsManager';
 import { startWatch, stopAllWatchers } from './services/imagemService';
+import { SettingsController } from './controllers/SettingsController';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-export const packageJson = JSON.parse(fs.readFileSync(`${path.join(app.getAppPath(), './package.json')}`, 'utf-8'));
+
 const preloadPath = path.join(__dirname, 'preload', 'preload.js');
 const iconPath = path.join(app.getAppPath(), 'icon', 'defaultImgIcon.png');
 
+const packageJsonPath = isDev
+  ? path.resolve(__dirname, '../../package.json') // Em dev, busca na raiz do projeto
+  : path.join(app.getAppPath(), 'package.json');  // Em produção, usa o app.getAppPath()
+
+export const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+export let directoryPathProject: any;
+
 let mainWindowIsClosing = false;
 let currentTheme: string = getPreferences().theme;
-export let directoryPathProject: any;
 
 // Registrar esquema personalizado como privilegiado
 protocol.registerSchemesAsPrivileged([
@@ -47,7 +53,7 @@ interface Windows {
 }
 
 // Window management
-const windows: Windows = {
+export const windows: Windows = {
   splash: null,
   launcher: null,
   main: null,
@@ -136,7 +142,7 @@ export function createLauncherWindow(selectTab: string | null, isSplash: boolean
 }
 
 // Criar Janela Programa
-function createProjectWindow(filePath: string): void {
+function createProjectWindow(projectFilePath: string): void {
   // Carregar o estado anterior da janela
   const engineWindowState = windowStateKeeper({
     defaultWidth: 1200,
@@ -150,7 +156,6 @@ function createProjectWindow(filePath: string): void {
     y: engineWindowState.y,
     width: engineWindowState.width,
     height: engineWindowState.height,
-
     icon: iconPath,
     webPreferences: {
       preload: preloadPath,
@@ -169,11 +174,12 @@ function createProjectWindow(filePath: string): void {
   if (isDev) {
     windows.main?.webContents.openDevTools();
   }
+  console.log('..: createProjectWindow setting loaded:', projectFilePath);
 
   windows.main.loadURL(
     isDev
-      ? `http://localhost:5173#engine?file=${encodeURIComponent(filePath)}`
-      : `file://${path.join(__dirname, '../renderer', 'index.html')}#/engine?file=${encodeURIComponent(filePath)}`
+      ? `http://localhost:5173#engine?path=${encodeURIComponent(projectFilePath)}`
+      : `file://${path.join(__dirname, '../renderer', 'index.html')}#/engine?path=${encodeURIComponent(projectFilePath)}`
   );
 
   // Detecta quando a janela perde o foco
@@ -188,7 +194,7 @@ function createProjectWindow(filePath: string): void {
 
   windows.main?.once('ready-to-show', () => {
     windows.main?.show(); // Show the window when the content has been loaded
-    updateWindowTitle();
+    // updateWindowTitle();
   });
 
   windows.main.on('close', async (event) => {
@@ -295,7 +301,7 @@ app.whenReady().then(() => {
       if (fs.existsSync(filePath)) {
         const fileBuffer = fs.readFileSync(filePath);
 
-        return new Response(fileBuffer, {
+        return new Response(new Uint8Array(fileBuffer), {
           status: 200, // Success
           headers: { 'Content-Type': 'image/png' },
         });
@@ -320,10 +326,9 @@ app.whenReady().then(() => {
 });
 
 async function handleWindowClose(window: BrowserWindow) {
-  const settingsUtilsManager = SettingsUtilsManager.getInstance();
-  const settingsData = settingsUtilsManager.getData();
+  const settingsController = SettingsController.getInstance();
 
-  if (!settingsData.saved) {
+  if (!settingsController.isSaved()) {
     const response = await dialog.showMessageBox(window, {
       type: 'info',
       buttons: ['Save', 'Don\'t Save', 'Cancelar'],
@@ -335,10 +340,10 @@ async function handleWindowClose(window: BrowserWindow) {
     });
 
     if (response.response === 0) { // Botão "Save"
-      saveChanges();
+      requestSaveChanges();
       return true; // Permitir o fechamento
     } else if (response.response === 1) { // Botão "Don't Save"
-      settingsUtilsManager.updateData({ saved: true });
+      settingsController.setIsSaved(true);
       return true; // Permitir o fechamento
     } else if (response.response === 2) { // Botão "Cancelar"
       return false; // Impedir fechamento
@@ -365,17 +370,20 @@ async function loadProject(filePath: string) {
   
   stopAllWatchers();
   // cleanAllTargetDir();
-
+  
   // Criar o menu a partir do template
   const menu = Menu.buildFromTemplate(menuTemplate());
   // Definir o menu da aplicação
   Menu.setApplicationMenu(menu)
-
+  
   // Cria a janela
   console.log('..: loadProject filePath %s received', filePath);
+  
+  // await loadSettings(filePath);
 
   const file = path.basename(filePath);
   const directory = path.dirname(filePath);
+
   directoryPathProject = setProjectDirectory(directory);
   setProjectFile(file);
 
@@ -385,7 +393,6 @@ async function loadProject(filePath: string) {
   updatePreferences('recentProjects', { title: file  , path: directory});
 
   createProjectWindow(filePath);
-  loadSettings(filePath);
 };
 
 // Função para iniciar o Emulador

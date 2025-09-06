@@ -12,6 +12,7 @@ import SplashScreen from './components/pages/splashScreen/SplashScreen';
 import Launcher from './components/pages/launcher/Launcher';
 import About from './components/pages/about/About';
 import Engine from './components/pages/engine/Engine';
+import AppProvider from './providers/AppProviders';
 
 interface Preferences {
   theme: string;
@@ -201,17 +202,19 @@ const App: React.FC = () => {
     // }}
     // floatButtonGroup={{ size: 'large' }}
     >
-      <HashRouter>
-        <Content style={{ height: '100vh', filter: isWindowActive ? 'none' : 'grayscale(100%)' }}>
-          <Routes>
-            <Route path="/launcher" element={<Launcher />} />
-            <Route path="/engine" element={<Engine />} />
-            <Route path="/splash" element={<SplashScreen />} />
-            <Route path="/about" element={<About />} />
-            <Route path="*" element={<Navigate to="/launcher" replace />} />
-          </Routes>
-        </Content>
-      </HashRouter>
+      <AppProvider>
+        <HashRouter>
+          <Content style={{ height: '100vh', filter: isWindowActive ? 'none' : 'grayscale(100%)' }}>
+            <Routes>
+              <Route path="/launcher" element={<Launcher />} />
+              <Route path="/engine" element={<Engine />} />
+              <Route path="/splash" element={<SplashScreen />} />
+              <Route path="/about" element={<About />} />
+              <Route path="*" element={<Navigate to="/launcher" replace />} />
+            </Routes>
+          </Content>
+        </HashRouter>
+      </AppProvider>
     </ConfigProvider>
   );
 }

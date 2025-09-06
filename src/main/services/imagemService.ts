@@ -12,9 +12,9 @@ const debounceInterval = 100; // Intervalo em milissegundos para ignorar eventos
 
 // Pegar caminho completo da imagem
 const getFullPathImages = (files: any, assetsPath: string) => {
-   // Retorna o caminho completo de cada arquivo
-    const fullPaths = files.map((file: any) => path.join(assetsPath, file));
-    console.log('..: fetch-images:', fullPaths);
+  // Retorna o caminho completo de cada arquivo
+  const fullPaths = files.map((file: any) => path.join(assetsPath, file));
+  console.log('..: fetch-images:', fullPaths);
 }
 
 const preparePathForFrontend = (filePath: string) => {
@@ -100,15 +100,15 @@ const watchImages = (win: any, monitoredDir: string, targetUserDir: string | nul
 
   const watch = fs.watch(monitoredDir, (eventType, fileName) => {
     if (fileName) {
-    //   if (eventCache[monitoredDir]) {
-    //     // Ignora eventos repetidos dentro do intervalo
-    //     return;
-    //   }
+      //   if (eventCache[monitoredDir]) {
+      //     // Ignora eventos repetidos dentro do intervalo
+      //     return;
+      //   }
 
-    //   eventCache[monitoredDir] = true;
-    //   setTimeout(() => {
-    //     delete eventCache[monitoredDir]; // Limpa o cache após o intervalo
-    //   }, debounceInterval);
+      //   eventCache[monitoredDir] = true;
+      //   setTimeout(() => {
+      //     delete eventCache[monitoredDir]; // Limpa o cache após o intervalo
+      //   }, debounceInterval);
 
       console.log(`..: Alteração detectada: ${eventType} no arquivo ${fileName}`);
       const imagesNames = syncImagesIncrementally(monitoredDir, null); // Atualiza lista de arquivos
@@ -121,7 +121,7 @@ const watchImages = (win: any, monitoredDir: string, targetUserDir: string | nul
 };
 
 // Iniciar o monitoramento
-export function startWatch (win: BrowserWindow | null, projectPath: string/*, targetUserDir: string*/) {
+export function startWatch(win: BrowserWindow | null, projectPath: string/*, targetUserDir: string*/) {
   if (!win) {
     return { status: 'error', message: 'Nenhuma janela ativa encontrada' };
   }
@@ -141,7 +141,7 @@ export function startWatch (win: BrowserWindow | null, projectPath: string/*, ta
 //   }
 // };
 
-export function createUserPathTargetDir (folderName: string) {
+export function createUserPathTargetDir(folderName: string) {
   const targetDirWithFolder = path.join(targetDir, 'assets', folderName);
 
   // Garantir que a pasta exista
@@ -153,3 +153,8 @@ export function createUserPathTargetDir (folderName: string) {
   return targetDirWithFolder;
 };
 
+
+// TODO salvar imagem na base
+export function saveImageSettings(imageSettings: string) {
+
+}

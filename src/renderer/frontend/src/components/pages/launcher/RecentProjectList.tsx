@@ -85,9 +85,9 @@ const RecentProjectList: React.FC<RecentProjectListProps> = ({ projects, handleR
             <List.Item.Meta
               style={{ marginLeft: '10px' }}
               title={
-                <Typography.Title ellipsis level={4} style={{ marginTop: '10px' }}>
+                <span style={{  marginTop: '10px', fontWeight: 600, fontSize: 20, display: 'block' }}>
                   {item.title}
-                </Typography.Title>
+                </span>
               }
               description={
                 <Typography.Text ellipsis type='secondary' style={{ marginBottom: '5px' }} >

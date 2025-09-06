@@ -1,17 +1,15 @@
 import path from 'path';
 import fs from 'fs';
-import { SettingsController } from '@/controllers/SettingsController';
-import { MainSettingsManager } from '@/managers/MainSettingsManager';
 
-// Controllers
-const settingsController = SettingsController.getInstance();
-const mainSettingsManager = settingsController.getSettings('settings') as MainSettingsManager;
+// Função para criar o arquivo ${nameFile}.gbasres
+export function createGenericSettingsStruct(basePath: string, nameFile: string, structSettings?: any, stringSettings?: any): void {
+    let filePath = path.join(basePath, nameFile);
 
-// Função para criar o arquivo settings.gbasres
-export function createProjectSettingsStruct(basePath: string): void {
-    const filePath = path.join(basePath, 'settings.gbasres');
-    if (!fs.existsSync(filePath)) {
-        fs.writeFileSync(filePath, JSON.stringify(mainSettingsManager.getData(), null, 2));
+    if (!nameFile.endsWith('.gbaproj') && !nameFile.endsWith('.gitignore'))
+        filePath = path.join(basePath, `${nameFile}.gbasres`);
+
+    if (filePath != null && !fs.existsSync(filePath)) {
+        fs.writeFileSync(filePath, structSettings ? JSON.stringify(structSettings, null, 2) : stringSettings ? `${stringSettings}` : '');
         console.log(`..: Arquivo de configurações criado: ${filePath}`);
     }
 }

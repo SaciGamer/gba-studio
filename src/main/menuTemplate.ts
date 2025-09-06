@@ -2,7 +2,7 @@ import { exec } from 'child_process';
 import { ipcMain, MenuItem, MenuItemConstructorOptions } from 'electron';
 import { updatePreferences, getPreferences } from './handlers/preferenceHandlers';
 import { changeTheme, createAboutWindow, createLauncherWindow } from './main'
-import { saveChanges } from './services/saveSettingsService';
+import { requestSaveChanges } from './services/saveSettingsService';
 
 let isShowCollisionsChecked = true;
 let isShowNavigatorChecked = true;
@@ -46,8 +46,8 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                     label: 'Save', 
                     accelerator: 'CmdOrCtrl+S', 
                     click: () => { 
-                        console.log('..: save pelo menu'); 
-                        saveChanges();
+                        console.log('..: Chamada para save pelo menu'); 
+                        requestSaveChanges();
                     } },
                 { 
                     label: 'Save As...', 

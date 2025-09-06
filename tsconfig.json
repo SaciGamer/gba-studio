@@ -16,7 +16,8 @@
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "sourceMap": false // "true" to Debug, "false" to Release
   },
   "exclude": ["node_modules", "dist", "release"]
 }

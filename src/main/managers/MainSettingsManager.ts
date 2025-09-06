@@ -1,7 +1,7 @@
-import { MainSettings } from '@/interfaces/MainSettingsInterface';
+import { IMainSettings } from '@/interfaces/MainSettingsInterface';
 import { BaseManager as BaseManager } from './BaseManager';
 
-const defaultMainSettings: MainSettings = {
+const defaultMainSettings: IMainSettings = {
     _resourceType: 'settings',
     startSceneId: '',
     startX: 9,
@@ -12,7 +12,7 @@ const defaultMainSettings: MainSettings = {
     colorMode: 'mono'
 };
 
-export class MainSettingsManager extends BaseManager<MainSettings> {
+export class MainSettingsManager extends BaseManager<IMainSettings> {
     protected static instance: MainSettingsManager | null = null;
 
     private constructor() {
@@ -27,31 +27,38 @@ export class MainSettingsManager extends BaseManager<MainSettings> {
     }
 
     public getStartSceneId(): string {
-        return this.data.startSceneId;
+        let response = this.getData();
+        return response ? response.startSceneId : '';
     }
 
     public getStartX(): number {
-        return this.data.startX;
+        let response = this.getData();
+        return response ? response.startX : 0;
     }
 
     public getStartY(): number {
-        return this.data.startY;
+        let response = this.getData();
+        return response ? response.startY : 0;
     }
 
     public getStartMoveSpeed(): number {
-        return this.data.startMoveSpeed;
+        let response = this.getData();
+        return response ? response.startMoveSpeed : 0;
     }
 
     public getStartAnimSpeed(): number {
-        return this.data.startAnimSpeed;
+        let response = this.getData();
+        return response ? response.startAnimSpeed : 0;
     }
 
     public getStartDirection(): string {
-        return this.data.startDirection;
+        let response = this.getData();
+        return response ? response.startDirection : '';
     }
 
     public getColorMode(): string {
-        return this.data.colorMode;
+        let response = this.getData();
+        return response ? response.colorMode : '';
     }
     
 }

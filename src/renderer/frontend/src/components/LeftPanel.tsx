@@ -2,27 +2,17 @@ import { BuildOutlined, CaretRightFilled, CaretRightOutlined, FileFilled, PlusOu
 import {  Collapse, Input, Layout, Splitter, Tooltip, Tree, TreeDataNode, Typography } from 'antd';
 import React, { Key, useEffect, useRef, useState } from 'react';
 import { AntdToken } from '../components/common/AntDToken';
-import { useBlockContext, BlockProvider } from './BlockContext';
+import { useElementContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
+import { ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
 
 const { Content } = Layout;
 const { Panel } = Collapse;
 const { Text } = Typography;
 
-// Definindo a interface para os props
-interface LeftPanelProps {
-  selectBlock: (id: number) => void;
-  selectedBlockId: number | null;
-}
-
-interface Block {
-  id: number;
-  title: string,
-  content: any;
-  sceneId: number;
-}
-
-const LeftPanel: React.FC<LeftPanelProps> = ({ selectBlock, selectedBlockId }) => {
-  const { blocks, addBlock } = useBlockContext();
+const LeftPanel: React.FC = () => {
+  const { scenes } = useSceneContext();
+  const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
+  const { elementSelected, setElementSelected } = useElementContext();
 
   const [isScenesOpen, setIsScenesOpen] = useState(true);
   const [isScriptsOpen, setIsScriptsOpen] = useState(true);
@@ -148,8 +138,9 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ selectBlock, selectedBlockId }) =
   };
 
   const [searchTerm, setSearchTerm] = useState('');
-  const filteredBlocks = Object.values(blocks).filter(block =>
-    block.title.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredBlocks = Object.values(scenes).filter(block =>
+    block.name?.toLowerCase().includes(searchTerm.toLowerCase()) && 
+    !block._deleted
   );
 
   const handleSearchClick = () => {
@@ -193,16 +184,17 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ selectBlock, selectedBlockId }) =
     </Tooltip>
   );
 
-  // Adicionar um novo bloco
-  const handleAddBlock = () => {
-    const newBlock: Block = { id: -1, title: "Novo Bloco", content: [], sceneId: 123654 };
-    console.log('..: Add new block');
-    addBlock(newBlock);
-  };
+  const handleCallNewScene = () => {
+    setSettingUtils(prev => ({
+      ...prev,
+      activeButton: 'add',
+      activeSubButton: 'Scene'
+    }))
+  }
 
   const functionAdd = () => (
     <Tooltip placement="bottom" title={"Add Scene"} color={token.colorBorder} >
-      <PlusOutlined style={{ marginLeft: 8, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); handleAddBlock() }} />
+      <PlusOutlined style={{ marginLeft: 8, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); handleCallNewScene() }} />
     </Tooltip>
   );
 
@@ -277,6 +269,12 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ selectBlock, selectedBlockId }) =
     setTreeHeightVariables(newSizes[2] - 50);
   };
 
+  const handleSelectElement = (element: ISceneSettings | null) => {
+    // setGlobalSelectedKey(elementId? `scenes-${elementId}` : null);
+    // setSelectBlockId(elementId? elementId : null);
+    setElementSelected(element);
+  }
+
   return (
     <Splitter layout="vertical"
       onResize={handleResize}
@@ -319,13 +317,12 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ selectBlock, selectedBlockId }) =
                     <Content
                       key={block.id}
                       onClick={() => {
-                        setGlobalSelectedKey(`scenes-${block.id}`);
-                        selectBlock(block.id);
+                        handleSelectElement(block);
                       }}
                       hidden={false}
                       style={{
                         backgroundColor:
-                          globalSelectedKey === `scenes-${block.id}`
+                          elementSelected?.id === block.id
                             ? token.colorPrimary
                             : 'transparent',
                         borderRadius: token.borderRadius,
@@ -334,7 +331,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ selectBlock, selectedBlockId }) =
                     >
                       <CaretRightFilled />
                       <BuildOutlined />
-                      <Text style={{ marginLeft: 5 }}>{block.title}</Text>
+                      <Text style={{ marginLeft: 5 }}>{block.name}</Text>
                     </Content>
                   ))}
                 </Content>

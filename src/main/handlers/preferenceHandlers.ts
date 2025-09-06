@@ -1,11 +1,11 @@
 import { IpcMainInvokeEvent, ipcMain } from 'electron';
 import Store from 'electron-store';
-import { Preferences, RecentProject, StoreData } from '@/interfaces/StoreInterface';
+import { IPreferences, IRecentProject, IStoreData } from '@/interfaces/StoreInterface';
 
-const __store = new Store<StoreData>();
+const __store = new Store<IStoreData>();
 
 // Defina um objeto de preferência padrão 
-const defaultPreferences: Preferences = {
+const defaultPreferences: IPreferences = {
   theme: 'systemDefault',
   language: 'pt_BR',
   recentProjects: [],
@@ -26,26 +26,26 @@ const defaultPreferences: Preferences = {
 
 // PREFERENCES CONFIG --------------------------------------------
 // Carregar configuração de preferências 
-export const getPreferences = (): Preferences => { 
+export const getPreferences = (): IPreferences => { 
   const responseGetStore = __store.get('preferences', defaultPreferences); 
   console.log('..: PreferencesConfig %s carregado do store!', responseGetStore)
   return responseGetStore; 
 } 
 
 // Salvar configuração de preferências 
-const savePreferences = (preferenceConfig: Preferences): void => { 
+const savePreferences = (preferenceConfig: IPreferences): void => { 
   __store.set('preferences', preferenceConfig); 
 }
 
 // Atualizar uma única configuração 
-export const updatePreferences = (key: keyof Preferences, value: any): void => {
+export const updatePreferences = (key: keyof IPreferences, value: any): void => {
   console.log("..: Atualizando preferencias: key: %s, value: %s", key, value);
   const preferences = getPreferences();
   
   // Adicionar novo projeto à lista de projetos recentes 
   if (key === 'recentProjects' && 'path' in value) {
     const recentProjects = preferences.recentProjects || []; 
-    const projectExistIndex = recentProjects.findIndex((projeto: RecentProject) => projeto.path === value.path);
+    const projectExistIndex = recentProjects.findIndex((projeto: IRecentProject) => projeto.path === value.path);
     console.log('..: updatePreferences projectExistIndex: ', projectExistIndex);
 
     if (projectExistIndex !== -1) {
@@ -65,7 +65,7 @@ export const updatePreferences = (key: keyof Preferences, value: any): void => {
   // console.log("..: Atualizou preferencesConfig");
 }
 
-export const deletePreference = (key: keyof Preferences, value: any): void => {
+export const deletePreference = (key: keyof IPreferences, value: any): void => {
   console.log('..: Deletando preference: ', value);
   const preferences = getPreferences(); 
 
@@ -74,7 +74,7 @@ export const deletePreference = (key: keyof Preferences, value: any): void => {
     savePreferences(preferences); 
   } else {
     //preferences.recentProjects[key] = '';
-    //TODO
+    // TODO
     console.log('..: Validar remoção de recentProjects');
   }
 
@@ -118,7 +118,7 @@ const getLastPositionSplitters = () => {
 
 export const configurarPreferenceHandlers = () => {
   ipcMain.handle('loadPreferences', () => getPreferences());
-  ipcMain.handle('removePreferences', (_event: IpcMainInvokeEvent, key: keyof Preferences, value: unknown) => deletePreference(key, value));
+  ipcMain.handle('removePreferences', (_event: IpcMainInvokeEvent, key: keyof IPreferences, value: unknown) => deletePreference(key, value));
   //--
   ipcMain.handle('loadLastUsedPath', () => getLastUsedPath());
   ipcMain.handle('lastUsedPath', (_event: IpcMainInvokeEvent, lastPath: string) => saveLastUsedPath(lastPath));

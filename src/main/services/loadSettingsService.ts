@@ -1,41 +1,68 @@
 import path from 'path';
 import fs from 'fs';
-// import { SettingsController } from '../controllers/SettingsController';
-import { ProjectManager } from '@/managers/ProjectManager';
-// import { SettingsUtilsManager } from '../managers/SettingsUtilsManager';
-import { MainSettingsManager } from '@/managers/MainSettingsManager';
-import { SettingsUtilsManager } from '@/managers/SettingsUtilsManager';
+import { SettingsController } from '../controllers/SettingsController';
 
 // Controllers
-const projectManager = ProjectManager.getInstance();
-const settingsUtils = SettingsUtilsManager.getInstance();
-const mainSettingsManager = MainSettingsManager.getInstance();
+const settingsController = SettingsController.getInstance();
 
-export function loadSettings(filePath: string): void {
-    console.log('..: Carregando configurações :..');
-    console.log('..: filePath:', filePath);
+export async function loadSettings(filePath: string): Promise<any[]>{
+  console.log('..: Carregando configurações :..');
+  console.log('..: filePath:', filePath);
 
-    const directory = settingsUtils.getProjectDirectory();
+  const directory = path.dirname(filePath);
+  const resources: any[] = [];
 
-    // ## User Settings ###############################
-    const loadSettingProject = defaultLoadSettings(filePath, null, 'project', projectManager.getData());
-    projectManager.updateData(loadSettingProject);
-    // ## User Settings END ###########################
+  try {
+    const allResources = loadAllResourcesRecursively(directory);
+    resources.push(...allResources);
+
+    console.log('..: All settings loaded to FE:', resources);    
+    console.log('..: All settings loaded to BE:', settingsController.getSettingsData('all'));
     
-    // ## Gamer Settings ###############################
-    const loadMainSettings = defaultLoadSettings(directory, 'project', 'settings', mainSettingsManager.getData());
-    mainSettingsManager.updateData(loadMainSettings);
-    // ## Gamer Settings END ###########################
+    return resources;
+
+  } catch (error) {
+    console.error('..: Erro ao carregar configurações:', error);
+    throw error;
+  }
 }
 
-// Função default para carregar as configurações no backend
-function defaultLoadSettings<T>(settingsPath: any, folder: string | null, type: 'project' | 'settings', cacheJson: T): T {
+function loadAllResourcesRecursively(dirPath: string): any[] {
+  const resources: any[] = [];
+
+  function walkDir(currentPath: string) {
+    const files = fs.readdirSync(currentPath);
+
+    files.forEach(file => {
+      const filePath = path.join(currentPath, file);
+      const stat = fs.statSync(filePath);
+
+      if (stat.isDirectory()) {
+        walkDir(filePath);
+      } else if (file.endsWith('.gbasres') || file.endsWith('.gbaproj')) {
+        try {
+          const data = loadSettingsFile(filePath);
+          if (data) {
+            resources.push(data);
+            // settingsController.addNewItem(JSON.parse(data));
+          }
+        } catch (error) {
+          console.error(`..: Erro ao carregar arquivo ${filePath}:`, error);
+        }
+      }
+    });
+  }
+
+  walkDir(dirPath);
+  return resources;
+}
+
+function loadSettingsFile(filePath: string): any | null {
   try {
-    const pathFileToSave = path.join(settingsPath, folder? path.join(`${folder}`, `${type}.gbasres`) : '');
-    const settings = JSON.parse(fs.readFileSync(pathFileToSave, 'utf8'));
-    return { ...cacheJson, ...settings }; ;
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    return fileContent;
   } catch (error) {
-    console.error('..: Erro ao ler configurações:', error);
-    return { ...cacheJson }; // Retorna defaults se houver erro
+    console.error(`..: Erro ao ler arquivo ${filePath}:`, error);
+    return null;
   }
 }
