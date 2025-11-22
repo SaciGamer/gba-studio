@@ -1,0 +1,10 @@
+{
+  "_resourceType": "settings",
+  "startSceneId": "810c10e7-5f61-48a2-a4e2-a62a9ecd07fd",
+  "startX": 9,
+  "startY": 9,
+  "startMoveSpeed": 1,
+  "startAnimSpeed": 4,
+  "startDirection": "right",
+  "colorMode": false
+}

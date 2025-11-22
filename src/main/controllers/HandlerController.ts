@@ -1,5 +1,5 @@
 import { configurarPreferenceHandlers } from "@/handlers/preferenceHandlers";
-import { settingsHandlers } from "@/handlers/settingsHandlers";
+import { settingsHandlers } from "@/handlers/SettingsHandlers";
 
  const initializeIpcHandlers = (): void => {
     // Funções preferences com handle

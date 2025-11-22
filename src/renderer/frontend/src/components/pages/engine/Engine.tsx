@@ -6,6 +6,7 @@ import TopBar from '../../TopBar';
 import LeftPanel from '../../LeftPanel';
 import CentralEditor from '../../CentralEditor';
 import RightPanel from '../../RightPanel';
+import ToolchainPanel from '../../toolchain/ToolchainPanel';
 import BottomPanel from '../../BottomPanel';
 import { ZoomProvider } from '../../ZoomContext';
 import EmulatorView from '../../EmulatorView';
@@ -237,6 +238,48 @@ const Engine: React.FC = () => {
     loadFile(projectFilePath);
   }, [location.search]);
 
+  // Expose serialized project helper for fallback run-live (main may call window.__getSerializedProject())
+  useEffect(() => {
+    (window as any).__getSerializedProject = async () => {
+      try {
+        // Collect project files from providers refs
+        const projectDir = settingUtilsRef.current?.projectDirectory || '';
+        const files: any[] = [];
+        const assets: any[] = [];
+
+        // Scenes
+        const scenes = scenesRef.current || [];
+        scenes.forEach((s: any) => files.push({ path: `project/scenes/${s.name.toLowerCase().replace(/ /g,'_')}.gbasres`, content: s }));
+
+        // Backgrounds
+        const bgs = backgroundsRef.current || [];
+        bgs.forEach((b: any) => files.push({ path: `project/backgrounds/${b.name.toLowerCase().replace(/ /g,'_')}.gbasres`, content: b }));
+
+        // Project
+        if (projectRef.current) {
+          const projPathFile = settingUtilsRef.current && (settingUtilsRef.current as any).projectPathFile ? (settingUtilsRef.current as any).projectPathFile : null;
+          const projFileName = projPathFile ? projPathFile.split('\\').pop()?.split('/').pop() : 'project.gbaproj';
+          files.push({ path: `project/${projFileName}`, content: projectRef.current });
+        }
+
+        // Settings
+        if (settingsRef.current) files.push({ path: `project/settings.gbasres`, content: settingsRef.current });
+
+        // Collect assets from settingUtils localImagePath (scan assets folder)
+        try {
+          const fs = (window as any).fs || null; // window fs not available; fallback to asking main is not possible here
+        } catch (e) {}
+
+        return { projectFiles: files, assets };
+      } catch (err) {
+        console.error('Error building serialized project', err);
+        return null;
+      }
+    };
+
+    return () => { try { delete (window as any).__getSerializedProject; } catch (e) {} };
+  }, []);
+
   // TODO pegar requisição para save
   useEffect(() => {
     const prepareForBackend = (fields: any, ignoredFields: string[]) => {
@@ -437,6 +480,9 @@ const Engine: React.FC = () => {
 
                 {/* PAINEL DIREITO */}
                 <Splitter.Panel defaultSize="35%" min={350} size={panelSizes[2]} >
+                  <div style={{ padding: 12 }}>
+                    <ToolchainPanel />
+                  </div>
                   <RightPanel controllerView={setContentView} />
                 </Splitter.Panel>
               </Splitter>
