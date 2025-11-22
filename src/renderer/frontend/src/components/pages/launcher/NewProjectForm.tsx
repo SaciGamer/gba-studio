@@ -6,8 +6,8 @@ import blanckGBA from '@/img/blankGBA_Studio.jpg';
 import samplekGBA from '@/img/sampleProjectGBA_Studio.jpg';
 
 const templates = [
-    { value: 'Blank Project', imgSrc: blanckGBA, description: 'A completely blank canvas' },
-    { value: 'Sample Project', imgSrc: samplekGBA, description: 'A GBA template containing examples' },
+  { value: 'Blank Project', imgSrc: blanckGBA, description: 'A completely blank canvas', templateId: 'blank' },
+  { value: 'Sample Project', imgSrc: samplekGBA, description: 'A GBA template containing examples', templateId: 'sample_project_example' },
 ];
 
 const NewProjectForm = () => {
@@ -51,7 +51,8 @@ const NewProjectForm = () => {
 
   const handleTemplateSelect = (value: any) => {
     setSelectedTemplate(value);
-    form.setFieldsValue({ template: value })
+    const tpl = templates.find(t => t.value === value)?.templateId ?? value;
+    form.setFieldsValue({ template: tpl })
   };
 
   const handleSubmit = async (values: any) => {
@@ -62,7 +63,8 @@ const NewProjectForm = () => {
     if (!exists) {
       // Lógica para criar o projeto
       setCreating(true);
-      const createdPath = await window.electronAPI.createProjectPath(pathToProject)
+      // values.template is now the templateId (e.g. 'sample_project_example' or 'blank')
+      const createdPath = await window.electronAPI.createProjectPath(pathToProject, values.template)
       console.log('..: Path criado: ', createdPath);
 
       const pathWithFileProject = await window.electronAPI.pathJoin(createdPath, `${values.projectName}.gbaproj`);

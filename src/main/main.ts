@@ -10,10 +10,12 @@ import { spawn } from 'child_process';
 import windowStateKeeper from 'electron-window-state';
 import { getPreferences, updatePreferences } from './handlers/preferenceHandlers';
 import { requestSaveChanges, setProjectDirectory, setProjectFile } from './services/saveSettingsService';
+import { saveEvents } from './services/saveSettingsService';
 import { createProjectStruct } from './structs/mainProjectStruct';
 import menuTemplate from './menuTemplate';
 // import { loadSettings } from './services/loadSettingsService';
 import compileGBA from './utils/gbaCompiler/compile-gba';
+import transcodeProject from './utils/projectTranscoder/transcode-project';
 import initializeIpcHandlers from './controllers/HandlerController';
 import { startWatch, stopAllWatchers } from './services/imagemService';
 import { SettingsController } from './controllers/SettingsController';
@@ -398,10 +400,25 @@ async function loadProject(filePath: string) {
 // Função para iniciar o Emulador
 function launchEmulator(romPath: string) {
   console.log("..: Iniciando Emulação :..");
-  const emulatorPath = path.join(__dirname, 'emulator', 'visualboyadvance-m.exe');
-  romPath = path.join(__dirname, romPath)
-  console.log(`..: diretorio do projeto: ${romPath}`)
-  const emulator = spawn(emulatorPath, [romPath]);
+  const prefs = getPreferences();
+  const prefEmu = (prefs && (prefs as any).emulatorPath) ? (prefs as any).emulatorPath : '';
+
+  // Prefer project-local vendor/mGBA
+  const repoRoot = path.resolve(__dirname, '..', '..');
+  const vendorMgba1 = path.join(repoRoot, 'vendor', 'mGBA', 'mGBA.exe');
+  const vendorMgba2 = path.join(repoRoot, 'vendor', 'mGBA', 'mgba.exe');
+  const bundledVba = path.join(__dirname, 'emulator', 'visualboyadvance-m.exe');
+
+  let emulatorExec = '';
+  if (fs.existsSync(vendorMgba1)) emulatorExec = vendorMgba1;
+  else if (fs.existsSync(vendorMgba2)) emulatorExec = vendorMgba2;
+  else if (prefEmu && fs.existsSync(prefEmu)) emulatorExec = prefEmu;
+  else emulatorExec = bundledVba;
+
+  romPath = path.join(__dirname, romPath);
+  console.log(`..: Using emulator: ${emulatorExec}`);
+  console.log(`..: diretorio do projeto: ${romPath}`);
+  const emulator = spawn(emulatorExec, [romPath]);
   //emulator.setApplicationMenu(null) // remover menu
 
   emulator.stdout.on('data', (data) => {
@@ -416,6 +433,52 @@ function launchEmulator(romPath: string) {
     console.log(`Emulator exited with code ${code}`);
   });
 }
+
+// Track emulator process so we can stop it from the IDE
+let emulatorProcess: any = null;
+
+function launchEmulatorAndTrack(romPath: string) {
+  // Launch and keep reference
+  const proc = spawn(((): string => {
+    const prefs = getPreferences();
+    const prefEmu = (prefs && (prefs as any).emulatorPath) ? (prefs as any).emulatorPath : '';
+
+    // Prefer project-local vendor/mGBA
+    const repoRoot = path.resolve(__dirname, '..', '..');
+    const vendorMgba1 = path.join(repoRoot, 'vendor', 'mGBA', 'mGBA.exe');
+    const vendorMgba2 = path.join(repoRoot, 'vendor', 'mGBA', 'mgba.exe');
+    const bundledVba = path.join(__dirname, 'emulator', 'visualboyadvance-m.exe');
+
+    if (fs.existsSync(vendorMgba1)) return vendorMgba1;
+    if (fs.existsSync(vendorMgba2)) return vendorMgba2;
+    if (prefEmu && fs.existsSync(prefEmu)) return prefEmu;
+    return bundledVba;
+  })(), [romPath]);
+
+  emulatorProcess = proc;
+
+  // Notify renderer
+  BrowserWindow.getAllWindows().forEach(win => {
+    try { win.webContents.send('emulator-started'); } catch (e) { }
+  });
+
+  proc.on('close', (code) => {
+    emulatorProcess = null;
+    BrowserWindow.getAllWindows().forEach(win => {
+      try { win.webContents.send('emulator-stopped'); } catch (e) { }
+    });
+  });
+
+  proc.stdout?.on('data', (d) => console.log('Emu:', d.toString()));
+  proc.stderr?.on('data', (d) => console.error('Emu-err:', d.toString()));
+  return proc;
+}
+
+ipcMain.on('stop-emulator', (event) => {
+  if (emulatorProcess) {
+    try { emulatorProcess.kill(); } catch (e) { console.warn('Failed to stop emulator', e); }
+  }
+});
 
 function getCaminhoAppData() {
   const appDataPath = path.join(os.homedir(), 'AppData', 'Local', 'gbaStudio'); 
@@ -475,17 +538,188 @@ ipcMain.on('run-project', (event) => {
   // Inicie o emulador com a ROM compilada
 });
 
+// Run using serialized project from renderer (no save requested)
+ipcMain.on('run-live', async (event) => {
+  console.log('..: run-live requested');
+  try {
+    if (!windows.main) return;
+    // Ask renderer to provide serialized project via a global helper that FE should implement
+    const resp = await windows.main.webContents.executeJavaScript('window.__getSerializedProject ? window.__getSerializedProject() : null');
+    if (!resp) {
+      console.warn('Renderer did not provide serialized project');
+      return;
+    }
+
+    // Write the serialized data to a temp folder here (same logic as send-serialized handler)
+    const tmpRoot = path.join(os.tmpdir(), 'gba-studio-temp', 'gba-studio-serialized');
+    if (fs.existsSync(tmpRoot))
+      fs.rmSync(tmpRoot, { recursive: true, force: true });
+    fs.mkdirSync(tmpRoot, { recursive: true });
+
+    if (resp.projectFiles) {
+      resp.projectFiles.forEach((f: any) => {
+        const target = path.join(tmpRoot, f.path);
+        const dir = path.dirname(target);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(target, JSON.stringify(f.content, null, 2), 'utf8');
+      });
+    }
+
+    if (resp.assets) {
+      resp.assets.forEach((a: any) => {
+        const target = path.join(tmpRoot, a.path);
+        const dir = path.dirname(target);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(target, Buffer.from(a.base64, 'base64'));
+      });
+    }
+
+    const tmpPath = tmpRoot;
+
+    const transRes: any = await transcodeProject(tmpPath);
+    const tempBuild = transRes.tempBuild;
+
+  // Notify renderer that transcode finished and compilation will start
+  try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: 'Transcodificação concluída. Iniciando compilação...' })); } catch (e) {}
+
+  const compileRes = await compileGBA({ cwd: tempBuild });
+
+    if (compileRes && compileRes.gbaPath) {
+      // For Play, copy the generated .gba into a temp location and launch that
+      const playTmp = path.join(os.tmpdir(), 'gba-studio-temp', 'gba-studio-play');
+      if (fs.existsSync(playTmp)) fs.rmSync(playTmp, { recursive: true, force: true });
+      fs.mkdirSync(playTmp, { recursive: true });
+      const destGba = path.join(playTmp, path.basename(compileRes.gbaPath));
+      try { fs.copyFileSync(compileRes.gbaPath, destGba); } catch (e) { console.warn('Could not copy gba to play tmp', e); }
+      const rel = path.relative(__dirname, destGba);
+      launchEmulatorAndTrack(rel);
+    } else {
+      console.warn('run-live: compile did not produce a .gba');
+    }
+  } catch (err) {
+    console.error('run-live error', err);
+  }
+});
+
 ipcMain.on('compile-project', async (event)  => {
   // Implemente a lógica de compilação aqui
   console.log('..: Recebida solicitação para compilar o projeto :..');
   console.log('..: Compiling project...');
-  try {
-    const result = await compileGBA();
-    console.log('..: Success Compiling');
-    return { success: true, message: result };
-  } catch (error) {
+    try {
+      // Ask renderer to save current project data to disk first
+      requestSaveChanges();
+
+      // Wait for save to complete (timeout 10s)
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Save timeout')) , 10000);
+        saveEvents.once('saved', () => { clearTimeout(timeout); resolve(true); });
+      });
+
+      // Transcode project files into path build before compiling
+      try {
+  // Notify renderer that transcode is starting
+  try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: 'Iniciando transcodificação do projeto...' })); } catch (e) {}
+
+  const transRes: any = await transcodeProject(directoryPathProject);
+
+  // Compile using path build
+  const tempBuild = transRes.tempBuild;
+  try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: 'Transcodificação concluída. Iniciando compilação...' })); } catch (e) {}
+
+  const compileRes = await compileGBA({ cwd: tempBuild });
+
+        // On successful compile, copy outputs (.gba, .elf, .map) into project's build folder
+        if (compileRes && compileRes.gbaPath) {
+          const outDir = path.join(directoryPathProject, 'build');
+          if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+
+          // Copy .gba
+          try { fs.copyFileSync(compileRes.gbaPath, path.join(outDir, path.basename(compileRes.gbaPath))); } catch (e) { console.warn('Could not copy .gba to project build', e); }
+
+          // Try to copy .elf and .map if present in same folder
+          const possibleElf = compileRes.gbaPath.replace(/\.gba$/i, '.elf');
+          const possibleMap = compileRes.gbaPath.replace(/\.gba$/i, '.map');
+          try { if (fs.existsSync(possibleElf)) fs.copyFileSync(possibleElf, path.join(outDir, path.basename(possibleElf))); } catch (e) { /* ignore */ }
+          try { if (fs.existsSync(possibleMap)) fs.copyFileSync(possibleMap, path.join(outDir, path.basename(possibleMap))); } catch (e) { /* ignore */ }
+        }
+
+        return { success: true, message: compileRes };
+      } catch (e) {
+        console.warn('Transcode/compile failed', e);
+        return { success: false, message: e };
+      }
+    } catch (error) {
     console.log('..: Erro Compiling ' + error);
     return { success: false, message: error};
+  }
+});
+
+ipcMain.handle('compile-project-demo', async (event, projectPath) => {
+    try {
+    // Ensure latest FE data is saved
+    requestSaveChanges();
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Save timeout')) , 10000);
+      saveEvents.once('saved', () => { clearTimeout(timeout); resolve(true); });
+    });
+  console.log('..: compile-project-demo for', projectPath);
+  try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: 'Iniciando compilação demo...' })); } catch (e) {}
+    const tempBuild = path.join(os.tmpdir(), 'gba-project-temp', 'gba-studio-build');
+
+    // Clean temp
+    if (fs.existsSync(tempBuild)) {
+      fs.rmSync(tempBuild, { recursive: true, force: true });
+    }
+    fs.mkdirSync(tempBuild, { recursive: true });
+
+    // Copy project files into path build (look for main.c or any .c in project folder)
+    try {
+      const projectSrc = path.join(projectPath);
+      if (fs.existsSync(projectSrc)) {
+        const copyRecursive = (src: string, dest: string) => {
+          const stat = fs.statSync(src);
+          if (stat.isDirectory()) {
+            if (!fs.existsSync(dest)) fs.mkdirSync(dest);
+            const entries = fs.readdirSync(src);
+            for (const e of entries) {
+              copyRecursive(path.join(src, e), path.join(dest, e));
+            }
+          } else {
+            const ext = path.extname(src).toLowerCase();
+            if (['.c', '.h', '.s', '.o', '.bin', '.data', '.txt'].includes(ext) || ext === '') {
+              fs.copyFileSync(src, dest);
+            }
+          }
+        };
+
+        // Try to copy project's 'project' folder or root
+        const candidate1 = path.join(projectPath, 'project');
+        const candidate2 = projectPath;
+        if (fs.existsSync(candidate1)) copyRecursive(candidate1, tempBuild);
+        else copyRecursive(candidate2, tempBuild);
+      }
+    } catch (err) {
+      console.warn('Could not copy project files for demo compile:', err);
+    }
+
+  // Now run compileGBA which will pick up repo gba-project
+  try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: 'Iniciando compilação demo (repo gba-project)...' })); } catch (e) {}
+  const result = await compileGBA({ cwd: path.join(__dirname, '..', '..', 'gba-project') });
+
+    // Auto-launch using returned path
+    try {
+      if (result && result.gbaPath) {
+        const rel = path.relative(__dirname, result.gbaPath);
+        launchEmulator(rel);
+      }
+    } catch (err) {
+      console.warn('Could not auto-launch emulator after demo compile:', err);
+    }
+
+    return { success: true, message: result };
+  } catch (error) {
+    console.error('Demo compile error', error);
+    return { success: false, message: error };
   }
 });
 
@@ -575,12 +809,12 @@ ipcMain.handle('check-project-file', async (event, projectPath) => {
   return fs.existsSync(projectPath);
 });
 
-ipcMain.handle('create-project-path', async (event, projectPath) => {
+ipcMain.handle('create-project-path', async (event, projectPath, template) => {
   const normalizedPath = projectPath.replace(/[/\\]/g, path.sep);
 
-  console.log('..: Create project path request: ', normalizedPath);
+  console.log('..: Create project path request: ', normalizedPath, ' template:', template);
   fs.mkdirSync(normalizedPath, { recursive: true });
-  createProjectStruct(normalizedPath);
+  createProjectStruct(normalizedPath, template);
   return normalizedPath;
 });
 
@@ -647,6 +881,45 @@ ipcMain.handle('fetch-images', async (event, folderName) => {
 
 initializeIpcHandlers();
 // ## Handle Preferences END ###########################################
+
+// Vendor import and checks
+ipcMain.handle('import-vendor', async (event, vendorName: string, srcPath: string) => {
+  try {
+    const repoRoot = path.resolve(__dirname, '..', '..');
+    const vendorRoot = path.join(repoRoot, 'vendor');
+    if (!fs.existsSync(vendorRoot)) fs.mkdirSync(vendorRoot, { recursive: true });
+
+    const dest = path.join(vendorRoot, vendorName);
+    // Copy recursively
+    const copyRecursive = (src: string, destPath: string) => {
+      const stat = fs.statSync(src);
+      if (stat.isDirectory()) {
+        if (!fs.existsSync(destPath)) fs.mkdirSync(destPath);
+        const entries = fs.readdirSync(src);
+        for (const e of entries) copyRecursive(path.join(src, e), path.join(destPath, e));
+      } else {
+        fs.copyFileSync(src, destPath);
+      }
+    };
+
+    copyRecursive(srcPath, dest);
+    return { success: true, message: `Imported ${vendorName}` };
+  } catch (err) {
+    console.error('import-vendor error', err);
+    return { success: false, message: String(err) };
+  }
+});
+
+ipcMain.handle('check-vendor-exe', async (event, vendorName: string, exeRelativePath: string) => {
+  try {
+    const repoRoot = path.resolve(__dirname, '..', '..');
+    const vendorExe = path.join(repoRoot, 'vendor', vendorName, exeRelativePath);
+    return fs.existsSync(vendorExe);
+  } catch (err) {
+    console.error('check-vendor-exe error', err);
+    return false;
+  }
+});
 
 // ## SAVE AS ##########################################################
 /*const saveProjectAs = (projectData) => {

@@ -42,4 +42,46 @@ export const settingsHandlers = () => {
         responseSaveChanges(dataToSave);
     });
 
+    // Receive serialized project fallback (JSON + base64 assets)
+    ipcMain.handle('send-serialized', (event, serializedData) => {
+        console.log('..: Received serialized project data (fallback)');
+        // Write serializedData into a temp project folder for processing
+        // Save to os.tmpdir() or repo temp
+        try {
+            const os = require('os');
+            const path = require('path');
+            const fs = require('fs');
+            const tmpRoot = path.join(os.tmpdir(), 'gba-studio-temp', 'gba-studio-serialized');
+            if (fs.existsSync(tmpRoot))
+                fs.rmSync(tmpRoot, { recursive: true, force: true });
+            fs.mkdirSync(tmpRoot, { recursive: true });
+
+            // Expect serializedData to be { projectFiles: [{ path, content }], assets: [{ path, base64 }] }
+            if (serializedData.projectFiles) {
+                serializedData.projectFiles.forEach((f: any) => {
+                    const target = path.join(tmpRoot, f.path);
+                    const dir = path.dirname(target);
+                    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+                    fs.writeFileSync(target, JSON.stringify(f.content, null, 2), 'utf8');
+                });
+            }
+
+            if (serializedData.assets) {
+                const assetsDir = path.join(tmpRoot, 'assets');
+                if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
+                serializedData.assets.forEach((a: any) => {
+                    const target = path.join(tmpRoot, a.path);
+                    const dir = path.dirname(target);
+                    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+                    fs.writeFileSync(target, Buffer.from(a.base64, 'base64'));
+                });
+            }
+
+            return { status: 'ok', tmpPath: tmpRoot };
+        } catch (err) {
+            console.error('send-serialized handler error', err);
+            return { status: 'error', message: String(err) };
+        }
+    });
+
 }

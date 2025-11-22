@@ -25,6 +25,8 @@
     "files": [
       "dist/**/*",
       "icon/**/*",
+      "sample_project_example",
+      "vendor/**/*",
       "package.json"
     ],
     "mac": {
@@ -41,12 +43,14 @@
     "linux": {
       "icon": "icon/defaultImgIcon.png"
     },
-    "asar": true,
+    "asar": false,
     "asarUnpack": []
   },
   "files": [
     "dist/**/*",
     "icon/**/*",
+    "sample_project_example",
+    "vendor/**/*",
     "package.json"
   ],
   "scripts": {
@@ -56,7 +60,7 @@
     "build:main": "yarn workspace @gba-studio/main build",
     "build:renderer": "yarn workspace @gba-studio/frontend build",
     "preview": "yarn workspace @gba-studio/frontend preview && electron .",
-    "build-gba": "cd gba-project && make rebuild && cd .."
+    "build-gba": "cd dist/gba-studio-build && make rebuild && cd ../.."
   },
   "dependencies": {
     "antd": "^5.24.0",

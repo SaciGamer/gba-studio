@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { BrowserWindow } from 'electron';
+import { EventEmitter } from 'events';
 import { SettingsController } from '@/controllers/SettingsController';
 import { createGenericSettingsStruct } from '@/structs/projectSettingsStruct';
 import { IMainSettings, IProjectSettings } from '@/interfaces/MainSettingsInterface';
@@ -11,6 +12,8 @@ import { directoryPathProject } from '@/main';
 //Controllers
 const settingsController = SettingsController.getInstance();
 let processingToSaved = false;
+// Event emitter to signal save completion so other modules (eg. build) can wait
+export const saveEvents = new EventEmitter();
 
 export function updateWindowTitle(baseTitle: string, projectName: string, isSaved: boolean): void {
     console.log('..: updateWindowTitle fields:', baseTitle, projectName, isSaved);
@@ -160,6 +163,8 @@ export function saveChanges(dataToSave: any) {
     //     }
     // }
     console.log('..: Nenhuma alteração para salvar');
+    // Emit save complete even when nothing to save so build flows can continue
+    try { saveEvents.emit('saved', true); } catch (e) { console.warn('saveEvents emit failed', e); }
     return false;
 }
 

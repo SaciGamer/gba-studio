@@ -13,6 +13,7 @@ import Launcher from './components/pages/launcher/Launcher';
 import About from './components/pages/about/About';
 import Engine from './components/pages/engine/Engine';
 import AppProvider from './providers/AppProviders';
+import PreferencesModal from './components/PreferencesModal';
 
 interface Preferences {
   theme: string;
@@ -31,6 +32,7 @@ const App: React.FC = () => {
   const [locale, setLocale] = useState(en_US);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [prefsOpen, setPrefsOpen] = useState(false);
 
   // Carregar preferências iniciais --------------------------------
   useEffect(() => {
@@ -91,11 +93,13 @@ const App: React.FC = () => {
     // Adiciona os listeners
     window.electronAPI.on('window-blurred', handleWindowBlurred);
     window.electronAPI.on('window-focused', handleWindowFocused);
+  window.electronAPI.on('open-preferences', () => setPrefsOpen(true));
 
     // Limpa os listeners ao desmontar o componente
     return () => {
       window.electronAPI.removeListener('window-blurred', handleWindowBlurred);
       window.electronAPI.removeListener('window-focused', handleWindowFocused);
+  window.electronAPI.removeListener('open-preferences', () => setPrefsOpen(true));
     };
   }, []);
   // Efeito PRETO/BRANCO tela inativa END -------------------------
@@ -215,6 +219,7 @@ const App: React.FC = () => {
           </Content>
         </HashRouter>
       </AppProvider>
+  <PreferencesModal open={prefsOpen} onClose={() => setPrefsOpen(false)} />
     </ConfigProvider>
   );
 }

@@ -7,11 +7,19 @@ const electronAPI = {
   removeListener: (channel: any, listener: any) => ipcRenderer.removeListener(channel, listener),
   // Customized ------------------------------------------
   pathJoin: (...args: any) => ipcRenderer.invoke('path-join', args),
+  // Toolchain helpers
+  getDevkitPath: () => ipcRenderer.invoke('get-devkit-path'),
+  setDevkitPath: (p: string) => ipcRenderer.invoke('set-devkit-path', p),
+  getEmulatorPath: () => ipcRenderer.invoke('get-emulator-path'),
+  setEmulatorPath: (p: string) => ipcRenderer.invoke('set-emulator-path', p),
+  importVendor: (vendorName: string, srcPath: string) => ipcRenderer.invoke('import-vendor', vendorName, srcPath),
+  checkVendorExe: (vendorName: string, exeRelativePath: string) => ipcRenderer.invoke('check-vendor-exe', vendorName, exeRelativePath),
   openBrowser: (url: string) => ipcRenderer.invoke('abrir-navegador', url),
   getVersionsAPI: () => ipcRenderer.invoke('get-versions'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
-  createProjectPath: (projectPath: any) => ipcRenderer.invoke('create-project-path', projectPath),
+  createProjectPath: (projectPath: any, template?: string) => ipcRenderer.invoke('create-project-path', projectPath, template),
   checkProjectFile: (projectPath: any) => ipcRenderer.invoke('check-project-file', projectPath),
+  compileProjectDemo: (projectPath: any) => ipcRenderer.invoke('compile-project-demo', projectPath),
   loadPreferences: () => ipcRenderer.invoke('loadPreferences'),
   removePreferences: (key: any, value: any) => ipcRenderer.invoke('removePreferences', key, value),
   loadLastUsedPath: () => ipcRenderer.invoke('loadLastUsedPath'),
@@ -33,6 +41,9 @@ const electronAPI = {
   // Save Project  ---------------------------------------
   onRequestProjectToSave: (callback: any) => ipcRenderer.on('get-data', (event: any, requestToSave: string) => callback(requestToSave)),
   responseProjectToSave: (dataToSave: any) => ipcRenderer.invoke('send-data', dataToSave),
+  // Serialized project (fallback) --------------------------------
+  onRequestSerializedProject: (callback: any) => ipcRenderer.on('request-serialized-project', (event: any, requestToSave: string) => callback(requestToSave)),
+  responseSerializedProject: (dataSerialized: any) => ipcRenderer.invoke('send-serialized', dataSerialized),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

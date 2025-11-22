@@ -24,6 +24,7 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
   const [searchValue, setSearchValue] = useState<string>('');
   const [selectedKey, setSelectedKey] = useState<number>(1);
   const [menuName, setMenuName] = useState<string>('Game World');
+  const [isRunning, setIsRunning] = useState<boolean>(false);
 
   const clearSearch = () => {
     setSearchValue('');
@@ -66,6 +67,18 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
       console.warn('..: Menu item not found for contenView:', contenView);
     }
   }, [contenView]);
+
+  useEffect(() => {
+    // Listen emulator events
+    if (window.electronAPI && window.electronAPI.on) {
+      window.electronAPI.on('emulator-started', () => setIsRunning(true));
+      window.electronAPI.on('emulator-stopped', () => setIsRunning(false));
+    }
+    return () => {
+      try { window.electronAPI.removeListener('emulator-started', () => setIsRunning(true)); } catch (e) {}
+      try { window.electronAPI.removeListener('emulator-stopped', () => setIsRunning(false)); } catch (e) {}
+    };
+  }, []);
 
   return (
     <Space style={{ display: 'flex', alignItems: 'center', paddingInline: '10px', paddingBlock: '5px', justifyContent: 'space-between', backgroundColor: token.colorBgBase }}>
@@ -114,11 +127,24 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
             style={{ padding: '10px', marginLeft: '5px' }}>
           </Button>
         </Tooltip>
-        <Tooltip title="Run">
+        <Tooltip title="Build">
           <Button icon={<PlaySquareOutlined />} 
-            onClick={() => console.log('..: TopBar Run Test')}
+            onClick={() => { 
+              console.log('..: TopBar Build - request compile'); 
+              window.electronAPI.send('compile-project', null); 
+            }}
             style={{ marginLeft: '15px', padding: '10px' }}>
           </Button>
+        </Tooltip>
+        <Tooltip title={isRunning ? 'Stop' : 'Play'}>
+          <Button 
+            icon={ isRunning ? <CloseCircleOutlined /> : <PlaySquareOutlined /> }
+            onClick={() => { 
+              if (isRunning) { window.electronAPI.send('stop-emulator', null); console.log('..: TopBar Stop emulator'); }
+              else { window.electronAPI.send('run-live', null); console.log('..: TopBar Run-live requested'); }
+            }}
+            style={{ marginLeft: '8px', padding: '10px' }}
+          />
         </Tooltip>
       </div>
     </Space >
