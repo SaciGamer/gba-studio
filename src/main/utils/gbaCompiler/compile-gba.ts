@@ -64,15 +64,15 @@ const compileGBA = (options?: { cwd?: string }): Promise<CompileResult> => {
     console.log('..: Using DEVKITARM at', devkitEnv);
 
     // Prefer repo-local tools/devkitPro top-level
-    const repoToolsoot = path.resolve(path.resolve(__dirname, '..', '..', '..', '..'), 'tools', 'devkitPro');
-    const devkitARMFromTools= path.join(repoTToolsot, 'devkitARM');
-    const libgbaFromTools= path.join(repoTToolsot, 'libgba');
-    const libtoncFromTools= path.join(repoTToolsot, 'libtonc');
+    const repoToolsRoot = path.resolve(path.resolve(__dirname, '..', '..', '..', '..'), 'tools', 'devkitPro');
+    const devkitARMFromTools= path.join(repoToolsRoot, 'devkitARM');
+    const libgbaFromTools= path.join(repoToolsRoot, 'libgba');
+    const libtoncFromTools= path.join(repoToolsRoot, 'libtonc');
 
     // Use libgba for LIBGBA env var, but ensure both libgba and libtonc are available
     const env = Object.assign({}, process.env, {
       DEVKITARM: devkitEnv,
-      DEVKITPRO: fs.existsSync(repoToolsoot) ? repoTToolsot : process.env.DEVKITPRO || '',
+      DEVKITPRO: fs.existsSync(repoToolsRoot) ? repoToolsRoot : process.env.DEVKITPRO || '',
       LIBGBA: libgbaFromTools// Corrigido: LIBGBA deve apontar para libgba, não libtonc
     });
 
