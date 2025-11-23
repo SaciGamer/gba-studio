@@ -403,15 +403,15 @@ function launchEmulator(romPath: string) {
   const prefs = getPreferences();
   const prefEmu = (prefs && (prefs as any).emulatorPath) ? (prefs as any).emulatorPath : '';
 
-  // Prefer project-local vendor/mGBA
+  // Prefer project-local tools/mGBA
   const repoRoot = path.resolve(__dirname, '..', '..');
-  const vendorMgba1 = path.join(repoRoot, 'vendor', 'mGBA', 'mGBA.exe');
-  const vendorMgba2 = path.join(repoRoot, 'vendor', 'mGBA', 'mgba.exe');
+  const toolsMgba1 = path.join(repoRoot, 'tools', 'mGBA', 'mGBA.exe');
+  const toolsMgba2 = path.join(repoRoot, 'tools', 'mGBA', 'mgba.exe');
   const bundledVba = path.join(__dirname, 'emulator', 'visualboyadvance-m.exe');
 
   let emulatorExec = '';
-  if (fs.existsSync(vendorMgba1)) emulatorExec = vendorMgba1;
-  else if (fs.existsSync(vendorMgba2)) emulatorExec = vendorMgba2;
+  if (fs.existsSync(toolsMgba1)) emulatorExec = toolsMgba1;
+  else if (fs.existsSync(toolsMgba2)) emulatorExec = toolsMgba2;
   else if (prefEmu && fs.existsSync(prefEmu)) emulatorExec = prefEmu;
   else emulatorExec = bundledVba;
 
@@ -443,14 +443,14 @@ function launchEmulatorAndTrack(romPath: string) {
     const prefs = getPreferences();
     const prefEmu = (prefs && (prefs as any).emulatorPath) ? (prefs as any).emulatorPath : '';
 
-    // Prefer project-local vendor/mGBA
+    // Prefer project-local tools/mGBA
     const repoRoot = path.resolve(__dirname, '..', '..');
-    const vendorMgba1 = path.join(repoRoot, 'vendor', 'mGBA', 'mGBA.exe');
-    const vendorMgba2 = path.join(repoRoot, 'vendor', 'mGBA', 'mgba.exe');
+    const toolsMgba1 = path.join(repoRoot, 'tools', 'mGBA', 'mGBA.exe');
+    const toolsMgba2 = path.join(repoRoot, 'tools', 'mGBA', 'mgba.exe');
     const bundledVba = path.join(__dirname, 'emulator', 'visualboyadvance-m.exe');
 
-    if (fs.existsSync(vendorMgba1)) return vendorMgba1;
-    if (fs.existsSync(vendorMgba2)) return vendorMgba2;
+    if (fs.existsSync(toolsMgba1)) return toolsMgba1;
+    if (fs.existsSync(toolsMgba2)) return toolsMgba2;
     if (prefEmu && fs.existsSync(prefEmu)) return prefEmu;
     return bundledVba;
   })(), [romPath]);
@@ -882,14 +882,14 @@ ipcMain.handle('fetch-images', async (event, folderName) => {
 initializeIpcHandlers();
 // ## Handle Preferences END ###########################################
 
-// Vendor import and checks
-ipcMain.handle('import-vendor', async (event, vendorName: string, srcPath: string) => {
+// Tools import and checks
+ipcMain.handle('import-tools', async (event, toolsName: string, srcPath: string) => {
   try {
     const repoRoot = path.resolve(__dirname, '..', '..');
-    const vendorRoot = path.join(repoRoot, 'vendor');
-    if (!fs.existsSync(vendorRoot)) fs.mkdirSync(vendorRoot, { recursive: true });
+    const toolsRoot = path.join(repoRoot, 'tools');
+    if (!fs.existsSync(toolsRoot)) fs.mkdirSync(toolsRoot, { recursive: true });
 
-    const dest = path.join(vendorRoot, vendorName);
+    const dest = path.join(toolsRoot, toolsName);
     // Copy recursively
     const copyRecursive = (src: string, destPath: string) => {
       const stat = fs.statSync(src);
@@ -903,20 +903,20 @@ ipcMain.handle('import-vendor', async (event, vendorName: string, srcPath: strin
     };
 
     copyRecursive(srcPath, dest);
-    return { success: true, message: `Imported ${vendorName}` };
+    return { success: true, message: `Imported ${toolsName}` };
   } catch (err) {
-    console.error('import-vendor error', err);
+    console.error('import-tools error', err);
     return { success: false, message: String(err) };
   }
 });
 
-ipcMain.handle('check-vendor-exe', async (event, vendorName: string, exeRelativePath: string) => {
+ipcMain.handle('check-tools-exe', async (event, toolsName: string, exeRelativePath: string) => {
   try {
     const repoRoot = path.resolve(__dirname, '..', '..');
-    const vendorExe = path.join(repoRoot, 'vendor', vendorName, exeRelativePath);
-    return fs.existsSync(vendorExe);
+    const toolsExe = path.join(repoRoot, 'tools', toolsName, exeRelativePath);
+    return fs.existsSync(toolsExe);
   } catch (err) {
-    console.error('check-vendor-exe error', err);
+    console.error('check-tools-exe error', err);
     return false;
   }
 });

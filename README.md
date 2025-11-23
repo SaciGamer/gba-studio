@@ -12,17 +12,17 @@ Este README explica o que é necessário para rodar e construir o projeto em des
 - Yarn (opcional, mas usado nos scripts do projeto). Instale com `npm install -g yarn` ou use `corepack enable` nas versões modernas do Node.
 - Git (para clonar o repositório).
 - Ferramentas para build de GBA (devkitPro / devkitARM) para a parte de geração de ROMs — veja seção abaixo.
-- (Opcional) mGBA ou outro emulador GBA para testes (uma cópia está disponível em `vendor/mGBA` neste repositório).
+- (Opcional) mGBA ou outro emulador GBA para testes (uma cópia está disponível em `tools/mGBA` neste repositório).
 
 **Requisitos específicos para Windows**
 
 - PowerShell 5.1 (ou superior) já é o shell padrão — instruções abaixo usam PowerShell.
-- Se for usar `devkitPro` do repositório local (fornecido em `vendor/devkitPro`), defina as variáveis de ambiente `DEVKITPRO` e `DEVKITARM` apontando para as pastas corretas ou instale devkitPro normalmente (`devkitPro` install) e adicione `devkitARM` ao `PATH`.
+- Se for usar `devkitPro` do repositório local (fornecido em `tools/devkitPro`), defina as variáveis de ambiente `DEVKITPRO` e `DEVKITARM` apontando para as pastas corretas ou instale devkitPro normalmente (`devkitPro` install) e adicione `devkitARM` ao `PATH`.
 
 Exemplo (PowerShell) para apontar para a cópia do repositório (ajuste o caminho se necessário):
 
 ```powershell
-$env:DEVKITPRO = "X:\gba-studio\vendor\devkitPro"
+$env:DEVKITPRO = "X:\gba-studio\tools\devkitPro"
 $env:DEVKITARM = "$env:DEVKITPRO\devkitARM"
 $env:PATH = "$env:DEVKITARM\bin;$env:PATH"
 ```
@@ -123,7 +123,7 @@ Verifique `package.json` para os scripts exatos usados pelo projeto.
 
 - `src/main/` — código do processo principal do Electron (window management, IPC, handlers)
 - `src/renderer/frontend/` — frontend React + Vite
-- `vendor/` — ferramentas e bibliotecas empacotadas (ex.: `devkitPro`, `mGBA`, outras ferramentas auxiliares)
+- `tools/` — ferramentas e bibliotecas empacotadas (ex.: `devkitPro`, `mGBA`, outras ferramentas auxiliares)
 - `gba-project/` — (quando presente) Makefile e arquivos do projeto GBA que são compilados para gerar ROM
 - `release/`, `icon/` e outros diretórios de empacotamento e assets
 

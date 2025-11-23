@@ -38,42 +38,42 @@ const compileGBA = (options?: { cwd?: string }): Promise<CompileResult> => {
     const prefs = getPreferences();
     const devkitFromPrefs = (prefs && (prefs as any).devkitPath) ? (prefs as any).devkitPath : '';
     
-    // Fallback: app userData vendor
+    // Fallback: app userData tools
     // const userData = path.join(os.homedir(), 'AppData', 'Local', 'gbaStudio');
-    // const appDataVendorDevkit = path.join(userData, 'vendor', 'devkitPro', 'devkitARM');
+    // const appDataToolsevkit = path.join(userData, 'tools', 'devkitPro', 'devkitARM');
     
-    // Prefer project-local vendor/devkitPro/devkitARM
+    // Prefer project-local tools/devkitPro/devkitARM
     const repoRoot = path.resolve(__dirname, '..', '..', '..', '..');
-    const appDataVendorDevkit = isDev
-      ? path.resolve(repoRoot, 'vendor', 'devkitPro', 'devkitARM') // Em dev, busca na raiz do projeto
-      : path.join(app.getAppPath(), 'vendor', 'devkitPro', 'devkitARM');  // Em produção, usa o app.getAppPath()
+    const appDataToolsevkit = isDev
+      ? path.resolve(repoRoot, 'tools', 'devkitPro', 'devkitARM') // Em dev, busca na raiz do projeto
+      : path.join(app.getAppPath(), 'tools', 'devkitPro', 'devkitARM');  // Em produção, usa o app.getAppPath()
 
     let devkitEnv = '';
    
-    if (fs.existsSync(appDataVendorDevkit)) {
-      devkitEnv = appDataVendorDevkit;
+    if (fs.existsSync(appDataToolsevkit)) {
+      devkitEnv = appDataToolsevkit;
     } else {
       devkitEnv = process.env.DEVKITARM || devkitFromPrefs;
     }
 
     if (!devkitEnv || devkitEnv.trim() === '') {
-      reject(new Error('DEVKITARM not found. Please configure DEVKITARM path in Preferences, import a vendor devkit or set the DEVKITARM environment variable.'));
+      reject(new Error('DEVKITARM not found. Please configure DEVKITARM path in Preferences, import a devkit into the tools folder or set the DEVKITARM environment variable.'));
       return;
     }
 
     console.log('..: Using DEVKITARM at', devkitEnv);
 
-    // Prefer repo-local vendor/devkitPro top-level
-    const repoVendorRoot = path.resolve(path.resolve(__dirname, '..', '..', '..', '..'), 'vendor', 'devkitPro');
-    const devkitARMFromVendor = path.join(repoVendorRoot, 'devkitARM');
-    const libgbaFromVendor = path.join(repoVendorRoot, 'libgba');
-    const libtoncFromVendor = path.join(repoVendorRoot, 'libtonc');
+    // Prefer repo-local tools/devkitPro top-level
+    const repoToolsoot = path.resolve(path.resolve(__dirname, '..', '..', '..', '..'), 'tools', 'devkitPro');
+    const devkitARMFromTools= path.join(repoTToolsot, 'devkitARM');
+    const libgbaFromTools= path.join(repoTToolsot, 'libgba');
+    const libtoncFromTools= path.join(repoTToolsot, 'libtonc');
 
     // Use libgba for LIBGBA env var, but ensure both libgba and libtonc are available
     const env = Object.assign({}, process.env, {
       DEVKITARM: devkitEnv,
-      DEVKITPRO: fs.existsSync(repoVendorRoot) ? repoVendorRoot : process.env.DEVKITPRO || '',
-      LIBGBA: libgbaFromVendor // Corrigido: LIBGBA deve apontar para libgba, não libtonc
+      DEVKITPRO: fs.existsSync(repoToolsoot) ? repoTToolsot : process.env.DEVKITPRO || '',
+      LIBGBA: libgbaFromTools// Corrigido: LIBGBA deve apontar para libgba, não libtonc
     });
 
     // Normalize Windows backslashes to forward slashes for make/msys/git-bash

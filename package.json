@@ -26,7 +26,7 @@
       "dist/**/*",
       "icon/**/*",
       "sample_project_example",
-      "vendor/**/*",
+      "tools/**/*",
       "package.json"
     ],
     "mac": {
@@ -50,7 +50,7 @@
     "dist/**/*",
     "icon/**/*",
     "sample_project_example",
-    "vendor/**/*",
+    "tools/**/*",
     "package.json"
   ],
   "scripts": {

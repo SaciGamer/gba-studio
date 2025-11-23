@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 export async function transcodeProject(projectDir: string) {
   console.log('..: transcodeProject projectDir', projectDir);
   const repoRoot = path.resolve(__dirname, '..', '..');
-  const vendorRoot = path.join(repoRoot, '..', '..', 'vendor');
+  const toolsRoot = path.join(repoRoot, '..', '..', 'tools');
   const tempBuild = path.join(os.tmpdir(), 'gba-studio-temp', 'gba-studio-build');
 
   const projectFolder = path.join(projectDir, 'project');
@@ -50,7 +50,7 @@ export async function transcodeProject(projectDir: string) {
 
   // Copy the main Makefile from gba-project into path build so path build can be built independently
   try {
-    const srcMake = path.join(vendorRoot, 'Makefile');
+    const srcMake = path.join(toolsRoot, 'Makefile');
     const dstMake = path.join(tempBuild, 'Makefile');
     if (fs.existsSync(srcMake)) {
       let content = fs.readFileSync(srcMake, 'utf8');

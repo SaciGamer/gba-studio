@@ -10,8 +10,8 @@ const ToolchainPanel: React.FC = () => {
   useEffect(() => {
     const check = async () => {
       try {
-        const devkit = await window.electronAPI.checkVendorExe('devkitPro', 'devkitARM/bin/arm-none-eabi-gcc.exe');
-        const mgba = await window.electronAPI.checkVendorExe('mGBA', 'mGBA.exe');
+        const devkit = await window.electronAPI.checkToolsExe('devkitPro', 'devkitARM/bin/arm-none-eabi-gcc.exe');
+        const mgba = await window.electronAPI.checkToolsExe('mGBA', 'mGBA.exe');
         setDevkitPresent(!!devkit);
         setEmulatorPresent(!!mgba);
       } catch (err) {
@@ -32,15 +32,15 @@ const ToolchainPanel: React.FC = () => {
       // Let user pick DEVKIT folder
       const devkitFolder = await window.electronAPI.selectFolder();
       if (devkitFolder?.filePath) {
-        await window.electronAPI.importVendor('devkitPro', devkitFolder.filePath);
+        await window.electronAPI.importTools('devkitPro', devkitFolder.filePath);
       }
 
       const mgbaFolder = await window.electronAPI.selectFolder();
       if (mgbaFolder?.filePath) {
-        await window.electronAPI.importVendor('mGBA', mgbaFolder.filePath);
+        await window.electronAPI.importTools('mGBA', mgbaFolder.filePath);
       }
 
-      message.success('Import started. Check vendor folder.');
+      message.success('Import started. Check tools folder.');
     } catch (err) {
       console.error(err);
       message.error('Import failed');
@@ -76,11 +76,11 @@ const ToolchainPanel: React.FC = () => {
       <Space direction="vertical" style={{ width: '100%' }}>
         <Title level={5}>Toolchain</Title>
         <div>
-          <Text>DevkitARM (vendor): </Text>
+          <Text>DevkitARM (tools): </Text>
           <Text strong>{devkitPresent === null ? 'Checking...' : devkitPresent ? 'Available' : 'Missing'}</Text>
         </div>
         <div>
-          <Text>mGBA (vendor): </Text>
+          <Text>mGBA (tools): </Text>
           <Text strong>{emulatorPresent === null ? 'Checking...' : emulatorPresent ? 'Available' : 'Missing'}</Text>
         </div>
 
