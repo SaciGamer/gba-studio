@@ -26,7 +26,7 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
       // Let user select folder via selectFolder (opens a dialog)
       const res = await window.electronAPI.selectFolder();
       if (res && res.filePath) {
-        const importRes = await window.electronAPI.importVendor('devkitPro', res.filePath);
+        const importRes = await window.electronAPI.importTools('devkitPro', res.filePath);
         if (importRes.success) message.success('devkitPro imported');
         else message.error(importRes.message || 'Import failed');
       }
@@ -40,7 +40,7 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
     try {
       const res = await window.electronAPI.selectFolder();
       if (res && res.filePath) {
-        const importRes = await window.electronAPI.importVendor('mGBA', res.filePath);
+        const importRes = await window.electronAPI.importTools('mGBA', res.filePath);
         if (importRes.success) message.success('mGBA imported');
         else message.error(importRes.message || 'Import failed');
       }
