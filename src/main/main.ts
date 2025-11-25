@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 
 import windowStateKeeper from 'electron-window-state';
-import { getPreferences, updatePreferences } from './handlers/preferenceHandlers';
+import { getPreferences, updatePreferences, initializeDefaultPaths } from './handlers/preferenceHandlers';
 import { requestSaveChanges, setProjectDirectory, setProjectFile } from './services/saveSettingsService';
 import { saveEvents } from './services/saveSettingsService';
 import { createProjectStruct } from './structs/mainProjectStruct';
@@ -287,6 +287,9 @@ export function changeTheme(theme: string) {
 }
 
 app.whenReady().then(() => {
+  // Initialize default paths from environment variables
+  initializeDefaultPaths();
+
   // Manipular requisições do esquema 'local://'
   protocol.handle('local', async (request) => {
     const url = decodeURIComponent(request.url.replace('local://', ''));
@@ -664,7 +667,13 @@ ipcMain.handle('compile-project-demo', async (event, projectPath) => {
     });
   console.log('..: compile-project-demo for', projectPath);
   try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: 'Iniciando compilação demo...' })); } catch (e) {}
-    const tempBuild = path.join(os.tmpdir(), 'gba-project-temp', 'gba-studio-build');
+    
+    // Resolve temp build path: use preference if set, otherwise use OS tmpdir
+    const prefs = getPreferences();
+    const tempBuildPreference = prefs.tempBuildPath;
+    const tempBuild = tempBuildPreference && fs.existsSync(tempBuildPreference)
+      ? path.join(tempBuildPreference, 'gba-studio-build')
+      : path.join(os.tmpdir(), 'gba-project-temp', 'gba-studio-build');
 
     // Clean temp
     if (fs.existsSync(tempBuild)) {

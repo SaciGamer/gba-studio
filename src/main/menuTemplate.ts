@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
-import { ipcMain, MenuItem, MenuItemConstructorOptions } from 'electron';
+import { ipcMain, MenuItem, MenuItemConstructorOptions, BrowserWindow } from 'electron';
 import { updatePreferences, getPreferences } from './handlers/preferenceHandlers';
-import { changeTheme, createAboutWindow, createLauncherWindow } from './main'
+import { changeTheme, createAboutWindow, createLauncherWindow, windows } from './main'
 import { requestSaveChanges } from './services/saveSettingsService';
 
 let isShowCollisionsChecked = true;
@@ -23,7 +23,8 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                     accelerator: 'CmdOrCtrl+N', 
                     click: () => {
                         console.log('..: New Project clicado'); 
-                        ipcMain.emit('change-to-launcher', {}, 'new_project', false);
+                        // Trigger the main-process handler directly (same pattern as Open...)
+                        try { ipcMain.emit('change-to-launcher', null, 'new_project', false); } catch (e) { console.warn('Failed to emit change-to-launcher', e); }
                     }
                 },
                 {
@@ -31,7 +32,7 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                     accelerator: 'CmdOrCtrl+O', 
                     click: () => {
                         console.log('..: Open clicado');
-                        ipcMain.emit('open-project-window');
+                        try { ipcMain.emit('open-project-window'); } catch (e) { console.warn('Failed to emit open-project-window', e); }
                     },
                 },
                 {
@@ -39,7 +40,8 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                     accelerator: 'CmdOrCtrl+P', 
                     click: () => {
                         console.log('..: Switch Project clicado'); 
-                        ipcMain.emit('change-to-launcher', {}, 'recent_project', false);
+                        // Trigger the main-process handler directly
+                        try { ipcMain.emit('change-to-launcher', null, 'recent_project', false); } catch (e) { console.warn('Failed to emit change-to-launcher', e); }
                     }
                 },
                 { 
@@ -78,7 +80,15 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                     ]
                 },
                 { type: 'separator' },
-                { label: 'Preferences...', click: () => { console.log('..: Preferencias clicado'); } }
+                { label: 'Preferences...', click: () => { 
+                    console.log('..: Preferences clicado'); 
+                    if (windows.main) {
+                        windows.main.webContents.send('open-preferences');
+                    } else if (windows.launcher) {
+                        // windows.launcher.webContents.send('open-preferences');
+                        console.warn('Failed to open-preferences, no main window');
+                    }
+                } }
             ]
         },
         {
@@ -225,7 +235,15 @@ function updateTheme(menuItem: MenuItem, theme: string): void {
     // Marcar o item selecionado e aplicar o tema
     menuItem.checked = true;
     console.log('..: Mudando tema para: ', theme);
-    ipcMain.emit('change-theme', null, theme);
+    
+    // Enviar evento para todas as janelas abertas
+    if (windows.main) {
+        windows.main.webContents.send('change-theme', theme);
+    }
+    if (windows.launcher) {
+        windows.launcher.webContents.send('change-theme', theme);
+    }
+    
     changeTheme(theme);
 }
 

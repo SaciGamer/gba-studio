@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Input, Button, Space, message } from 'antd';
+import { Modal, Input, Button, Space, message, Form, Tag, Divider, Alert } from 'antd';
+import { FolderOutlined, CheckCircleOutlined, ExclamationCircleOutlined, CloudDownloadOutlined } from '@ant-design/icons';
 
 const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const [devkitPath, setDevkitPath] = useState('');
   const [emulatorPath, setEmulatorPath] = useState('');
+  const [tempBuildPath, setTempBuildPath] = useState('');
   const [loading, setLoading] = useState(false);
+  const [devkitValid, setDevkitValid] = useState<boolean | null>(null);
+  const [emulatorValid, setEmulatorValid] = useState<boolean | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -12,39 +17,83 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
       try {
         const dk = await window.electronAPI.getDevkitPath();
         const em = await window.electronAPI.getEmulatorPath();
+        const tb = await window.electronAPI.getTempBuildPath();
         setDevkitPath(dk || '');
         setEmulatorPath(em || '');
+        setTempBuildPath(tb || '');
+        
+        // Validar caminhos
+        if (dk) {
+          const isValid = await window.electronAPI.checkToolsExe('devkitPro', 'devkitARM/bin/arm-none-eabi-gcc.exe');
+          setDevkitValid(isValid);
+        } else {
+          setDevkitValid(false);
+        }
+        
+        if (em) {
+          const isValid = await window.electronAPI.checkToolsExe('mGBA', 'mGBA.exe');
+          setEmulatorValid(isValid);
+        } else {
+          setEmulatorValid(null);
+        }
       } catch (err) {
         console.error(err);
       }
     })();
   }, [open]);
 
-  const importDevkit = async () => {
-    setLoading(true);
+  const selectDevkitPath = async () => {
     try {
-      // Let user select folder via selectFolder (opens a dialog)
       const res = await window.electronAPI.selectFolder();
       if (res && res.filePath) {
-        const importRes = await window.electronAPI.importTools('devkitPro', res.filePath);
-        if (importRes.success) message.success('devkitPro imported');
-        else message.error(importRes.message || 'Import failed');
+        setDevkitPath(res.filePath);
       }
     } catch (err) {
       console.error(err);
-    } finally { setLoading(false); }
+      message.error('Failed to select devkit path');
+    }
   };
 
-  const importMgba = async () => {
-    setLoading(true);
+  const selectEmulatorPath = async () => {
     try {
       const res = await window.electronAPI.selectFolder();
       if (res && res.filePath) {
-        const importRes = await window.electronAPI.importTools('mGBA', res.filePath);
-        if (importRes.success) message.success('mGBA imported');
-        else message.error(importRes.message || 'Import failed');
+        setEmulatorPath(res.filePath);
       }
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+    } catch (err) {
+      console.error(err);
+      message.error('Failed to select emulator path');
+    }
+  };
+
+  const selectTempBuildPath = async () => {
+    try {
+      const res = await window.electronAPI.selectFolder();
+      if (res && res.filePath) {
+        setTempBuildPath(res.filePath);
+      }
+    } catch (err) {
+      console.error(err);
+      message.error('Failed to select temp build path');
+    }
+  };
+
+  const downloadDevkitPro = async () => {
+    setDownloading(true);
+    try {
+      message.info('DevKit Pro download not yet implemented. Please configure path manually or use Import Tools.');
+    } catch (err) {
+      console.error(err);
+      message.error('Failed to download DevKit Pro');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const getStatusTag = (isValid: boolean | null) => {
+    if (isValid === null) return null;
+    if (isValid) return <Tag icon={<CheckCircleOutlined />} color="success">Valid</Tag>;
+    return <Tag icon={<ExclamationCircleOutlined />} color="error">Invalid</Tag>;
   };
 
   const save = async () => {
@@ -52,33 +101,96 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
     try {
       await window.electronAPI.setDevkitPath(devkitPath);
       await window.electronAPI.setEmulatorPath(emulatorPath);
+      await window.electronAPI.setTempBuildPath(tempBuildPath);
       message.success('Preferences saved');
       onClose();
     } catch (err) {
       message.error('Failed to save preferences');
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   return (
-    <Modal open={open} title="Preferences" onCancel={onClose} footer={null}>
-      <Space direction="vertical" style={{ width: '100%' }}>
-        <div>
-          <label>DEVKITARM path</label>
-          <Input value={devkitPath} onChange={(e) => setDevkitPath(e.target.value)} placeholder="Path to devkitPro/devkitARM" />
-          <Button style={{ marginTop: 8 }} onClick={importDevkit} loading={loading}>Import devkit from disk</Button>
-        </div>
+    <Modal open={open} title="Preferences" onCancel={onClose} footer={null} width={800}>
+      <Form layout="vertical">
+        <Alert 
+          message="GBA Studio Configuration"
+          description="Configure paths for DevKit Pro, emulator, and temporary build files."
+          type="info"
+          style={{ marginBottom: 16 }}
+        />
 
-        <div>
-          <label>Emulator path</label>
-          <Input value={emulatorPath} onChange={(e) => setEmulatorPath(e.target.value)} placeholder="Path to emulator executable" />
-          <Button style={{ marginTop: 8 }} onClick={importMgba} loading={loading}>Import mGBA from disk</Button>
-        </div>
+        <Divider>Development Tools</Divider>
 
-        <div style={{ textAlign: 'right' }}>
-          <Button onClick={onClose} style={{ marginRight: 8 }}>Cancel</Button>
-          <Button type="primary" onClick={save} loading={loading}>Save</Button>
-        </div>
-      </Space>
+        {/* DevkitARM Path */}
+        <Form.Item 
+          label={
+            <Space>
+              <span>DevKitARM Path</span>
+              {getStatusTag(devkitValid)}
+            </Space>
+          } 
+          required
+        >
+          <Space.Compact style={{ width: '100%' }}>
+            <Input 
+              value={devkitPath} 
+              onChange={(e) => setDevkitPath(e.target.value)} 
+              placeholder="Path to devkitPro/devkitARM"
+              readOnly
+            />
+            <Button icon={<FolderOutlined />} onClick={selectDevkitPath}>Browse</Button>
+            <Button icon={<CloudDownloadOutlined />} onClick={downloadDevkitPro} loading={downloading}>Download</Button>
+          </Space.Compact>
+        </Form.Item>
+
+        {/* Emulator Path */}
+        <Form.Item 
+          label={
+            <Space>
+              <span>Emulator Path (mGBA)</span>
+              {getStatusTag(emulatorValid)}
+            </Space>
+          }
+        >
+          <Space.Compact style={{ width: '100%' }}>
+            <Input 
+              value={emulatorPath} 
+              onChange={(e) => setEmulatorPath(e.target.value)} 
+              placeholder="Path to mGBA executable or folder"
+              readOnly
+            />
+            <Button icon={<FolderOutlined />} onClick={selectEmulatorPath}>Browse</Button>
+          </Space.Compact>
+        </Form.Item>
+
+        <Divider>Build Configuration</Divider>
+
+        {/* Temporary Build Path */}
+        <Form.Item 
+          label="Temporary Build Path" 
+          required
+        >
+          <Space.Compact style={{ width: '100%' }}>
+            <Input 
+              value={tempBuildPath} 
+              onChange={(e) => setTempBuildPath(e.target.value)} 
+              placeholder="Where to store temporary build files"
+              readOnly
+            />
+            <Button icon={<FolderOutlined />} onClick={selectTempBuildPath}>Browse</Button>
+          </Space.Compact>
+        </Form.Item>
+
+        {/* Action Buttons */}
+        <Form.Item>
+          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <Button onClick={onClose}>Cancel</Button>
+            <Button type="primary" onClick={save} loading={loading}>Save</Button>
+          </Space>
+        </Form.Item>
+      </Form>
     </Modal>
   );
 };

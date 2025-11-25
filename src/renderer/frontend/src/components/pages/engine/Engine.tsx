@@ -6,7 +6,6 @@ import TopBar from '../../TopBar';
 import LeftPanel from '../../LeftPanel';
 import CentralEditor from '../../CentralEditor';
 import RightPanel from '../../RightPanel';
-import ToolchainPanel from '../../toolchain/ToolchainPanel';
 import BottomPanel from '../../BottomPanel';
 import { ZoomProvider } from '../../ZoomContext';
 import EmulatorView from '../../EmulatorView';
@@ -480,9 +479,6 @@ const Engine: React.FC = () => {
 
                 {/* PAINEL DIREITO */}
                 <Splitter.Panel defaultSize="35%" min={350} size={panelSizes[2]} >
-                  <div style={{ padding: 12 }}>
-                    <ToolchainPanel />
-                  </div>
                   <RightPanel controllerView={setContentView} />
                 </Splitter.Panel>
               </Splitter>

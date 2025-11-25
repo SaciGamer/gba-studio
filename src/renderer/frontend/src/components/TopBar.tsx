@@ -39,7 +39,7 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
   }
 
   const handleProjectFolder = () => {
-    console.log('..:: Open Project Folder ::..');
+    console.log('..:: Open Project Folder ::..') ;
     window.electronAPI.send('open-project-folder', null);
   }
   
@@ -99,7 +99,7 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
           <Button onClick={() => handleZoomChange(10)}>+</Button>
         </Tooltip>
       </Space>)}
-      <div style={{ marginLeft: '5px', display: 'flex', alignItems: 'right' }}>
+      <div style={{ marginLeft: '5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
         <Input.Search 
           placeholder="Search"
           value={searchValue}
