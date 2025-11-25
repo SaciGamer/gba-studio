@@ -340,6 +340,24 @@ const Engine: React.FC = () => {
     };
   }, []);
 
+  // Listener para mudança de view pelo menu (atalhos e itens de menu View)
+  useEffect(() => {
+    const handleChangeContentView = (event: any, viewId: number) => {
+      console.log('..: Mudando view para:', viewId);
+      setContentView(viewId);
+    };
+
+    if (window.electronAPI && window.electronAPI.on) {
+      window.electronAPI.on('change-content-view', handleChangeContentView);
+    }
+
+    return () => {
+      if (window.electronAPI && window.electronAPI.removeListener) {
+        window.electronAPI.removeListener('change-content-view', handleChangeContentView);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     // Helper to check if any item in array has _saved === false
     const hasUnsaved = (arr: any[]) => Array.isArray(arr) && arr.some(item => item && item._saved === false);
