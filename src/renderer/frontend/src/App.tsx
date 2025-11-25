@@ -90,16 +90,20 @@ const App: React.FC = () => {
       setIsWindowActive(true);
     };
 
+    const handleOpenPreferences = () => {
+      setPrefsOpen(true);
+    };
+
     // Adiciona os listeners
     window.electronAPI.on('window-blurred', handleWindowBlurred);
     window.electronAPI.on('window-focused', handleWindowFocused);
-  window.electronAPI.on('open-preferences', () => setPrefsOpen(true));
+    window.electronAPI.on('open-preferences', handleOpenPreferences);
 
     // Limpa os listeners ao desmontar o componente
     return () => {
       window.electronAPI.removeListener('window-blurred', handleWindowBlurred);
       window.electronAPI.removeListener('window-focused', handleWindowFocused);
-  window.electronAPI.removeListener('open-preferences', () => setPrefsOpen(true));
+      window.electronAPI.removeListener('open-preferences', handleOpenPreferences);
     };
   }, []);
   // Efeito PRETO/BRANCO tela inativa END -------------------------
@@ -219,7 +223,7 @@ const App: React.FC = () => {
           </Content>
         </HashRouter>
       </AppProvider>
-  <PreferencesModal open={prefsOpen} onClose={() => setPrefsOpen(false)} />
+      <PreferencesModal open={prefsOpen} onClose={() => setPrefsOpen(false)} />
     </ConfigProvider>
   );
 }
