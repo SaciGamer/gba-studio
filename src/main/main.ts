@@ -33,6 +33,8 @@ const packageJsonPath = isDev
 export const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
 export let directoryPathProject: any;
 
+// If the app was started with a project file, store it here so splash can route to Engine
+export let startupProjectToOpen: string | null = null;
 let mainWindowIsClosing = false;
 let currentTheme: string = getPreferences().theme;
 
@@ -62,6 +64,46 @@ export const windows: Windows = {
   about: null
 };
 
+// Detect if app was started with a project file in args (Windows: double-clicking a .gbaproj)
+const initialProjectArg = process.argv.find(a => typeof a === 'string' && a.toLowerCase().endsWith('.gbaproj')) as string | undefined;
+if (initialProjectArg) {
+  startupProjectToOpen = initialProjectArg;
+}
+
+// Ensure single instance: if a second instance is launched with a .gbaproj, route it to the running instance
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, argv /* , workingDir */) => {
+    try {
+      const fileArg = (argv || []).find((a: any) => typeof a === 'string' && a.toLowerCase().endsWith('.gbaproj')) as string | undefined;
+      if (fileArg) {
+        // If main already exists, load the project immediately
+        if (windows.main) {
+          loadProject(fileArg);
+        } else {
+          // Otherwise set it as startup project so splash will route to Engine
+          startupProjectToOpen = fileArg;
+          // If there's no splash running, create one so it can route
+          if (!windows.splash) {
+            createSplashWindow();
+          }
+        }
+      } else {
+        // No project arg: bring existing window to front
+        if (windows.main) {
+          try { if (windows.main.isMinimized()) windows.main.restore(); windows.main.focus(); } catch (e) {}
+        } else if (windows.launcher) {
+          try { if (windows.launcher.isMinimized()) windows.launcher.restore(); windows.launcher.focus(); } catch (e) {}
+        }
+      }
+    } catch (e) {
+      console.error('second-instance handler error', e);
+    }
+  });
+}
+
 // Splash
 function createSplashWindow() {
   windows.splash = new BrowserWindow({
@@ -86,10 +128,27 @@ function createSplashWindow() {
 
    // Após um tempo, fechar a splash screen e mostrar a janela principal
    setTimeout(() => {
+    // Close splash first
     windows.splash?.close();
+
+    // If we were started with a project file, open that project (go to Engine)
+    if (startupProjectToOpen) {
+      const p = startupProjectToOpen;
+      startupProjectToOpen = null;
+      // Use loadProject so menus and state are properly initialized
+      loadProject(p);
+      return;
+    }
+
+    // Otherwise create/show the launcher normally
     windows.launcher?.setAlwaysOnTop(true); // Garantir que a janela principal esteja sempre no topo
-    windows.launcher?.show();
-    windows.launcher?.focus();
+    // If launcher window hasn't been created yet, create it
+    if (!windows.launcher) {
+      createLauncherWindow(null, false);
+    } else {
+      windows.launcher.show();
+      windows.launcher.focus();
+    }
     windows.launcher?.setAlwaysOnTop(false); // Desabilitar a configuração após trazer a janela para o topo
   }, 3000); // 3 segundos
 }
@@ -327,7 +386,8 @@ app.whenReady().then(() => {
   });
 
   createSplashWindow();
-  createLauncherWindow(null, true);
+  // Launcher creation is handled by the splash screen (it will create/show launcher
+  // if no startup project was provided). This avoids duplicating windows.
 });
 
 async function handleWindowClose(window: BrowserWindow) {
