@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Input, Button, Space, message, Form, Tag, Divider, Alert } from 'antd';
+import { Modal, Input, Button, Space, message, Form, Tag, Divider, Typography } from 'antd';
 import { FolderOutlined, CheckCircleOutlined, ExclamationCircleOutlined, CloudDownloadOutlined } from '@ant-design/icons';
 
 const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
@@ -114,12 +114,10 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
   return (
     <Modal open={open} title="Preferences" onCancel={onClose} footer={null} width={800}>
       <Form layout="vertical">
-        <Alert 
-          message="GBA Studio Configuration"
-          description="Configure paths for DevKit Pro, emulator, and temporary build files."
-          type="info"
-          style={{ marginBottom: 16 }}
-        />
+        <Space direction="vertical" size={0} style={{ marginBottom: 24, display: 'flex' }}>
+          <Typography.Text strong>GBA Studio Configuration</Typography.Text>
+          <Typography.Text type="secondary">Configure paths for DevKit Pro, emulator and temporary build files.</Typography.Text>
+        </Space>
 
         <Divider>Development Tools</Divider>
 
