@@ -3,7 +3,7 @@
   "author": "GBA Studio",
   "productName": "GBA Studio",
   "description": "Project for creating and compiling GBA",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "license": "GPL-2.0 license",
   "private": true,
   "type": "module",
@@ -43,7 +43,7 @@
     "linux": {
       "icon": "icon/defaultImgIcon.png"
     },
-    "asar": false,
+    "asar": true, 
     "asarUnpack": []
   },
   "files": [
