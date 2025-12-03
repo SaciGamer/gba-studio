@@ -3,7 +3,7 @@
   "author": "GBA Studio",
   "productName": "GBA Studio",
   "description": "Project for creating and compiling GBA",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "license": "GPL-2.0 license",
   "private": true,
   "type": "module",
@@ -22,11 +22,76 @@
       "output": "release",
       "buildResources": "icon"
     },
+    "extraResources": [
+    {
+      "from": "tools/image-magick/win32/magick.exe",
+      "to": "bin/magick.exe"
+    },
+    {
+      "from": "tools/image-magick/darwin/magick",
+      "to": "bin/magick"
+    },
+    {
+      "from": "tools/image-magick/linux/magick",
+      "to": "bin/magick"
+    },
+
+    {
+      "from": "tools/butano/win32/butano.exe",
+      "to": "bin/butano.exe"
+    },
+    {
+      "from": "tools/butano/darwin/butano",
+      "to": "bin/butano"
+    },
+    {
+      "from": "tools/butano/linux/butano",
+      "to": "bin/butano"
+    },
+
+    {
+      "from": "tools/butano-tile/win32/butano-tile.exe",
+      "to": "bin/butano-tile.exe"
+    },
+    {
+      "from": "tools/butano-tile/darwin/butano-tile",
+      "to": "bin/butano-tile"
+    },
+    {
+      "from": "tools/butano-tile/linux/butano-tile",
+      "to": "bin/butano-tile"
+    },
+
+    {
+      "from": "tools/mgba/win32/mgba.exe",
+      "to": "bin/mgba.exe"
+    },
+    {
+      "from": "tools/mgba/darwin/mgba",
+      "to": "bin/mgba"
+    },
+    {
+      "from": "tools/mgba/linux/mgba",
+      "to": "bin/mgba"
+    },
+
+    {
+      "from": "tools/tiled/win32/tiled.exe",
+      "to": "bin/tiled.exe"
+    },
+    {
+      "from": "tools/tiled/darwin/tiled",
+      "to": "bin/tiled"
+    },
+    {
+      "from": "tools/tiled/linux/tiled",
+      "to": "bin/tiled"
+    }
+  ],
     "files": [
       "dist/**/*",
       "icon/**/*",
       "sample_project_example",
-      "tools/**/*",
       "package.json"
     ],
     "mac": {
@@ -43,7 +108,7 @@
     "linux": {
       "icon": "icon/defaultImgIcon.png"
     },
-    "asar": true, 
+    "asar": true,
     "asarUnpack": []
   },
   "files": [
@@ -56,21 +121,26 @@
   "scripts": {
     "start": "concurrently \"yarn workspace @gba-studio/frontend dev\" \"wait-on --httpTimeout 5000 http://localhost:5173 && electron .\"",
     "dev": "concurrently \"yarn workspace @gba-studio/frontend dev\" \"wait-on --httpTimeout 5000 http://localhost:5173 && electron .\"",
+    "compile-scripts": "tsc -p scripts/tsconfig.scripts.json",
+    "prebuild": "node scripts-dist/setupMagick.js",
     "build": "rm -rf dist && yarn build:main && yarn build:renderer && electron-builder",
+    "prebuild:main": "node scripts-dist/setupMagick.js",
     "build:main": "yarn workspace @gba-studio/main build",
     "build:renderer": "yarn workspace @gba-studio/frontend build",
-    "preview": "yarn workspace @gba-studio/frontend preview && electron .",
-    "build-gba": "cd dist/gba-studio-build && make rebuild && cd ../.."
+    "preview": "yarn workspace @gba-studio/frontend preview && electron ."
   },
   "dependencies": {
     "antd": "^5.24.0",
     "assert": "^2.1.0",
     "buffer": "^6.0.3",
     "crypto-browserify": "^3.12.0",
+    "decompress": "^4.2.1",
     "electron-is-dev": "^3.0.1",
     "electron-store": "^10.0.1",
     "electron-window-state": "^5.0.3",
     "https-browserify": "^1.0.0",
+    "imagemagick": "^0.1.3",
+    "node-7z": "^3.0.0",
     "os-browserify": "^0.3.0",
     "process": "^0.11.10",
     "react": "^18.2.0",

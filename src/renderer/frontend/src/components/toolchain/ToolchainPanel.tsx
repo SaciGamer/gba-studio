@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Button, Space, Typography, message } from 'antd';
+import { useBuildState } from '../../providers/BuildStateProvider';
 
 const { Text, Title } = Typography;
 
 const ToolchainPanel: React.FC = () => {
   const [devkitPresent, setDevkitPresent] = useState<boolean | null>(null);
   const [emulatorPresent, setEmulatorPresent] = useState<boolean | null>(null);
+  const { isBuilding, isRunning, setBuilding } = useBuildState();
 
   useEffect(() => {
     const check = async () => {
@@ -50,6 +52,7 @@ const ToolchainPanel: React.FC = () => {
   const compileMake = async () => {
     try {
       message.info('Triggering make...');
+      setBuilding(true);
       window.electronAPI.send('compile-project', null);
     } catch (err) {
       message.error('Failed to trigger make');
@@ -59,6 +62,7 @@ const ToolchainPanel: React.FC = () => {
   const buildAndRunDemo = async () => {
     try {
       message.info('Starting build...');
+      setBuilding(true);
   // Call the main demo compile path which copies the demo template into gba-project temp and builds
   const repoRoot = await window.electronAPI.pathJoin('.', '..', '..');
   // Use the packaged template path in the main process: src/main/templates/demo-showcase
@@ -87,8 +91,8 @@ const ToolchainPanel: React.FC = () => {
         <Space>
           <Button onClick={openPreferences}>Preferences</Button>
           <Button onClick={importTools}>Import Tools</Button>
-          <Button onClick={compileMake}>Compile (make)</Button>
-          <Button type="primary" onClick={buildAndRunDemo}>Build & Run Demo</Button>
+          <Button onClick={compileMake} disabled={isBuilding || isRunning}>Compile (make)</Button>
+          <Button type="primary" onClick={buildAndRunDemo} disabled={isBuilding || isRunning}>Build & Run Demo</Button>
         </Space>
       </Space>
     </Card>

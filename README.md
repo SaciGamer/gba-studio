@@ -146,7 +146,75 @@ Verifique `package.json` para os scripts exatos usados pelo projeto.
 
 ---
 
-**Executando testes / verificação rápida**
+**Sistema de Resources (GBA)**
+
+O projeto utiliza um sistema automático de geração de headers C/C++ a partir de arquivos de recurso (`.gbasres`). Este sistema integra-se com Butano e devkitARM para compilação de ROMs.
+
+**Fluxo de Resources**
+
+1. **Arquivo de Recurso** (`.gbasres`): Arquivo JSON que define um recurso (Settings, Background, Scene, etc.)
+   
+2. **Header C/C++** (`.h`): O `ResourceBuilder` processa cada arquivo `.gbasres` e gera um header com constantes estáticas
+   - Exemplo: `settings_res.h`, `scene_0_res.h`, `castle_novo_res.h`
+
+3. **Resource Registry** (`resource_registry.cpp/.h`): Array central que registra todos os recursos com suas metadatas
+   - Função: `get_resource_by_name(const char* name)` — busca por nome
+   - Função: `get_resource_by_id(const bn::string<64>& id)` — busca por ID
+   - Função: `get_resource_by_id_and_type(id, type)` — busca por ID e tipo
+
+4. **Graphics Manager** (`graphics_manager.cpp`): Utiliza o registry para carregar recursos
+   - Fluxo: Settings → Scene (por STARTSCENEID) → Background (por BACKGROUNDID) → Carregamento visual
+
+**Estrutura de Recursos**
+
+Cada recurso tem um tipo (`ResourceType`) e campos correspondentes:
+
+- **Settings**: configurações iniciais do jogo
+  - Campos: `STARTSCENEID`, `STARTX`, `STARTY`, `STARTMOVESPEED`, `STARTANIMSPEED`, `STARTDIRECTION`
+  
+- **Background**: imagens de fundo
+  - Campos: `ID`, `AUTOCOLOR`, `FILENAME`, `NAME`
+  
+- **Scene**: cenas do jogo
+  - Campos: `ID`, `NAME`, `BACKGROUNDID` (referência para o background)
+
+**Geração de Headers**
+
+Durante o build:
+
+```powershell
+yarn build:main
+```
+
+O `ResourceBuilder` (em `src/main/utils/builders/ResourceBuilder.ts`):
+1. Lê todos os arquivos `.gbasres` de `sample_project_example/project/`
+2. Extrai tipo (`__RESOURCETYPE`) e constantes de cada arquivo
+3. Gera headers correspondentes em `include/`
+4. Constrói o array `RESOURCES[]` em `resource_registry.cpp`
+
+**Exemplo de uso em C++**
+
+```cpp
+// Buscar configurações
+const Resource* settings = get_resource_by_name("settings");
+
+// Extrair ID da cena inicial
+bn::string<64> scene_id(SETTINGS_STARTSCENEID);
+
+// Buscar cena pelo ID
+const Resource* scene = get_resource_by_id_and_type(scene_id, ResourceType::Scene);
+
+// Extrair e buscar background
+const Resource* bg = get_resource_by_id_and_type(scene->background_id, ResourceType::Background);
+
+// Criar background visual
+auto bg_item = bn::regular_bg_items::castle_novo;
+auto bg_ptr = bn::regular_bg_ptr::create(bg_item);
+```
+
+---
+
+
 
 Se o repositório incluir testes (ver `package.json`), rode:
 

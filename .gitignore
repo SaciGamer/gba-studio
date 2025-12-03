@@ -22,6 +22,7 @@ dist/
 build/
 **/dist
 **/build
+scripts-dist/
 
 # Testes
 coverage/

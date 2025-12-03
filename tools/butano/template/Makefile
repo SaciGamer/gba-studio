@@ -33,19 +33,20 @@
 #---------------------------------------------------------------------------------------------------------------------
 TARGET      	:=  $(notdir $(CURDIR))
 BUILD       	:=  build
-LIBBUTANO   	:=  ../butano
+LIBBUTANO   	:=  $(BUTANO)/butano
+LIBBUTANOTILED 	:=  $(BUTANOTILED)
 PYTHON      	:=  python
-SOURCES     	:=  src
-INCLUDES    	:=  include
+SOURCES     	:=  src $(BUILD)/src
+INCLUDES    	:=  include $(BUILD)/include $(BUTANO)/common/include
 DATA        	:=
-GRAPHICS    	:=  graphics
+GRAPHICS    	:=  graphics $(BUILD)/graphics
 AUDIO       	:=  audio
 AUDIOBACKEND	:=  maxmod
 AUDIOTOOL		:=  
 DMGAUDIO    	:=  dmg_audio
 DMGAUDIOBACKEND	:=  default
-ROMTITLE    	:=  ROM TITLE
-ROMCODE     	:=  SBTP
+ROMTITLE    	:=  GBA STUDIO ROM TITLE
+ROMCODE     	:=  GBAS
 USERFLAGS   	:=  
 USERCXXFLAGS	:=  
 USERASFLAGS 	:=  
@@ -55,7 +56,8 @@ USERLIBS    	:=
 DEFAULTLIBS 	:=  
 STACKTRACE		:=	
 USERBUILD   	:=  
-EXTTOOL     	:=  
+MAPS			:=	maps
+EXTTOOL			:=  @$(PYTHON) -B $(LIBBUTANOTILED)/bntmx.py --target=butano --build=$(BUILD) $(MAPS)
 
 #---------------------------------------------------------------------------------------------------------------------
 # Export absolute butano path:
