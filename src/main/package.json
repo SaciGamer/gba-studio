@@ -16,8 +16,8 @@
     },
     "devDependencies": {
       "@types/node": "^20.11.19",
-      "typescript": "^5.2.2",
-      "tsc-alias": "^1.8.5"
+      "tsc-alias": "^1.8.5",
+      "typescript": "^5.2.2"
     }
   }
   

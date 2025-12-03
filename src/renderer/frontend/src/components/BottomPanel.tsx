@@ -1,10 +1,12 @@
 import * as React from 'react';
 const { useEffect, useState } = React;
 
+import { useBuildState } from '../providers/BuildStateProvider';
+
 const BottomPanel: React.FC = () => {
   const [statusLines, setStatusLines] = useState<string[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isBuilding } = useBuildState();
 
   useEffect(() => {
   const api = (window as any).electronAPI;
@@ -14,9 +16,7 @@ const BottomPanel: React.FC = () => {
       try {
         const msg = payload && payload.message ? String(payload.message) : JSON.stringify(payload);
         setStatusLines((s) => [...s.slice(-30), msg]);
-        if (payload && payload.status === 'running') setIsRunning(true);
-        if (payload && payload.status === 'finished') setIsRunning(false);
-        if (payload && payload.status === 'started') setIsRunning(true);
+        // provider manages high-level building state; keep local logs only
       } catch (e) { /* ignore */ }
     };
 
@@ -24,7 +24,6 @@ const BottomPanel: React.FC = () => {
       try {
         const msg = payload && payload.message ? String(payload.message) : JSON.stringify(payload);
         setError(msg);
-        setIsRunning(false);
         setStatusLines((s) => [...s.slice(-30), `ERROR: ${msg}`]);
       } catch (e) { /* ignore */ }
     };
@@ -42,9 +41,8 @@ const BottomPanel: React.FC = () => {
     <div className="h-64 bg-gray-800 p-4">
       <div className="bg-black w-full h-full flex flex-col text-white p-3">
         <div className="flex items-center justify-between">
-          <div className="text-lg font-medium">Emulator Placeholder</div>
           <div className="text-sm">
-            {isRunning ? <span>Compilando...</span> : <span>Ocioso</span>}
+            {isBuilding ? <span>Compilando...</span> : <span>Ocioso</span>}
           </div>
         </div>
 

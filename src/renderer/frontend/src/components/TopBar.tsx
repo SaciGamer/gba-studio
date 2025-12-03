@@ -3,6 +3,7 @@ import { Dropdown, Input, Button, Tooltip, Space } from 'antd';
 import { DownOutlined, FolderOpenOutlined, ExportOutlined, PlaySquareOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useZoomContext } from './ZoomContext';
 import { AntdToken } from '../components/common/AntDToken';
+import { useBuildState } from '../providers/BuildStateProvider';
 
 interface TopBarProps {
   contenView: number;
@@ -24,7 +25,7 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
   const [searchValue, setSearchValue] = useState<string>('');
   const [selectedKey, setSelectedKey] = useState<number>(1);
   const [menuName, setMenuName] = useState<string>('Game World');
-  const [isRunning, setIsRunning] = useState<boolean>(false);
+  const { isBuilding, isRunning, setBuilding } = useBuildState();
 
   const clearSearch = () => {
     setSearchValue('');
@@ -68,17 +69,8 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
     }
   }, [contenView]);
 
-  useEffect(() => {
-    // Listen emulator events
-    if (window.electronAPI && window.electronAPI.on) {
-      window.electronAPI.on('emulator-started', () => setIsRunning(true));
-      window.electronAPI.on('emulator-stopped', () => setIsRunning(false));
-    }
-    return () => {
-      try { window.electronAPI.removeListener('emulator-started', () => setIsRunning(true)); } catch (e) {}
-      try { window.electronAPI.removeListener('emulator-stopped', () => setIsRunning(false)); } catch (e) {}
-    };
-  }, []);
+  // emulator start/stop handled by BuildStateProvider; no local listeners needed
+  useEffect(() => {}, [isBuilding, isRunning]);
 
   return (
     <Space style={{ display: 'flex', alignItems: 'center', paddingInline: '10px', paddingBlock: '5px', justifyContent: 'space-between', backgroundColor: token.colorBgBase }}>
@@ -128,9 +120,13 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
           </Button>
         </Tooltip>
         <Tooltip title="Build">
-          <Button icon={<PlaySquareOutlined />} 
+          <Button 
+            icon={<PlaySquareOutlined />} 
+            loading={isBuilding}
+            disabled={isRunning}
             onClick={() => { 
               console.log('..: TopBar Build - request compile'); 
+              setBuilding(true);
               window.electronAPI.send('compile-project', null); 
             }}
             style={{ marginLeft: '15px', padding: '10px' }}>
@@ -139,6 +135,7 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
         <Tooltip title={isRunning ? 'Stop' : 'Play'}>
           <Button 
             icon={ isRunning ? <CloseCircleOutlined /> : <PlaySquareOutlined /> }
+            disabled={isBuilding}
             onClick={() => { 
               if (isRunning) { window.electronAPI.send('stop-emulator', null); console.log('..: TopBar Stop emulator'); }
               else { window.electronAPI.send('run-live', null); console.log('..: TopBar Run-live requested'); }

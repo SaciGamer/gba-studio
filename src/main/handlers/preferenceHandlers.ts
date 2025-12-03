@@ -173,6 +173,17 @@ const setTempBuildPath = (tempBuildPath: string): void => {
 };
 // DEVKIT & BUILD PATHS END -----------------------------------------------
 
+// BUILD CONFIG -----------------------------------------------------------
+export const getBuildConfig = () => {
+  return __store.get('buildConfig', { parallel: 0, optimizationLevel: 'O2', verbose: false });
+};
+
+export const setBuildConfig = (cfg: any): void => {
+  console.log('..: Setting buildConfig to', cfg);
+  __store.set('buildConfig', cfg);
+};
+// BUILD CONFIG END -------------------------------------------------------
+
 // Initialize default paths on app start
 export const initializeDefaultPaths = (): void => {
   const prefs = getPreferences();
@@ -221,4 +232,7 @@ export const configurarPreferenceHandlers = () => {
   ipcMain.handle('set-emulator-path', (_event: IpcMainInvokeEvent, emulatorPath: string) => setEmulatorPath(emulatorPath));
   ipcMain.handle('get-temp-build-path', () => getTempBuildPath());
   ipcMain.handle('set-temp-build-path', (_event: IpcMainInvokeEvent, tempBuildPath: string) => setTempBuildPath(tempBuildPath));
+  // Build config handlers
+  ipcMain.handle('get-build-config', () => getBuildConfig());
+  ipcMain.handle('set-build-config', (_event: IpcMainInvokeEvent, cfg: any) => setBuildConfig(cfg));
 }

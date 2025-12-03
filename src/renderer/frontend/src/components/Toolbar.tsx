@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ipcRenderer } from 'electron';
+import { useBuildState } from '../providers/BuildStateProvider';
 
 const Toolbar: React.FC = () => {
-  const [isProcessing, setIsProcessing] = useState(false);
-  
+  const { isBuilding, isRunning, setBuilding } = useBuildState();
+
   const handleCompile = () => {
-    setIsProcessing(true);
+    setBuilding(true);
     ipcRenderer.send('compile-project');
-    setIsProcessing(false);
+    // actual completion is handled via compile-progress / compile-error events
   };
 
   const handleRun = () => {
@@ -20,10 +21,10 @@ const Toolbar: React.FC = () => {
       <button className="gb-button">Open...</button>
       <button className="gb-button">Save</button>
       <button className="gb-button">Save As...</button>
-      <button className="gb-button" onClick={handleCompile} disabled={isProcessing}>
-        {isProcessing ? 'Processando...' : 'Compilar'}
+      <button className="gb-button" onClick={handleCompile} disabled={isBuilding || isRunning}>
+        {isBuilding ? 'Processando...' : 'Compilar'}
       </button>
-      <button className="gb-button" onClick={handleRun}>Run</button>
+      <button className="gb-button" onClick={handleRun} disabled={isBuilding}>Run</button>
     </div>
   );
 };
