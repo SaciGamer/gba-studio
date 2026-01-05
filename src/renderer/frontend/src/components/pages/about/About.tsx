@@ -9,7 +9,7 @@ const About: React.FC = () => {
   const [versions, setVersions] = useState({ electron: '', chrome: '', node: '', v8: '', projectVersion: '' });
 
   const handleImageClick = () => {
-    window.electronAPI.openBrowser("https://google.com.br/?gbastudio");
+    window.electronAPI.openBrowser("https://sacigamer.github.io/gba-studio-site/about");
   };
 
   useEffect(() => {
