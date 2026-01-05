@@ -198,7 +198,7 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                     label: 'Documentation',
                     click: () => {
                         console.log('..: Documentation clicado');
-                        openBrowser('https://www.google.com/?documentation');
+                        openBrowser('https://sacigamer.github.io/gba-studio-site/');
                     }
                 },
                 {
