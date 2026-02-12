@@ -7,6 +7,7 @@ interface IActiveButtons {
 
 interface IImages {
     images: string[] | null;
+    imagesHD: string[] | null;
     localImagePath: string;
 }
 

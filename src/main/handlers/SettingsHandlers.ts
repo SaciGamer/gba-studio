@@ -15,7 +15,7 @@ export const settingsHandlers = () => {
     ipcMain.handle('updateSettings', async (event, typeToSave, newSettings) => {
         console.log('..: updateSettings received, type: %s and config: %s', typeToSave, newSettings);
         changesPending(typeToSave, newSettings);
-        return { status: 'success', statusCode: 200, message: 'data settings updated' };
+        return { status: 'success', statusCode: 200, message: '>> data settings updated' };
     });
 
     // Remove configuração
@@ -29,7 +29,7 @@ export const settingsHandlers = () => {
         console.log('..: fetchSettings settingsHandlers fetchSettings data with type:', typeToFetch)
         const settingsData = settingsController.getSettingsData(typeToFetch);
         console.log('..: fetchSettings SettingsData: ', settingsData);
-        return { status: 'success', message: 'response settings data', settings: settingsData };
+        return { status: 'success', message: '>> response settings data', settings: settingsData };
     });
 
     // Atualização de titulo

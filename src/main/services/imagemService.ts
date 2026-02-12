@@ -98,8 +98,8 @@ export function stopAllWatchers() {
 const watchImages = (win: any, monitoredDir: string, targetUserDir: string | null) => {
   console.log(`..: Monitorando o diretório: ${monitoredDir}`);
 
-  const watch = fs.watch(monitoredDir, (eventType, fileName) => {
-    if (fileName) {
+  const watch = fs.watch(monitoredDir, (eventType, filename) => {
+    if (filename) {
       //   if (eventCache[monitoredDir]) {
       //     // Ignora eventos repetidos dentro do intervalo
       //     return;
@@ -110,7 +110,7 @@ const watchImages = (win: any, monitoredDir: string, targetUserDir: string | nul
       //     delete eventCache[monitoredDir]; // Limpa o cache após o intervalo
       //   }, debounceInterval);
 
-      console.log(`..: Alteração detectada: ${eventType} no arquivo ${fileName}`);
+      console.log(`..: Alteração detectada: ${eventType} no arquivo ${filename}`);
       const imagesNames = syncImagesIncrementally(monitoredDir, null); // Atualiza lista de arquivos
       console.log('..: watchImages enviar para o FE:', monitoredDir, imagesNames);
       win.webContents.send('update-images', preparePathForFrontend(monitoredDir), imagesNames); // Notifica o frontend
@@ -123,7 +123,7 @@ const watchImages = (win: any, monitoredDir: string, targetUserDir: string | nul
 // Iniciar o monitoramento
 export function startWatch(win: BrowserWindow | null, projectPath: string/*, targetUserDir: string*/) {
   if (!win) {
-    return { status: 'error', message: 'Nenhuma janela ativa encontrada' };
+    return { status: 'error', message: '>> Nenhuma janela ativa encontrada' };
   }
   targetDir = directoryPathProject;
   watchImages(win, projectPath, null/*, targetUserDir*/); // Chama a função passando a janela e o caminho do projeto

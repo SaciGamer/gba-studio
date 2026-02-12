@@ -1,15 +1,15 @@
-import { BuildOutlined, CaretRightFilled, CaretRightOutlined, FileFilled, PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
+import { BuildOutlined, CaretRightFilled, CaretRightOutlined, EditOutlined, FileFilled, PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
 import {  Collapse, Input, Layout, Splitter, Tooltip, Tree, TreeDataNode, Typography } from 'antd';
-import React, { Key, useEffect, useRef, useState } from 'react';
+import React, { Key, useEffect, useMemo, useRef, useState } from 'react';
 import { AntdToken } from '../components/common/AntDToken';
 import { useElementContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
-import { ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
+import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
 
 const { Content } = Layout;
 const { Panel } = Collapse;
 const { Text } = Typography;
 
-const LeftPanel: React.FC = () => {
+const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScriptsAndVariables = true }) => {
   const { scenes } = useSceneContext();
   const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
   const { elementSelected, setElementSelected } = useElementContext();
@@ -33,6 +33,12 @@ const LeftPanel: React.FC = () => {
   const [globalSelectedKey, setGlobalSelectedKey] = useState<string | null>(null);
 
   const toggleSection = (section: string) => {
+    if (!showScriptsAndVariables) {
+      // Se não mostrar Scripts/Variables, apenas alternar scenes
+      setIsScenesOpen(!isScenesOpen);
+      return;
+    }
+    
     setPanelSizes(prevSizes => {
       const newSizes = [...prevSizes];
       const collapsedSize = 40;
@@ -138,10 +144,26 @@ const LeftPanel: React.FC = () => {
   };
 
   const [searchTerm, setSearchTerm] = useState('');
-  const filteredBlocks = Object.values(scenes).filter(block =>
-    block.name?.toLowerCase().includes(searchTerm.toLowerCase()) && 
-    !block._deleted
-  );
+  const filteredScenes = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+
+    return Object.values(scenes).filter(scene => {
+      // sempre excluir deletados
+      if (scene._deleted) return false;
+
+      // se tiver termo de busca, aplica filtro de nome
+      if (searchTerm && !scene.name?.toLowerCase().includes(term)) {
+        return false;
+      }
+
+      // se não mostrar scripts/variáveis, também exclui LOGO
+      if (!showScriptsAndVariables && !(scene.sceneType === ETypeScene.LOGO || scene.sceneType === ETypeScene.POINTNCLICK)) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [scenes, searchTerm, showScriptsAndVariables]);
 
   const handleSearchClick = () => {
     setIsSearchVisible(!isSearchVisible);
@@ -287,7 +309,7 @@ const LeftPanel: React.FC = () => {
         <Collapse
           defaultActiveKey={['1']}
           activeKey={isScenesOpen ? 1 : 0}
-          onChange={(keys) => { toggleSection('scenes'); console.log("novo teste: ", keys); }}
+          onChange={(keys) => { toggleSection('scenes'); console.log("..: Leftpanel scene key: ", keys); }}
           expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} style={{ fontSize: token.fontSize, }} />}
           style={{ height: 40, border: 'none' }}
           items={[
@@ -313,16 +335,16 @@ const LeftPanel: React.FC = () => {
                       }}
                     />
                   )}
-                  {filteredBlocks.map((block) => (
+                  {filteredScenes.map((scene) => (
                     <Content
-                      key={block.id}
+                      key={scene.id}
                       onClick={() => {
-                        handleSelectElement(block);
+                        handleSelectElement(scene);
                       }}
                       hidden={false}
                       style={{
                         backgroundColor:
-                          elementSelected?.id === block.id
+                          elementSelected?.id === scene.id
                             ? token.colorPrimary
                             : 'transparent',
                         borderRadius: token.borderRadius,
@@ -331,7 +353,7 @@ const LeftPanel: React.FC = () => {
                     >
                       <CaretRightFilled />
                       <BuildOutlined />
-                      <Text style={{ marginLeft: 5 }}>{block.name}</Text>
+                      <Text style={{ marginLeft: 5 }}>{scene.name}</Text>
                     </Content>
                   ))}
                 </Content>
@@ -341,75 +363,79 @@ const LeftPanel: React.FC = () => {
         />
        
       </Splitter.Panel>
-      {/* PAINEL 2 */}
-      <Splitter.Panel size={panelSizes[1]} style={{ overflow: 'hidden' }}>
-        <Collapse
-          defaultActiveKey={['1']}
-          activeKey={isScriptsOpen ? 1 : 0}
-          onChange={(keys) => { toggleSection('scripts'); console.log("novo teste: ", keys); }}
-          expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} style={{ fontSize: token.fontSize, }} />}
-          style={{ height: 40, border: 'none' }}
-          items={[
-            {
-              key: '1',
-              label: 'SCRIPTS',
-              extra: genExtra(),
-              children: (
-                <Tree
-                  className="custom-tree"
-                  showIcon
-                  icon={<FileFilled />}
-                  height={treeHeightScripts}
-                  treeData={treeDataScripts}
-                  defaultExpandAll
-                  blockNode
-                  selectedKeys={getSelectedKeyFromGlobal('scripts')}
-                  onSelect={(selectedKeys, info) =>
-                    onSelectTree(selectedKeys, info, 'scripts')
-                  }
-                  style={{ background: token.colorBgBase }}
-                />
-              ),
-              style: panelStyle,
-            },
-          ]}
-        />
-          
-      </Splitter.Panel>
-      {/* PAINEL 3 */}
-      <Splitter.Panel size={panelSizes[2]} style={{ overflow: 'hidden', }}>
-        <Collapse
-          defaultActiveKey={['1']}
-          activeKey={isVariablesOpen ? 1 : 0}
-          onChange={(keys) => { toggleSection('variables'); console.log("novo teste: ", keys); }}
-          expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} style={{ fontSize: token.fontSize, }} />}
-          style={{ height: 40, border: 'none' }}
-          items={[
-            {
-              key: '1',
-              label: 'VARIABLES',
-              extra: genExtra(),
-              children: (
-                <Tree
-                  className="custom-tree"
-                  showIcon
-                  icon={<div>$</div>}
-                  height={treeHeightVariables}
-                  treeData={treeDataVariables}
-                  defaultExpandAll
-                  blockNode
-                  selectedKeys={getSelectedKeyFromGlobal('variables')}
-                  onSelect={(selectedKeys, info) =>
-                    onSelectTree(selectedKeys, info, 'variables')
-                  }
-                  style={{ backgroundColor: token.colorBgBase }}
-                />
-              ),
-              style: panelStyle,
-            },
-          ]}
-        />
-      </Splitter.Panel>
+      {showScriptsAndVariables && (
+        <>
+          {/* PAINEL 2 */}
+          <Splitter.Panel size={panelSizes[1]} style={{ overflow: 'hidden' }}>
+            <Collapse
+              defaultActiveKey={['1']}
+              activeKey={isScriptsOpen ? 1 : 0}
+              onChange={(keys) => { toggleSection('scripts'); console.log("novo teste: ", keys); }}
+              expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} style={{ fontSize: token.fontSize, }} />}
+              style={{ height: 40, border: 'none' }}
+              items={[
+                {
+                  key: '1',
+                  label: 'SCRIPTS',
+                  extra: genExtra(),
+                  children: (
+                    <Tree
+                      className="custom-tree"
+                      showIcon
+                      icon={<FileFilled />}
+                      height={treeHeightScripts}
+                      treeData={treeDataScripts}
+                      defaultExpandAll
+                      blockNode
+                      selectedKeys={getSelectedKeyFromGlobal('scripts')}
+                      onSelect={(selectedKeys, info) =>
+                        onSelectTree(selectedKeys, info, 'scripts')
+                      }
+                      style={{ background: token.colorBgBase }}
+                    />
+                  ),
+                  style: panelStyle,
+                },
+              ]}
+            />
+              
+          </Splitter.Panel>
+          {/* PAINEL 3 */}
+          <Splitter.Panel size={panelSizes[2]} style={{ overflow: 'hidden', }}>
+            <Collapse
+              defaultActiveKey={['1']}
+              activeKey={isVariablesOpen ? 1 : 0}
+              onChange={(keys) => { toggleSection('variables'); console.log("novo teste: ", keys); }}
+              expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} style={{ fontSize: token.fontSize, }} />}
+              style={{ height: 40, border: 'none' }}
+              items={[
+                {
+                  key: '1',
+                  label: 'VARIABLES',
+                  extra: genExtra(),
+                  children: (
+                    <Tree
+                      className="custom-tree"
+                      showIcon
+                      icon={<div>$</div>}
+                      height={treeHeightVariables}
+                      treeData={treeDataVariables}
+                      defaultExpandAll
+                      blockNode
+                      selectedKeys={getSelectedKeyFromGlobal('variables')}
+                      onSelect={(selectedKeys, info) =>
+                        onSelectTree(selectedKeys, info, 'variables')
+                      }
+                      style={{ backgroundColor: token.colorBgBase }}
+                    />
+                  ),
+                  style: panelStyle,
+                },
+              ]}
+            />
+          </Splitter.Panel>
+        </>
+      )}
     </Splitter>
   );
 };

@@ -16,19 +16,14 @@ let processingToSaved = false;
 export const saveEvents = new EventEmitter();
 
 export function updateWindowTitle(baseTitle: string, projectName: string, isSaved: boolean): void {
-    console.log('..: updateWindowTitle fields:', baseTitle, projectName, isSaved);
-    // const projectManager = settingsController.getSettingsData<IProjectSettings>('project') as IProjectSettings;
-    // console.log('..: updateWindowTitle projectManager:', projectManager);
+    // console.log('..: updateWindowTitle fields:', baseTitle, projectName, isSaved);
 
     if (windows.main) {
-        console.log('..: updateWindowTitle windows:', windows.main?.getTitle());
-        // const title = `${settingsController.getBaseTitle()} - ${projectManager.name ? `${projectManager.name}` : ''}`;
+        // console.log('..: updateWindowTitle windows:', windows.main?.getTitle());
         const title = `${baseTitle ? baseTitle : ''} - ${projectName ? projectName : ''}`;
-        // mainWindow.setTitle(`${title}${!settingsController.isSaved() ? ' (Modified)' : ''}`);
         windows.main.setTitle(`${title}${!isSaved ? ' (Modified)' : ''}`);
-        // Controle de Save para Validar Janela antes de Fechar
         settingsController.setIsSaved(isSaved);
-        console.log('..: updateWindowTitle title changed:',  windows.main?.getTitle());
+        // console.log('..: updateWindowTitle title changed:',  windows.main?.getTitle());
     }
 }
 
@@ -89,16 +84,16 @@ export function saveChanges(dataToSave: any) {
                     fileData.forEach((subFile: any) => {
                         const projectPath = path.join(directoryPathProject, 'project');
                         // Transformar em minúsculas e substituir o espaço por underscore
-                        const fileNameFormatted = subFile.name.toLowerCase().replace(/ /g, "_");
+                        const filenameFormatted = subFile.name.toLowerCase().replace(/ /g, "_");
                         
                         // Verifica se o elemento está marcado para deleção
                         if (subFile._deleted === true) {
                             // Não salva o arquivo deletado
-                            return deleteSettings(projectPath, subFile._resourceType + 's', fileNameFormatted!, subFile); 
+                            return deleteSettings(projectPath, subFile._resourceType + 's', filenameFormatted!, subFile); 
                         }
                         
                         // Salvar arquivo caso não tenha sido flegado para deletar
-                        const scenesSaved = saveSettingsToStore(projectPath, subFile._resourceType + 's', fileNameFormatted!, subFile);
+                        const scenesSaved = saveSettingsToStore(projectPath, subFile._resourceType + 's', filenameFormatted!, subFile);
                         console.log(`..: Configurações scene ${subFile._index} saved:`, scenesSaved);
                     });
                     return;
@@ -124,7 +119,7 @@ export function saveChanges(dataToSave: any) {
     // if (!settingsController.isSaved() && settingsController.getProjectFile()) {
     //     try {
     //         const directory = settingsController.getProjectDirectory();
-    //         const projectFileNamePrincipal = settingsController.getProjectFile() || `unknow`;
+    //         const projectFilenamePrincipal = settingsController.getProjectFile() || `unknow`;
 
     //         console.log('..: saveChanges all Datas:', settingsController.getSettingsData('all'));
 
@@ -134,7 +129,7 @@ export function saveChanges(dataToSave: any) {
     //         console.log('..: Configurações settings saved:', settingsSaved);
 
     //         const projectData = settingsController.getSettingsData('project') as IProjectSettings;
-    //         const projectSaved = saveSettingsToStore(directory, '', projectFileNamePrincipal, projectData);
+    //         const projectSaved = saveSettingsToStore(directory, '', projectFilenamePrincipal, projectData);
     //         console.log('..: Configurações project saved:', projectSaved);
 
     //         // Salvar os arquivos de cena
@@ -146,9 +141,9 @@ export function saveChanges(dataToSave: any) {
     //             scenesData.forEach((sceneData) => {
     //                 const projectPath = path.join(directory!, 'project', 'scenes');
     //                 // Transformar em minúsculas e substituir o espaço por underscore
-    //                 const fileNameFormatted = sceneData.name.toLowerCase().replace(/ /g, "_");
-    
-    //                 const scenesSaved = saveSettingsToStore(projectPath, fileNameFormatted!, 'scene', sceneData);
+    //                 const filenameFormatted = sceneData.name.toLowerCase().replace(/ /g, "_");
+    //
+    //                 const scenesSaved = saveSettingsToStore(projectPath, filenameFormatted!, 'scene', sceneData);
     //                 console.log(`..: Configurações scene ${sceneData._index} saved:`, scenesSaved);
     //             });
     //         }
@@ -169,8 +164,8 @@ export function saveChanges(dataToSave: any) {
 }
 
 // Função para atualizar configurações
-function saveSettingsToStore<T>(basePath: any, folder: string, fileName: string, newSettings: Partial<T>): T {
-    const pathFileToSave = path.join(basePath, folder ? path.join(`${folder}`, `${fileName}.gbasres`) : fileName);
+function saveSettingsToStore<T>(basePath: any, folder: string, filename: string, newSettings: Partial<T>): T {
+    const pathFileToSave = path.join(basePath, folder ? path.join(`${folder}`, `${filename}.gbasres`) : filename);
     console.log('..: caminho para salvar a configuração: ', pathFileToSave);
     try {
         if (fs.existsSync(pathFileToSave)) {
@@ -183,7 +178,7 @@ function saveSettingsToStore<T>(basePath: any, folder: string, fileName: string,
                 fs.mkdirSync(pathFileToCreate, { recursive: true });
             }
 
-            createGenericSettingsStruct(pathFileToCreate, fileName, newSettings);
+            createGenericSettingsStruct(pathFileToCreate, filename, newSettings);
         }
 
         return newSettings as unknown as T;
@@ -193,8 +188,8 @@ function saveSettingsToStore<T>(basePath: any, folder: string, fileName: string,
     }
 }
 
-function deleteSettings<T>(basePath: any, folder: string, fileName: string, newSettings: Partial<T>): void {
-    const pathFileToDelete = path.join(basePath, folder ? path.join(`${folder}`, `${fileName}.gbasres`) : fileName);
+function deleteSettings<T>(basePath: any, folder: string, filename: string, newSettings: Partial<T>): void {
+    const pathFileToDelete = path.join(basePath, folder ? path.join(`${folder}`, `${filename}.gbasres`) : filename);
     console.log('..: caminho para deletar a configuração: ', pathFileToDelete);
     
     try {

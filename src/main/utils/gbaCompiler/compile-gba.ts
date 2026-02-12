@@ -61,7 +61,7 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
     // Notify renderer that compilation started
     broadcast('compile-progress', {
       status: 'started',
-      message: 'Iniciando compilação...',
+      message: '>> Iniciando compilação...',
     });
 
     try {
@@ -142,7 +142,7 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
         // On successful completion, notify renderer
         broadcast('compile-progress', {
           status: 'finished',
-          message: 'Compilação finalizada',
+          message: '>> Compilação finalizada',
         });
 
         // Try to locate produced .gba file

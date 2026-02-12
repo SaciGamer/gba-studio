@@ -74,8 +74,29 @@ export interface TemplateConfig {
   romCode: string;
 }
 
+export interface GameConfig {
+  projectName: string;
+  authorName?: string;
+  version?: string;
+  useThreads?: boolean;
+  useAudio?: boolean;
+  useGraphics?: boolean;
+}
+
+export interface JsonResourceDefault {
+  _resourceType: string;
+  _deleted?: boolean;
+  id?: string;
+  name?: string;
+  filename?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+  tileMap?: number[][];
+}
+
 export interface ResourceFile {
-  filename: string;
+  resourceName: string;
   resourceType: string;
-  content: Buffer;
+  headerContent: Buffer;
+  jsonContent?: JsonResourceDefault;
 }

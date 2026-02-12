@@ -1,17 +1,18 @@
-import React, { CSSProperties, useState, useEffect } from 'react';
+import React, { CSSProperties, useState, useEffect, useRef } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 
 import { AntdToken } from '../common/AntDToken';
 import { elementStyle, titleStyle } from './GameElement.styles';
 import { Content } from 'antd/es/layout/layout';
-import { ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
-import { useBackgroundContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
+import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
+import { useBackgroundContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
 import imgPlaceholder from '@/img/placeholder.png';
 
 interface GameElementProps {
-  element: ISceneSettings;
+  sceneElement: ISceneSettings;
   isSelected: boolean;
   onSelect: (scene: ISceneSettings) => void;
+  // onResize?: (width: number, height: number) => void;
 }
 
 interface imgProps {
@@ -20,8 +21,8 @@ interface imgProps {
   height: number;
 };
 
-const GameElement: React.FC<GameElementProps> = ({ element: scene, isSelected, onSelect }) => {
-  if (!scene) return null;
+const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, onSelect/*, onResize*/ }) => {
+  if (!sceneElement) return null;
 
   const { token } = AntdToken();
   // State para mouse sobre o elemento
@@ -30,107 +31,217 @@ const GameElement: React.FC<GameElementProps> = ({ element: scene, isSelected, o
   // const [elementSize, setElementSize] = useState({ width: 0, height: 0 });
   const { backgrounds, setBackgrounds } = useBackgroundContext();
   const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
-  const [imgDefault, setImgDefault] = useState<imgProps>({ src: '', width: 0, height: 0 });
+  // const [imgDefault, setImgDefault] = useState<imgProps>({ src: '', width: 0, height: 0 });
+  const [tilesetImage, setTilesetImage] = useState<HTMLImageElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: scene.id,
-    data: scene,
+    id: sceneElement.id,
+    data: sceneElement,
   });
 
   // Pegando informacoes da imagem
-  useEffect(() => {
-    if (!backgrounds) return;
-    console.log(`..: GameElement backgroundId: ${scene.backgroundId} and all itens:`, backgrounds);
-    const backgroundByScene = backgrounds.find(b => b.id === scene.backgroundId);
-    console.log('..: GameElement backgroundFileName existe on backgrounds:', backgroundByScene);
-    const pathBackground = backgroundByScene?.filename != null && !backgroundByScene._deleted ? `${settingUtils.localImagePath}/${backgrounds.find(b => b.id == scene.backgroundId)?.filename}` : imgPlaceholder;
-    console.log('..: GameElement pathBackground:', pathBackground);
+  // useEffect(() => {
+  //   if (!backgrounds) return;
+  //   console.log(`..: GameElement backgroundId: ${sceneElement.backgroundId} and all itens:`, backgrounds);
+  //   const backgroundByScene = backgrounds.find(b => b.id === sceneElement.backgroundId);
+  //   console.log('..: GameElement backgroundFilename existe on backgrounds:', backgroundByScene);
+  //   const pathBackground = backgroundByScene?.filename != null && !backgroundByScene._deleted ? `${settingUtils.localImagePath}/${backgrounds.find(b => b.id == sceneElement.backgroundId)?.filename}` : imgPlaceholder;
+  //   console.log('..: GameElement pathBackground:', pathBackground);
     
-    const img = new Image();
-    img.src = pathBackground;
+  //   const img = new Image();
+  //   img.src = pathBackground;
 
-    img.onload = () => {
-      const { src: iSrc, width: iWidth, height: iHeight } = img;
-      setImgDefault({ src: iSrc, width: iWidth, height: iHeight });
-      console.info(`..: GameElement Imagem carregada:`, { src: pathBackground, width: iWidth, height: iHeight });
+  //   img.onload = () => {
+  //     const { src: iSrc, width: iWidth, height: iHeight } = img;
+  //     setImgDefault({ src: iSrc, width: iWidth, height: iHeight });
+  //     console.info(`..: GameElement Imagem carregada:`, { src: pathBackground, width: iWidth, height: iHeight });
+  //   };
+
+  //   img.onerror = () => {
+  //     setImgDefault({ src: pathBackground, width: 240, height: 160 });
+  //     console.error(`ERROR: GameElement ao carregar a imagem:`, pathBackground);
+  //   };
+
+  // }, [sceneElement.background, sceneElement.backgroundId, backgrounds, settingUtils.localImagePath]);
+
+  // useEffect(() => {
+  //   if (onResize) {
+  //     if (sceneElement.sceneType === ETypeScene.LOGO || sceneElement.sceneType === ETypeScene.POINTNCLICK) {
+  //       onResize(-1, -1);
+  //     } else if (onResize) {
+  //       onResize(sceneElement.width || 240, sceneElement.height || 160);
+  //     }
+  //   }
+    
+  // }, [sceneElement.sceneType]);
+
+  // Load tileset image when tileset is selected
+  useEffect(() => {
+    const loadTilesetImage = async () => {
+      if (sceneElement.selectedTilesetId) {
+        try {
+          const tilesetData = await window.electronAPI.fetchImages('tilesets');
+          if (tilesetData.status === 'success' && tilesetData.fileImages) {
+            const selectedTilesetFile = tilesetData.fileImages.find((filename: string) =>
+              filename.replace(/\.[^/.]+$/, '') === sceneElement.selectedTilesetId
+            );
+            if (selectedTilesetFile) {
+              const imagePath = `${tilesetData.localPath}/${selectedTilesetFile}`;
+              const img = new Image();
+              img.onload = () => {
+                setTilesetImage(img);
+              };
+              img.src = imagePath;
+            }
+          }
+        } catch (error) {
+          console.error('Error loading tileset image:', error);
+          setTilesetImage(null);
+        }
+      } else {
+        setTilesetImage(null);
+      }
     };
 
-    img.onerror = () => {
-      setImgDefault({ src: pathBackground, width: 240, height: 160 });
-      console.error(`ERROR: GameElement ao carregar a imagem:`, pathBackground);
-    };
+    loadTilesetImage();
+  }, [sceneElement.selectedTilesetId]);
 
-  }, [scene.backgroundId, backgrounds, settingUtils.localImagePath]);
+  // useEffect(() => {
+  //   if (canvasRef.current && onResize) {
+  //     const rect = canvasRef.current.getBoundingClientRect();
+  //     setImgDefault(prev => ({
+  //       ...prev,
+  //       width: rect.width,
+  //       height: rect.height,
+  //     }));
+
+  //     onResize(rect.width, rect.height);
+  //   }
+  // }, [canvasRef.current]);
+
+  // Render elementos
+  useEffect(() => {
+    let canvas = canvasRef.current;
+
+    if (!canvas) {
+      // cria um novo canvas se não existir
+      canvas = document.createElement("canvas");
+      canvas.width = 0;
+      canvas.height = 0;
+      // opcional: anexar ao DOM se precisar visualizar
+      document.body.appendChild(canvas);
+    }
+
+    const ctx = canvas?.getContext('2d');
+    if (!ctx) return;
+
+    // limpa a cena
+    // ctx.clearRect(0, 0, sceneElement.width, sceneElement.height);
+    canvas.width = sceneElement.width || 240;
+    canvas.height = sceneElement.height || 160;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Desliga o filtro de suavização
+    ctx.imageSmoothingEnabled = false;
+    
+    // Variaveis para calcular tiles
+    if ((sceneElement.sceneType === ETypeScene.LOGO || sceneElement.sceneType === ETypeScene.POINTNCLICK) && sceneElement.tileMap && tilesetImage ) {
+      const tileWidth = 16;
+      const tileHeight = 16;
+      const tilesPerRow = Math.floor(tilesetImage.naturalWidth / tileWidth);
+
+      // canvas.width = sceneElement.tileMap[0]?.length * tileWidth || 240;
+      // canvas.height = sceneElement.tileMap.length * tileHeight || 160;
+
+      // Render each tile
+      sceneElement.tileMap.forEach((row: number[], rowIndex: number) => {
+        row.forEach((tileIndex: number, colIndex: number) => {
+          if (tileIndex >= 0) {
+            const sourceX = (tileIndex % tilesPerRow) * tileWidth;
+            const sourceY = Math.floor(tileIndex / tilesPerRow) * tileHeight;
+            const destX = colIndex * tileWidth;
+            const destY = rowIndex * tileHeight;
+
+            ctx.drawImage(
+              tilesetImage,
+              sourceX, sourceY, tileWidth, tileHeight,
+              destX, destY, tileWidth, tileHeight
+            );
+          }
+        });
+      });
+    } else {
+       // desenha backgrounds
+      sceneElement.backgrounds?.sort((a, b) => a.layerId - b.layerId).forEach(lbg => {
+        const bgData = backgrounds.find(b => b.id === lbg.backgroundId);
+        if (bgData) {
+          const img = new Image();
+          img.src = `${settingUtils.localImagePath}/${bgData.filename}`;
+          img.onload = () => {
+            // centralizar
+            const x = (sceneElement.width - img.width) / 2;
+            const y = (sceneElement.height - img.height) / 2;
+            ctx.drawImage(img, x, y);
+          };
+        }
+      });
+    }
+
+    // desenha colisões (exemplo)
+    sceneElement.collisions?.forEach(c => {
+      ctx.fillStyle = "rgba(255,0,0,0.3)";
+      ctx.fillRect(c.x, c.y, c.width, c.height);
+    });
+
+    // desenha triggers (exemplo)
+    sceneElement.triggers?.forEach(t => {
+      ctx.strokeStyle = "rgba(0,255,0,0.5)";
+      ctx.strokeRect(t.x, t.y, t.width, t.height);
+    });
+
+    console.log(canvas.width, canvas.height, canvas.style.width, canvas.style.height);    
+
+  }, [sceneElement.sceneType, sceneElement.tileMap, tilesetImage, sceneElement.backgrounds, backgrounds, settingUtils.localImagePath]);
 
   const computedElementStyle: CSSProperties = elementStyle(
     transform,
-    imgDefault,
-    scene.width || imgDefault.width,
-    scene.height || imgDefault.height,
-    scene.x,
-    scene.y,
+    sceneElement.x,
+    sceneElement.y,
     isSelected,
     token
   );
 
   const computedTitleStyle: CSSProperties = titleStyle(isSelected, isHovered, token);
 
-  const contentListNoTitle: Record<string, React.ReactNode> = {
-    article: <p>article content</p>,
-    app: <p>app content</p>,
-    project: <p>project content</p>,
-  };
-
   return (
-    // CARD funcionando
-    // <Card
-    //   ref={setNodeRef}
-    //   className="game-element"
-    //   bordered={false}
-    //   style={computedElementStyle}
-    //   onClick={() => onSelect(id)}
-    //   onContextMenu={() => onSelect(id)}
-    //   onMouseEnter={() => setIsHovered(true)}
-    //   onMouseLeave={() => setIsHovered(false)}
-    //   cover={<img alt={title} src={background} style={{borderRadius: '0px'}} />}
-    //   hoverable
-    // >
-    //   {/* <Card.Meta 
-    //     title={title} 
-    //     style={titleStyle(isSelected, isHovered, token)}
-    //     {...listeners}
-    //     {...attributes}
-    //   /> */}
-    //   <Meta
-    //     // avatar={<Avatar  src={background} />}
-    //     title={title} 
-    //     // description="This is the description"
-    //     {...listeners}
-    //     {...attributes}
-    //   />
-    // </Card>
-
     <Content
       ref={setNodeRef}
       className="game-element"
-      style={computedElementStyle}
+      style={{...computedElementStyle, width: canvasRef.current?.width, height: canvasRef.current?.height}}
       {...attributes}
-      onClick={() => onSelect(scene)}
+      onClick={() => onSelect(sceneElement)}
       onContextMenu={(e) => {
         e.preventDefault();
-        onSelect(scene);
+        onSelect(sceneElement);
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-    >
-      <Content {...listeners} className="handle-game-element" style={computedTitleStyle}>
-        {scene.name}
+    >    
+      {/* Renderiza tileMap se disponivel */}
+      <canvas ref={canvasRef}/>
+
+      {/* TITLE */}
+      <Content {...listeners} style={computedTitleStyle}>
+        {sceneElement.name}
       </Content>
+
+      {/* BASE INFO */}
       {isSelected &&
         <Content
           style={{
             ...computedTitleStyle,
-            bottom: scene.height - 32,
+            bottom: -32,
             borderTopLeftRadius: '0px',
             borderTopRightRadius: '0px',
             borderBottomLeftRadius: token.borderRadius,
@@ -138,8 +249,8 @@ const GameElement: React.FC<GameElementProps> = ({ element: scene, isSelected, o
           }}
         >
           A: X/10
-          S: XX/96
-          T: X/30
+          S: XX/128
+          {/* T: X/30 */}
         </Content>
       }
     </Content>

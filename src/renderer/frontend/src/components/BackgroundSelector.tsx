@@ -5,157 +5,82 @@ import { theme } from 'antd';
 import { ImagePreview } from './ImagePreview';
 import type { UploadProps } from 'antd';
 import type { RcFile } from 'antd/es/upload/interface';
-import { useBackgroundContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
+import { useBackgroundContext, useElementContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
+import { IBackgroundSettings } from '@/providers/contexts/interfaces/IBackgroundElement';
+import { IBackgroundElement, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
 
 const { useToken } = theme;
 
 interface BackgroundSelectorProps {
-  selectedBackgroundId?: string;
   selectedElementId: string;
-  onBackgroundChange: (data: { preview: string, file: File }) => void;
-}
-
-interface ImageInfo {
-  file: RcFile;
-  width: number;
-  height: number;
-  tiles: number;
-  preview: string;
+  layerKey: number;
 }
 
 export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
   selectedElementId,
-  selectedBackgroundId,
-  onBackgroundChange
+  layerKey,
 }) => {
   const { token } = useToken();
-  const [form] = Form.useForm();
-  const [imageInfo, setImageInfo] = useState<ImageInfo | null>(null);
-
   const { scenes, setScenes } = useSceneContext();
   const { backgrounds, setBackgrounds, backgroundsRef } = useBackgroundContext();
   const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
-
-  const validateImage = (file: RcFile): Promise<boolean> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      
-      reader.onload = () => {
-        const img = new Image();
-        img.src = reader.result as string;
-        
-        img.onload = () => {
-          if (img.width % 32 !== 0 || img.height % 32 !== 0) {
-            message.error('A imagem deve ter dimensões múltiplas de 32px');
-            reject(false);
-            return;
-          }
-
-          const tilesX = img.width / 32;
-          const tilesY = img.height / 32;
-          const totalTiles = tilesX * tilesY;
-
-          const imageData = {
-            file,
-            width: img.width,
-            height: img.height,
-            tiles: totalTiles,
-            preview: reader.result as string
-          };
-
-          setImageInfo(imageData);
-          onBackgroundChange({ preview: imageData.preview, file });
-          resolve(true);
-        };
-
-        img.onerror = () => {
-          message.error('Erro ao carregar a imagem');
-          reject(false);
-        };
-      };
-    });
-  };
-
-  const uploadProps: UploadProps = {
-    accept: '.png,.jpg,.jpeg',
-    showUploadList: false,
-    beforeUpload: async (file) => {
-      try {
-        await validateImage(file);
-        return false; // Não faz upload automático
-      } catch {
-        return Upload.LIST_IGNORE;
-      }
-    },
-  };
-
-  useEffect(() => {
-    form.setFieldsValue({ Background: selectedBackgroundId });
-  }, [selectedBackgroundId, selectedElementId]);
+  const elementSelected = scenes.find(s => s.id === selectedElementId);
+  // const [listBackgrounds, setListBackgrounds] = useState<IBackgroundSettings[]>([]);
 
   return (
-    <Form
-      form={form}
-      layout="vertical"
-      initialValues={{ Background: selectedBackgroundId }}
+    <Select
+      showSearch
+      optionFilterProp="label"
+      value={elementSelected?.backgrounds?.find(bg => bg.layerId === layerKey)?.backgroundId ?? null}
+      onChange={(newBackgroundId) => {
+        setScenes(prevScenes =>
+          prevScenes.map((s) =>
+            s.id === selectedElementId
+              ? {
+                  ...s,
+                  backgrounds: (() => {
+                    const exists = s.backgrounds?.some(bg => bg.layerId === layerKey);
+                    if (exists) {
+                      // Atualiza a camada existente
+                      return s.backgrounds?.map(bg =>
+                        bg.layerId === layerKey
+                          ? { ...bg, backgroundId: newBackgroundId, name: "", path: "" }
+                          : bg
+                      );
+                    } else {
+                      // Cria a camada se não existir
+                      return [
+                        ...(s.backgrounds ?? []),
+                        { layerId: layerKey, backgroundId: newBackgroundId, name: "", path: "" }
+                      ];
+                    }
+                  })(),
+                  _saved: false
+                }
+              : s
+          )
+        );
+      }}
+      style={{ width: '100%' }}
     >
-      <Form.Item label="Background" name="Background" style={{ marginBottom: token.marginLG }}>
-        <Select
-          showSearch
-          optionFilterProp="label"
-          value={form.getFieldValue("Background")}
-          onChange={(newBackgroundId) => {
-            setScenes(prevScenes =>
-              prevScenes.map((s) =>
-                s.id === selectedElementId ? { ...s, backgroundId: newBackgroundId, _saved: false } : s
-              )
-            );
-            form.setFieldsValue({ Background: newBackgroundId });
-          }}
-        >
-          {[...backgroundsRef.current]
-            .filter(b => !b._deleted)
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((background) => (
-              <Select.Option key={background.id} value={background.id} label={background.name}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <img
-                    src={`${settingUtils.localImagePath}/${background?.filename}`}
-                    alt={background.name}
-                    style={{ width: 24, height: 24, marginRight: 8 }}
-                  />
-                  {background.name}
-                </div>
-              </Select.Option>
-            ))}
-        </Select>
-        {/* <div style={{ display: 'flex', gap: token.paddingXS }}>
-          <Input
-            style={{ flex: 1, cursor: 'default' }}
-            placeholder="Selecione uma imagem"
-            value={imageInfo?.file.name || ''}
-            readOnly
-          />
-          
-          <Upload {...uploadProps}>
-            <Input
-              style={{ 
-                width: 40, 
-                padding: 0, 
-                textAlign: 'center',
-                cursor: 'pointer'
-              }}
-              suffix={<UploadOutlined />}
-              type="button"
-            />
-          </Upload>
-        </div>
+      <Select.Option value={null} key="none">
+        <em>No background</em>
+      </Select.Option>
 
-        {imageInfo && <ImagePreview imageInfo={imageInfo} />} */}
-      </Form.Item>
-
-    </Form>
-    
+      {[...backgroundsRef.current]
+        .filter(b => !b._deleted)
+        .sort((a, b) => a.name.localeCompare(b.name)).map((background) => (
+          <Select.Option key={background.id} value={background.id} label={background.name}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <img
+                src={`${settingUtils.localImagePath}/${background?.filename}`}
+                alt={background.name}
+                style={{ width: 24, height: 24, marginRight: 8 }}
+              />
+              {background.name}
+            </div>
+          </Select.Option>
+        ))}
+    </Select>
   );
 };

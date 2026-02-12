@@ -37,7 +37,7 @@ const electronAPI = {
   deleteSettings: (typeToDelete: string, id: string) => ipcRenderer.invoke('deleteSettings', typeToDelete, id),
   fetchSettings: (typeToFetch: string) => ipcRenderer.invoke('fetchSettings', typeToFetch),
   // Images ----------------------------------------------
-  saveImage: (filePath: string, fileName: string, data: any) => ipcRenderer.invoke('save-image', { filePath, fileName, data }),
+  saveImage: (filePath: string, filename: string, data: any) => ipcRenderer.invoke('save-image', { filePath, filename: filename, data }),
   fetchImages: (folderName: string) => ipcRenderer.invoke('fetch-images', folderName),
   onUpdateImages: (callback: any) => ipcRenderer.on('update-images', (event: any, localPath: string, images: string) => callback({ localPath, images })),
   // Save Project  ---------------------------------------

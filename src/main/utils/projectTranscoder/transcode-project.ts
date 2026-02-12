@@ -2,11 +2,11 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
-import { TranscodeOptions, TranscodeResult } from '../types/BuildTypes';
+import { GameConfig, TranscodeOptions, TranscodeResult } from '../types/BuildTypes';
 import TemplateBuilder from '../builders/TemplateBuilder';
 import ResourceBuilder from '../builders/ResourceBuilder';
 import AssetBuilder from '../builders/AssetBuilder';
-import { CppBuilder, GameConfig } from '../builders/CppBuilder';
+import { CppBuilder } from '../builders/CppBuilder';
 import { packageJson } from '@/main';
 
 // Obter o caminho do diretório atual
@@ -80,6 +80,14 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
     // Process resources (.gbasres files)
     const resourceBuilder = new ResourceBuilder(outputDir, templateDir);
     const projectResourceDir = path.join(projectDir, 'project');
+    const gameConfig: GameConfig = {
+      projectName: projectName,
+      authorName: 'GBA Studio',
+      version: packageJson.version || '1.0.0',
+      useThreads: false,  // Can be made configurable from FE later
+      useAudio: true,     // Include audio support by default
+      useGraphics: true,  // Include graphics support by default
+    };
 
     let resourceFiles: any[] = [];
     if (fs.existsSync(projectResourceDir)) {
@@ -89,7 +97,7 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
       // Generate resource header and registry
       if (resourceFiles.length > 0) {
         await resourceBuilder.writeResourceHeader(resourceFiles);
-        await resourceBuilder.generateResourceRegistryClass(resourceFiles);
+        await resourceBuilder.generateResourceRegistryClass(resourceFiles, gameConfig);
       }
     }
 
@@ -100,11 +108,13 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
       const projectAssetsDir = path.join(projectDir, 'assets');
 
       if (fs.existsSync(projectAssetsDir)) {
-        assetStats = await assetBuilder.copyAssets(projectAssetsDir, {
-          overwrite: true,
-          preserveStructure: false, // Estrutura de pastas
-          verbose: false,
-        });
+        assetStats = await assetBuilder.copyAssets(projectAssetsDir, resourceFiles,
+          {
+            overwrite: true,
+            preserveStructure: false, // Estrutura de pastas
+            verbose: false,
+          }
+        );
 
         console.log('..: Copied', assetStats.copiedCount, 'assets');
       }
@@ -112,21 +122,13 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
 
     // Create Graphics Header by dir build output
     const buildDir = templateBuilder.getOutputDir();
+    let graphicHeaderGeneratedByButano: string[] = [];
     if (fs.existsSync(buildDir)) {
-      await resourceBuilder.writeGraphicsHeader(buildDir);
+      graphicHeaderGeneratedByButano = await resourceBuilder.writeGraphicsHeader(buildDir);
     }
 
     // Generate C++ base project structure using CppBuilder
-    const cppBuilder = new CppBuilder(outputDir, templateDir);
-    const gameConfig: GameConfig = {
-      projectName: projectName,
-      authorName: 'GBA Studio',
-      version: packageJson.version || '1.0.0',
-      useThreads: false,  // Can be made configurable from FE later
-      useAudio: true,     // Include audio support by default
-      useGraphics: true,  // Include graphics support by default
-    };
-
+    const cppBuilder = new CppBuilder(outputDir, templateDir, graphicHeaderGeneratedByButano);
     await cppBuilder.generateProjectStructure(gameConfig);
     console.log('..: Generated C++ project structure with base Game class and managers');
 
@@ -137,7 +139,7 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
 
     return {
       success: true,
-      message: 'Transcode complete',
+      message: '>> Transcode complete',
       outputDir: outputDir,
       buildDir: outputDir,
       sourceFiles: resourceFiles.map((f) => f.filename),
@@ -293,8 +295,6 @@ function prepareBuildDir(projectDir: string, outputDir: string) {
     lastBuild: new Date().toISOString()
   }, null, 2));
 }
-
-
 
 
 export default transcodeProject;

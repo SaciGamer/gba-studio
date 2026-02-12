@@ -8,6 +8,7 @@ import path from 'path';
 import { execFile } from "child_process";
 import { promisify } from "util";
 import isDev from "electron-is-dev";
+import { ResourceFile } from '../types/BuildTypes';
 
 const execFileAsync = promisify(execFile);
 
@@ -31,9 +32,11 @@ export class AssetBuilder {
    */
   public async copyAssets(
     sourceAssetDir: string,
+    resourceFiles: ResourceFile[],
     options: AssetCopyOptions = {}
   ): Promise<{ copiedCount: number; skippedCount: number }> {
     const { overwrite = true, preserveStructure = true, verbose = false } = options;
+    const backgroundFiles = resourceFiles.filter(r => r.jsonContent?._resourceType === "background");
 
     if (!fs.existsSync(sourceAssetDir)) {
       console.warn('..: Asset directory not found:', sourceAssetDir);
@@ -43,7 +46,7 @@ export class AssetBuilder {
     let copiedCount = 0;
     let skippedCount = 0;
 
-    const walk = async (dir: string, relativeBase: string) => {
+    const walk = async (dir: string, relativeBase: string, resourceFiles: ResourceFile[]) => {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
 
       for (const entry of entries) {
@@ -52,17 +55,17 @@ export class AssetBuilder {
 
         if (entry.isDirectory()) {
           // Recursively process subdirectories
-          await walk(sourcePath, relativePath);
+          await walk(sourcePath, relativePath, resourceFiles);
         } else if (entry.isFile()) {
           // Sanitize filename for graphics to satisfy Butano tools (must start with lowercase and allowed chars)
           const ext = path.extname(sourcePath).toLowerCase();
-          let fileName = entry.name;
+          let filename = entry.name;
           if (['.png', '.bmp', '.gif', '.jpg', '.jpeg'].includes(ext)) {
-            fileName = this.sanitizeFileName(entry.name);
+            filename = this.sanitizeFilename(entry.name);
           }
 
           // Determine destination based on asset type
-          const relForDest = preserveStructure ? path.join(path.dirname(relativePath), fileName) : fileName;
+          const relForDest = preserveStructure ? path.join(path.dirname(relativePath), filename) : filename;
           const destPath = this.getAssetDestination(sourcePath, relForDest);
 
           if (!fs.existsSync(path.dirname(destPath))) {
@@ -72,7 +75,8 @@ export class AssetBuilder {
           if (!fs.existsSync(destPath) || overwrite) {
             fs.copyFileSync(sourcePath, destPath);
 
-            await this.processAssets(sourcePath, destPath);
+            const resourceFile = resourceFiles.find(r => r.jsonContent?.filename === entry.name)
+            await this.processAssets(sourcePath, destPath, relativeBase, resourceFile);
             
             if (verbose) {
               console.log('..: Copied asset:', relativePath);
@@ -88,13 +92,13 @@ export class AssetBuilder {
       }
     };
 
-    await walk(sourceAssetDir, '');
+    await walk(sourceAssetDir, '', backgroundFiles);
     return { copiedCount, skippedCount };
   }
 
-  private async processAssets(sourcePath: string, actualPath: string) {
-    const bmpPath = await this.convertToBmp(actualPath);
-    await this.createGraphicsJson(path.dirname(sourcePath), bmpPath);
+  private async processAssets(sourcePath: string, actualPath: string, relativeBase: string, resourceFile?: ResourceFile) {
+    const bmpPath = await this.convertToBmp(actualPath, relativeBase, resourceFile);
+    await this.createGraphicsJson(path.dirname(sourcePath), bmpPath, relativeBase);
   }
 
   /**
@@ -224,15 +228,19 @@ export class AssetBuilder {
   /**
    * Create a .json descriptor for a graphic asset
    */
-  private async createGraphicsJson(assetPath: string, destDir: string) {
-    const rel = assetPath.toLowerCase();
+  private async createGraphicsJson(assetPath: string, destDir: string, relativeBase: string) {
+    const rel = relativeBase.toLowerCase();
     let type = "sprite";
 
-    if (rel.includes("background")) {
+    if (rel === "backgrounds") {
       type = "regular_bg";
-    } else if (rel.includes("sprites")) {
+    } else if (rel === "tilesets") {
+      type = "palette_bitmap";
+    } else if (rel === "backgrounds-hd") {
+      type = "direct_bitmap";
+    } /*else if (rel === "sprites") {
       type = "sprite";
-    }
+    }*/
 
     const jsonContent = {
       type,
@@ -251,7 +259,7 @@ export class AssetBuilder {
   /** 
    * Convert image to BMP format using sharp
    */
-  private async convertToBmp(sourcePath: string) {
+  private async convertToBmp(sourcePath: string, relativeBase: string, resourceFile?: ResourceFile) {
     const ext = path.extname(sourcePath).toLowerCase();
 
     // Only convert if source is not already BMP
@@ -269,7 +277,7 @@ export class AssetBuilder {
       //   destPath
       // ]);
 
-      await this.convertWithMagick(sourcePath, destPath, "background");
+      await this.convertWithMagick(sourcePath, destPath, relativeBase, resourceFile);
 
       // Se o nome mudou, apaga o original
       if (sourcePath !== destPath && fs.existsSync(sourcePath)) {
@@ -282,7 +290,8 @@ export class AssetBuilder {
     return sourcePath;
   }
 
-  private async convertWithMagick(sourcePath: string, destPath: string, mode: "title" | "background", customizedPalettePath?: string) {
+
+  private async convertWithMagick(sourcePath: string, destPath: string, mode: string/*"title" | "backgrounds" | "sprites"*/, resourceFile?: ResourceFile, customizedPalettePath?: string) {
     // Background (16 colors, 4bpp) remapeando para paleta customizada se 
     // magick indexed.png -colors 16 -depth 4 BMP3:output_4bpp.bmp
     // magick indexed.png -remap sua_paleta.png -depth 4 BMP3:output_remapped_4bpp.bmp
@@ -301,6 +310,7 @@ export class AssetBuilder {
       case "title":
         args = [
           sourcePath,
+          "-background", "none",
           customizedPalettePath ? "-remap" : "-colors",
           customizedPalettePath ? customizedPalettePath : "256",
           // "-depth", "8",
@@ -308,20 +318,38 @@ export class AssetBuilder {
           `BMP3:${destPath}`
         ];
         break;
-      case "background":
+      case "backgrounds":
         args = [
           sourcePath,
+          "-background", "none",
           "-colors", "16",
           // "-depth", "4",
           "-type", "Palette",
           `BMP3:${destPath}`
         ];
+
+        // se menor que 256x256, centraliza e cria uma imagem maior
+        if (resourceFile?.jsonContent?.imageWidth !== undefined && resourceFile?.jsonContent?.imageHeight !== undefined && 
+          (resourceFile.jsonContent.imageWidth < 256 || resourceFile.jsonContent.imageHeight < 256)) {
+          args = [
+            sourcePath,
+            // "-background", "#FF00FF", // cor de fundo magenta (transparente)
+            // "-flatten", // achata a imagem e usa a cor de fundo removendo transparência
+            "-background", "none",
+            "-gravity", "center",
+            "-extent", "256x256",
+            "-colors", "16",
+            "-type", "Palette",
+            `BMP3:${destPath}`
+          ];
+        }
         break;
       default:
         args = [
           sourcePath,
+          "-background", "none",
           customizedPalettePath ? "-remap" : "-colors",
-          customizedPalettePath ? customizedPalettePath : "256",
+          customizedPalettePath ? customizedPalettePath : "256", // customizedPalettePath inserir customPalette.png
           // "-depth", "8",
           "-type", "Palette",
           `BMP3:${destPath}`
@@ -348,7 +376,7 @@ export class AssetBuilder {
    * - allowed characters: lowercase letters, digits and underscore
    * - only one dot before the extension
    */
-  private sanitizeFileName(original: string): string {
+  private sanitizeFilename(original: string): string {
     // Separate base and extension (use last dot)
     const idx = original.lastIndexOf('.');
     const base = idx >= 0 ? original.slice(0, idx) : original;
