@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -79,6 +79,8 @@ public:
         _palette_item(palette_item),
         _map_item(map_item)
     {
+        BN_ASSERT(regular_bg_tiles_item::valid_tiles_count(tiles_item.tiles_ref().size(), tiles_item.bpp()),
+                  "Invalid tiles count: ", tiles_item.tiles_ref().size(), " - ", int(tiles_item.bpp()));
         BN_BASIC_ASSERT(tiles_item.bpp() == palette_item.bpp(), "Tiles and palette BPP are different");
     }
 

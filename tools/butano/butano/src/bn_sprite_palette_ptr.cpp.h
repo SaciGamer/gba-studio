@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -219,6 +219,11 @@ int sprite_palette_ptr::colors_count() const
 span<const color> sprite_palette_ptr::colors() const
 {
     return palettes_manager::sprite_palettes_bank().colors(_id);
+}
+
+void sprite_palette_ptr::set_colors(const span<const color>& colors)
+{
+    palettes_manager::sprite_palettes_bank().set_colors(_id, colors);
 }
 
 void sprite_palette_ptr::set_colors(const sprite_palette_item& palette_item)

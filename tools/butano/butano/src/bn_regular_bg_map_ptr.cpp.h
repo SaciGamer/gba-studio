@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -284,12 +284,12 @@ bool regular_bg_map_ptr::big() const
 
 bpp_mode regular_bg_map_ptr::bpp() const
 {
-    return palette().bpp();
+    return bg_blocks_manager::bpp(_handle);
 }
 
 int regular_bg_map_ptr::tiles_offset() const
 {
-    return bg_blocks_manager::regular_tiles_offset(_handle);
+    return bg_blocks_manager::regular_map_tiles_offset(_handle);
 }
 
 int regular_bg_map_ptr::palette_banks_offset() const
@@ -339,6 +339,11 @@ void regular_bg_map_ptr::set_tiles(regular_bg_tiles_ptr&& tiles)
 
 void regular_bg_map_ptr::set_tiles(const regular_bg_tiles_item& tiles_item)
 {
+    set_tiles(tiles_item, bg_blocks_manager::allow_tiles_offset());
+}
+
+void regular_bg_map_ptr::set_tiles(const regular_bg_tiles_item& tiles_item, bool allow_offset)
+{
     optional<regular_bg_tiles_ptr> tiles = tiles_item.find_tiles();
 
     if(regular_bg_tiles_ptr* tiles_ptr = tiles.get())
@@ -348,7 +353,7 @@ void regular_bg_map_ptr::set_tiles(const regular_bg_tiles_item& tiles_item)
     else
     {
         bg_blocks_manager::remove_regular_map_tiles(_handle);
-        bg_blocks_manager::set_regular_map_tiles(_handle, regular_bg_tiles_ptr::create(tiles_item));
+        bg_blocks_manager::set_regular_map_tiles(_handle, regular_bg_tiles_ptr::create(tiles_item, allow_offset));
     }
 }
 
@@ -369,7 +374,7 @@ void regular_bg_map_ptr::set_palette(bg_palette_ptr&& palette)
 
 void regular_bg_map_ptr::set_palette(const bg_palette_item& palette_item)
 {
-    if(palette_item.bpp() == bpp_mode::BPP_4 || bpp() == bpp_mode::BPP_4)
+    if(palette_item.bpp() == bpp_mode::BPP_4)
     {
         optional<bg_palette_ptr> palette = palette_item.find_palette();
 
@@ -394,8 +399,14 @@ void regular_bg_map_ptr::set_tiles_and_palette(regular_bg_tiles_ptr tiles, bg_pa
     bg_blocks_manager::set_regular_map_tiles_and_palette(_handle, move(tiles), move(palette));
 }
 
-void regular_bg_map_ptr::set_tiles_and_palette(const regular_bg_tiles_item& tiles_item,
-                                               const bg_palette_item& palette_item)
+void regular_bg_map_ptr::set_tiles_and_palette(
+        const regular_bg_tiles_item& tiles_item, const bg_palette_item& palette_item)
+{
+    set_tiles_and_palette(tiles_item, bg_blocks_manager::allow_tiles_offset(), palette_item);
+}
+
+void regular_bg_map_ptr::set_tiles_and_palette(
+        const regular_bg_tiles_item& tiles_item, bool allow_tiles_offset, const bg_palette_item& palette_item)
 {
     optional<regular_bg_tiles_ptr> tiles = tiles_item.find_tiles();
     regular_bg_tiles_ptr* tiles_ptr = tiles.get();
@@ -403,7 +414,7 @@ void regular_bg_map_ptr::set_tiles_and_palette(const regular_bg_tiles_item& tile
     if(! tiles_ptr)
     {
         bg_blocks_manager::remove_regular_map_tiles(_handle);
-        tiles = regular_bg_tiles_ptr::create(tiles_item);
+        tiles = regular_bg_tiles_ptr::create(tiles_item, allow_tiles_offset);
         tiles_ptr = tiles.get();
     }
 
@@ -412,7 +423,7 @@ void regular_bg_map_ptr::set_tiles_and_palette(const regular_bg_tiles_item& tile
 
     if(! palette_ptr)
     {
-        if(palette_item.bpp() == bpp_mode::BPP_4 || bpp() == bpp_mode::BPP_4)
+        if(palette_item.bpp() == bpp_mode::BPP_4)
         {
             bg_blocks_manager::remove_map_palette(_handle);
         }
@@ -422,6 +433,19 @@ void regular_bg_map_ptr::set_tiles_and_palette(const regular_bg_tiles_item& tile
     }
 
     bg_blocks_manager::set_regular_map_tiles_and_palette(_handle, move(*tiles_ptr), move(*palette_ptr));
+}
+
+optional<span<const regular_bg_map_cell>> regular_bg_map_ptr::vram() const
+{
+    optional<span<regular_bg_map_cell>> vram_opt = bg_blocks_manager::regular_map_vram(_handle);
+    optional<span<const regular_bg_map_cell>> result;
+
+    if(span<regular_bg_map_cell>* vram = vram_opt.get())
+    {
+        result = span<const regular_bg_map_cell>(vram->data(), vram->size());
+    }
+
+    return result;
 }
 
 optional<span<regular_bg_map_cell>> regular_bg_map_ptr::vram()

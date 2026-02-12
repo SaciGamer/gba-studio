@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -9,6 +9,9 @@
 #include "bn_affine_bg_ptr.h"
 #include "bn_regular_bg_ptr.h"
 #include "bn_display_manager.h"
+#include "bn_palette_bitmap_bg_ptr.h"
+#include "bn_dp_direct_bitmap_bg_ptr.h"
+#include "bn_sp_direct_bitmap_bg_ptr.h"
 
 namespace bn
 {
@@ -25,6 +28,24 @@ bool window::show_bg(const affine_bg_ptr& affine_bg) const
     return bgs_manager::show_in_window(bg_handle, _id);
 }
 
+bool window::show_bg(const palette_bitmap_bg_ptr& palette_bitmap_bg) const
+{
+    auto bg_handle = const_cast<void*>(palette_bitmap_bg.handle());
+    return bgs_manager::show_in_window(bg_handle, _id);
+}
+
+bool window::show_bg(const sp_direct_bitmap_bg_ptr& sp_direct_bitmap_bg) const
+{
+    auto bg_handle = const_cast<void*>(sp_direct_bitmap_bg.handle());
+    return bgs_manager::show_in_window(bg_handle, _id);
+}
+
+bool window::show_bg(const dp_direct_bitmap_bg_ptr& dp_direct_bitmap_bg) const
+{
+    auto bg_handle = const_cast<void*>(dp_direct_bitmap_bg.handle());
+    return bgs_manager::show_in_window(bg_handle, _id);
+}
+
 void window::set_show_bg(const regular_bg_ptr& regular_bg, bool show)
 {
     auto bg_handle = const_cast<void*>(regular_bg.handle());
@@ -34,6 +55,24 @@ void window::set_show_bg(const regular_bg_ptr& regular_bg, bool show)
 void window::set_show_bg(const affine_bg_ptr& affine_bg, bool show)
 {
     auto bg_handle = const_cast<void*>(affine_bg.handle());
+    bgs_manager::set_show_in_window(bg_handle, _id, show);
+}
+
+void window::set_show_bg(const palette_bitmap_bg_ptr& palette_bitmap_bg, bool show)
+{
+    auto bg_handle = const_cast<void*>(palette_bitmap_bg.handle());
+    bgs_manager::set_show_in_window(bg_handle, _id, show);
+}
+
+void window::set_show_bg(const sp_direct_bitmap_bg_ptr& sp_direct_bitmap_bg, bool show)
+{
+    auto bg_handle = const_cast<void*>(sp_direct_bitmap_bg.handle());
+    bgs_manager::set_show_in_window(bg_handle, _id, show);
+}
+
+void window::set_show_bg(const dp_direct_bitmap_bg_ptr& dp_direct_bitmap_bg, bool show)
+{
+    auto bg_handle = const_cast<void*>(dp_direct_bitmap_bg.handle());
     bgs_manager::set_show_in_window(bg_handle, _id, show);
 }
 

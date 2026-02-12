@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -1125,6 +1125,16 @@ void set_third_attributes(id_type id, const sprite_third_attributes& third_attri
     set_tiles_and_palette(id, shape_size(id), sprite_tiles_ptr(third_attributes.tiles()),
                           sprite_palette_ptr(third_attributes.palette()));
     set_bg_priority(id, third_attributes.bg_priority());
+}
+
+bool bg_sorting_enabled()
+{
+    return data_ref().sorter.bg_sorting_enabled();
+}
+
+void set_bg_sorting_enabled(bool bg_sorting_enabled)
+{
+    data_ref().sorter.set_bg_sorting_enabled(bg_sorting_enabled);
 }
 
 int reserved_handles_count()

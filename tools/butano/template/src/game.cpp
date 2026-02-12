@@ -10,12 +10,15 @@
 #include "bn_core.h"
 #include "bn_display.h"
 #include "bn_keypad.h"
+#include "bn_log.h"
 // #include "bn_scene.h"
 
 /**
  * Game constructor - Initialize game systems
  */
 Game::Game() : running(true) {
+    BN_LOG("..: Game inicializando :..");
+
     // Initialize Butano
     bn::core::init();
     
@@ -43,9 +46,11 @@ void Game::initialize() {
     // - Load backgrounds
     // - Initialize sounds
     // - Setup scene
-
+    
+    
     // Inicializa gráficos e carrega o background inicial
-    graphics.initialize();
+    const Scenes* scene = graphics.initialize();
+    graphics.initialize_tilemap(scene);
 }
 
 /**
@@ -72,7 +77,7 @@ void Game::render() {
     // - Background scrolling
     // - UI rendering
 
-    // Aqui você pode atualizar sprites ou backgrounds
+    // Aqui atualiza sprites ou backgrounds
     graphics.update_sprites();
 }
 
@@ -80,6 +85,8 @@ void Game::render() {
  * Main game loop
  */
 void Game::run() {
+    BN_LOG("..: Game RUN :..");
+
     while (is_running()) {
         // Update game state
         update();

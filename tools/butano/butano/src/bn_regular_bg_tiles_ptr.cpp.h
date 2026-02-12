@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -26,17 +26,33 @@ optional<regular_bg_tiles_ptr> regular_bg_tiles_ptr::find(const regular_bg_tiles
 
 regular_bg_tiles_ptr regular_bg_tiles_ptr::create(const regular_bg_tiles_item& tiles_item)
 {
-    return regular_bg_tiles_ptr(bg_blocks_manager::create_regular_tiles(tiles_item, false));
+    return create(tiles_item, bg_blocks_manager::allow_tiles_offset());
+}
+
+regular_bg_tiles_ptr regular_bg_tiles_ptr::create(const regular_bg_tiles_item& tiles_item, bool allow_offset)
+{
+    return regular_bg_tiles_ptr(bg_blocks_manager::create_regular_tiles(tiles_item, allow_offset, false));
 }
 
 regular_bg_tiles_ptr regular_bg_tiles_ptr::allocate(int tiles_count, bpp_mode bpp)
 {
-    return regular_bg_tiles_ptr(bg_blocks_manager::allocate_regular_tiles(tiles_count, bpp, false));
+    return allocate(tiles_count, bpp, bg_blocks_manager::allow_tiles_offset());
+}
+
+regular_bg_tiles_ptr regular_bg_tiles_ptr::allocate(int tiles_count, bpp_mode bpp, bool allow_offset)
+{
+    return regular_bg_tiles_ptr(bg_blocks_manager::allocate_regular_tiles(tiles_count, bpp, allow_offset, false));
 }
 
 optional<regular_bg_tiles_ptr> regular_bg_tiles_ptr::create_optional(const regular_bg_tiles_item& tiles_item)
 {
-    int handle = bg_blocks_manager::create_regular_tiles(tiles_item, true);
+    return create_optional(tiles_item, bg_blocks_manager::allow_tiles_offset());
+}
+
+optional<regular_bg_tiles_ptr> regular_bg_tiles_ptr::create_optional(
+        const regular_bg_tiles_item& tiles_item, bool allow_offset)
+{
+    int handle = bg_blocks_manager::create_regular_tiles(tiles_item, allow_offset, true);
     optional<regular_bg_tiles_ptr> result;
 
     if(handle >= 0)
@@ -49,7 +65,13 @@ optional<regular_bg_tiles_ptr> regular_bg_tiles_ptr::create_optional(const regul
 
 optional<regular_bg_tiles_ptr> regular_bg_tiles_ptr::allocate_optional(int tiles_count, bpp_mode bpp)
 {
-    int handle = bg_blocks_manager::allocate_regular_tiles(tiles_count, bpp, true);
+    return allocate_optional(tiles_count, bpp, bg_blocks_manager::allow_tiles_offset());
+}
+
+optional<regular_bg_tiles_ptr> regular_bg_tiles_ptr::allocate_optional(
+        int tiles_count, bpp_mode bpp, bool allow_offset)
+{
+    int handle = bg_blocks_manager::allocate_regular_tiles(tiles_count, bpp, allow_offset, true);
     optional<regular_bg_tiles_ptr> result;
 
     if(handle >= 0)
@@ -105,6 +127,16 @@ int regular_bg_tiles_ptr::tiles_count() const
     return bg_blocks_manager::tiles_count(_handle);
 }
 
+bpp_mode regular_bg_tiles_ptr::bpp() const
+{
+    return bg_blocks_manager::bpp(_handle);
+}
+
+int regular_bg_tiles_ptr::offset() const
+{
+    return bg_blocks_manager::regular_tiles_offset(_handle);
+}
+
 compression_type regular_bg_tiles_ptr::compression() const
 {
     return bg_blocks_manager::compression(_handle);
@@ -123,6 +155,24 @@ void regular_bg_tiles_ptr::set_tiles_ref(const regular_bg_tiles_item& tiles_item
 void regular_bg_tiles_ptr::reload_tiles_ref()
 {
     bg_blocks_manager::reload(_handle);
+}
+
+void regular_bg_tiles_ptr::overwrite_tile(int tile_index, const tile& tiles_ref)
+{
+    bg_blocks_manager::overwrite_tile(_handle, tile_index, tiles_ref);
+}
+
+optional<span<const tile>> regular_bg_tiles_ptr::vram() const
+{
+    optional<span<tile>> vram_opt = bg_blocks_manager::tiles_vram(_handle);
+    optional<span<const tile>> result;
+
+    if(span<tile>* vram = vram_opt.get())
+    {
+        result = span<const tile>(vram->data(), vram->size());
+    }
+
+    return result;
 }
 
 optional<span<tile>> regular_bg_tiles_ptr::vram()

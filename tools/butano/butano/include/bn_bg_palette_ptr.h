@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -133,6 +133,12 @@ public:
      * @brief Returns the colors contained in this palette.
      */
     [[nodiscard]] span<const color> colors() const;
+
+    /**
+     * @brief Sets the colors contained in this palette.
+     * @param colors Colors to copy to this palette.
+     */
+    void set_colors(const span<const color>& colors);
 
     /**
      * @brief Sets the colors contained in this palette.

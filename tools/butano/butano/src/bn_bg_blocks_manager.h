@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -72,9 +72,9 @@ namespace bn::bg_blocks_manager
                 const affine_bg_map_item& map_item, const affine_bg_map_cell* data_ptr,
                 const affine_bg_tiles_ptr& tiles, const bg_palette_ptr& palette);
 
-    [[nodiscard]] int create_regular_tiles(const regular_bg_tiles_item& tiles_item, bool optional);
+    [[nodiscard]] int create_regular_tiles(const regular_bg_tiles_item& tiles_item, bool allow_offset, bool optional);
 
-    [[nodiscard]] int create_affine_tiles(const affine_bg_tiles_item& tiles_item, bool optional);
+    [[nodiscard]] int create_affine_tiles(const affine_bg_tiles_item& tiles_item, bool allow_offset, bool optional);
 
     [[nodiscard]] int create_regular_map(
                 const regular_bg_map_item& map_item, const regular_bg_map_cell* data_ptr,
@@ -84,9 +84,11 @@ namespace bn::bg_blocks_manager
                 const affine_bg_map_item& map_item, const affine_bg_map_cell* data_ptr,
                 affine_bg_tiles_ptr&& tiles, bg_palette_ptr&& palette, bool optional);
 
-    [[nodiscard]] int allocate_regular_tiles(int tiles_count, bpp_mode bpp, bool optional);
+    [[nodiscard]] int allocate_regular_tiles(int tiles_count, bpp_mode bpp, bool allow_offset, bool optional);
 
-    [[nodiscard]] int allocate_affine_tiles(int tiles_count, bool optional);
+    [[nodiscard]] int allocate_affine_tiles(int tiles_count, bool allow_offset, bool optional);
+
+    [[nodiscard]] int allocate_all_affine_tiles(bool optional);
 
     [[nodiscard]] int allocate_regular_map(const size& map_dimensions, regular_bg_tiles_ptr&& tiles,
                                            bg_palette_ptr&& palette, bool optional);
@@ -112,9 +114,15 @@ namespace bn::bg_blocks_manager
 
     [[nodiscard]] int regular_tiles_offset(int id);
 
+    [[nodiscard]] int regular_map_tiles_offset(int id);
+
     [[nodiscard]] int affine_tiles_offset(int id);
 
+    [[nodiscard]] int affine_map_tiles_offset(int id);
+
     [[nodiscard]] int palette_offset(int id);
+
+    [[nodiscard]] bpp_mode bpp(int id);
 
     [[nodiscard]] compression_type compression(int id);
 
@@ -133,6 +141,8 @@ namespace bn::bg_blocks_manager
     void set_affine_map_cells_ref(int id, const affine_bg_map_item& map_item, const affine_bg_map_cell* data_ptr);
 
     void reload(int id);
+
+    void overwrite_tile(int id, int tile_index, const tile& tiles_ref);
 
     [[nodiscard]] const regular_bg_tiles_ptr& regular_map_tiles(int id);
 

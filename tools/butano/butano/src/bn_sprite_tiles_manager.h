@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -42,6 +42,8 @@ namespace bn::sprite_tiles_manager
     [[nodiscard]] int create_optional(const span<const tile>& tiles_ref, compression_type compression);
 
     [[nodiscard]] int allocate_optional(int tiles_count, bpp_mode bpp);
+
+    [[nodiscard]] int allocate_first_half(bool optional);
 
     void increase_usages(int id);
 

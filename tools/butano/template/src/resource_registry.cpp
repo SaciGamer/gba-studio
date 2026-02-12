@@ -10,49 +10,71 @@
 #include "resource_types.h"
 #include "resources.h"
 
-static const Resource RESOURCES[] = {
-    // {{NAME_FILE}}
-{{OBJECT_CONSTANTS}}
+static const Backgrounds BACKGROUNDS[] = {
+{{BACKGROUNDS_CONSTANTS}}
 };
 
-// Tamanho do array RESOURCES para iteração segura
-const size_t RESOURCES_SIZE = sizeof(RESOURCES) / sizeof(RESOURCES[0]);
+static const Scenes SCENES[] = {
+{{SCENES_CONSTANTS}}
+};
 
-const Resource* get_resource_by_name(const char* name)
+static const Settings SETTINGS = {{SETTINGS_CONSTANTS}};
+
+// Função auxiliar genérica para iterar sobre arrays de qualquer tipo
+template <typename T, typename Func>
+const T* find_in_array(const T* array, size_t size, Func&& predicate)
 {
-    for(const auto& r : RESOURCES)
+    for(size_t i = 0; i < size; ++i)
     {
-        bn::string<64> res_name(r.name);
-        if(res_name == bn::string<64>(name))
+        if(predicate(array[i]))
         {
-            return &r;
+            return &array[i];   // retorna o item encontrado
         }
     }
-    return nullptr;
+    return nullptr;             // não encontrou
 }
 
-const Resource* get_resource_by_id(const bn::string<64>& resource_id)
+// FUNCOES para BACKGROUND
+const Backgrounds* get_background_by_name(const char* name)
 {
-    // Busca na array RESOURCES pelo ID
-    for(size_t i = 0; i < RESOURCES_SIZE; ++i)
-    {
-        if(RESOURCES[i].id && bn::string<64>(RESOURCES[i].id) == resource_id)
-        {
-            return &RESOURCES[i];
-        }
-    }
-    return nullptr;
+    bn::string<64> target(name);
+    return find_in_array(BACKGROUNDS, sizeof(BACKGROUNDS)/sizeof(BACKGROUNDS[0]), [&](const Backgrounds& b) {
+        return bn::string<64>(b.name) == target;
+    });
 }
 
-const Resource* get_resource_by_id_and_type(const bn::string<64>& resource_id, ResourceType type)
+const Backgrounds* get_background_by_id(const bn::string<64>& background_id)
 {
-    // Busca na array RESOURCES pelo ID e tipo
-    for(size_t i = 0; i < RESOURCES_SIZE; ++i)
-    {
-        if(RESOURCES[i].type == type && RESOURCES[i].id && bn::string<64>(RESOURCES[i].id) == resource_id)
-        {
-            return &RESOURCES[i];
-        }
-    }
-    return nullptr;
+    return find_in_array(BACKGROUNDS, sizeof(BACKGROUNDS)/sizeof(BACKGROUNDS[0]), [&](const Backgrounds& b) {
+        return bn::string<64>(b.id) == background_id;
+    });
 }
+
+// FUNCOES para SCENE
+const Scenes* get_scene_by_name(const char* name) {
+    bn::string<64> target(name);
+    return find_in_array(SCENES, sizeof(SCENES)/sizeof(SCENES[0]), [&](const Scenes& s) {
+        return bn::string<64>(s.name) == target;
+    });
+}
+
+const Scenes* get_scene_by_id(const bn::string<64>& scene_id) {
+    return find_in_array(SCENES, sizeof(SCENES)/sizeof(SCENES[0]), [&](const Scenes& s) {
+        return bn::string<64>(s.id) == scene_id;
+    });
+}
+
+const Scenes* get_scene_by_id_and_type(const bn::string<64>& scene_id, ResourceType type) {
+    return find_in_array(SCENES, sizeof(SCENES)/sizeof(SCENES[0]), [&](const Scenes& s) {
+        return bn::string<64>(s.id) == scene_id && s.type == type;
+    });
+}
+
+// FUNCOES para SETTINGS
+const Settings* get_settings()
+{
+    return &SETTINGS;
+}
+
+// FUNCOES para TILEMAP
+

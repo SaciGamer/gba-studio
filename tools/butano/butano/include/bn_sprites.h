@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -79,6 +79,22 @@ namespace bn::sprites
      * @brief Sets if the sprite layer is visible or not.
      */
     void set_visible(bool visible);
+
+    /**
+     * @brief Indicates if sprites are sorted according to their priority relative to backgrounds or not.
+     *
+     * Disabling background sorting allows to create sprite masks.
+     */
+    [[nodiscard]] bool bg_sorting_enabled();
+
+    /**
+     * @brief Sets if sprites are sorted according to their priority relative to backgrounds or not.
+     *
+     * Disabling background sorting allows to create sprite masks.
+     *
+     * Background sorting can't be toggled with active sprites.
+     */
+    void set_bg_sorting_enabled(bool bg_sorting_enabled);
 
     /**
      * @brief Indicates if the sprite layer is part of the blending bottom layer or not.

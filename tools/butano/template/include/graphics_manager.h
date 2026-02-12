@@ -6,21 +6,36 @@
 #include "bn_sprite_item.h"
 #include "bn_regular_bg_ptr.h"
 #include "bn_regular_bg_item.h"
+#include "bn_bg_palettes.h"
+#include "bn_palette_bitmap_bg_painter.h"
 #include "bn_optional.h"
 #include "bn_string.h"
-#include "bn_bg_palettes.h"
 #include "bn_sprite_palettes.h"
+#include "bn_vector.h"
+
+#include "palette_bitmap_manager.h"
+
+struct Scenes; 
 
 /**
  * Graphics Manager for {{PROJECT_NAME}}
- * Handles sprite and background rendering
+ * Handles sprite, background, tilemap rendering
  */
 class GraphicsManager {
 private:
     static constexpr int MAX_SPRITES = 128;
     bn::optional<bn::sprite_ptr> sprites[MAX_SPRITES];
-    int sprite_count;
+    int sprite_count = 0;
     bn::optional<bn::regular_bg_ptr> current_bg;
+    bn::optional<bn::regular_bg_ptr> current_bg2;
+    bn::optional<bn::regular_bg_ptr> current_bg3;
+    bn::optional<bn::regular_bg_ptr> current_bg4;
+    bn::optional<bn::palette_bitmap_bg_ptr> current_palette_btmp_bg;
+
+    // Tilemap support
+    // bn::optional<PaletteBitmapManager> tilemap_manager;
+    // bn::string<64> current_tileset_name;
+    // bn::string<64> current_tilemap_name;
 
 public:
     GraphicsManager();
@@ -29,7 +44,8 @@ public:
     /**
      * Initialize graphics
      */
-    void initialize();
+    const Scenes* initialize();
+    void initialize_tilemap(const Scenes* scene);
 
     /**
      * Create sprite
@@ -55,6 +71,59 @@ public:
      * Get sprite count
      */
     int get_sprite_count() const;
+
+//     // Tilemap methods
+
+//     /**
+//      * Initialize tilemap for current scene
+//      */
+//     void initialize_tilemap();
+
+//     /**
+//      * Render tilemap
+//      */
+//     void render_tilemap();
+
+//     /**
+//      * Update tile at position
+//      */
+//     void update_tile(int x, int y, int tile_index);
+
+//     /**
+//      * Fill area with tile
+//      */
+//     void fill_tile_area(int start_x, int start_y, int width, int height, int tile_index);
+
+//     /**
+//      * Clear tilemap
+//      */
+//     void clear_tilemap(int tile_index = 0);
+
+//     /**
+//      * Get tile at position
+//      */
+//     int get_tile_at(int x, int y) const;
+
+//     /**
+//      * Check if tilemap is initialized
+//      */
+//     bool is_tilemap_initialized() const;
+
+// private:
+//     /**
+//      * Load tileset item by name
+//      */
+//     bn::optional<bn::palette_bitmap_pixels_item> get_tileset_item(const bn::string<64>& name);
+
+//     /**
+//      * Convert tile data array to 2D vector
+//      */
+//     bn::vector<bn::vector<int, 64>, 64> convert_tile_data_to_map(
+//         const int* tile_data,
+//         int data_size,
+//         int map_width,
+//         int map_height
+//     );
 };
 
 #endif // {{GRAPHICS_NAME_UPPER}}_H

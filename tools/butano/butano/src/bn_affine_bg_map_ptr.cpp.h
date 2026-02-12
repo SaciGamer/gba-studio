@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -289,7 +289,7 @@ affine_bg_big_map_canvas_size affine_bg_map_ptr::big_canvas_size() const
 
 int affine_bg_map_ptr::tiles_offset() const
 {
-    return bg_blocks_manager::affine_tiles_offset(_handle);
+    return bg_blocks_manager::affine_map_tiles_offset(_handle);
 }
 
 compression_type affine_bg_map_ptr::compression() const
@@ -334,6 +334,11 @@ void affine_bg_map_ptr::set_tiles(affine_bg_tiles_ptr&& tiles)
 
 void affine_bg_map_ptr::set_tiles(const affine_bg_tiles_item& tiles_item)
 {
+    set_tiles(tiles_item, bg_blocks_manager::allow_tiles_offset());
+}
+
+void affine_bg_map_ptr::set_tiles(const affine_bg_tiles_item& tiles_item, bool allow_offset)
+{
     optional<affine_bg_tiles_ptr> tiles = tiles_item.find_tiles();
 
     if(affine_bg_tiles_ptr* tiles_ptr = tiles.get())
@@ -343,7 +348,7 @@ void affine_bg_map_ptr::set_tiles(const affine_bg_tiles_item& tiles_item)
     else
     {
         bg_blocks_manager::remove_affine_map_tiles(_handle);
-        bg_blocks_manager::set_affine_map_tiles(_handle, affine_bg_tiles_ptr::create(tiles_item));
+        bg_blocks_manager::set_affine_map_tiles(_handle, affine_bg_tiles_ptr::create(tiles_item, allow_offset));
     }
 }
 
@@ -365,6 +370,19 @@ void affine_bg_map_ptr::set_palette(bg_palette_ptr&& palette)
 void affine_bg_map_ptr::set_palette(const bg_palette_item& palette_item)
 {
     bg_blocks_manager::set_affine_map_palette(_handle, bg_palette_ptr::create(palette_item));
+}
+
+optional<span<const affine_bg_map_cell>> affine_bg_map_ptr::vram() const
+{
+    optional<span<affine_bg_map_cell>> vram_opt = bg_blocks_manager::affine_map_vram(_handle);
+    optional<span<const affine_bg_map_cell>> result;
+
+    if(span<affine_bg_map_cell>* vram = vram_opt.get())
+    {
+        result = span<const affine_bg_map_cell>(vram->data(), vram->size());
+    }
+
+    return result;
 }
 
 optional<span<affine_bg_map_cell>> affine_bg_map_ptr::vram()
