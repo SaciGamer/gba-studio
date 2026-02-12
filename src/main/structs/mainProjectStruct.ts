@@ -21,7 +21,7 @@ export function createProjectStruct(basePath: string, template?: string): void {
   console.log('..: Criando estrutura de pastas :..');
   // Estrutura de pastas
   const folders = ['assets', 'plugins', 'project'];
-  const assets = ['avatars', 'backgrounds', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui'];
+  const assets = ['avatars', 'backgrounds', 'backgrounds-hd', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui'];
   const projects = ['backgrounds', 'emotes', 'fonts', 'musics', 'palettes', 'sprites'];
   const files = ['.gitignore', `${projectSettings.name}.gbaproj`];
 

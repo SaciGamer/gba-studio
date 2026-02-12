@@ -1,22 +1,15 @@
 import { CSSProperties } from 'react';
 import { CSS, Transform } from '@dnd-kit/utilities';
 
-interface imgProps {
-  src: string;
-  width: number;
-  height: number;
-};
-
-export const elementStyle = (transform: Transform | null, img: imgProps, width: number, height: number, x: number, y: number, isSelected: boolean, tokenAntD: any): CSSProperties => {
+export const elementStyle = (transform: Transform | null, /*width: number, height: number, */ x: number, y: number, isSelected: boolean, tokenAntD: any): CSSProperties => {
   return {
     transform: CSS.Transform.toString(transform),
     transition: 'background-color 0.3s, box-shadow 0.3s',
-    backgroundImage: `url(${img.src})`,
     backgroundColor: 'black', // Cor padrão do fundo da imagem
-    // backgroundSize: 'cover', // Extende a imagem para caber
-    backgroundRepeat: 'no-repeat', // Evitar repetir a imagem
-    width: width < 240 ? 240 : `${width}px`,
-    height: height < 160 ? 160 : `${height}px`,
+    // backgroundSize: 'contain',      // ajusta para caber sem cortar
+    // backgroundRepeat: 'no-repeat', // Evitar repetir a imagem
+    // width: width < 240 ? 256 : `${width}px`,
+    // height: height < 160 ? 256 : `${height}px`,
     position: 'absolute',
     left: `${x}px`,
     top: `${y}px`,

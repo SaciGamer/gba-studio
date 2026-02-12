@@ -148,7 +148,7 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
 
   const handleMoreSettings = () => {
     console.log("Navigating to another tab for more settings...");
-    controllerView(8);
+    controllerView(9);
   };
 
   useEffect(() => {
@@ -198,7 +198,7 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
             label: (
               <div style={{ display: 'flex', alignItems: 'center' }}>
                   <img 
-                    src={`${backgrounds.find(b => b.id == scene.backgroundId)?.filename ? settingUtils.localImagePath+'/'+backgrounds.find(b => b.id == scene.backgroundId)?.filename : imgPlaceholder}`} // Caminho da imagem da miniatura
+                    src={`${scene.backgroundId && backgrounds.find(b => b.id == scene.backgroundId)?.filename ? settingUtils.localImagePath+'/'+backgrounds.find(b => b.id == scene.backgroundId)?.filename : imgPlaceholder}`} // Caminho da imagem da miniatura
                     alt={scene.name} 
                     style={{ width: 24, height: 24, marginRight: 8 }}
                   />
@@ -223,17 +223,6 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
       </Space>
 
       <Divider style={{ margin: `${token.margin}px 0` }} />
-      {/* Start Position */}
-      <Space.Compact block>
-        <Form.Item name={"startX"} noStyle>
-          <InputNumber min={0} addonBefore="X" style={{ flex: 1, textAlign: 'center' }} />
-        </Form.Item>
-        <Form.Item name={"startY"} noStyle>
-          <InputNumber min={0} addonBefore="Y" style={{ flex: 1, textAlign: 'center', marginLeft: "10px" }} />
-        </Form.Item>
-      </Space.Compact>
-
-      <Divider style={{ margin: `${token.margin}px 0` }} />
 
       {/* Direction */}
       <Form.Item name="startDirection" label="Direction">
@@ -252,6 +241,16 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
           </Radio.Button>
         </Radio.Group>
       </Form.Item>
+      
+      {/* Start Position */}
+      <Space.Compact block>
+        <Form.Item name={"startX"} noStyle>
+          <InputNumber min={0} addonBefore="X" style={{ flex: 1, textAlign: 'center' }} />
+        </Form.Item>
+        <Form.Item name={"startY"} noStyle>
+          <InputNumber min={0} addonBefore="Y" style={{ flex: 1, textAlign: 'center', marginLeft: "10px" }} />
+        </Form.Item>
+      </Space.Compact>
 
       <Divider style={{ margin: `${token.margin}px 0` }} />
 

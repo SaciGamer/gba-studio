@@ -5,25 +5,19 @@
 
 import fs from 'fs';
 import path from 'path';
-
-export interface GameConfig {
-  projectName: string;
-  authorName?: string;
-  version?: string;
-  useThreads?: boolean;
-  useAudio?: boolean;
-  useGraphics?: boolean;
-}
+import { GameConfig } from '../types/BuildTypes';
 
 export class CppBuilder {
   private srcDir: string;
   private includeDir: string;
   private templateDir?: string;
+  private graphicHeadersGeneratedByButano: string[];
 
-  constructor(buildDir: string, templateDir?: string) {
+  constructor(buildDir: string, templateDir?: string, graphicHeadersGeneratedByButano: string[] = []) {
     this.srcDir = path.join(buildDir, 'src');
     this.includeDir = path.join(buildDir, 'include');
     this.templateDir = templateDir;
+    this.graphicHeadersGeneratedByButano = graphicHeadersGeneratedByButano;
   }
 
   /**
@@ -313,6 +307,24 @@ public:
 
   }
 
+  private conditionalToShowBackgroundsIfElse(graphicNames: string[]) {
+    if (graphicNames.length === 0) return "";
+
+    // Implementation for conditional logic to show backgrounds
+    return graphicNames.filter(file => file.startsWith('bn_regular_bg_items_'))
+        .map(file => {
+          // remove extensão .h
+          let name = file.replace(/\.h$/, "");
+          // remove prefixo "bn_regular_bg_items_"
+          let suffix = name.replace(/^bn_regular_bg_items_/, "");
+
+          return `if (name == bn::string<64>("${suffix}")) {
+\t// Show background ${suffix}
+\treturn bn::regular_bg_items::${suffix};
+    }`;
+        }).join(' else ');
+  }
+
   /**
    * Generate graphics manager state support headers
    */
@@ -328,6 +340,7 @@ public:
           content = content.replace(/\{\{PROJECT_NAME\}\}/g, config.projectName);
           content = content.replace(/\{\{AUTHOR\}\}/g, config.authorName || '');
           content = content.replace(/\{\{VERSION\}\}/g, config.version || '1.0.0');
+          content = content.replace(/\{\{BACKGROUND_CONDITIONALS_FROM_NAME\}\}/g, this.conditionalToShowBackgroundsIfElse(this.graphicHeadersGeneratedByButano || []));
           fs.writeFileSync(graphicSrcPath, content, 'utf8');
           console.log('..: Copied template graphics_manager.cpp from template dir');
           return;

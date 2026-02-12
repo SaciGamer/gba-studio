@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { Flex, Splitter, Typography, Layout, App as AntDApp, Skeleton, Spin } from 'antd';
 
 // import Layout from './components/Layout.tsx';
@@ -14,6 +14,7 @@ import EmulatorView from '../../EmulatorView';
 // import '.././styles.css';
 
 import GameWorld from '../../gameWorld/GameWorld';
+import TileEditor from '../../TileEditor';
 // import { ipcRenderer } from 'electron';
 
 // import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
@@ -21,8 +22,8 @@ import GameWorld from '../../gameWorld/GameWorld';
 import { useLocation } from 'react-router-dom';
 import ErrorBoundary from 'antd/es/alert/ErrorBoundary';
 import { AntdToken } from '../../common/AntDToken';
-import { ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
-import { useBackgroundContext, useProjectContext, useSceneContext, useSettingsContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
+import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
+import { useBackgroundContext, useProjectContext, useSceneContext, useSettingsContext, useSettingsUtilsContext, useElementContext } from '@/providers/contexts/AppContexts';
 import { IBackgroundSettings } from '@/providers/contexts/interfaces/IBackgroundElement';
 import { IProjectSettings } from '@/providers/contexts/interfaces/IProjectElement';
 import { IMainSettings } from '@/providers/contexts/interfaces/ISettingElement';
@@ -42,6 +43,7 @@ const Engine: React.FC = () => {
   const { settings, setSettings, settingsRef, ignoredFields: ignoredFieldsSettings } = useSettingsContext();
   const { backgrounds, setBackgrounds, backgroundsRef, ignoredFields: ignoredFieldsBackgrounds } = useBackgroundContext();
   const { settingUtils, setSettingUtils, settingUtilsRef } = useSettingsUtilsContext();
+  const { elementSelected } = useElementContext();
 
   // Update settings utils initialization
   const initializeSettingUtils = useCallback((projectFilePath: string) => {
@@ -133,7 +135,7 @@ const Engine: React.FC = () => {
     handleResizeEnd(newSizes);
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!window.electronAPI) {
       console.error('window.electronAPI is undefined');
       return;
@@ -151,7 +153,7 @@ const Engine: React.FC = () => {
     loadSizesSplitters();
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const query = new URLSearchParams(location.search);
     console.log("..: Engine - query:", query);
 
@@ -159,13 +161,13 @@ const Engine: React.FC = () => {
 
     const loadFile = async (projectFilePath: string | null) => {
       if (!projectFilePath) return;
-      
-      // Initialize settings utils first
-      console.log("..: Engine - File Path:", projectFilePath);
-      initializeSettingUtils(projectFilePath);
-      console.log('..: useEffect settingUtils default ', settingUtils);
-    
+
       try {
+        // Initialize settings utils first
+        console.log("..: Engine - File Path:", projectFilePath);
+        initializeSettingUtils(projectFilePath);
+        console.log('..: useEffect settingUtils default ', settingUtils);
+
         const file = await window.electronAPI.loadSettings(projectFilePath);
         console.log("..: Engine - Response BE:", file);
         if (!file || !Array.isArray(file)) {
@@ -257,8 +259,8 @@ const Engine: React.FC = () => {
         // Project
         if (projectRef.current) {
           const projPathFile = settingUtilsRef.current && (settingUtilsRef.current as any).projectPathFile ? (settingUtilsRef.current as any).projectPathFile : null;
-          const projFileName = projPathFile ? projPathFile.split('\\').pop()?.split('/').pop() : 'project.gbaproj';
-          files.push({ path: `project/${projFileName}`, content: projectRef.current });
+          const projFilename = projPathFile ? projPathFile.split('\\').pop()?.split('/').pop() : 'project.gbaproj';
+          files.push({ path: `project/${projFilename}`, content: projectRef.current });
         }
 
         // Settings
@@ -513,49 +515,85 @@ const Engine: React.FC = () => {
             </Layout>
             )}
             {contentView == 2 && (
+              <Layout style={{ display: 'block', flex: 1, overflow: 'hidden' }}>
+                <Splitter
+                  onResizeEnd={handleResizeEnd}
+                  onResize={handleResizePanel}
+                >
+                  {/* PAINEL ESQUERDO */}
+                  <Splitter.Panel defaultSize="20%" min={200} size={panelSizes[0]}>
+                    <LeftPanel showScriptsAndVariables={false} />
+                  </Splitter.Panel>
+
+                  {/* CENTRO */}
+                  <Splitter.Panel>
+                    <Splitter layout="vertical">
+                      <Content>
+                        {elementSelected && (elementSelected.sceneType === ETypeScene.LOGO || elementSelected.sceneType === ETypeScene.POINTNCLICK) ? (
+                          <TileEditor scene={elementSelected} resetPanelSize={resetPanelSize} setShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton} />
+                        ) : (
+                          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', fontSize: '18px', color: token.colorTextSecondary }}>
+                            Select a scene to edit
+                          </div>
+                        )}
+                      </Content>
+                      <Splitter.Panel defaultSize="25%" min={40} max="90%">
+                        <BottomPanel />
+                      </Splitter.Panel>
+                    </Splitter>
+                  </Splitter.Panel>
+
+                  {/* PAINEL DIREITO */}
+                  <Splitter.Panel defaultSize="35%" min={350} size={panelSizes[2]}>
+                    <RightPanel controllerView={setContentView} isTileEditor={true} />
+                  </Splitter.Panel>
+                </Splitter>
+              </Layout>
+            )}
+          </Layout>
+            {contentView == 3 && (
               <Content style={{ margin: 50 }}>
                 <Skeleton.Node active style={{ height: 150, width: 250 }} />
                 <Skeleton active />
                 <Skeleton.Image active style={{ height: 150, width: 250 }} />
               </Content>
             )}
-            {contentView == 3 && (
+            {contentView == 4 && (
               <Content style={{ display: 'flex', flex: 'grid', margin: 50 }}>
                 <Skeleton.Image active style={{ height: 150, width: 250 }} />
                 <Skeleton active style={{ paddingInline: 20 }} />
                 <Skeleton.Image active style={{ height: 150, width: 250 }} />
               </Content>
             )}
-            {contentView == 4 && (
-              <Content style={{ margin: 50 }}>
-                <Skeleton active />
-                <Skeleton.Node active style={{ height: 150, width: 250 }} />
-              </Content>
-            )}
             {contentView == 5 && (
               <Content style={{ margin: 50 }}>
                 <Skeleton active />
                 <Skeleton.Node active style={{ height: 150, width: 250 }} />
-                <Skeleton active />
               </Content>
             )}
             {contentView == 6 && (
               <Content style={{ margin: 50 }}>
                 <Skeleton active />
+                <Skeleton.Node active style={{ height: 150, width: 250 }} />
+                <Skeleton active />
               </Content>
             )}
             {contentView == 7 && (
               <Content style={{ margin: 50 }}>
-                <Skeleton.Node active style={{ height: 150, width: 250 }} />
                 <Skeleton active />
               </Content>
             )}
             {contentView == 8 && (
               <Content style={{ margin: 50 }}>
+                <Skeleton.Node active style={{ height: 150, width: 250 }} />
+                <Skeleton active />
+              </Content>
+            )}
+            {contentView == 9 && (
+              <Content style={{ margin: 50 }}>
                 <Skeleton.Node active style={{ height: 600, width: 350 }} />
               </Content>
             )}
-          </Layout>
         </ZoomProvider>
       </AntDApp>
     </ErrorBoundary>

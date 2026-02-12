@@ -6,6 +6,7 @@ export interface IBackgroundSettings extends IResourceSettings {
     imageHeight: number;
     tileColors: string;
     autoColor: boolean;
+    hd: boolean;
 }
 
 export interface BackgroundContextType {

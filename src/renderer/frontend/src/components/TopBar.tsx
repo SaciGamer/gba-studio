@@ -46,13 +46,14 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
   
   const menuItems = [
     { key: '1', label: 'Game World'},
-    { key: '2', label: 'Sprites' },
-    { key: '3', label: 'Images' },
-    { key: '4', label: 'Music' },
-    { key: '5', label: 'Sound Effects' },
-    { key: '6', label: 'Palettes' },
-    { key: '7', label: 'Dialog Review' },
-    { key: '8', label: 'Setting' }
+    { key: '2', label: 'Tiles Editor' },
+    { key: '3', label: 'Sprites' },
+    { key: '4', label: 'Images' },
+    { key: '5', label: 'Music' },
+    { key: '6', label: 'Sound Effects' },
+    { key: '7', label: 'Palettes' },
+    { key: '8', label: 'Dialog Review' },
+    { key: '9', label: 'Setting' }
   ];
 
   const menu = {

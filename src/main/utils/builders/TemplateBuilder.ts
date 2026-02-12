@@ -29,7 +29,7 @@ export class TemplateBuilder {
     // Update Makefile with project-specific settings
     await this.configureMakefile(buildConfig);
 
-    console.log('..: Template build directory initialized at:', this.buildDir);
+    console.log('..: TemplateBuilder initializeBuildDirectory finish at:', this.buildDir);
   }
 
   /**
@@ -120,17 +120,17 @@ export class TemplateBuilder {
     // Replace template values with project-specific ones
     content = content.replace(
       /^TARGET\s*:=\s*\$\(notdir \$\(CURDIR\)\)/m,
-      `TARGET      := ${buildConfig.projectName || 'gba-project'}`
+      `TARGET\t\t:= ${buildConfig.projectName || 'gba-project'}`
     );
 
     content = content.replace(
       /^ROMTITLE\s*:=\s*.*/m,
-      `ROMTITLE    := ${buildConfig.romTitle || 'GBA STUDIO'}`
+      `ROMTITLE\t:= ${buildConfig.romTitle || 'GBA STUDIO'}`
     );
 
     content = content.replace(
       /^ROMCODE\s*:=\s*.*/m,
-      `ROMCODE     := ${buildConfig.romCode || 'GBAS'}`
+      `ROMCODE\t\t:= ${buildConfig.romCode || 'GBAS'}`
     );
 
     fs.writeFileSync(makefilePath, content, 'utf8');

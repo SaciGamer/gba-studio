@@ -6,7 +6,8 @@
 
 import fs from 'fs';
 import path from 'path';
-import { ResourceFile } from '../types/BuildTypes';
+import { GameConfig, JsonResourceDefault, ResourceFile } from '../types/BuildTypes';
+import { json } from 'stream/consumers';
 
 export class ResourceBuilder {
   private srcDir: string;
@@ -37,6 +38,12 @@ export class ResourceBuilder {
         } else if (entry.isFile() && entry.name.endsWith('.gbasres')) {
           try {
             const resourceFile = await this.processResource(fullPath);
+
+            if (resourceFile.resourceType === 'deleted') {
+              console.log('..: Skipping deleted or empty resource:', fullPath);
+              continue;
+            }
+
             resourceFiles.push(resourceFile);
           } catch (err) {
             console.warn('..: Failed to process resource:', fullPath, err);
@@ -54,11 +61,13 @@ export class ResourceBuilder {
    */
   private async processResource(resourcePath: string): Promise<ResourceFile> {
     const fileContent = fs.readFileSync(resourcePath, 'utf8');
-    const baseFileName = path.basename(resourcePath, '.gbasres').toLowerCase().replace(/ /g, '_');
-    const headerFileName = `${baseFileName}_res.h`;
+    // const baseFilename = path.basename(resourcePath, '.gbasres').toLowerCase().replace(/ /g, '_');
+    let headerFilename;
+    let newFilename;
+    const extension = '_res.h';
 
     // Parse JSON to extract variables
-    let jsonObj: any = null;
+    let jsonObj: JsonResourceDefault | null = null;
     try {
       jsonObj = JSON.parse(fileContent);
     } catch (e) {
@@ -66,18 +75,39 @@ export class ResourceBuilder {
       jsonObj = null;
     }
 
-    const headerContent = this.generateHeaderFromJson(baseFileName, jsonObj, fileContent);
+    if (!jsonObj || jsonObj?._deleted) {
+      return {
+        resourceName: '',
+        resourceType: 'deleted',
+        headerContent: Buffer.from('', 'utf8'),
+      };
+    } else {
+      const idPart = jsonObj?.id ? `_${jsonObj.id}` : "";
+      headerFilename = `${jsonObj._resourceType}${idPart}`.replaceAll('-', '_');
+      newFilename = `${headerFilename}${extension}`;
+
+      if (jsonObj?.name !== undefined) {
+        jsonObj.name = jsonObj?.name?.toLowerCase().replace(/ /g, '_');
+      }
+
+      if(jsonObj?.filename !== undefined) {
+        jsonObj.filename = jsonObj?.filename?.toLowerCase().replace(/ /g, '_');
+      }
+    }
+
+    const headerContent = this.generateHeaderFromJson(headerFilename, jsonObj, fileContent);
 
     // Write header to source directory
-    const outputPath = path.join(this.includeDir, headerFileName);
+    const outputPath = path.join(this.includeDir, newFilename);
     fs.writeFileSync(outputPath, headerContent, 'utf8');
 
-    console.log('..: Generated resource header:', headerFileName);
+    console.log('..: Generated resource header:', newFilename);
 
     return {
-      filename: headerFileName,
+      resourceName: newFilename,
       resourceType: 'gbasres',
-      content: Buffer.from(headerContent, 'utf8'),
+      headerContent: Buffer.from(headerContent, 'utf8'),
+      jsonContent: jsonObj,
     };
   }
 
@@ -101,6 +131,20 @@ export class ResourceBuilder {
           header += `static const int ${cleanKey} = ${val};\n`;
         } else if (typeof val === 'boolean') {
           header += `static const int ${cleanKey} = ${val ? 1 : 0};\n`;
+        } else if (Array.isArray(val) && val.every(row => Array.isArray(row) && row.every(v => typeof v === 'number'))) {
+          // É um array 2D de números -> gera como int[][]
+          const rowCount = val.length;
+          const colCount = val[0].length;
+          const rows = val.map(row => `{ ${row.join(', ')} }`).join(',\n    ');
+
+          header += `#define ${cleanKey}_ROWS ${rowCount}\n`;
+          header += `#define ${cleanKey}_COLS ${colCount}\n`;
+          header += `static const int ${cleanKey}[${cleanKey}_ROWS][${cleanKey}_COLS] = {\n    ${rows}\n};\n`;
+        } else if (Array.isArray(val) && val.every(v => typeof v === 'number')) {
+          // Array 1D de números -> gera como int[]
+          const values = val.join(', ');
+          header += `static const int ${cleanKey}[] = { ${values} };\n`;
+          header += `static const int ${cleanKey}_SIZE = sizeof(${cleanKey}) / sizeof(int);\n`;
         } else {
           // For arrays/objects, embed JSON string literal
           const encoded = JSON.stringify(val).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -110,7 +154,7 @@ export class ResourceBuilder {
     } else {
       // Could not parse JSON: embed raw JSON string so consumers can parse at runtime
       const escaped = rawJson.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
-      header += `static const char ${baseName}_JSON[] = \"${escaped}\";\n`;
+      header += `static const char ${baseName}_NO_PARSER[] = \"${escaped}\";\n`;
     }
 
     header += `\n#endif // ${guardName}\n`;
@@ -126,7 +170,7 @@ export class ResourceBuilder {
     header += `/* Master include for generated resource headers */\n\n`;
 
     for (const file of resourceFiles) {
-      const includeName = file.filename; // e.g. base_res.h
+      const includeName = file.resourceName; // e.g. base_res.h
       header += `#include \"${includeName}\"\n`;
     }
 
@@ -137,23 +181,36 @@ export class ResourceBuilder {
   /**
    * Generate a header file for graphics build/bn_regular_bg_items_*
    */
-  public async generateGraphicsHeader(buildDir: string): Promise<string> {
+  public async generateGraphicsHeader(buildDir: string): Promise<{headerFileContent: string, headersIncluded: string[]}> {
+    let graphicHeaderGeneratedByButano = [];
+
     const guardName = 'GENERATED_GRAPHICS_H';
-    let header = `#ifndef ${guardName}\n#define ${guardName}\n\n`;
-    header += `/* Master include for generated graphics headers */\n\n`;
+    let headerFileContent = `#ifndef ${guardName}\n#define ${guardName}\n\n`;
+    headerFileContent += `/* Master include for generated graphics headers */\n\n`;
 
     const entries = fs.readdirSync(buildDir, { withFileTypes: true });
+
+    const prefixes = [
+      "bn_regular_bg_items_",
+      "bn_sprite_items_",
+      "bn_palette_bitmap_items_",
+      "bn_direct_bitmap_items_"
+    ];
+    
     for (const entry of entries) {
-      if (entry.isFile() && entry.name.startsWith('bn_regular_bg_items_') && entry.name.endsWith('.h')) {
-        header += `#include "${entry.name}"\n`;
-      }
-      if (entry.isFile() && entry.name.startsWith('bn_sprite_items_') && entry.name.endsWith('.h')) {
-        header += `#include "${entry.name}"\n`;
+      if (!entry.isFile() || !entry.name.endsWith(".h")) continue;
+
+      if (prefixes.some(prefix => entry.name.startsWith(prefix))) {
+        headerFileContent += `#include "${entry.name}"\n`;
+        graphicHeaderGeneratedByButano.push(entry.name);
       }
     }
 
-    header += `\n#endif // ${guardName}\n`;
-    return header;
+    headerFileContent += `\n#endif // ${guardName}\n`;
+    return {
+      headerFileContent,
+      headersIncluded: graphicHeaderGeneratedByButano
+    };
   }
 
 
@@ -170,115 +227,123 @@ export class ResourceBuilder {
    /**
    * Write graphics header file
    */
-  public async writeGraphicsHeader(buildDir: string) {
-    const headerContent = await this.generateGraphicsHeader(buildDir);
+  public async writeGraphicsHeader(buildDir: string): Promise<string[]> {
+    const {headerFileContent, headersIncluded} = await this.generateGraphicsHeader(buildDir);
     const headerPath = path.join(this.includeDir, 'graphics_items.h');
-    fs.writeFileSync(headerPath, headerContent, 'utf8');
+    fs.writeFileSync(headerPath, headerFileContent, 'utf8');
     console.log('..: Generated graphics items header:', headerPath);
+    return headersIncluded;
   }
 
   /**
    * Generate resource registry C++ class
    */
-  public async generateResourceRegistryClass(resourceFiles: ResourceFile[]): Promise<void> {
+  public async generateResourceRegistryClass(resourceFiles: ResourceFile[], config: GameConfig ): Promise<void> {
     const tplPath = path.join(this.templateDir, 'src', 'resource_registry.cpp');
 
-    let registry_template = fs.readFileSync(tplPath, 'utf8');
-    let objects = "";
+    if (fs.existsSync(tplPath)) {
+      let registry_template = fs.readFileSync(tplPath, 'utf8');
+      // let objects = "";
+      let backgrounds = "";
+      let scenes = "";
+      let settings = "";
 
+      for (const file of resourceFiles) {
+        switch(file.jsonContent?._resourceType) {
+          case "background":
+            backgrounds += parseResourceFile(file) + "\n";
+            break;
+          case "scene":
+            scenes += parseResourceFile(file) + "\n";
+            break;
+          case "settings":
+            settings += parseResourceFile(file) + "\n";
+            break;
+        }
 
-    // for (const file of resourceFiles) {
-    //   const baseName = file.filename.replace('_res.h', '');
+        // objects += parseResourceFile(file) + "\n";
+      }
 
-    //   if (baseName === "settings") {
-    //     objects  += `    { "${baseName}", SETTINGS_STARTSCENEID, ResourceType::Settings, 0, nullptr, SETTINGS_STARTX, SETTINGS_STARTY, SETTINGS_STARTMOVESPEED, SETTINGS_STARTANIMSPEED, SETTINGS_STARTDIRECTION },\n`;
-    //   } else if (baseName === "castle_novo") {
-    //     objects  += `    { "${baseName}", CASTLE_NOVO_ID, ResourceType::Background, CASTLE_NOVO_AUTOCOLOR, CASTLE_NOVO_FILENAME, 0,0,0,0,nullptr },\n`;
-    //   } else {
-    //     // fallback genérico
-    //     objects  += `    { "${baseName}", nullptr, ResourceType::Unknown, 0, nullptr, 0,0,0,0,nullptr },\n`;
-    //   }
-    // }
+      registry_template = registry_template.replace("{{PROJECT_NAME}}", config.projectName);
+      registry_template = registry_template.replace("{{AUTHOR}}", config.authorName || '');
+      registry_template = registry_template.replace("{{VERSION}}", config.version || '1.0.0');
+      // registry_template = registry_template.replace("{{OBJECT_CONSTANTS}}", objects);
+      registry_template = registry_template.replace("{{BACKGROUNDS_CONSTANTS}}", backgrounds);
+      registry_template = registry_template.replace("{{SCENES_CONSTANTS}}", scenes);
+      registry_template = registry_template.replace("{{SETTINGS_CONSTANTS}}", settings);
 
-    for (const file of resourceFiles) {
-      objects += parseResourceFile(file) + "\n";
+      const registryPath = path.join(this.srcDir, 'resource_registry.cpp');
+      fs.writeFileSync(registryPath, registry_template, 'utf8');
+      console.log('..: Tempalte resource registry completed:', registryPath);
     }
-
-
-    // registry_template = registry_template.replace("{{PROJECT_NAME}}", projectName);
-    // registry_template = registry_template.replace("{{AUTHOR}}", author);
-    // registry_template = registry_template.replace("{{VERSION}}", version);
-    registry_template = registry_template.replace("{{OBJECT_CONSTANTS}}", objects);
-
-    const registryPath = path.join(this.srcDir, 'resource_registry.cpp');
-    fs.writeFileSync(registryPath, registry_template, 'utf8');
-    console.log('..: Tempalte resource registry completed:', registryPath);
   }
 }
 
 // Função auxiliar para analisar o conteúdo do arquivo de recurso e gerar a linha apropriada
 function parseResourceFile(file: ResourceFile): string {
-  const baseName = file.filename.replace('_res.h', '');
-  const upper = baseName.toUpperCase();
-  const content = file.content.toString('utf8');
+  const baseName = file.resourceName.replace('_res.h', '');
+  const baseNameUpper = baseName.toUpperCase();
+  const headerContent = file.headerContent.toString('utf8');
 
-  // Detecta tipo de recurso no header
-  let type = "Unknown";
-  const key = '__RESOURCETYPE';
-  const idx = content.indexOf(key);
-  if (idx !== -1) {
-    const after = content.slice(idx, idx + 256);
-    const quoteMatch = after.match(/=\s*(?:\\")?"([^"\\]*)"/);
-    if (quoteMatch) {
-      type = quoteMatch[1];
-    } else {
-      const fallback = after.match(/=\s*"([^"]+)"/);
-      if (fallback) type = fallback[1];
-    }
+  // Detecta tipo de recurso no jsonContent se disponível
+  let type = "unknown";
+  let name;
+  if(file.jsonContent?._resourceType) {
+    type = file.jsonContent._resourceType;
+    name = type;
+  }
+
+  if(file.jsonContent?.name !== undefined) {
+    name = file.jsonContent.name;
   }
 
   // Helper: verifica existência de símbolo (escapa metacaracteres para regex)
   const escapeForRegExp = (s: string) => s.replace(/[-\\/\\^$*+?.()|[\]{}]/g, '\\$&');
-  const hasSymbol = (sym: string) => new RegExp(`\\b${escapeForRegExp(sym)}\\b`).test(content);
+  const hasSymbol = (sym: string) => new RegExp(`\\b${escapeForRegExp(sym)}\\b`).test(headerContent);
 
   if (type === "settings") {
     const required = [
-      `${upper}_STARTSCENEID`,
-      `${upper}_STARTX`,
-      `${upper}_STARTY`,
-      `${upper}_STARTMOVESPEED`,
-      `${upper}_STARTANIMSPEED`,
-      `${upper}_STARTDIRECTION`,
+      `${baseNameUpper}_STARTSCENEID`,
+      `${baseNameUpper}_STARTX`,
+      `${baseNameUpper}_STARTY`,
+      `${baseNameUpper}_STARTMOVESPEED`,
+      `${baseNameUpper}_STARTANIMSPEED`,
+      `${baseNameUpper}_STARTDIRECTION`,
+      `${baseNameUpper}_COLORMODE`,
     ];
     if (required.every(hasSymbol)) {
-      // Format: { name, id, type, auto_color, filename, start_x, start_y, move_speed, anim_speed, direction, background_id }
-      return `    { "${baseName}", ${upper}_STARTSCENEID, ResourceType::Settings, 0, nullptr, ${upper}_STARTX, ${upper}_STARTY, ${upper}_STARTMOVESPEED, ${upper}_STARTANIMSPEED, ${upper}_STARTDIRECTION, nullptr },`;
+      // Format: { name, start_scene_id, start_x, start_y, move_speed, anim_speed, direction }
+      return ` { ResourceType::${type}, ${baseNameUpper}_STARTSCENEID, ${baseNameUpper}_STARTX, ${baseNameUpper}_STARTY, ${baseNameUpper}_STARTMOVESPEED, ${baseNameUpper}_STARTANIMSPEED, ${baseNameUpper}_STARTDIRECTION, ${baseNameUpper}_COLORMODE }`;
     }
   } else if (type === "background") {
     const required = [
-      `${upper}_ID`,
-      `${upper}_AUTOCOLOR`,
-      `${upper}_FILENAME`,
+      `${baseNameUpper}_ID`,
+      `${baseNameUpper}_AUTOCOLOR`,
+      `${baseNameUpper}_FILENAME`,
     ];
     if (required.every(hasSymbol)) {
-      // Format: { name, id, type, auto_color, filename, start_x, start_y, move_speed, anim_speed, direction, background_id }
-      return `    { "${baseName}", ${upper}_ID, ResourceType::Background, ${upper}_AUTOCOLOR, ${upper}_FILENAME, 0, 0, 0, 0, nullptr, nullptr },`;
+      // Format: { name, id, autocolor, name_const, filename, image_width, image_height, tile_colors }
+      return `    { ResourceType::${type}, ${baseNameUpper}_ID, ${baseNameUpper}_AUTOCOLOR, ${baseNameUpper}_NAME, ${baseNameUpper}_FILENAME, ${baseNameUpper}_IMAGEWIDTH, ${baseNameUpper}_IMAGEHEIGHT, ${baseNameUpper}_TILECOLORS },`;
     }
   } else if (type === "scene") {
     const required = [
-      `${upper}_ID`,
-      `${upper}_BACKGROUNDID`
+      `${baseNameUpper}_ID`,
+      `${baseNameUpper}_BACKGROUNDID`,
+      `${baseNameUpper}_SELECTEDTILESETID`,
+      `${baseNameUpper}_IMAGETYPE`,
     ];
     if (required.every(hasSymbol)) {
-      // Format: { name, id, type, auto_color, filename, start_x, start_y, move_speed, anim_speed, direction, background_id }
-      return `    { "${baseName}", ${upper}_ID, ResourceType::Scene, 0, nullptr, 0, 0, 0, 0, nullptr, ${upper}_BACKGROUNDID },`;
+      // Format: { name, id, name_const, background_id, selected_tileset_id, width, height, scene_type, image_type }
+      const tilemap = file.jsonContent?.tileMap ? `${baseNameUpper}_TILEMAP_ROWS, ${baseNameUpper}_TILEMAP_COLS, &${baseNameUpper}_TILEMAP[0][0]` : '0, 0, nullptr';
+
+      return `    { ResourceType::${type}, ${baseNameUpper}_ID, ${baseNameUpper}_NAME, ${baseNameUpper}_BACKGROUNDID, ${baseNameUpper}_SELECTEDTILESETID, ${baseNameUpper}_WIDTH, ${baseNameUpper}_HEIGHT, ${baseNameUpper}_SCENETYPE, ${baseNameUpper}_IMAGETYPE, ${tilemap} },`;
     } else {
-      return `    { "${baseName}", ${upper}_ID, ResourceType::Scene, 0, nullptr, 0, 0, 0, 0, nullptr, nullptr },`;
+      return `    { ResourceType::${type}, ${baseNameUpper}_ID, "${name}", 0, 0, 0, 0, ${baseNameUpper}_SCENETYPE, 0, 0, 0, nullptr },`;
     }
   }
 
   // Fallback genérico
-  return `    { "${baseName}", nullptr, ResourceType::Unknown, 0, nullptr, 0, 0, 0, 0, nullptr, nullptr },`;
+  return ``;
 }
 
 export default ResourceBuilder;

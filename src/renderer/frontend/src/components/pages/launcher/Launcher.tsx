@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Layout, Menu, Image, message, App as AntDApp, Spin } from 'antd';
 import {
@@ -39,7 +39,7 @@ const Launcher = () => {
 
   const [lastTabSelected, setLastTabSelected] = useState<string | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const loadPreferences = async () => {
       try {
         await window.electronAPI.loadPreferences().then((preferencias: { recentProjects?: Project[] }) => {

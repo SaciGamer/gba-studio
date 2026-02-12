@@ -647,7 +647,7 @@ ipcMain.on('run-live', async (event) => {
     const tempBuild = transRes.outputDir;
 
     // Notify renderer that transcode finished and compilation will start
-    try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: 'Transcodificação concluída. Iniciando compilação...' })); } catch (e) {}
+    try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: '>> Transcodificação concluída.' })); } catch (e) {}
 
     // Compile with new parameter-based interface (use saved build config)
     const prefsRunLive = getPreferences();
@@ -694,7 +694,7 @@ ipcMain.on('compile-project', async (event)  => {
     // Transcode project files into path build before compiling
     try {
       // Notify renderer that transcode is starting
-      try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: 'Iniciando transcodificação do projeto...' })); } catch (e) {}
+      try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: '>> Iniciando transcodificação do projeto...' })); } catch (e) {}
 
       // Transcode with new parameter-based interface
       const transRes: any = await transcodeProject({
@@ -704,7 +704,7 @@ ipcMain.on('compile-project', async (event)  => {
 
       // Compile using path build
       const tempBuild = transRes.outputDir;
-      try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: 'Transcodificação concluída. Iniciando compilação...' })); } catch (e) {}
+      try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: '>> Transcodificação concluída.' })); } catch (e) {}
 
       // Compile with new parameter-based interface (use saved build config)
       {
@@ -754,7 +754,7 @@ ipcMain.handle('compile-project-demo', async (event, projectPath) => {
       saveEvents.once('saved', () => { clearTimeout(timeout); resolve(true); });
     });
   console.log('..: compile-project-demo for', projectPath);
-  try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: 'Iniciando compilação demo...' })); } catch (e) {}
+  try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: '>> Iniciando compilação demo...' })); } catch (e) {}
     
     // Resolve temp build path: use preference if set, otherwise use OS tmpdir
     const prefs = getPreferences();
@@ -800,7 +800,7 @@ ipcMain.handle('compile-project-demo', async (event, projectPath) => {
     }
 
     // Now run compileGBA which will pick up repo gba-project
-    try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: 'Iniciando compilação demo (repo gba-project)...' })); } catch (e) {}
+    try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: '>> Iniciando compilação demo (repo gba-project)...' })); } catch (e) {}
     const buildCfg = getBuildConfig();
     const result = await compileGBA({
       buildDir: path.join(__dirname, '..', '..', 'gba-project'),
@@ -952,7 +952,7 @@ ipcMain.handle('get-versions', () => ({
 }));
 
 // Recebendo o arquivo do frontend
-ipcMain.handle('save-image', async (event, { filePath, fileName, data }) => {
+ipcMain.handle('save-image', async (event, { filePath, filename, data }) => {
   try {
     const pathToSave = filePath || directoryPathProject;
     const uploadDir = path.join(pathToSave, 'assets', 'backgrounds'); // Diretório de destino
@@ -960,14 +960,14 @@ ipcMain.handle('save-image', async (event, { filePath, fileName, data }) => {
       fs.mkdirSync(uploadDir);
     }
 
-    const destinationPath = path.join(uploadDir, fileName);
+    const destinationPath = path.join(uploadDir, filename);
 
     // Escreve o arquivo no disco
     fs.writeFileSync(destinationPath, data, 'base64');
     return { status: 'success', message: destinationPath };
   } catch (error) {
     console.error('Error saving image:', error);
-    return { status: 'error', message: 'Error saving image.' };
+    return { status: 'error', message: '>> Error saving image.' };
   }
 });
 
@@ -976,7 +976,7 @@ ipcMain.handle('fetch-images', async (event, folderName) => {
   const assetsPath = path.join(directoryPathProject, 'assets', folderName);
 
   if (!fs.existsSync(assetsPath)) {
-    return { status: 'error', message: 'Directory not found.' };
+    return { status: 'error', message: '>> Directory not found.' };
   }
 
   // const targetUserDir = createUserPathTargetDir(folderName);
