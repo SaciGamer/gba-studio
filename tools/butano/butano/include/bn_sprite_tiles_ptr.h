@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -254,6 +254,12 @@ public:
      * @brief Uploads the referenced tiles to VRAM again to make visible the possible changes in them.
      */
     void reload_tiles_ref();
+
+    /**
+     * @brief Returns the allocated memory in VRAM
+     * if this sprite_tiles_ptr was created with allocate or allocate_optional; bn::nullopt otherwise.
+     */
+    [[nodiscard]] optional<span<const tile>> vram() const;
 
     /**
      * @brief Returns the allocated memory in VRAM

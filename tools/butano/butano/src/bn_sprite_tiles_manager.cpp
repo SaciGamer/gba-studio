@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -32,7 +32,6 @@ namespace
 {
     static_assert(BN_CFG_SPRITE_TILES_MAX_ITEMS > 0 &&
                   BN_CFG_SPRITE_TILES_MAX_ITEMS <= hw::sprite_tiles::tiles_count());
-    static_assert(power_of_two(BN_CFG_SPRITE_TILES_MAX_ITEMS));
 
 
     #if BN_CFG_LOG_ENABLED
@@ -44,6 +43,17 @@ namespace
 
     constexpr int max_items = BN_CFG_SPRITE_TILES_MAX_ITEMS;
     constexpr int max_list_items = max_items + 2;
+    constexpr int max_map_items = [](){
+        int minimum = max_items * 2;
+        int result = 2;
+
+        while(result < minimum)
+        {
+            result *= 2;
+        }
+
+        return result;
+    }();
 
 
     enum class status_type
@@ -266,7 +276,7 @@ namespace
 
     public:
         items_list items;
-        unordered_map<const tile*, int, max_items * 2, hasher> items_map;
+        unordered_map<const tile*, int, max_map_items, hasher> items_map;
         vector<uint16_t, max_items> free_items;
         vector<uint16_t, max_items> to_remove_items;
         vector<uint16_t, max_items> to_commit_uncompressed_items;
@@ -435,18 +445,13 @@ namespace
         return tiles_count < data_ref().items.item(item_index).tiles_count;
     };
 
-    void _insert_free_item(int id, ivector<uint16_t>::iterator free_items_last)
+    void _insert_free_item(int id)
     {
         static_data& data = data_ref();
         const item_type& item = data.items.item(id);
-        auto free_items_it = upper_bound(data.free_items.begin(), free_items_last, item.tiles_count,
+        auto free_items_it = upper_bound(data.free_items.begin(), data.free_items.end(), item.tiles_count,
                                          tiles_count_upper_bound_comparator);
         data.free_items.insert(free_items_it, uint16_t(id));
-    }
-
-    void _insert_free_item(int id)
-    {
-        _insert_free_item(id, data_ref().free_items.end());
     }
 
     void _erase_free_item(int id)
@@ -625,10 +630,10 @@ namespace
             int id, const tile* tiles_data, compression_type compression, int tiles_count, bool delay_commit)
     {
         static_data& data = data_ref();
-        item_type& item = data.items.item(id);
-        int new_item_tiles_count = int(item.tiles_count) - tiles_count;
+        item_type* item = &data.items.item(id);
+        int new_item_tiles_count = int(item->tiles_count) - tiles_count;
 
-        switch(item.status())
+        switch(item->status())
         {
 
         case status_type::FREE:
@@ -640,53 +645,48 @@ namespace
             break;
 
         case status_type::TO_REMOVE:
-            item.commit_if_recovered = false;
-            _erase_items_map_item(item.data);
+            item->commit_if_recovered = false;
+            _erase_items_map_item(item->data);
             data.to_remove_tiles_count -= tiles_count;
             break;
 
         default:
-            BN_ERROR("Invalid item status: ", int(item.status()));
+            BN_ERROR("Invalid item status: ", int(item->status()));
             break;
         }
 
-        item.data = tiles_data;
-        item.set_compression(compression);
-        item.tiles_count = uint16_t(tiles_count);
-        item.usages = 1;
-        item.set_status(status_type::USED);
-
-        if(tiles_data)
-        {
-            if(delay_commit)
-            {
-                _insert_to_commit_item(id, item);
-            }
-            else
-            {
-                _hw_commit(tiles_data, compression, int(item.start_tile), tiles_count);
-            }
-        }
-
-        int new_free_item_id;
-
-        if(new_item_tiles_count)
+        if(new_item_tiles_count) [[likely]]
         {
             BN_BASIC_ASSERT(! data.items.full(), "No more sprite tiles items available");
 
             item_type new_item;
-            new_item.start_tile = item.start_tile + item.tiles_count;
-            new_item.tiles_count = uint16_t(new_item_tiles_count);
+            new_item.start_tile = item->start_tile + uint16_t(new_item_tiles_count);
+            item->tiles_count = uint16_t(new_item_tiles_count);
 
-            auto new_item_iterator = data.items.insert(item.next_index, new_item);
-            new_free_item_id = new_item_iterator.id();
+            auto new_item_iterator = data.items.insert(item->next_index, new_item);
+            id = new_item_iterator.id();
+            item = &(*new_item_iterator);
         }
-        else
+
+        item->data = tiles_data;
+        item->set_compression(compression);
+        item->tiles_count = uint16_t(tiles_count);
+        item->usages = 1;
+        item->set_status(status_type::USED);
+
+        if(tiles_data)
         {
-            new_free_item_id = -1;
+            if(delay_commit) [[unlikely]]
+            {
+                _insert_to_commit_item(id, *item);
+            }
+            else
+            {
+                _hw_commit(tiles_data, compression, int(item->start_tile), tiles_count);
+            }
         }
 
-        return new_free_item_id;
+        return id;
     }
 
     [[nodiscard]] int _create_impl(const tile* tiles_data, compression_type compression, int tiles_count)
@@ -710,15 +710,7 @@ namespace
                 if(int(item.tiles_count) == tiles_count)
                 {
                     data.to_remove_items.erase(to_remove_items_it);
-
-                    int new_free_item_id = _create_item(id, tiles_data, compression, tiles_count, true);
-
-                    if(new_free_item_id >= 0) [[likely]]
-                    {
-                        _insert_free_item(new_free_item_id);
-                    }
-
-                    return id;
+                    return _create_item(id, tiles_data, compression, tiles_count, true);
                 }
             }
         }
@@ -732,16 +724,15 @@ namespace
             if(free_items_it != free_items_end)
             {
                 int id = *free_items_it;
-                int new_free_item_id = _create_item(id, tiles_data, compression, tiles_count, data.delay_commit);
+                int new_item_id = _create_item(id, tiles_data, compression, tiles_count, data.delay_commit);
+                data.free_items.erase(free_items_it);
 
-                if(new_free_item_id >= 0) [[likely]]
+                if(id != new_item_id) [[likely]]
                 {
-                    _insert_free_item(new_free_item_id, free_items_it);
-                    ++free_items_it;
+                    _insert_free_item(id);
                 }
 
-                data.free_items.erase(free_items_it);
-                return id;
+                return new_item_id;
             }
         }
 
@@ -773,16 +764,15 @@ namespace
             if(free_items_it != free_items_end)
             {
                 int id = *free_items_it;
-                int new_free_item_id = _create_item(id, nullptr, compression_type::NONE, tiles_count, false);
+                int new_item_id = _create_item(id, nullptr, compression_type::NONE, tiles_count, false);
+                data.free_items.erase(free_items_it);
 
-                if(new_free_item_id >= 0) [[likely]]
+                if(id != new_item_id) [[likely]]
                 {
-                    _insert_free_item(new_free_item_id, free_items_it);
-                    ++free_items_it;
+                    _insert_free_item(id);
                 }
 
-                data.free_items.erase(free_items_it);
-                return id;
+                return new_item_id;
             }
         }
 
@@ -885,7 +875,7 @@ int create(const span<const tile>& tiles_ref, compression_type compression)
     {
         _insert_items_map_item(tiles_data, result);
 
-        BN_SPRITE_TILES_LOG("CREATED. start_tile: ", data.items.item(result).start_tile);
+        BN_SPRITE_TILES_LOG("CREATED. start_tile: ", data_ref().items.item(result).start_tile);
         BN_SPRITE_TILES_LOG_STATUS();
     }
     else
@@ -917,7 +907,7 @@ int allocate(int tiles_count, bpp_mode bpp)
 
     if(result >= 0)
     {
-        BN_SPRITE_TILES_LOG("ALLOCATED. start_tile: ", data.items.item(result).start_tile);
+        BN_SPRITE_TILES_LOG("ALLOCATED. start_tile: ", data_ref().items.item(result).start_tile);
         BN_SPRITE_TILES_LOG_STATUS();
     }
     else
@@ -957,7 +947,7 @@ int create_optional(const span<const tile>& tiles_ref, compression_type compress
     {
         _insert_items_map_item(tiles_data, result);
 
-        BN_SPRITE_TILES_LOG("CREATED. start_tile: ", data.items.item(result).start_tile);
+        BN_SPRITE_TILES_LOG("CREATED. start_tile: ", data_ref().items.item(result).start_tile);
         BN_SPRITE_TILES_LOG_STATUS();
     }
     else
@@ -979,7 +969,7 @@ int allocate_optional(int tiles_count, bpp_mode bpp)
 
     if(result >= 0)
     {
-        BN_SPRITE_TILES_LOG("ALLOCATED. start_tile: ", data.items.item(result).start_tile);
+        BN_SPRITE_TILES_LOG("ALLOCATED. start_tile: ", data_ref().items.item(result).start_tile);
         BN_SPRITE_TILES_LOG_STATUS();
     }
     else
@@ -988,6 +978,89 @@ int allocate_optional(int tiles_count, bpp_mode bpp)
     }
 
     return result;
+}
+
+int allocate_first_half(bool optional)
+{
+    if(optional)
+    {
+        BN_SPRITE_TILES_LOG("sprite_tiles_manager - ALLOCATE FIRST HALF OPTIONAL");
+    }
+    else
+    {
+        BN_SPRITE_TILES_LOG("sprite_tiles_manager - ALLOCATE FIRST HALF");
+    }
+
+    static_data& data = data_ref();
+    int id = -1;
+
+    if(! data.delay_commit)
+    {
+        auto item_it = data.items.begin();
+        item_type& item = *item_it;
+
+        if(item.status() == status_type::FREE)
+        {
+            int tiles_count = hw::sprite_tiles::tiles_count() / 2;
+            int new_item_tiles_count = int(item.tiles_count) - tiles_count;
+
+            if(new_item_tiles_count >= 0)
+            {
+                id = item_it.id();
+
+                for(auto free_items_it = data.free_items.begin(), free_items_end = data.free_items.end();
+                        free_items_it != free_items_end; ++free_items_it)
+                {
+                    if(*free_items_it == id)
+                    {
+                        data.free_items.erase(free_items_it);
+                        break;
+                    }
+                }
+
+                data.free_tiles_count -= tiles_count;
+
+                item.data = nullptr;
+                item.set_compression(compression_type::NONE);
+                item.tiles_count = uint16_t(tiles_count);
+                item.usages = 1;
+                item.set_status(status_type::USED);
+
+                if(new_item_tiles_count)
+                {
+                    item_type new_item;
+                    new_item.start_tile = item.tiles_count;
+                    new_item.tiles_count = uint16_t(new_item_tiles_count);
+
+                    auto new_item_iterator = data.items.insert(item.next_index, new_item);
+                    _insert_free_item(new_item_iterator.id());
+                }
+            }
+        }
+    }
+
+    if(id >= 0)
+    {
+        BN_SPRITE_TILES_LOG("ALLOCATED: ", data.items.item(id).start_tile);
+        BN_SPRITE_TILES_LOG_STATUS();
+    }
+    else
+    {
+        BN_SPRITE_TILES_LOG("NOT ALLOCATED");
+
+        if(! optional)
+        {
+            #if BN_CFG_LOG_ENABLED
+                log_status();
+            #endif
+
+            BN_ERROR("Sprite tiles first half allocate failed.",
+                     "\n\nThere's no more available VRAM.",
+                     _status_log_message);
+        }
+    }
+
+    return id;
 }
 
 void increase_usages(int id)

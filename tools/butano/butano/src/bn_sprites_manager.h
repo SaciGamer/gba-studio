@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -184,6 +184,10 @@ namespace sprites_manager
     [[nodiscard]] sprite_third_attributes third_attributes(id_type id);
 
     void set_third_attributes(id_type id, const sprite_third_attributes& third_attributes);
+
+    [[nodiscard]] bool bg_sorting_enabled();
+
+    void set_bg_sorting_enabled(bool bg_sorting_enabled);
 
     int reserved_handles_count();
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -161,6 +161,19 @@ void sprite_tiles_ptr::set_tiles_ref(const sprite_tiles_item& tiles_item, int gr
 void sprite_tiles_ptr::reload_tiles_ref()
 {
     sprite_tiles_manager::reload_tiles_ref(_handle);
+}
+
+optional<span<const tile>> sprite_tiles_ptr::vram() const
+{
+    optional<span<tile>> vram_opt = sprite_tiles_manager::vram(_handle);
+    optional<span<const tile>> result;
+
+    if(span<tile>* vram = vram_opt.get())
+    {
+        result = span<const tile>(vram->data(), vram->size());
+    }
+
+    return result;
 }
 
 optional<span<tile>> sprite_tiles_ptr::vram()

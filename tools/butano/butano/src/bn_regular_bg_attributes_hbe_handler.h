@@ -1,11 +1,12 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
 #ifndef BN_REGULAR_BG_ATTRIBUTES_HBE_HANDLER_H
 #define BN_REGULAR_BG_ATTRIBUTES_HBE_HANDLER_H
 
+#include "bn_size.h"
 #include "bn_regular_bg_tiles_ptr.h"
 #include "bn_regular_bg_attributes.h"
 #include "bn_bgs_manager.h"

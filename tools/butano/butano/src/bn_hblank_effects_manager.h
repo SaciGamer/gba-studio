@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -22,6 +22,7 @@ namespace bn::hblank_effects_manager
         RECT_WINDOW_VERTICAL_BOUNDARIES,
         REGULAR_BG_ATTRIBUTES,
         AFFINE_BG_ATTRIBUTES,
+        BITMAP_BG_ATTRIBUTES,
         REGULAR_BG_HORIZONTAL_POSITION,
         AFFINE_BG_PIVOT_HORIZONTAL_POSITION,
         REGULAR_BG_VERTICAL_POSITION,

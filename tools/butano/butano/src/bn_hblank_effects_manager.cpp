@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -18,6 +18,7 @@
 #include "bn_rect_window_vertical_boundaries_hbe_handler.h"
 #include "bn_regular_bg_attributes_hbe_handler.h"
 #include "bn_affine_bg_attributes_hbe_handler.h"
+#include "bn_bitmap_bg_attributes_hbe_handler.h"
 #include "bn_regular_bg_horizontal_position_hbe_handler.h"
 #include "bn_affine_bg_pivot_horizontal_position_hbe_handler.h"
 #include "bn_regular_bg_vertical_position_hbe_handler.h"
@@ -61,6 +62,33 @@
 #include "bn_affine_bg_dx_register_hbe_ptr.cpp.h"
 #include "bn_affine_bg_dy_register_hbe_ptr.cpp.h"
 #include "bn_affine_bg_mat_attributes_hbe_ptr.cpp.h"
+#include "bn_palette_bitmap_bg_attributes_hbe_ptr.cpp.h"
+#include "bn_palette_bitmap_bg_pivot_position_hbe_ptr.cpp.h"
+#include "bn_palette_bitmap_bg_pa_register_hbe_ptr.cpp.h"
+#include "bn_palette_bitmap_bg_pb_register_hbe_ptr.cpp.h"
+#include "bn_palette_bitmap_bg_pc_register_hbe_ptr.cpp.h"
+#include "bn_palette_bitmap_bg_pd_register_hbe_ptr.cpp.h"
+#include "bn_palette_bitmap_bg_dx_register_hbe_ptr.cpp.h"
+#include "bn_palette_bitmap_bg_dy_register_hbe_ptr.cpp.h"
+#include "bn_palette_bitmap_bg_mat_attributes_hbe_ptr.cpp.h"
+#include "bn_sp_direct_bitmap_bg_attributes_hbe_ptr.cpp.h"
+#include "bn_sp_direct_bitmap_bg_pivot_position_hbe_ptr.cpp.h"
+#include "bn_sp_direct_bitmap_bg_pa_register_hbe_ptr.cpp.h"
+#include "bn_sp_direct_bitmap_bg_pb_register_hbe_ptr.cpp.h"
+#include "bn_sp_direct_bitmap_bg_pc_register_hbe_ptr.cpp.h"
+#include "bn_sp_direct_bitmap_bg_pd_register_hbe_ptr.cpp.h"
+#include "bn_sp_direct_bitmap_bg_dx_register_hbe_ptr.cpp.h"
+#include "bn_sp_direct_bitmap_bg_dy_register_hbe_ptr.cpp.h"
+#include "bn_sp_direct_bitmap_bg_mat_attributes_hbe_ptr.cpp.h"
+#include "bn_dp_direct_bitmap_bg_attributes_hbe_ptr.cpp.h"
+#include "bn_dp_direct_bitmap_bg_pivot_position_hbe_ptr.cpp.h"
+#include "bn_dp_direct_bitmap_bg_pa_register_hbe_ptr.cpp.h"
+#include "bn_dp_direct_bitmap_bg_pb_register_hbe_ptr.cpp.h"
+#include "bn_dp_direct_bitmap_bg_pc_register_hbe_ptr.cpp.h"
+#include "bn_dp_direct_bitmap_bg_pd_register_hbe_ptr.cpp.h"
+#include "bn_dp_direct_bitmap_bg_dx_register_hbe_ptr.cpp.h"
+#include "bn_dp_direct_bitmap_bg_dy_register_hbe_ptr.cpp.h"
+#include "bn_dp_direct_bitmap_bg_mat_attributes_hbe_ptr.cpp.h"
 #include "bn_sprite_affine_mat_attributes_hbe_ptr.cpp.h"
 #include "bn_sprite_affine_mat_pa_register_hbe_ptr.cpp.h"
 #include "bn_sprite_affine_mat_pb_register_hbe_ptr.cpp.h"
@@ -120,6 +148,9 @@ namespace
             return false;
 
         case handler_type::AFFINE_BG_ATTRIBUTES:
+            return false;
+
+        case handler_type::BITMAP_BG_ATTRIBUTES:
             return false;
 
         case handler_type::REGULAR_BG_HORIZONTAL_POSITION:
@@ -301,6 +332,10 @@ namespace
                 affine_bg_attributes_hbe_handler::setup_target(target_id, target_last_value);
                 break;
 
+            case handler_type::BITMAP_BG_ATTRIBUTES:
+                bitmap_bg_attributes_hbe_handler::setup_target(target_id, target_last_value);
+                break;
+
             case handler_type::REGULAR_BG_HORIZONTAL_POSITION:
                 regular_bg_horizontal_position_hbe_handler::setup_target(target_id, target_last_value);
                 break;
@@ -468,6 +503,9 @@ namespace
 
             case handler_type::AFFINE_BG_ATTRIBUTES:
                 return _check_update_impl<affine_bg_attributes_hbe_handler>(updated);
+
+            case handler_type::BITMAP_BG_ATTRIBUTES:
+                return _check_update_impl<bitmap_bg_attributes_hbe_handler>(updated);
 
             case handler_type::REGULAR_BG_HORIZONTAL_POSITION:
                 return _check_update_impl<regular_bg_horizontal_position_hbe_handler>(updated);
@@ -644,6 +682,10 @@ namespace
                 affine_bg_attributes_hbe_handler::show(target_id);
                 break;
 
+            case handler_type::BITMAP_BG_ATTRIBUTES:
+                bitmap_bg_attributes_hbe_handler::show(target_id);
+                break;
+
             case handler_type::REGULAR_BG_HORIZONTAL_POSITION:
                 regular_bg_horizontal_position_hbe_handler::show(target_id);
                 break;
@@ -817,6 +859,10 @@ namespace
 
             case handler_type::AFFINE_BG_ATTRIBUTES:
                 affine_bg_attributes_hbe_handler::cleanup(target_id);
+                break;
+
+            case handler_type::BITMAP_BG_ATTRIBUTES:
+                bitmap_bg_attributes_hbe_handler::cleanup(target_id);
                 break;
 
             case handler_type::REGULAR_BG_HORIZONTAL_POSITION:

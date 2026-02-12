@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -25,10 +25,7 @@ namespace bn
 class affine_bg_ptr;
 
 /**
- * @brief Creates affine_bg_map_ptr objects with custom attributes.
- *
- * If some of the attributes of the affine background to create differs from the default ones,
- * using this class improves performance.
+ * @brief Creates affine_bg_ptr objects with custom attributes.
  *
  * @ingroup affine_bg
  */
@@ -821,4 +818,3 @@ private:
 }
 
 #endif
-

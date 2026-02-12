@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -167,22 +167,22 @@ namespace bn::core
     [[nodiscard]] int last_missed_frames();
 
     /**
-     * @brief Returns the user function called in core::update.
+     * @brief Returns the user function called in core::update, before V-Blank.
      */
     [[nodiscard]] update_callback_type update_callback();
 
     /**
-     * @brief Sets the user function called in core::update.
+     * @brief Sets the user function called in core::update, before V-Blank.
      */
     void set_update_callback(update_callback_type update_callback);
 
     /**
-     * @brief Returns the user function called in V-Blank.
+     * @brief Returns the user function called in core::update, during V-Blank.
      */
     [[nodiscard]] vblank_callback_type vblank_callback();
 
     /**
-     * @brief Sets the user function called in V-Blank.
+     * @brief Sets the user function called in core::update, during V-Blank.
      */
     void set_vblank_callback(vblank_callback_type vblank_callback);
 

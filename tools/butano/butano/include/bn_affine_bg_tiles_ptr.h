@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025 Gustavo Valiente gustavo.valiente@protonmail.com
+ * Copyright (c) 2020-2026 Gustavo Valiente gustavo.valiente@protonmail.com
  * zlib License, see LICENSE file.
  */
 
@@ -53,6 +53,9 @@ public:
      * @brief Searches for an affine_bg_tiles_ptr which references the given tiles.
      * If it is not found, it creates an affine_bg_tiles_ptr which references them.
      *
+     * Tiles offset is allowed to improve VRAM usage if bg_tiles::allow_offset says so.
+     * You should probably disable it if a dynamic map is going to use these tiles.
+     *
      * The tiles are not copied but referenced,
      * so they should outlive the affine_bg_tiles_ptr to avoid dangling references.
      *
@@ -61,6 +64,21 @@ public:
      * otherwise it returns an affine_bg_tiles_ptr which references them.
      */
     [[nodiscard]] static affine_bg_tiles_ptr create(const affine_bg_tiles_item& tiles_item);
+
+    /**
+     * @brief Searches for an affine_bg_tiles_ptr which references the given tiles.
+     * If it is not found, it creates an affine_bg_tiles_ptr which references them.
+     *
+     * The tiles are not copied but referenced,
+     * so they should outlive the affine_bg_tiles_ptr to avoid dangling references.
+     *
+     * @param tiles_item affine_bg_tiles_item which references the tiles to search or handle.
+     * @param allow_offset Indicates if tiles offset is allowed to improve VRAM usage.
+     * You should probably disable it if a dynamic map is going to use these tiles.
+     * @return affine_bg_tiles_ptr which references tiles_item.graphics_tiles_ref() if it has been found;
+     * otherwise it returns an affine_bg_tiles_ptr which references them.
+     */
+    [[nodiscard]] static affine_bg_tiles_ptr create(const affine_bg_tiles_item& tiles_item, bool allow_offset);
 
     /// @cond DO_NOT_DOCUMENT
 
@@ -74,14 +92,30 @@ public:
 
     /**
      * @brief Creates an affine_bg_tiles_ptr which references a chunk of VRAM tiles not visible on the screen.
+     *
+     * Tiles offset is allowed to improve VRAM usage if bg_tiles::allow_offset says so.
+     * You should probably disable it if a dynamic map is going to use these tiles.
+     *
      * @param tiles_count Number of tiles to allocate.
      * @return affine_bg_tiles_ptr which references a chunk of VRAM tiles not visible on the screen.
      */
     [[nodiscard]] static affine_bg_tiles_ptr allocate(int tiles_count);
 
     /**
+     * @brief Creates an affine_bg_tiles_ptr which references a chunk of VRAM tiles not visible on the screen.
+     * @param tiles_count Number of tiles to allocate.
+     * @param allow_offset Indicates if tiles offset is allowed to improve VRAM usage.
+     * You should probably disable it if a dynamic map is going to use these tiles.
+     * @return affine_bg_tiles_ptr which references a chunk of VRAM tiles not visible on the screen.
+     */
+    [[nodiscard]] static affine_bg_tiles_ptr allocate(int tiles_count, bool allow_offset);
+
+    /**
      * @brief Searches for an affine_bg_tiles_ptr which references the given tiles.
      * If it is not found, it creates an affine_bg_tiles_ptr which references them.
+     *
+     * Tiles offset is allowed to improve VRAM usage if bg_tiles::allow_offset says so.
+     * You should probably disable it if a dynamic map is going to use these tiles.
      *
      * The tiles are not copied but referenced,
      * so they should outlive the affine_bg_tiles_ptr to avoid dangling references.
@@ -92,6 +126,23 @@ public:
      * bn::nullopt otherwise.
      */
     [[nodiscard]] static optional<affine_bg_tiles_ptr> create_optional(const affine_bg_tiles_item& tiles_item);
+
+    /**
+     * @brief Searches for an affine_bg_tiles_ptr which references the given tiles.
+     * If it is not found, it creates an affine_bg_tiles_ptr which references them.
+     *
+     * The tiles are not copied but referenced,
+     * so they should outlive the affine_bg_tiles_ptr to avoid dangling references.
+     *
+     * @param tiles_item affine_bg_tiles_item which references the tiles to search or handle.
+     * @param allow_offset Indicates if tiles offset is allowed to improve VRAM usage.
+     * You should probably disable it if a dynamic map is going to use these tiles.
+     * @return affine_bg_tiles_ptr which references tiles_item.graphics_tiles_ref() if it has been found;
+     * otherwise it returns an affine_bg_tiles_ptr which references them if it could be allocated;
+     * bn::nullopt otherwise.
+     */
+    [[nodiscard]] static optional<affine_bg_tiles_ptr> create_optional(
+            const affine_bg_tiles_item& tiles_item, bool allow_offset);
 
     /// @cond DO_NOT_DOCUMENT
 
@@ -105,11 +156,25 @@ public:
 
     /**
      * @brief Creates an affine_bg_tiles_ptr which references a chunk of VRAM tiles not visible on the screen.
+     *
+     * Tiles offset is allowed to improve VRAM usage if bg_tiles::allow_offset says so.
+     * You should probably disable it if a dynamic map is going to use these tiles.
+     *
      * @param tiles_count Number of tiles to allocate.
      * @return affine_bg_tiles_ptr which references a chunk of VRAM tiles
      * not visible on the screen if it could be allocated; bn::nullopt otherwise.
      */
     [[nodiscard]] static optional<affine_bg_tiles_ptr> allocate_optional(int tiles_count);
+
+    /**
+     * @brief Creates an affine_bg_tiles_ptr which references a chunk of VRAM tiles not visible on the screen.
+     * @param tiles_count Number of tiles to allocate.
+     * @param allow_offset Indicates if tiles offset is allowed to improve VRAM usage.
+     * You should probably disable it if a dynamic map is going to use these tiles.
+     * @return affine_bg_tiles_ptr which references a chunk of VRAM tiles
+     * not visible on the screen if it could be allocated; bn::nullopt otherwise.
+     */
+    [[nodiscard]] static optional<affine_bg_tiles_ptr> allocate_optional(int tiles_count, bool allow_offset);
 
     /**
      * @brief Copy constructor.
@@ -166,6 +231,11 @@ public:
     [[nodiscard]] int tiles_count() const;
 
     /**
+     * @brief Returns how many tiles to offset in the cells of a map using these tiles before writing them in VRAM.
+     */
+    [[nodiscard]] int offset() const;
+
+    /**
      * @brief Returns the compression of the referenced tiles.
      */
     [[nodiscard]] compression_type compression() const;
@@ -193,6 +263,24 @@ public:
      * @brief Uploads the referenced tiles to VRAM again to make visible the possible changes in them.
      */
     void reload_tiles_ref();
+
+    /**
+     * @brief Overwrites a single tile.
+     *
+     * Remember that the tiles are not copied but referenced,
+     * so they should outlive the affine_bg_tiles_ptr to avoid dangling references.
+     *
+     * @param tile_index Index of the tile to overwrite.
+     * @param tiles_ref Reference to the new tile data. It must point to two tiles, because an affine tile
+     * counts as two bn::tile objects.
+     */
+    void overwrite_tile(int tile_index, const tile& tiles_ref);
+
+    /**
+     * @brief Returns the allocated memory in VRAM
+     * if this affine_bg_tiles_ptr was created with allocate or allocate_optional; bn::nullopt otherwise.
+     */
+    [[nodiscard]] optional<span<const tile>> vram() const;
 
     /**
      * @brief Returns the allocated memory in VRAM
