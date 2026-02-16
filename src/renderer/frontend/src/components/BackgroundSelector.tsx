@@ -7,7 +7,7 @@ import type { UploadProps } from 'antd';
 import type { RcFile } from 'antd/es/upload/interface';
 import { useBackgroundContext, useElementContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
 import { IBackgroundSettings } from '@/providers/contexts/interfaces/IBackgroundElement';
-import { IBackgroundElement, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
+import { ETypeScene, IBackgroundElement, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
 
 const { useToken } = theme;
 
@@ -25,6 +25,9 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
   const { backgrounds, setBackgrounds, backgroundsRef } = useBackgroundContext();
   const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
   const elementSelected = scenes.find(s => s.id === selectedElementId);
+  const isHDScene = elementSelected?.sceneType === ETypeScene.LOGO || elementSelected?.sceneType === ETypeScene.POINTNCLICK;
+  const backgroundsAvaible = backgroundsRef.current.filter(b => !b._deleted && b.hd === isHDScene);
+
   // const [listBackgrounds, setListBackgrounds] = useState<IBackgroundSettings[]>([]);
 
   return (
@@ -67,20 +70,24 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
         <em>No background</em>
       </Select.Option>
 
-      {[...backgroundsRef.current]
-        .filter(b => !b._deleted)
-        .sort((a, b) => a.name.localeCompare(b.name)).map((background) => (
-          <Select.Option key={background.id} value={background.id} label={background.name}>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <img
-                src={`${settingUtils.localImagePath}/${background?.filename}`}
-                alt={background.name}
-                style={{ width: 24, height: 24, marginRight: 8 }}
-              />
-              {background.name}
-            </div>
-          </Select.Option>
-        ))}
+      {[...backgroundsAvaible]
+        .map(background => {
+          const path = isHDScene ? settingUtils.localImagePathHD : settingUtils.localImagePath;
+
+          return (
+            <Select.Option key={background.id} value={background.id} label={background.name}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <img
+                  src={`${path}/${background.filename}`}
+                  alt={background.name}
+                  style={{ width: 24, height: 24, marginRight: 8 }}
+                />
+                {background.name}
+              </div>
+            </Select.Option>
+          );
+        })
+      }
     </Select>
   );
 };

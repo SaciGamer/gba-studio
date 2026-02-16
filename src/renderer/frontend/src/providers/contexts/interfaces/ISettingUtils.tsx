@@ -9,6 +9,7 @@ interface IImages {
     images: string[] | null;
     imagesHD: string[] | null;
     localImagePath: string;
+    localImagePathHD: string;
 }
 
 export interface ISettingUtils extends IBaseSettings, IActiveButtons, IImages {

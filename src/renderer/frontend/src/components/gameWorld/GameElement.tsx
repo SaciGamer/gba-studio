@@ -40,42 +40,6 @@ const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, onS
     data: sceneElement,
   });
 
-  // Pegando informacoes da imagem
-  // useEffect(() => {
-  //   if (!backgrounds) return;
-  //   console.log(`..: GameElement backgroundId: ${sceneElement.backgroundId} and all itens:`, backgrounds);
-  //   const backgroundByScene = backgrounds.find(b => b.id === sceneElement.backgroundId);
-  //   console.log('..: GameElement backgroundFilename existe on backgrounds:', backgroundByScene);
-  //   const pathBackground = backgroundByScene?.filename != null && !backgroundByScene._deleted ? `${settingUtils.localImagePath}/${backgrounds.find(b => b.id == sceneElement.backgroundId)?.filename}` : imgPlaceholder;
-  //   console.log('..: GameElement pathBackground:', pathBackground);
-    
-  //   const img = new Image();
-  //   img.src = pathBackground;
-
-  //   img.onload = () => {
-  //     const { src: iSrc, width: iWidth, height: iHeight } = img;
-  //     setImgDefault({ src: iSrc, width: iWidth, height: iHeight });
-  //     console.info(`..: GameElement Imagem carregada:`, { src: pathBackground, width: iWidth, height: iHeight });
-  //   };
-
-  //   img.onerror = () => {
-  //     setImgDefault({ src: pathBackground, width: 240, height: 160 });
-  //     console.error(`ERROR: GameElement ao carregar a imagem:`, pathBackground);
-  //   };
-
-  // }, [sceneElement.background, sceneElement.backgroundId, backgrounds, settingUtils.localImagePath]);
-
-  // useEffect(() => {
-  //   if (onResize) {
-  //     if (sceneElement.sceneType === ETypeScene.LOGO || sceneElement.sceneType === ETypeScene.POINTNCLICK) {
-  //       onResize(-1, -1);
-  //     } else if (onResize) {
-  //       onResize(sceneElement.width || 240, sceneElement.height || 160);
-  //     }
-  //   }
-    
-  // }, [sceneElement.sceneType]);
-
   // Load tileset image when tileset is selected
   useEffect(() => {
     const loadTilesetImage = async () => {
@@ -106,19 +70,6 @@ const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, onS
 
     loadTilesetImage();
   }, [sceneElement.selectedTilesetId]);
-
-  // useEffect(() => {
-  //   if (canvasRef.current && onResize) {
-  //     const rect = canvasRef.current.getBoundingClientRect();
-  //     setImgDefault(prev => ({
-  //       ...prev,
-  //       width: rect.width,
-  //       height: rect.height,
-  //     }));
-
-  //     onResize(rect.width, rect.height);
-  //   }
-  // }, [canvasRef.current]);
 
   // Render elementos
   useEffect(() => {
@@ -171,22 +122,22 @@ const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, onS
           }
         });
       });
-    } else {
-       // desenha backgrounds
-      sceneElement.backgrounds?.sort((a, b) => a.layerId - b.layerId).forEach(lbg => {
-        const bgData = backgrounds.find(b => b.id === lbg.backgroundId);
-        if (bgData) {
-          const img = new Image();
-          img.src = `${settingUtils.localImagePath}/${bgData.filename}`;
-          img.onload = () => {
-            // centralizar
-            const x = (sceneElement.width - img.width) / 2;
-            const y = (sceneElement.height - img.height) / 2;
-            ctx.drawImage(img, x, y);
-          };
-        }
-      });
-    }
+    } 
+
+    // desenha backgrounds
+    sceneElement.backgrounds?.sort((a, b) => a.layerId - b.layerId).forEach(lbg => {
+      const bgData = backgrounds.find(b => b.id === lbg.backgroundId);
+      if (bgData) {
+        const img = new Image();
+        img.src = `${bgData.hd ? settingUtils.localImagePathHD : settingUtils.localImagePath}/${bgData.filename}`;
+        img.onload = () => {
+          // centralizar
+          const x = (sceneElement.width - img.width) / 2;
+          const y = (sceneElement.height - img.height) / 2;
+          ctx.drawImage(img, x, y);
+        };
+      }
+    });
 
     // desenha colisões (exemplo)
     sceneElement.collisions?.forEach(c => {
@@ -199,8 +150,6 @@ const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, onS
       ctx.strokeStyle = "rgba(0,255,0,0.5)";
       ctx.strokeRect(t.x, t.y, t.width, t.height);
     });
-
-    console.log(canvas.width, canvas.height, canvas.style.width, canvas.style.height);    
 
   }, [sceneElement.sceneType, sceneElement.tileMap, tilesetImage, sceneElement.backgrounds, backgrounds, settingUtils.localImagePath]);
 
