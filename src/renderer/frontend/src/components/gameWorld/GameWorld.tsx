@@ -15,7 +15,7 @@ import { AimOutlined, AppstoreAddOutlined, AuditOutlined, BgColorsOutlined, Bloc
 import imgPlaceholder from '@/img/placeholder.png';
 import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
 import { useBackgroundContext, useElementContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
-import path from 'path';
+import { ISettingUtils } from '@/providers/contexts/interfaces/ISettingUtils';
 
 enum SubMenuType {
   TOOLTIP = 'tooltip',
@@ -66,6 +66,8 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   const [worldSize, setWorldSize] = useState({ width: 800, height: 800 });
   const [isMovedBackground, setIsMovedBackground] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
+
+  const [updatedImages, setUpdatedImages] = useState<any>();
 
   let isDeleting = false;
 
@@ -558,141 +560,135 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve({ width: img.width, height: img.height });
-      img.onerror = reject;
+      img.onerror = () => reject(new Error(`Falha ao carregar imagem: ${src}`));
       img.src = src;
     });
   };
 
-  // Primeiro useEffect - Gerencia atualizações dos backgrounds
-  useEffect(() => {
-    const createNewBackgrounds = async () => {
-      if (!settingUtils.images) {
-        console.log('⚠️ Sem imagens para processar');
-        return;
-      }
-      
-      console.log('🔍 Verificando backgrounds para:', settingUtils.images);
-      
-      // Processa todos os backgrounds de uma vez
-      const pendingBackgrounds = settingUtils.images.filter(image => {
-        const name = image.split('.')[0];
-        return !backgrounds.some(bg => bg.name === name);
-      });
+  // Função - validação e criação de backgrounds
+  const validateAndAddBackgrounds = async (images: string[] | null, localPath: string, hd: boolean) => {
+    if (!images) {
+      console.log('⚠️ Sem imagens para processar HD: ', hd);
+      return [];
+    }
 
-      if (pendingBackgrounds.length > 0) {
-        console.log('✨ Criando novos backgrounds:', pendingBackgrounds);
-        
-        const newBackgrounds = await Promise.all(
-          pendingBackgrounds.map(async image => {
-            const { width, height } = await getImageSize(`${settingUtils.localImagePath}/${image}`);
-            return {
-              _resourceType: 'background' as const,
-              id: uuidv4(),
-              autoColor: false,
-              name: image.split('.')[0],
-              filename: image,
-              imageWidth: width,
-              imageHeight: height,
-              hd: false,
-              tileColors: '',
-              _saved: false,
-              _deleted: false,
-            };
-          })
-        );
-
-        setBackgrounds(prev => [...prev, ...newBackgrounds]);
-      }
-
-      // Separa a extensão das imagens
-      const validNames = settingUtils.images.map(image => image.split('.')[0]);
-
-      // Marca digitalmente como deletados os backgrounds que não existem mais nas imagens
-      const updatedBackgrounds = backgrounds.map(bg => {
-        if (!validNames.includes(bg.name)) {
-          return { ...bg, _deleted: true, _saved: false };
-        }
-        return bg;
-      });
-
-      // Se houve alguma alteração, atualiza o estado
-      if (
-        backgrounds.some(bg => !validNames.includes(bg.name) && !bg._deleted) ||
-        backgrounds.length !== updatedBackgrounds.length
-      ) {
-        setBackgrounds(updatedBackgrounds);
-      }
-    };
-
-    createNewBackgrounds();
-  }, [settingUtils.images]);
-
-  // Segundo useEffect - Gerencia fetch inicial e listener para backgrounds
-  useEffect(() => {
-    const startFetchBackgrounds = async () => {
-      try {
-        const response = await window.electronAPI.fetchImages('backgrounds');
-        if (response.status === 'success') {
-          console.log('📥 Recebido backgrounds:', response);
-          setSettingUtils(prev => ({ 
-            ...prev, 
-             images: [ 
-              ...(prev.images ?? []),
-              ...(response.fileImages ?? [])
-            ], 
-            localImagePath: response.localPath ?? prev.localImagePath
-          }));
-        }
-      } catch (error) {
-        console.error('❌ Erro ao buscar backgrounds:', error);
-      }
-    };
-
-    const startFetchBackgroundsHD = async () => {
-      try {
-        const response = await window.electronAPI.fetchImages('backgrounds-hd');
-        if (response.status === 'success') {
-          console.log('📥 Recebido backgrounds HD:', response);
-          setSettingUtils(prev => ({ 
-            ...prev, 
-            images: [ 
-              ...(prev.images ?? []),
-              ...(response.fileImages ?? [])
-            ], 
-            // localImagePath: response.localPath
-          }));
-        }
-      } catch (error) {
-        console.error('❌ Erro ao buscar backgrounds HD:', error);
-      }
-    };
-
-    startFetchBackgrounds();
-    startFetchBackgroundsHD();
-
-    // Listener para atualizações
-    window.electronAPI.onUpdateImages((updatedImages: any) => {
-      console.log('🔄 Novos backgrounds chegando:', updatedImages);
-      if (updatedImages.localPath.length > 0 && updatedImages.localPath.includes('backgrounds-hd')) {
-         setSettingUtils(prev => ({ 
-          ...prev, 
-          images: updatedImages.images, 
-          localImagePath: updatedImages.localPath
-        }));
-        console.log('📥 images HD setada:', settingUtilsRef.current.imagesHD);
-      } else if (updatedImages.localPath.length > 0 && updatedImages.localPath.includes('backgrounds')) {
-         setSettingUtils(prev => ({ 
-          ...prev, 
-          images: updatedImages.images, 
-          localImagePath: updatedImages.localPath 
-        }));
-        console.log('📥 images setada:', settingUtilsRef.current.images);
-      } else  console.log(`❌ images: ${updatedImages.images} não setada na settingsUtils:`, settingUtilsRef.current.images);
-      }
-
+    const pending = images.filter(image => {
+      const name = image.split('.')[0];
+      return !backgrounds.some(bg => bg.name === name && bg.hd === hd);
     });
 
+    if (pending.length === 0) return [];
+
+    console.log('✨ Criando novos backgrounds:', pending);
+    const newBackgrounds = await Promise.all(
+      pending.map(async image => {
+        const { width, height } = await getImageSize(`${localPath}/${image}`);
+        return {
+          _resourceType: 'background' as const,
+          id: uuidv4(),
+          autoColor: false,
+          name: image.split('.')[0],
+          filename: image,
+          imageWidth: width,
+          imageHeight: height,
+          hd,
+          tileColors: '',
+          _saved: false,
+          _deleted: false,
+        };
+      })
+    );
+
+    return newBackgrounds;
+  };
+
+  // UseEffect - Valida, cria backgrounds e exclui algumas imagens
+  useEffect(() => {
+    const updateBackgrounds = async () => {
+      const [newNormal, newHD] = await Promise.all([
+        validateAndAddBackgrounds(settingUtils.images, settingUtils.localImagePath, false),
+        validateAndAddBackgrounds(settingUtils.imagesHD, settingUtils.localImagePathHD, true),
+      ]);
+
+      const allImages = [
+        ...(settingUtils.images ?? []).map(img => ({ name: img.split('.')[0], hd: false })),
+        ...(settingUtils.imagesHD ?? []).map(img => ({ name: img.split('.')[0], hd: true }))
+      ];
+
+      setBackgrounds(prev => {
+        // marca que precisam ser deletados ou retorna vazio se não há imagens
+        const updated = allImages && allImages.length > 0 ? prev.map(bg => {
+          const exists = allImages.some(i =>
+            i.name.trim().toLowerCase() === bg.name.trim().toLowerCase() &&
+            Boolean(i.hd) === Boolean(bg.hd)
+          );
+          return exists ? bg : { ...bg, _deleted: true, _saved: false };
+        }) : [...prev];
+
+        // adiciona novos (se não houver, já retornam [])
+        return [...updated, ...newNormal, ...newHD];
+      });
+    }
+
+    updateBackgrounds();
+    
+  }, [settingUtils.images, settingUtils.imagesHD]);
+
+  // UseEffect - Gerencia fetch inicial
+  useEffect(() => {
+    const fetchBackgrounds = async () => {
+      try {
+        const responseNormal = await window.electronAPI.fetchImages('backgrounds');
+        const responseHD = await window.electronAPI.fetchImages('backgrounds-hd');
+
+        setSettingUtils(prev => {
+          let next = { ...prev };
+          if (responseNormal.status === 'success') {
+            next.images = responseNormal.fileImages;
+            next.localImagePath = responseNormal.localPath;
+          }
+          if (responseHD.status === 'success') {
+            next.imagesHD = responseHD.fileImages;
+            next.localImagePathHD = responseHD.localPath;
+          }
+          return next;
+        });
+      } catch (err) {
+        console.error("❌ Erro ao buscar backgrounds:", err);
+      }
+    };
+
+    fetchBackgrounds();
   }, []);
+
+  // UseEffect - Gerencia pastas que foram feitas fetch para inserir novas imagens de background
+  useEffect(() => {
+    const handlerUpdateBackgrounds = (images: ISettingUtils) => {
+      console.log('🔄 Novos backgrounds chegando:', images);
+      setUpdatedImages(images);
+    };
+
+    window.electronAPI.onUpdateImages(handlerUpdateBackgrounds);
+    return () => window.electronAPI.removeListener('updateImages', handlerUpdateBackgrounds);
+  }, []);
+
+  useEffect(() => {
+    if (!updatedImages) return;
+
+    setSettingUtils(prev => {
+      let next = { ...prev };
+      if (updatedImages.localPath.endsWith('backgrounds-hd')) {
+        next.imagesHD = updatedImages.images ?? prev.imagesHD;
+        next.localImagePathHD = updatedImages.localPath || prev.localImagePathHD;
+        console.log('📥 images HD setada:', next.imagesHD);
+      } else if (updatedImages.localPath.endsWith('backgrounds')) {
+        next.images = updatedImages.images ?? prev.images;
+        next.localImagePath = updatedImages.localPath || prev.localImagePath;
+        console.log('📥 images setada:', next.images);
+      }
+      return next;
+    });
+  }, [updatedImages]);
 
   // function getImageInfo(imagePath:) {
   //   return new Promise((resolve, reject) => {

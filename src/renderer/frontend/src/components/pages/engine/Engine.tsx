@@ -57,7 +57,9 @@ const Engine: React.FC = () => {
       activeButton: 'select',
       activeSubButton: '',
       localImagePath: '',
-      images: null
+      localImagePathHD: '',
+      images: null,
+      imagesHD: null
     };
 
     setSettingUtils(prev => ({ ...prev, ...defaultSettingUtils }));
