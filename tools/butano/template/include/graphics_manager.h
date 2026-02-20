@@ -6,6 +6,8 @@
 #include "bn_sprite_item.h"
 #include "bn_regular_bg_ptr.h"
 #include "bn_regular_bg_item.h"
+#include "bn_sp_direct_bitmap_bg_painter.h"
+#include "bn_direct_bitmap_item.h"
 #include "bn_bg_palettes.h"
 #include "bn_palette_bitmap_bg_painter.h"
 #include "bn_optional.h"
@@ -14,6 +16,10 @@
 #include "bn_vector.h"
 
 #include "palette_bitmap_manager.h"
+
+#include "graphics_items.h"
+#include "resources.h"
+#include "resource_registry.h"
 
 struct Scenes; 
 
@@ -26,10 +32,9 @@ private:
     static constexpr int MAX_SPRITES = 128;
     bn::optional<bn::sprite_ptr> sprites[MAX_SPRITES];
     int sprite_count = 0;
-    bn::optional<bn::regular_bg_ptr> current_bg;
-    bn::optional<bn::regular_bg_ptr> current_bg2;
-    bn::optional<bn::regular_bg_ptr> current_bg3;
-    bn::optional<bn::regular_bg_ptr> current_bg4;
+    bn::vector<bn::regular_bg_ptr, 4> current_bgs;
+    bn::optional<bn::sp_direct_bitmap_bg_ptr> current_bitmap_bgs;
+
     bn::optional<bn::palette_bitmap_bg_ptr> current_palette_btmp_bg;
 
     // Tilemap support
@@ -46,6 +51,12 @@ public:
      */
     const Scenes* initialize();
     void initialize_tilemap(const Scenes* scene);
+
+    /**
+     * Render scene
+     */
+    void render_scene_regular_bg(const Scenes& scene);
+    void render_scene_bitmap_bg(const Scenes& scene);
 
     /**
      * Create sprite

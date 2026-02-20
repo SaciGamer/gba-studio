@@ -245,6 +245,7 @@ export class ResourceBuilder {
       let registry_template = fs.readFileSync(tplPath, 'utf8');
       // let objects = "";
       let backgrounds = "";
+      let backgroundsLayers = "";
       let scenes = "";
       let settings = "";
 
@@ -255,6 +256,17 @@ export class ResourceBuilder {
             break;
           case "scene":
             scenes += parseResourceFile(file) + "\n";
+
+            if (file.jsonContent?.backgrounds) {
+              let sceneBackgroundsLayerTemplate = `static const SceneLayer {{SCENE_NAME}}_LAYERS[] = {{{BACKGROUNDS_LAYERS_CONTENT}}};\n\n`;
+              sceneBackgroundsLayerTemplate = sceneBackgroundsLayerTemplate.replace("{{SCENE_NAME}}", file.resourceName.replace('_res.h', '').toUpperCase());
+
+              file.jsonContent?.backgrounds.forEach((bg: any) => {
+                sceneBackgroundsLayerTemplate = sceneBackgroundsLayerTemplate.replace("{{BACKGROUNDS_LAYERS_CONTENT}}", `\n    { ${bg.layerId}, "${bg.backgroundId}", ${bg.name ? `${bg.name.toUpperCase()}_NAME` : 'nullptr'}, ${bg.path ? `${bg.path.toUpperCase()}_FILENAME` : 'nullptr'} },{{BACKGROUNDS_LAYERS_CONTENT}}`);
+              });
+              
+              backgroundsLayers += sceneBackgroundsLayerTemplate;
+           }
             break;
           case "settings":
             settings += parseResourceFile(file) + "\n";
@@ -264,10 +276,15 @@ export class ResourceBuilder {
         // objects += parseResourceFile(file) + "\n";
       }
 
+      if (backgroundsLayers) {
+        backgroundsLayers = backgroundsLayers.replaceAll("{{BACKGROUNDS_LAYERS_CONTENT}}", '\n');
+      }
+
       registry_template = registry_template.replace("{{PROJECT_NAME}}", config.projectName);
       registry_template = registry_template.replace("{{AUTHOR}}", config.authorName || '');
       registry_template = registry_template.replace("{{VERSION}}", config.version || '1.0.0');
       // registry_template = registry_template.replace("{{OBJECT_CONSTANTS}}", objects);
+      registry_template = registry_template.replace("{{BACKGROUNDS_LAYERS_CONSTANTS}}", backgroundsLayers);
       registry_template = registry_template.replace("{{BACKGROUNDS_CONSTANTS}}", backgrounds);
       registry_template = registry_template.replace("{{SCENES_CONSTANTS}}", scenes);
       registry_template = registry_template.replace("{{SETTINGS_CONSTANTS}}", settings);
@@ -328,17 +345,20 @@ function parseResourceFile(file: ResourceFile): string {
   } else if (type === "scene") {
     const required = [
       `${baseNameUpper}_ID`,
-      `${baseNameUpper}_BACKGROUNDID`,
-      `${baseNameUpper}_SELECTEDTILESETID`,
-      `${baseNameUpper}_IMAGETYPE`,
+      `${baseNameUpper}_BACKGROUNDS_JSON`,
     ];
     if (required.every(hasSymbol)) {
       // Format: { name, id, name_const, background_id, selected_tileset_id, width, height, scene_type, image_type }
       const tilemap = file.jsonContent?.tileMap ? `${baseNameUpper}_TILEMAP_ROWS, ${baseNameUpper}_TILEMAP_COLS, &${baseNameUpper}_TILEMAP[0][0]` : '0, 0, nullptr';
+      const tileSetId = file.jsonContent?.selectedTilesetId !== undefined ? `${baseNameUpper}_SELECTEDTILESETID` : '0';
+      const imageType = file.jsonContent?.imageType !== undefined ? `${baseNameUpper}_IMAGETYPE` : '0';
+      const backgroundLayerCount = file.jsonContent?.backgrounds ? file.jsonContent.backgrounds.length : 0;
 
-      return `    { ResourceType::${type}, ${baseNameUpper}_ID, ${baseNameUpper}_NAME, ${baseNameUpper}_BACKGROUNDID, ${baseNameUpper}_SELECTEDTILESETID, ${baseNameUpper}_WIDTH, ${baseNameUpper}_HEIGHT, ${baseNameUpper}_SCENETYPE, ${baseNameUpper}_IMAGETYPE, ${tilemap} },`;
+      return `    { ResourceType::${type}, ${baseNameUpper}_ID, ${baseNameUpper}_NAME, ${baseNameUpper}_LAYERS, ${backgroundLayerCount}, ${tileSetId}, ${baseNameUpper}_WIDTH, ${baseNameUpper}_HEIGHT, ${baseNameUpper}_SCENETYPE, ${imageType}, ${tilemap} },`;
     } else {
-      return `    { ResourceType::${type}, ${baseNameUpper}_ID, "${name}", 0, 0, 0, 0, ${baseNameUpper}_SCENETYPE, 0, 0, 0, nullptr },`;
+      const backgroundLayerCount = file.jsonContent?.backgrounds ? file.jsonContent.backgrounds.length : 0;
+
+      return `    { ResourceType::${type}, ${baseNameUpper}_ID, "${name}", nullptr, ${backgroundLayerCount}, nullptr, 0, 0, ${baseNameUpper}_SCENETYPE, nullptr, 0, 0, 0 },`;
     }
   }
 

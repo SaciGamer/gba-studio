@@ -92,6 +92,9 @@ export interface JsonResourceDefault {
   imageWidth?: number;
   imageHeight?: number;
   tileMap?: number[][];
+  selectedTilesetId?: string;
+  imageType?: string;
+  backgrounds?: any[];
 }
 
 export interface ResourceFile {

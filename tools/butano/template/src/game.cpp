@@ -50,6 +50,21 @@ void Game::initialize() {
     
     // Inicializa gráficos e carrega o background inicial
     const Scenes* scene = graphics.initialize();
+    
+    // 3. Valida tipo da cena
+    bn::string<64> scene_type = scene->scene_type;
+    BN_LOG("Scene type: ", scene_type.data());
+    if(scene_type != "Logo" && scene_type != "Point Click") {
+        // 4. Renderiza cena
+        BN_LOG("Renderizando cena com REGULAR BG");
+        graphics.render_scene_regular_bg(*scene);
+    } else {
+        BN_LOG("Renderizando cena com BITMAP BG");
+        // 5. Renderiza cena
+        graphics.render_scene_bitmap_bg(*scene);
+    }
+
+    // 6. Desenha tiles
     graphics.initialize_tilemap(scene);
 }
 

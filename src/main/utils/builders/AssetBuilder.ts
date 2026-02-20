@@ -314,6 +314,7 @@ export class AssetBuilder {
           customizedPalettePath ? "-remap" : "-colors",
           customizedPalettePath ? customizedPalettePath : "256",
           // "-depth", "8",
+          "-compress", "None",
           "-type", "Palette",
           `BMP3:${destPath}`
         ];
@@ -324,6 +325,7 @@ export class AssetBuilder {
           "-background", "none",
           "-colors", "16",
           // "-depth", "4",
+          "-compress", "None",
           "-type", "Palette",
           `BMP3:${destPath}`
         ];
@@ -339,6 +341,7 @@ export class AssetBuilder {
             "-gravity", "center",
             "-extent", "256x256",
             "-colors", "16",
+            "-compress", "None",
             "-type", "Palette",
             `BMP3:${destPath}`
           ];
@@ -351,6 +354,7 @@ export class AssetBuilder {
           customizedPalettePath ? "-remap" : "-colors",
           customizedPalettePath ? customizedPalettePath : "256", // customizedPalettePath inserir customPalette.png
           // "-depth", "8",
+          "-compress", "None",
           "-type", "Palette",
           `BMP3:${destPath}`
         ];

@@ -516,7 +516,12 @@ function launchEmulatorAndTrack(romPath: string) {
     if (fs.existsSync(toolsMgba2)) return toolsMgba2;
     if (prefEmu && fs.existsSync(prefEmu)) return prefEmu;
     return bundledVba;
-  })(), [romPath]);
+  })(), [
+    // "--nogui",    // remove menus/GUI
+    // "-f",         // fullscreen
+    "-2",         // escala 2x
+    romPath       // caminho da ROM
+  ]);
 
   emulatorProcess = proc;
 
