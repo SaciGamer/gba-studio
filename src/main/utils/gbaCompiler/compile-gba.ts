@@ -115,27 +115,26 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
       // Handle process completion
       proc.on('close', (code) => {
         if (code !== 0) {
-                    const errMsg = `make exited with code ${code}`;
-                    console.error('..: ' + errMsg);
-
-                    // Ensure logs directory exists and write full make output for debugging
-                    try {
-                      const logsDir = path.join(compileOptions.buildDir, 'build-logs');
-                      if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
-                      const logPath = path.join(logsDir, `make.log`);
-                      fs.writeFileSync(logPath, `=== STDOUT ===\n${stdout}\n\n=== STDERR ===\n${stderr}\n`, 'utf8');
-                      console.log('..: Wrote make log to', logPath);
-                      broadcast('compile-error', {
-                        message: errMsg,
-                        stdout,
-                        stderr,
-                        logPath,
-                      });
-                      reject(new Error(`${errMsg}\nSee log: ${logPath}\n${stderr}`));
-                    } catch (e) {
-                      broadcast('compile-error', { message: errMsg, stdout, stderr });
-                      reject(new Error(`${errMsg}\n${stderr}`));
-                    }
+          const errMsg = `make exited with code ${code}`;
+          console.error('..: ' + errMsg);
+          // Ensure logs directory exists and write full make output for debugging
+          try {
+            const logsDir = path.join(compileOptions.buildDir, 'build-logs');
+            if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+            const logPath = path.join(logsDir, `make.log`);
+            fs.writeFileSync(logPath, `=== STDOUT ===\n${stdout}\n\n=== STDERR ===\n${stderr}\n`, 'utf8');
+            console.log('..: Wrote make log to', logPath);
+            broadcast('compile-error', {
+              message: errMsg,
+              stdout,
+              stderr,
+              logPath,
+            });
+            reject(new Error(`${errMsg}\nSee log: ${logPath}\n${stderr}`));
+          } catch (e) {
+            broadcast('compile-error', { message: errMsg, stdout, stderr });
+            reject(new Error(`${errMsg}\n${stderr}`));
+          }
           return;
         }
 

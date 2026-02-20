@@ -7,8 +7,10 @@
  */
 
 #include "bn_string.h"
-#include "resource_types.h"
 #include "resources.h"
+#include "resource_registry.h"
+
+{{BACKGROUNDS_LAYERS_CONSTANTS}}
 
 static const Backgrounds BACKGROUNDS[] = {
 {{BACKGROUNDS_CONSTANTS}}

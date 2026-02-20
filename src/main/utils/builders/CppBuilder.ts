@@ -325,6 +325,23 @@ public:
         }).join(' else ');
   }
 
+  private conditionalToShowBitmapBackgroundsIfElse(graphicNames: string[]) {
+    if (graphicNames.length === 0) return "";
+
+    // Implementation for conditional logic to show bitmap backgrounds
+    return graphicNames.filter(file => file.startsWith('bn_direct_bitmap_items_'))
+        .map(file => {
+          // remove extensão .h
+          let name = file.replace(/\.h$/, "");
+          // remove prefixo "bn_direct_bitmap_items_"
+          let suffix = name.replace(/^bn_direct_bitmap_items_/, "");
+          return `if (name == bn::string<64>("${suffix}")) {
+\t// Show bitmap background ${suffix}
+\treturn bn::direct_bitmap_items::${suffix};
+    }`;
+        }).join(' else ');
+  }
+
   /**
    * Generate graphics manager state support headers
    */
@@ -341,6 +358,7 @@ public:
           content = content.replace(/\{\{AUTHOR\}\}/g, config.authorName || '');
           content = content.replace(/\{\{VERSION\}\}/g, config.version || '1.0.0');
           content = content.replace(/\{\{BACKGROUND_CONDITIONALS_FROM_NAME\}\}/g, this.conditionalToShowBackgroundsIfElse(this.graphicHeadersGeneratedByButano || []));
+          content = content.replace(/\{\{BITMAP_BACKGROUND_CONDITIONALS_FROM_NAME\}\}/g, this.conditionalToShowBitmapBackgroundsIfElse(this.graphicHeadersGeneratedByButano || []));
           fs.writeFileSync(graphicSrcPath, content, 'utf8');
           console.log('..: Copied template graphics_manager.cpp from template dir');
           return;

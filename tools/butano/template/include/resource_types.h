@@ -68,17 +68,26 @@ struct Backgrounds
 
 };
 
+struct SceneLayer
+{
+    int layerId;                // LAYER_ID
+    const char* backgroundId;   // BACKGROUND_ID
+    const char* name;
+    const char* path;
+};
+
 struct Scenes
 {
-    ResourceType type;          // Tipo
+    ResourceType type;                  // Tipo
+    const char* id;                     // id da scene
+    const char* name;                   // nome do arquivo de scene
 
-    const char* id;             // id da scene
-    
-    const char* name;           // nome do arquivo de scene
+    // const char* background_id;       // ID do background da cena
+    const SceneLayer* backgrounds_layers;   // Backgrounds com Layers
+    const int backgrounds_layers_size;      // Tanho do backgrounds_layers
 
-    const char* background_id;  // ID do background da cena
-    const char* tileset_id;     // ID do tileset da cena
-    // const char* tilemap_id;     // ID do tilemap da cena
+    const char* tileset_id;             // ID do tileset da cena
+    // const char* tilemap_id;          // ID do tilemap da cena
     
     // Scene
     int scene_width;
@@ -87,25 +96,25 @@ struct Scenes
 
     // Tilemap extras
     const char* tile_image_type;
-    int tile_map_rows;          // TILEMAP_*_HEIGHT (em tiles)
-    int tile_map_cols;           // TILEMAP_*_WIDTH (em tiles)
-    const int* tile_data;       // TILEMAP_*_DATA - ponteiro para array de dados dos tiles
-    // int tile_data_size;     // TILEMAP_*_DATA_SIZE - tamanho do array
+    int tile_map_rows;              // TILEMAP_*_HEIGHT (em tiles)
+    int tile_map_cols;              // TILEMAP_*_WIDTH (em tiles)
+    const int* tile_data;           // TILEMAP_*_DATA - ponteiro para array de dados dos tiles
+    // int tile_data_size;          // TILEMAP_*_DATA_SIZE - tamanho do array
 };
 
 struct Settings
 {
-    ResourceType type;      // Tipo
+    ResourceType type;              // Tipo
 
     // Settings extras
-    const char* start_scene_id;  // SETTINGS_STARTSCENEID
-    int start_x;            // SETTINGS_STARTX
-    int start_y;            // SETTINGS_STARTY
-    int move_speed;         // SETTINGS_STARTMOVESPEED
-    int anim_speed;         // SETTINGS_STARTANIMSPEED
-    const char* direction;  // SETTINGS_STARTDIRECTION
+    const char* start_scene_id;     // SETTINGS_STARTSCENEID
+    int start_x;                    // SETTINGS_STARTX
+    int start_y;                    // SETTINGS_STARTY
+    int move_speed;                 // SETTINGS_STARTMOVESPEED
+    int anim_speed;                 // SETTINGS_STARTANIMSPEED
+    const char* direction;          // SETTINGS_STARTDIRECTION
 
-    int color_mode;         // COLOR_MODE
+    int color_mode;                 // COLOR_MODE
 
 };
 
