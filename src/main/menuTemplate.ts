@@ -253,8 +253,18 @@ function updateLanguage(menuItem: MenuItem, language: string): void {
     turnOfCheckedItems(menuItem);
     menuItem.checked = true;
 
-    console.log('..: %s clicado', language);
+    console.log('..: Mudando idioma para: ', language);
+
     updatePreferences('language', language);
+
+    // Envia evento para todas as janelas abertas
+    if (windows.main) {
+        windows.main.webContents.send('change-language', language);
+    }
+    if (windows.launcher) {
+        windows.launcher.webContents.send('change-language', language);
+    }
+
 }
 
 function turnOfCheckedItems(menuItem: MenuItem): void {

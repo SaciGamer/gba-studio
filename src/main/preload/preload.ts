@@ -30,6 +30,8 @@ const electronAPI = {
   saveLastSplashTab: (lastSplashTab: any) => ipcRenderer.invoke('lastUsedSplashTab', lastSplashTab),
   saveLastPositionSplitters: (lastPositionSplitters: any) => ipcRenderer.invoke('lastPositionSplitters', lastPositionSplitters),
   loadLastPositionSplitters: () => ipcRenderer.invoke('loadLastPositionSplitters'),
+  saveFavoriteEvents: (favoriteEvents: string[]) => ipcRenderer.invoke('setFavoriteEvents', favoriteEvents),
+  loadFavoriteEvents: () => ipcRenderer.invoke('loadFavoriteEvents'),
   updateTitle: (baseTitle: string, projectName: string, isSaved: boolean) => ipcRenderer.invoke('updateTitle', baseTitle, projectName, isSaved),
   // Settings --------------------------------------------
   loadSettings: (filePath: string) => ipcRenderer.invoke('loadSettings', filePath),

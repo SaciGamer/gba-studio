@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from "react";
-import { Form, Input, InputNumber, Select, Radio, Checkbox, Button, Divider, theme, Spin, Space } from "antd";
-import { CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled } from "@ant-design/icons";
+import imgPlaceholder from '@/img/placeholder.png';
 import { useBackgroundContext, useProjectContext, useSceneContext, useSettingsContext, useSettingsUtilsContext } from "@/providers/contexts/AppContexts";
 import { IProjectSettings } from "@/providers/contexts/interfaces/IProjectElement";
+import { ISceneSettings } from "@/providers/contexts/interfaces/ISceneElement";
 import { EColorMode, IMainSettings } from "@/providers/contexts/interfaces/ISettingElement";
-import imgPlaceholder from '@/img/placeholder.png';
+import { CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled } from "@ant-design/icons";
+import { Button, Checkbox, Divider, Flex, Form, Image, Input, InputNumber, Radio, Select, Space, theme, Typography } from "antd";
+import { Content } from "antd/es/layout/layout";
+import React, { useEffect, useState } from "react";
 
 const { useToken } = theme;
 
@@ -121,6 +123,17 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
     { value: 8, label: "Speed 8 (Faster)", fps: "60 FPS" },
   ];
 
+  const clampPlayerPosition = (settings: IMainSettings, scene: ISceneSettings) => {
+    const maxX = Math.floor(scene.width / 16) - 2;
+    const maxY = Math.floor(scene.height / 16) - 2;
+
+    return {
+      ...settings,
+      startX: Math.max(0, Math.min(settings.startX, maxX)),
+      startY: Math.max(0, Math.min(settings.startY, maxY)),
+    };
+  }
+
   const handleValuesChange = (changedValues: Partial<IMainSettings>, allValues: IMainSettings) => {
     if ('colorMode' in changedValues) {
       const updatedColorMode = changedValues.colorMode
@@ -131,6 +144,11 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
 
       console.log("..: Updated Color Mode Enum:", updatedColorMode);
     }
+
+    if ('startSceneId' in changedValues) {
+      allValues = clampPlayerPosition(allValues, scenes.find(s => s.id === changedValues.startSceneId)!);
+    }
+
     console.log("..: Settings Alterações:", changedValues);
     console.log("..: Settings Valores atuais:", allValues);
 
@@ -182,6 +200,27 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
   //   return <Spin />;
   // }
 
+  const getImagePath = (scene: ISceneSettings): string => {
+    const getFileNameByBackgroundId = (scene: ISceneSettings): string | undefined => {
+      const sceneBackgroundId = scene.backgrounds?.find(b => b.backgroundId)?.backgroundId;
+      return backgrounds.find(b => !b._deleted && b.id === sceneBackgroundId)?.filename;
+    }
+
+    if (!scene.backgrounds) return imgPlaceholder;
+
+    const response = getFileNameByBackgroundId(scene);
+    if (scene.sceneType != "Logo" && scene.sceneType != "Point Click" && scene.backgrounds?.length > 1) {
+      return response ? settingUtils.localImagePath + '/' + response : imgPlaceholder;
+    }
+
+    return response ? settingUtils.localImagePathHD + '/' + response : imgPlaceholder;
+  };
+
+  function getSceneMax(startSceneId: string, maxDefault: number) {
+    const scene = scenes.find(s => s.id === startSceneId);
+    return scene ? (scene.width / 16) - 2 : maxDefault;
+  }
+
   return (
     <Form
       form={form}
@@ -193,19 +232,22 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
         <Select
           showSearch
           optionFilterProp="label"
+          // value={scenes.filter(sf => !sf._deleted && sf.id === settings.startSceneId) ?? null }
           options={scenes.filter(sf => !sf._deleted).map(scene => ({
             value: scene.id, // ID único da cena
             label: (
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <img 
-                    src={`${scene.backgroundId && backgrounds.find(b => b.id == scene.backgroundId)?.filename ? settingUtils.localImagePath+'/'+backgrounds.find(b => b.id == scene.backgroundId)?.filename : imgPlaceholder}`} // Caminho da imagem da miniatura
+              <Content style={{ display: 'flex', alignItems: 'center' }}>
+                  <Image 
+                    preview={false}
+                    src={getImagePath(scene)} // Caminho da imagem da miniatura
                     alt={scene.name} 
-                    style={{ width: 24, height: 24, marginRight: 8 }}
+                    style={{ display: 'flex', alignItems: 'center', width: 24, height: 24, marginRight: 8 }}
                   />
                   {scene.name} {/* Nome da cena */}
-              </div>
+              </Content>
             ),
           }))}
+          style={{ width: '100%' }}
         >
         </Select>
       </Form.Item>
@@ -217,7 +259,7 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
             Enable Color Mode
           </Checkbox>
         </Form.Item>
-        <Button type="primary" onClick={handleMoreSettings}>
+        <Button type="default" onClick={handleMoreSettings}>
           More Settings
         </Button>
       </Space>
@@ -230,7 +272,7 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
           <Radio.Button value="left" style={{ flex: 1, textAlign: 'center' }}>
             <CaretLeftFilled />
           </Radio.Button>
-          <Radio.Button value="top" style={{ flex: 1, textAlign: 'center' }}>
+          <Radio.Button value="up" style={{ flex: 1, textAlign: 'center' }}>
             <CaretUpFilled />
           </Radio.Button>
           <Radio.Button value="down" style={{ flex: 1, textAlign: 'center' }}>
@@ -243,14 +285,15 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
       </Form.Item>
       
       {/* Start Position */}
-      <Space.Compact block>
+      <Typography.Paragraph >Start Position</Typography.Paragraph>
+      <Flex>
         <Form.Item name={"startX"} noStyle>
-          <InputNumber min={0} addonBefore="X" style={{ flex: 1, textAlign: 'center' }} />
+          <InputNumber min={0} max={getSceneMax(settings.startSceneId, 15)} addonBefore="X" style={{ flex: 1, textAlign: 'center' }} />
         </Form.Item>
         <Form.Item name={"startY"} noStyle>
-          <InputNumber min={0} addonBefore="Y" style={{ flex: 1, textAlign: 'center', marginLeft: "10px" }} />
+          <InputNumber min={0} max={getSceneMax(settings.startSceneId, 10)} addonBefore="Y" style={{ flex: 1, textAlign: 'center', marginLeft: "10px" }} />
         </Form.Item>
-      </Space.Compact>
+      </Flex>
 
       <Divider style={{ margin: `${token.margin}px 0` }} />
 

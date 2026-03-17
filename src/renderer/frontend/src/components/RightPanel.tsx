@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Layout, Input, Space, Divider, Select, Button, Typography, InputNumber, theme, Tabs } from 'antd';
-import { BackgroundSelector } from './BackgroundSelector';
-import RightPanelGWSettings from './RightPanelGWSettings';
 import { useElementContext, useSceneContext } from '@/providers/contexts/AppContexts';
-import { EImageType, ETypeScene, IBackgroundElement } from '@/providers/contexts/interfaces/ISceneElement';
+import { EImageType, ETypeScene, IBackgroundElement, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { BgColorsOutlined, PictureOutlined } from '@ant-design/icons';
-import { IBackgroundSettings } from '@/providers/contexts/interfaces/IBackgroundElement';
+import { Button, Divider, Input, InputNumber, Layout, Select, Space, Tabs, theme, Typography } from 'antd';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { BackgroundSelector } from './BackgroundSelector';
+import CollapseEventManager from './events/CollapseEventManager';
+import SelectNewEvent from './events/SelectNewEvent';
+import RightPanelGWSettings from './RightPanelGWSettings';
 
 const { useToken } = theme;
 const { Content } = Layout;
@@ -34,10 +35,24 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
     columns: 10,
     rows: 10
   });
-  const [mapWidth, setMapWidth] = useState(((elementSelected?.width || 160) / tileset.tileHeight));
-  const [mapHeight, setMapHeight] = useState(((elementSelected?.height || 240) / tileset.tileWidth));
+  const [mapWidth, setMapWidth] = useState(((elementSelected?.width || 240) / tileset.tileWidth));
+  const [mapHeight, setMapHeight] = useState(((elementSelected?.height || 160) / tileset.tileHeight));
   const [imageType, setImageType] = useState<EImageType>(EImageType.PALETTE_BITMAP_BG);
   const backgroundLayers = [0, 1, 2, 3];
+  const groupEvents = [
+    {
+      key: 'playerHit1Script',
+      label: 'Group 1'
+    },
+    {
+      key: 'playerHit2Script',
+      label: 'Group 2'
+    },
+    {
+      key: 'playerHit3Script',
+      label: 'Group 3'
+    },
+  ];
   const [activeLayerKey, setActiveLayerKey] = useState("2");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -74,8 +89,8 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
 
   useEffect(() => {
     if (elementSelected?.height && elementSelected?.width) {
-      setMapHeight((elementSelected.height) / tileset.tileHeight);
       setMapWidth((elementSelected.width) / tileset.tileWidth);
+      setMapHeight((elementSelected.height) / tileset.tileHeight);
     } 
 
     if (elementSelected?.selectedTiles) {
@@ -122,7 +137,7 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
   const handleMapSizeChange = (dimension: 'width' | 'height', value: number, elementId: string) => {
     // Ensure minimum size (240x160 for 16px tiles = 15x10 tiles)
     const minTiles = dimension === 'width' ? 15 : 10;
-    const maxTiles = 50; // Maximum 50 tiles
+    const maxTiles = 64; // Maximum 64 tiles
     const tileSize = 16;
     
     // Ensure value is multiple of tile size and within bounds
@@ -201,15 +216,40 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
   };
 
   const handleSceneTypeChange = (value: string) => {
-    if (elementSelected) {
-      const updatedElement = { ...elementSelected, sceneType: value };
-      setElementSelected(updatedElement);
-      setScenes(prevScenes => prevScenes.map(scene => 
-        scene.id === updatedElement.id 
-          ? { ...scene, ...updatedElement, _saved: false } 
-          : scene
-      ));
-    }
+    if (!elementSelected) 
+      return;
+
+    // função auxiliar para validar backgrounds
+    const validChangeBackgrounds = (): IBackgroundElement[] | undefined => {
+      const isHDScene = value === ETypeScene.LOGO || value === ETypeScene.POINTNCLICK;
+      const elementSelectIsHD = elementSelected?.sceneType === ETypeScene.LOGO || elementSelected?.sceneType === ETypeScene.POINTNCLICK;
+
+      if (elementSelectIsHD != isHDScene) {
+        // zera todos os backgrounds
+        return elementSelected.backgrounds?.map((bg: IBackgroundElement) => ({
+          ...bg,
+          backgroundId: null,
+          name: "",
+          path: ""
+        }));
+      }
+      // mantém os backgrounds atuais
+      return elementSelected.backgrounds;
+    };
+
+    const updatedElement = { 
+      ...elementSelected, 
+      sceneType: value,
+      backgrounds: validChangeBackgrounds(),
+      _saved: false
+    };
+
+    setElementSelected(updatedElement);
+    setScenes(prevScenes => prevScenes.map(scene => 
+      scene.id === updatedElement.id 
+        ? { ...scene, ...updatedElement } 
+        : scene
+    ));
   }
 
   const handleEditMap = () => {
@@ -517,8 +557,7 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
   useEffect(() => {
     // Se a aba atual ficar desabilitada, volta para a default
     const isDisabled =
-      (activeLayerKey !== "2" && elementSelected?.sceneType == ETypeScene.LOGO) ||
-      elementSelected?.sceneType == ETypeScene.POINTNCLICK;
+      (activeLayerKey !== "2" && elementSelected?.sceneType == ETypeScene.LOGO) || elementSelected?.sceneType == ETypeScene.POINTNCLICK;
 
     if (isDisabled) {
       setActiveLayerKey("2");
@@ -533,9 +572,26 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
     );
   }
 
+  const getSceneScripts = scenes.find(scene => scene.id === elementSelected.id)?.script?.map((script) => script);
+  const getPlayerHitScripts = (groupKey: string): IScriptsElement[] | undefined => {
+    const scene = scenes.find(s => s.id === elementSelected.id);
+    if (!scene) return;
+
+    switch (groupKey) {
+      case "playerHit1Script":
+        return scene.playerHit1Script?.map(s => s);
+      case "playerHit2Script":
+        return scene.playerHit2Script?.map(s => s);
+      case "playerHit3Script":
+        return scene.playerHit3Script?.map(s => s);
+      default:
+        return [];
+    }
+  };  
+
   return (
-    <Content style={{ padding: 10 }}>
-      <Space direction="vertical" style={{ width: '100%', zIndex: 50 }}>
+    <Content>
+      <Space direction="vertical" style={{ width: '100%', zIndex: 50, padding: 10 }}>
         {isEditingTitle ? (
           <Input
             autoFocus
@@ -553,10 +609,11 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
         {/* <Form.Item name="startSceneId" label="Starting Scene" style={{ flex: 1, textAlign: 'center' }}> */}
         {/* TODO lista de imagens para escolher */}
         {/* </Form.Item> */}
-        
+      </Space>
+      <Space direction="vertical" style={{ width: '100%' }}>
         {isTileEditor ? (
           // Tiles Editor Mode - Scene properties + tileset selector
-          <>
+          <Space direction="vertical" style={{ width: '100%', padding: 10 }}>
             <Typography.Title level={5}>Tileset</Typography.Title>
             <Content style={{ width: '100%', height: '100%' }}>
               <Space direction="vertical" >
@@ -571,7 +628,7 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
                       <span>Width: </span>
                       <InputNumber
                         min={15}
-                        max={50}
+                        max={64}
                         value={mapWidth}
                         onChange={(value) => handleMapSizeChange('width', (value || 15) * 16, elementSelected.id)}
                         formatter={(value) => `${value} tiles`}
@@ -582,7 +639,7 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
                       <span>Height: </span>
                       <InputNumber
                         min={10}
-                        max={50}
+                        max={64}
                         value={mapHeight}
                         onChange={(value) => handleMapSizeChange('height', (value || 10) * 16, elementSelected.id)}
                         formatter={(value) => `${value} tiles`}
@@ -591,7 +648,7 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
                     </div>
                   </Space>
                   <span style={{ fontSize: '12px', color: '#666' }}>
-                    Minimum: 240x160px (15x10 tiles) | Maximum: 800x800px (50x50 tiles)
+                    Minimum: 240x160px (15x10 tiles) | Maximum: 1024x1024px (64x64 tiles)
                   </span>
                 </Space>
               </Space>
@@ -656,51 +713,101 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
               <Typography.Text>2. Click and drag on map to paint tiles</Typography.Text>
               <Typography.Text>3. Selected tiles</Typography.Text>
             </Space>
-          </>
+          </Space>
         ) : (
           // Game World Mode - Basic scene properties + Tiles Editor button
-          <>
-            <Typography.Text>Backgrounds</Typography.Text>
+          <Content>
+            <Space direction="vertical" style={{ width: '100%', padding: 10 }}>
+              <Typography.Text>Backgrounds</Typography.Text>
+              <Tabs 
+                activeKey={activeLayerKey}
+                onChange={setActiveLayerKey}
+                type="card"
+                size={'small'}
+                items={backgroundLayers.map(key => ({
+                  key: String(key),
+                  label: `Layer ${key}`,
+                  children: (
+                    <BackgroundSelector
+                      selectedElementId={elementSelected.id}
+                      layerKey={key}
+                    />
+                  ),
+                  disabled: key!= 2 && elementSelected.sceneType === ETypeScene.LOGO || elementSelected.sceneType === ETypeScene.POINTNCLICK
+                  }))
+                }
+              />
+
+              <Divider style={{ margin: `${token.margin}px 0` }} />
+
+              <Typography.Text>Scene type</Typography.Text>
+              <Select
+                title="Select scene type"
+                placeholder="Select scene type"
+                value={elementSelected.sceneType || sceneTypes[0].value}
+                onChange={handleSceneTypeChange}
+                style={{ width: '100%' }}
+                options={sceneTypes.map(ts => ({ label: ts.label, value: ts.value }))}
+              />
+              { (elementSelected.sceneType === ETypeScene.LOGO || elementSelected.sceneType === ETypeScene.POINTNCLICK) && (
+                <Button 
+                  type="default" 
+                  onClick={handleEditMap}
+                  style={{ width: '100%' }}
+                >
+                  Open Tiles Editor
+                </Button>
+              )}
+            </Space>
+
+            <Divider variant="solid" style={{ margin: `${token.margin}px 0` }} />
+
             <Tabs 
-              activeKey={activeLayerKey}
-              onChange={setActiveLayerKey}
-              type="card"
+              // activeKey={'oninit'}
+              // onChange={setActiveLayerKey}
+              defaultActiveKey='1'
+              type="line"
               size={'small'}
-              items={backgroundLayers.map(key => ({
-                key: String(key),
-                label: `Layer ${key}`,
-                children: (
-                  <BackgroundSelector
-                    selectedElementId={elementSelected.id}
-                    layerKey={key}
-                  />
-                ),
-                disabled: key!= 2 && elementSelected.sceneType === ETypeScene.LOGO || elementSelected.sceneType === ETypeScene.POINTNCLICK
-                }))
+              items={
+                [
+                  {
+                    key: '1',
+                    label: '  On Init  ',
+                    children: (
+                      <Content>
+                        <CollapseEventManager scripts={getSceneScripts} />
+                        <SelectNewEvent tabIndex={'1'}/>
+                      </Content>
+                    )
+                  },
+                  {
+                    key: '2',
+                    label: 'On Player Hit',
+                    disabled: true,
+                    children: (
+                      <Tabs
+                        defaultActiveKey='1'
+                        type="card"
+                        size={'small'}
+                        items={ groupEvents.map((groupEvent) => (
+                          {
+                            key: groupEvent.key,
+                            label: groupEvent.label,
+                            children: (
+                              <Content>
+                                <CollapseEventManager scripts={getPlayerHitScripts(groupEvent.key)} />
+                                <SelectNewEvent subTabIndex={groupEvent.key}/>
+                              </Content>
+                            )
+                          }))
+                        }
+                      />
+                    )
+                  }
+                ]
               }
             />
-
-            <Divider style={{ margin: `${token.margin}px 0` }} />
-
-            <Typography.Text>Scene type</Typography.Text>
-            <Select
-              title="Select scene type"
-              placeholder="Select scene type"
-              value={elementSelected.sceneType || sceneTypes[0].value}
-              onChange={handleSceneTypeChange}
-              style={{ width: '100%' }}
-              options={sceneTypes.map(ts => ({ label: ts.label, value: ts.value }))}
-            />
-            { (elementSelected.sceneType === ETypeScene.LOGO || elementSelected.sceneType === ETypeScene.POINTNCLICK) && (
-              <Button 
-                type="primary" 
-                onClick={handleEditMap}
-                style={{ width: '100%' }}
-              >
-                Open Tiles Editor
-              </Button>
-            )}
-          </>
+          </Content>
         )}
       </Space>
     </Content>

@@ -1,14 +1,12 @@
-import React, { useState, useEffect, useCallback, useLayoutEffect } from 'react';
-import { Flex, Splitter, Typography, Layout, App as AntDApp, Skeleton, Spin } from 'antd';
+import { App as AntDApp, Flex, Layout, Spin, Splitter, Typography } from 'antd';
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 
 // import Layout from './components/Layout.tsx';
-import TopBar from '../../TopBar';
-import LeftPanel from '../../LeftPanel';
-import CentralEditor from '../../CentralEditor';
-import RightPanel from '../../RightPanel';
 import BottomPanel from '../../BottomPanel';
+import LeftPanel from '../../LeftPanel';
+import RightPanel from '../../RightPanel';
+import TopBar from '../../TopBar';
 import { ZoomProvider } from '../../ZoomContext';
-import EmulatorView from '../../EmulatorView';
 
 // import './Engine.css';
 // import '.././styles.css';
@@ -19,16 +17,17 @@ import TileEditor from '../../TileEditor';
 
 // import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 
-import { useLocation } from 'react-router-dom';
-import ErrorBoundary from 'antd/es/alert/ErrorBoundary';
-import { AntdToken } from '../../common/AntDToken';
-import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
-import { useBackgroundContext, useProjectContext, useSceneContext, useSettingsContext, useSettingsUtilsContext, useElementContext } from '@/providers/contexts/AppContexts';
+import { useBackgroundContext, useElementContext, useProjectContext, useSceneContext, useSettingsContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
 import { IBackgroundSettings } from '@/providers/contexts/interfaces/IBackgroundElement';
 import { IProjectSettings } from '@/providers/contexts/interfaces/IProjectElement';
+import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
 import { IMainSettings } from '@/providers/contexts/interfaces/ISettingElement';
 import { ISettingUtils } from '@/providers/contexts/interfaces/ISettingUtils';
 import { LayoutOutlined } from '@ant-design/icons';
+import ErrorBoundary from 'antd/es/alert/ErrorBoundary';
+import { Skeleton } from 'antd/lib';
+import { useLocation } from 'react-router-dom';
+import { AntdToken } from '../../common/AntDToken';
 
 const { Content } = Layout;
 
@@ -137,6 +136,7 @@ const Engine: React.FC = () => {
     handleResizeEnd(newSizes);
   };
 
+  // Loading Sizes Splitters
   useLayoutEffect(() => {
     if (!window.electronAPI) {
       console.error('window.electronAPI is undefined');
@@ -153,6 +153,23 @@ const Engine: React.FC = () => {
     };
 
     loadSizesSplitters();
+  }, []);
+
+  // Loading Favorite Events
+  useLayoutEffect(() => {
+    if (!window.electronAPI) {
+      console.error('window.electronAPI is undefined');
+      return;
+    }
+
+    const favoriteEvents = async () => {
+      const response = await window.electronAPI.loadFavoriteEvents();
+      console.log('>> FavoriteEvents: ', response);
+      
+      setSettingUtils(prev => ({ ...prev, favoriteEvents: response }));
+    };
+
+    favoriteEvents();
   }, []);
 
   useLayoutEffect(() => {
@@ -552,7 +569,7 @@ const Engine: React.FC = () => {
                 </Splitter>
               </Layout>
             )}
-          </Layout>
+          
             {contentView == 3 && (
               <Content style={{ margin: 50 }}>
                 <Skeleton.Node active style={{ height: 150, width: 250 }} />
@@ -596,6 +613,7 @@ const Engine: React.FC = () => {
                 <Skeleton.Node active style={{ height: 600, width: 350 }} />
               </Content>
             )}
+          </Layout>
         </ZoomProvider>
       </AntDApp>
     </ErrorBoundary>

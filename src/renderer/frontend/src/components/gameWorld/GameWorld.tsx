@@ -238,6 +238,12 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     }
   }, [elementSelected?.id]);
 
+  useEffect(() => {
+    if (elementSelected) {
+      setElementSelected(scenes.find(s => s.id === elementSelected.id));
+    }
+  }, [scenes, elementSelected?.id]);
+
   // Movendo tela de trabalho
   const handleMoveBackStart = () => {
     setIsMovedBackground(true);
@@ -437,8 +443,8 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
         }],
         x: relativeX,
         y: relativeY,
-        width: 0,
-        height: 0,
+        width: 240,
+        height: 160,
         sceneType: ETypeScene.TOPDOWN,
       };
 

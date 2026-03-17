@@ -75,7 +75,7 @@ export class AssetBuilder {
           if (!fs.existsSync(destPath) || overwrite) {
             fs.copyFileSync(sourcePath, destPath);
 
-            const resourceFile = resourceFiles.find(r => r.jsonContent?.filename === entry.name)
+            const resourceFile = resourceFiles.find(r => r.jsonContent?.filename === filename)
             await this.processAssets(sourcePath, destPath, relativeBase, resourceFile);
             
             if (verbose) {
@@ -361,9 +361,9 @@ export class AssetBuilder {
         break;
     }
 
-    const { stdout, stderr } = await execFileAsync(magickPath, args);
-    console.log("..: execFileAsync stdout:", stdout);
-    console.log("..: execFileAsync stderr:", stderr);
+    /*const { stdout, stderr } = */await execFileAsync(magickPath, args);
+    // console.log("..: execFileAsync stdout:", stdout);
+    // console.log("..: execFileAsync stderr:", stderr);
 
     // const proc = spawn(magickPath, args);
     // proc.stdout.on("data", data => console.log(data.toString()));
