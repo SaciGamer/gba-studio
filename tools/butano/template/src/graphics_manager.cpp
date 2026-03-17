@@ -176,7 +176,8 @@ void GraphicsManager::render_scene_regular_bg(const Scenes& scene)
                 int priority = scene.backgrounds_layers_size - 1 - layer.layerId;
                 // fica sempre em uma camada valida
                 priority = bn::clamp(priority, 0, 3);
-                bg_ptr.set_priority(priority);
+                // bg_ptr.set_priority(priority); // reservar prioridade para ser setada pelo usuário!
+                bg_ptr.set_z_order(priority);
 
                 current_bgs.push_back(bg_ptr);
 
@@ -224,7 +225,7 @@ void GraphicsManager::render_scene_bitmap_bg(const Scenes& scene)
                 // ou esse
                 // Cria um bitmap BG vazio (BG2)
                 bn::sp_direct_bitmap_bg_ptr bmp_bg = bn::sp_direct_bitmap_bg_ptr::create();
-                bmp_bg.set_priority(2);
+                // bmp_bg.set_priority(2);
 
                 // Usa o painter para desenhar a imagem dentro do BG
                 bn::sp_direct_bitmap_bg_painter painter(bmp_bg);

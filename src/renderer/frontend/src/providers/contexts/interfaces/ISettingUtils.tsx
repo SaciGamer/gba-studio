@@ -12,7 +12,11 @@ interface IImages {
     localImagePathHD: string;
 }
 
-export interface ISettingUtils extends IBaseSettings, IActiveButtons, IImages {
+interface IFavoriteEvents {
+    favoriteEvents?: string[];
+}
+
+export interface ISettingUtils extends IBaseSettings, IActiveButtons, IImages, IFavoriteEvents {
     _resourceType: string;
     projectPathFile: string | null;
     projectDirectory: string | null;

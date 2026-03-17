@@ -1,3 +1,6 @@
+import { IChangeScene } from "@/components/events/interfaces/IChangeScene";
+import { IFade } from "@/components/events/interfaces/IFade";
+import { IWait } from "@/components/events/interfaces/IWaiting";
 import { IResourceSettings } from "./IBaseSettings";
 
 export enum ETypeScene {
@@ -16,7 +19,19 @@ export enum EImageType {
 
 export interface IBackgroundElement {
     layerId: number;
-    backgroundId?: string;
+    backgroundId?: string | null;
+}
+
+export interface IArgs extends IFade, IChangeScene, IWait {
+  __comment?: boolean;
+  __collapse?: boolean;
+}
+
+export interface IScriptsElement {
+    id: string;
+    command: string;
+    args?: IArgs;
+    children?: Object[];
 }
 
 interface IPosAndWidth {
@@ -28,7 +43,7 @@ interface IPosAndWidth {
 
 export interface ISceneSettings extends IResourceSettings {
     _index: number;
-    backgroundId?: string;  // Made optional
+    backgroundId?: string;  // REMOVER
     background?: string;    // Made optional
     backgrounds?: IBackgroundElement[];
     x: number;
@@ -43,15 +58,16 @@ export interface ISceneSettings extends IResourceSettings {
     collisions?: IPosAndWidth[];
     triggers?: IPosAndWidth[];
     autoFadeSpeed?: number;
-    script?: object[];
-    playerHit1Script?: object[],
-    playerHit2Script?: object[],
-    playerHit3Script?: object[],
+    script?: IScriptsElement[];
+    playerHit1Script?: IScriptsElement[],
+    playerHit2Script?: IScriptsElement[],
+    playerHit3Script?: IScriptsElement[],
     // Tiles editor fields
     imageType?: EImageType;
     selectedTilesetId?: string;
     tileMap?: number[][];
     isEditingMap?: boolean;
+    cameraPosition?: { x: number; y: number };
 }
 
 export interface SceneContextType {

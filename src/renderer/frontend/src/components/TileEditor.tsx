@@ -138,7 +138,7 @@ const TileEditor: React.FC<TileEditorProps> = ({ scene, resetPanelSize, setShowF
   // Atualiza tiles quando scene ou dimensões mudam
   useEffect(() => {
     const w = elementSelected?.width ? elementSelected.width / 16 : 15;
-    const h = elementSelected?.height ? elementSelected.height / 16 : 20;
+    const h = elementSelected?.height ? elementSelected.height / 16 : 10;
 
     setMapWidth(w);
     setMapHeight(h);

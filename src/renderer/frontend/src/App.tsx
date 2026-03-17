@@ -1,19 +1,22 @@
-import React, { useEffect } from 'react';
-import { Route, Routes, Navigate, HashRouter } from 'react-router-dom';
-import { useState } from 'react';
 import { ConfigProvider, Layout, Spin } from 'antd';
 import en_US from 'antd/locale/en_US';
+import es_ES from 'antd/locale/es_ES';
+import fr_FR from 'antd/locale/fr_FR';
+import pt_BR from 'antd/locale/pt_BR';
+import React, { useEffect, useState } from 'react';
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 
-import './components/themes/globalStyles.css';  // Importe o arquivo CSS global
 import { LayoutOutlined } from '@ant-design/icons';
 import { Content } from 'antd/es/layout/layout';
-import Themes from './components/themes/Themes';
-import SplashScreen from './components/pages/splashScreen/SplashScreen';
-import Launcher from './components/pages/launcher/Launcher';
+import { Locale } from 'antd/es/locale';
 import About from './components/pages/about/About';
 import Engine from './components/pages/engine/Engine';
-import AppProvider from './providers/AppProviders';
+import Launcher from './components/pages/launcher/Launcher';
+import SplashScreen from './components/pages/splashScreen/SplashScreen';
 import PreferencesModal from './components/PreferencesModal';
+import './components/themes/globalStyles.css'; // Importe o arquivo CSS global
+import Themes from './components/themes/Themes';
+import AppProvider from './providers/AppProviders';
 
 interface Preferences {
   theme: string;
@@ -29,12 +32,38 @@ interface RecentProject {
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<any>();
-  const [locale, setLocale] = useState(en_US);
+  const [locale, setLocale] = useState<Locale>(en_US);
 
   const [isLoading, setIsLoading] = useState(true);
   const [prefsOpen, setPrefsOpen] = useState(false);
 
   // Carregar preferências iniciais --------------------------------
+  // Função auxiliar para carregar o locale
+  const loadLocale = async (language: string) => {
+    try {
+      let localeModule;
+      switch (language) {
+        case 'pt_BR':
+          localeModule = pt_BR;
+          break;
+        case 'es_ES':
+          localeModule = es_ES;
+          break;
+        case 'fr_FR':
+          localeModule = fr_FR;
+          break;
+        case 'en_US':
+        default:
+          localeModule = en_US;
+      }
+      console.log('..: Carregando idioma: ', language);
+      setLocale(localeModule);
+    } catch (error) {
+      console.error('Erro ao carregar idioma:', error);
+      setLocale(en_US); // Fallback para inglês
+    }
+  };
+
   useEffect(() => {
     console.log('..: USE EFFECT ENTROU :..');
 
@@ -77,6 +106,19 @@ const App: React.FC = () => {
     return () => window.electronAPI.removeListener('change-theme', themeChangeHandler);
   }, []);
   // Evento para CHANGE THEME END ----------------------------------
+
+  // Evento para CHANGE LANGUAGE 
+  useEffect(() => {
+    if (!window.electronAPI) return;
+
+    const languageChangeHandler = (event: any, newLanguage: string) => {
+      loadLocale(newLanguage);
+    };
+
+    window.electronAPI.on('change-language', languageChangeHandler);
+    return () => window.electronAPI.removeListener('change-language', languageChangeHandler);
+  }, []);
+  // Evento para CHANGE LANGUAGE END -------------------------------
 
   // Efeito PRETO/BRANCO tela inativa ------------------------------
   const [isWindowActive, setIsWindowActive] = useState(true);
@@ -139,31 +181,6 @@ const App: React.FC = () => {
     holder.appendChild(dot);
 
     return dot;
-  };
-
-  // Função auxiliar para carregar o locale
-  const loadLocale = async (language: string) => {
-    try {
-      let localeModule;
-      switch (language) {
-        case 'pt_BR':
-          localeModule = await import('antd/locale/pt_BR');
-          break;
-        case 'es_ES':
-          localeModule = await import('antd/locale/es_ES');
-          break;
-        case 'fr_FR':
-          localeModule = await import('antd/locale/fr_FR');
-          break;
-        case 'en_US':
-        default:
-          localeModule = await import('antd/locale/en_US');
-      }
-      setLocale(localeModule.default);
-    } catch (error) {
-      console.error('Erro ao carregar idioma:', error);
-      setLocale(en_US); // Fallback para inglês
-    }
   };
 
   if (isLoading) {

@@ -1,12 +1,12 @@
-import React, { CSSProperties, useState, useEffect, useRef } from 'react';
 import { useDraggable } from '@dnd-kit/core';
+import React, { CSSProperties, useEffect, useRef, useState } from 'react';
 
+import { useBackgroundContext, useSettingsContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
+import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
+import { PlaySquareTwoTone } from '@ant-design/icons';
+import { Content } from 'antd/es/layout/layout';
 import { AntdToken } from '../common/AntDToken';
 import { elementStyle, titleStyle } from './GameElement.styles';
-import { Content } from 'antd/es/layout/layout';
-import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
-import { useBackgroundContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
-import imgPlaceholder from '@/img/placeholder.png';
 
 interface GameElementProps {
   sceneElement: ISceneSettings;
@@ -31,9 +31,11 @@ const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, onS
   // const [elementSize, setElementSize] = useState({ width: 0, height: 0 });
   const { backgrounds, setBackgrounds } = useBackgroundContext();
   const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
+  const { settings, setSettings } = useSettingsContext();
   // const [imgDefault, setImgDefault] = useState<imgProps>({ src: '', width: 0, height: 0 });
   const [tilesetImage, setTilesetImage] = useState<HTMLImageElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [draggingInitialPosition, setDraggingInitialPosition] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: sceneElement.id,
@@ -126,7 +128,7 @@ const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, onS
 
     // desenha backgrounds
     sceneElement.backgrounds?.sort((a, b) => a.layerId - b.layerId).forEach(lbg => {
-      const bgData = backgrounds.find(b => b.id === lbg.backgroundId);
+      const bgData = backgrounds.find(b => !b._deleted && b.id === lbg.backgroundId);
       if (bgData) {
         const img = new Image();
         img.src = `${bgData.hd ? settingUtils.localImagePathHD : settingUtils.localImagePath}/${bgData.filename}`;
@@ -139,17 +141,37 @@ const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, onS
       }
     });
 
-    // desenha colisões (exemplo)
+    // desenha colisões
     sceneElement.collisions?.forEach(c => {
       ctx.fillStyle = "rgba(255,0,0,0.3)";
       ctx.fillRect(c.x, c.y, c.width, c.height);
     });
 
-    // desenha triggers (exemplo)
+    // desenha triggers
     sceneElement.triggers?.forEach(t => {
       ctx.strokeStyle = "rgba(0,255,0,0.5)";
       ctx.strokeRect(t.x, t.y, t.width, t.height);
     });
+
+    // desenhar CÂMERA por cima de todas as camadas
+    let screenBaseX = 240;
+    let screenBaseY = 160;
+    let x = sceneElement?.cameraPosition?.x || ((canvas.width / 2) - (screenBaseX / 2));
+    let y = sceneElement?.cameraPosition?.y || ((canvas.height / 2) - (screenBaseY / 2));
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(149, 149, 149, 0.7)";   // cor da borda
+    ctx.strokeRect(x, y, screenBaseX, screenBaseY);   // caixa da câmera
+    ctx.fillStyle = "rgba(130, 133, 130, 0.3)";     // espessura da linha
+    ctx.fillRect(x, y, screenBaseX, screenBaseY);
+
+    // desenhar X dentro da câmera
+    ctx.beginPath();
+    ctx.moveTo(x, y);                        // canto superior esquerdo
+    ctx.lineTo(screenBaseX + x, screenBaseY + y);                    // canto inferior direito
+    ctx.moveTo(screenBaseX + x, y);                      // canto superior direito
+    ctx.lineTo(x, screenBaseY + y);                      // canto inferior esquerdo
+    ctx.stroke();
 
   }, [sceneElement.sceneType, sceneElement.tileMap, tilesetImage, sceneElement.backgrounds, backgrounds, settingUtils.localImagePath]);
 
@@ -162,6 +184,36 @@ const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, onS
   );
 
   const computedTitleStyle: CSSProperties = titleStyle(isSelected, isHovered, token);
+
+  const handleMoveInitialPlayerPosition = (e:any) => {
+    if (!draggingInitialPosition) return;
+
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    let x = Math.floor((e.clientX - rect.left) / 16); // tile X
+    let y = Math.floor((e.clientY - rect.top) / 16);  // tile Y
+
+    // limita dentro do grid
+    const maxX = Math.floor(rect.width / 16) - 2;
+    const maxY = Math.floor(rect.height / 16) - 2;
+
+    x = Math.max(0, Math.min(x, maxX));
+    y = Math.max(0, Math.min(y, maxY));
+
+    // dispara atualização para settings
+    setSettings(prev => ({...prev, startX: x, startY: y }));
+  };
+
+  const getRotation = (direction: string): number => {
+    switch (direction) {
+      case 'up': return -90;
+      case 'down': return 90;
+      case 'left': return 180;
+      case 'right': return 0;
+      default: return 0;
+    }
+  };
 
   return (
     <Content
@@ -177,8 +229,31 @@ const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, onS
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >    
-      {/* Renderiza tileMap se disponivel */}
-      <canvas ref={canvasRef}/>
+      <Content style={{position: "relative"}} 
+        onMouseUp={() => setDraggingInitialPosition(false)}
+        onMouseMove={(e) => handleMoveInitialPlayerPosition(e)}
+        onMouseLeave={() => setDraggingInitialPosition(false)}
+      >
+        {/* Renderiza tileMap se disponivel */}
+         <canvas ref={canvasRef}/>
+        {/* Ícone do player sobreposto */}
+        {settings?.startSceneId === sceneElement?.id && (
+          <PlaySquareTwoTone twoToneColor={[draggingInitialPosition ? "orange" : "gray", "red"]} 
+            rotate={getRotation(settings.startDirection)} 
+            style={{
+              position: "absolute", 
+              left: settings.startX * 16, 
+              top: settings.startY * 16, 
+              fontSize: 32, 
+              color: "red", 
+              cursor: draggingInitialPosition ? "grabbing" : "grab" }} 
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setDraggingInitialPosition(true);
+            }}
+            />
+        )}
+      </Content>
 
       {/* TITLE */}
       <Content {...listeners} style={computedTitleStyle}>
