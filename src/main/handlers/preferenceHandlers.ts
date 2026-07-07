@@ -118,16 +118,6 @@ const getLastPositionSplitters = () => {
 }
 // LAST POSITION SPLITTERS END ---------------------------------------------
 
-// FAVORITE EVENTS -------------------------------------------------
-const setFavoriteEvents = (favoriteEvents: string[]): void => {
-  __store.set('favoriteEvents', favoriteEvents);
-}
-
-const getFavoriteEvents = () => {
-  return __store.get('favoriteEvents');
-}
-// FAVORITE EVENTS END -------------------------------------------------
-
 // DEVKIT & BUILD PATHS ------------------------------------------------
 const getDevkitPath = (): string => {
   const prefs = getPreferences();
@@ -235,9 +225,6 @@ export const configurarPreferenceHandlers = () => {
   //--
   ipcMain.handle('lastPositionSplitters', (_event: IpcMainInvokeEvent, lastPositionSplitters: number[]) => saveLastPositionSplitters(lastPositionSplitters));
   ipcMain.handle('loadLastPositionSplitters', () => getLastPositionSplitters());
-  //--
-  ipcMain.handle('setFavoriteEvents', (_event: IpcMainInvokeEvent, favoriteEvents: string[]) => setFavoriteEvents(favoriteEvents));
-  ipcMain.handle('loadFavoriteEvents', () => getFavoriteEvents());
   //--
   ipcMain.handle('get-devkit-path', () => getDevkitPath());
   ipcMain.handle('set-devkit-path', (_event: IpcMainInvokeEvent, devkitPath: string) => setDevkitPath(devkitPath));

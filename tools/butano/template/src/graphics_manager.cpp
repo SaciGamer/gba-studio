@@ -9,6 +9,7 @@
 #include "bn_string.h"
 #include "bn_log.h"
 #include "bn_vector.h"
+#include "bn_regular_bg_ptr.h"
 
 #include "graphics_manager.h"
 
@@ -131,16 +132,7 @@ const Scenes* GraphicsManager::initialize()
         return nullptr;
     }
 
-    // 2. Busca a cena pelo ID na registry
-    const Scenes* scene = get_scene_by_id(settings->start_scene_id);
-    if(!scene)
-    {
-        BN_LOG("Scene não encontrada com ID: ", settings->start_scene_id);
-        return nullptr;
-    }
-    BN_LOG("Scene encontrada: ", scene->name);
-
-    return scene;
+    return GraphicsManager::loadNextSceneById(settings->start_scene_id);
 }
 
 void GraphicsManager::render_scene_regular_bg(const Scenes& scene) 
@@ -148,6 +140,8 @@ void GraphicsManager::render_scene_regular_bg(const Scenes& scene)
     // Limpa backgrounds ativos
     current_bgs.clear();
     current_bitmap_bgs.reset();
+
+    // bn::core::update();  
 
     BN_LOG("..: render_scene :..");
     for(int i = 0; i < scene.backgrounds_layers_size; i++)
@@ -178,6 +172,7 @@ void GraphicsManager::render_scene_regular_bg(const Scenes& scene)
                 priority = bn::clamp(priority, 0, 3);
                 // bg_ptr.set_priority(priority); // reservar prioridade para ser setada pelo usuário!
                 bg_ptr.set_z_order(priority);
+                bg_ptr.set_blending_enabled(true);
 
                 current_bgs.push_back(bg_ptr);
 
@@ -196,6 +191,8 @@ void GraphicsManager::render_scene_bitmap_bg(const Scenes& scene)
     // Limpa backgrounds ativos
     current_bgs.clear();
     current_bitmap_bgs.reset();
+
+    bn::core::update();  
 
     BN_LOG("..: render_scene :..");
 
@@ -226,6 +223,7 @@ void GraphicsManager::render_scene_bitmap_bg(const Scenes& scene)
                 // Cria um bitmap BG vazio (BG2)
                 bn::sp_direct_bitmap_bg_ptr bmp_bg = bn::sp_direct_bitmap_bg_ptr::create();
                 // bmp_bg.set_priority(2);
+                bmp_bg.set_blending_enabled(true);
 
                 // Usa o painter para desenhar a imagem dentro do BG
                 bn::sp_direct_bitmap_bg_painter painter(bmp_bg);
@@ -234,6 +232,7 @@ void GraphicsManager::render_scene_bitmap_bg(const Scenes& scene)
                 int x = (240 - s.width()) / 2;
                 int y = (160 - s.height()) / 2;
 
+                painter.fill(bn::color(0, 0, 0));  // limpa tudo com preto
                 painter.blit(x, y, bmp_bg_item.value());
 
                 // Guarda no current_bitmap_bg
@@ -279,14 +278,74 @@ void GraphicsManager::initialize_tilemap(const Scenes* scene)
     }
 
     // 2. Generate background by tile_data
-    bn::string<64> image_type = scene->tile_image_type;
+    // bn::string<64> image_type = scene->tile_image_type;
 
     // if(image_type == "dp_direct_bitmap_bg") {
         // generate_dp_direct_bitmap_bg_manager(tilemap_rows, tilemap_cols, scene->tile_data);
     // } else {
-        generate_palette_bitmap_bg_manager(current_palette_btmp_bg, tilemap_rows, tilemap_cols, scene->tile_data);
+        // generate_palette_bitmap_bg_manager(current_palette_btmp_bg, tilemap_rows, tilemap_cols, scene->tile_data);
     // }
 
+}
+
+void GraphicsManager::startup_screen(bn::regular_bg_ptr gba_studio_logo) {
+    current_bgs.clear();
+    bn::core::update();  
+    
+    current_bgs.push_back(gba_studio_logo);
+}
+
+void GraphicsManager::startup_screen_bitmap(bn::direct_bitmap_item spritesheet) {
+    current_bitmap_bgs.reset();
+    bn::core::update();  
+    
+    bn::sp_direct_bitmap_bg_ptr bmp_bg = bn::sp_direct_bitmap_bg_ptr::create();
+    bmp_bg.set_blending_enabled(true);
+
+    // Usa o painter para desenhar a imagem dentro do BG
+    bn::sp_direct_bitmap_bg_painter painter(bmp_bg);
+    
+    bn::size s = spritesheet.dimensions();
+    int x = (240 - s.width()) / 2;
+    int y = (160 - s.height()) / 2;
+
+    painter.fill(bn::color(0, 0, 0));  // limpa tudo com preto
+    painter.blit(x, y, spritesheet);
+
+    // Guarda no current_bitmap_bg
+    current_bitmap_bgs = bmp_bg;
+}
+
+const Scenes* GraphicsManager::loadNextSceneById(const bn::string<64>& scene_id) {
+    // 2. Busca a cena pelo ID na registry
+    const Scenes* scene = get_scene_by_id(scene_id);
+    if(!scene)
+    {
+        BN_LOG("loadNextSceneById - Scene não encontrada com ID: ", scene_id);
+        return nullptr;
+    }
+    BN_LOG("loadNextSceneById - Scene encontrada: ", scene->name);
+
+    // Setar a currente scene para conseguir ser usada as funções
+    setScene(scene);
+    
+    // 3. Valida tipo da cena
+    bn::string<64> scene_type = scene->scene_type;
+    BN_LOG("Scene type: ", scene_type.data());
+    if(scene_type != "Logo" && scene_type != "Point Click") {
+        // 4. Renderiza cena
+        BN_LOG("Renderizando cena com REGULAR BG");
+        GraphicsManager::render_scene_regular_bg(*scene);
+    } else {
+        BN_LOG("Renderizando cena com BITMAP BG");
+        // 5. Renderiza cena
+        GraphicsManager::render_scene_bitmap_bg(*scene);
+    }
+
+    // 6. Desenha tiles
+    GraphicsManager::initialize_tilemap(scene);
+
+    return scene;
 }
 
 bn::optional<bn::sprite_ptr> GraphicsManager::create_sprite(const bn::sprite_item& item, int x, int y)

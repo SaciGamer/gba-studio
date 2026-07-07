@@ -65,7 +65,7 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    console.log('..: USE EFFECT ENTROU :..');
+    console.log('..: USE EFFECT loadPreferences ENTROU :..');
 
     if (!window.electronAPI) {
       console.error('window.electronAPI is undefined');

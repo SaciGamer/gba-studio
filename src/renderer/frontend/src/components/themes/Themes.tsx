@@ -90,10 +90,10 @@ const Themes: Record<string, any> = {
       colorError: '#ff3333', // Vermelho
       // colorBgContainer: '#088A08',
       colorBgContainerDisabled: '#2c2c2c',
-      colorBgElevated: '#04B45F',
+      colorBgElevated: '#088A08',
       colorFill: '#e60012',
       // colorTextPlaceholder: '#ffffff',
-      colorBorder: '#ff3333 ',
+      // colorBorder: '#ff3333 ', // Borda e Titulo do LeftMenu
       controlHeightLG: '50px', // Aumenta a altura dos botões grandes
       // paddingXXS: '4px',
       // borderRadiusSm: '4px',
@@ -101,6 +101,10 @@ const Themes: Record<string, any> = {
       // controlHeight: '50px', // Aumenta a altura dos botões padrão
     },
     components: {
+      Collapse: {
+        contentBg:'#483D8B', // caso precise trocar a cor do fundo do colapse
+        padding: 10,
+      },
       Tooltip: {
         borderRadius: 20,                                            // Borda arredondada
         colorTextLightSolid: '#F8D030',                              // Cor do texto
@@ -116,20 +120,42 @@ const Themes: Record<string, any> = {
     token: {
       colorPrimary: '#e60012', // Cor primaria
       colorTextBase: '#FFFFFF', // Cor textos
-      colorBgBase: '#D8D8D8',
-      borderRadius: '0px', // Mais quadrado
+      colorBgBase: '#979797',
       colorSuccess: '#52c41a',
       colorWarning: '#faad14',
       colorError: '#f5222d',
       colorBgContainer: '#505050', // Cor de fundo dos botões e inputs
       colorBgContainerDisabled: '#D8D8D8', // Cor de fundo desabilitada dos botões e inputs
       colorBgElevated: '#000000', // Cor de fundo dos menus suspensos
-      colorTextPlaceholder: '#FFFFFF', // Placeholder cinza
+      colorTextPlaceholder: '#979797', // Placeholder cinza
       colorFill: '#e60012',
-      fontSize: 18,
+      fontSize: 15,
       colorBorder: '#000000',
-
-      controlHeightLG: '50px',
+      controlHeightLG: '45px',
+      borderRadius: '0px', // Mais quadrado
+      "borderRadiusXS": 0,
+      "borderRadiusSM": 0,
+      "borderRadiusLG": 0,
+      "padding": 8,
+      "paddingSM": 4,
+      "paddingLG": 12,
+      "margin": 8,
+      "marginSM": 4,
+      "marginLG": 12,
+      "boxShadow": "none",
+      "boxShadowSecondary": "none",
+      
+    },
+    components: {
+      Collapse: {
+        contentBg:'#979797', // caso precise trocar a cor do fundo do colapse
+        padding: 10,
+      },
+      Tooltip: {
+        borderRadius: 20,                                            // Borda arredondada
+        colorTextLightSolid: '#F8D030',                              // Cor do texto
+        colorBgSpotlight: 'rgba(243, 11, 11, 0.8)',                // Cor de fundo do tooltip
+      }
     },
   },
   blue: {
@@ -148,12 +174,19 @@ const Themes: Record<string, any> = {
 
       controlHeightLG: '50px',
     },
+    components: {
+      Collapse: {
+        // headerBg: '#6E6E6E', // Caso não use a config no painel
+        contentBg:'#0080FF', // caso precise trocar a cor do fundo do colapse
+        padding: 10,
+      },
+    }
   },
   silver: {
     token: {
-      colorPrimary: '#C0C0C0',
+      colorPrimary: '#93a5bb',
       colorTextBase: '#000000',
-      colorBgBase: '#E0E0E0',
+      colorBgBase: '#e0e0e0',
       borderRadius: '10px',
       colorSuccess: '#52c41a',
       colorWarning: '#faad14',
@@ -164,7 +197,7 @@ const Themes: Record<string, any> = {
       colorBorder: '#808080',
       // colorTextPlaceholder: '#000000',
 
-      controlHeightLG: '50px',
+      controlHeightLG: '45px',
     },
   },
 };

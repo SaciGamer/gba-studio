@@ -1,21 +1,22 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { DndContext } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, Modifier } from '@dnd-kit/core';
+import { Transform } from '@dnd-kit/utilities';
+import { Affix, App, Layout, Row } from 'antd';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import DragAndDrop from './DragAndDrop'
-import Grid from './Grid';
-import GameElement from './GameElement';
-import { Affix, App, Button, Layout, Row, Space } from 'antd';
 import { AntdToken } from '../common/AntDToken';
+import DragAndDrop from './DragAndDrop';
+import GameElement from './GameElement';
 
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import FloatButttons from '../FloatButtons';
+import { AimOutlined, AppstoreAddOutlined, AuditOutlined, BgColorsOutlined, BlockOutlined, BorderInnerOutlined, ClearOutlined, CloseSquareOutlined, ExpandOutlined, ExperimentOutlined, FormatPainterFilled, FormatPainterOutlined, InsertRowAboveOutlined, LayoutOutlined, PicLeftOutlined, PictureFilled, PlusSquareFilled, SelectOutlined, VerticalAlignMiddleOutlined } from '@ant-design/icons';
 import { Content } from 'antd/es/layout/layout';
-import { AimOutlined, AppstoreAddOutlined, AuditOutlined, BgColorsOutlined, BlockOutlined, BorderInnerOutlined, BorderlessTableOutlined, CheckCircleFilled, ClearOutlined, CloseSquareOutlined, DeleteOutlined, EditOutlined, ExpandOutlined, ExperimentOutlined, FormatPainterFilled, FormatPainterOutlined, IeCircleFilled, InfoCircleFilled, InsertRowAboveOutlined, MinusCircleFilled, MinusCircleOutlined, PicLeftOutlined, PictureFilled, PlusSquareFilled, ReloadOutlined, SelectOutlined, SmileOutlined, VerticalAlignMiddleOutlined, ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons';
+import { ReactZoomPanPinchRef, TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
+import FloatButttons from '../FloatButtons';
 
 import imgPlaceholder from '@/img/placeholder.png';
+import useAppContexts from '@/providers/contexts/AppContexts';
 import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
-import { useBackgroundContext, useElementContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
 import { ISettingUtils } from '@/providers/contexts/interfaces/ISettingUtils';
+import { Spin } from 'antd/lib';
 
 enum SubMenuType {
   TOOLTIP = 'tooltip',
@@ -58,16 +59,21 @@ interface IGameWorld {
 const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, showFloatButton }) => {
   const { token } = AntdToken();
   const { message, notification, modal } = App.useApp();
-  const { scenes, setScenes } = useSceneContext();
-  const { backgrounds, setBackgrounds } = useBackgroundContext();
-  const { settingUtils, setSettingUtils, settingUtilsRef } = useSettingsUtilsContext();
-  const { elementSelected, setElementSelected } = useElementContext();
+  const { 
+    scenes, setScenes, scenesRef, 
+    backgrounds, setBackgrounds, 
+    settingUtils, setSettingUtils,
+    elementSelected, setElementSelected, 
+    userSettings, setUserSettings
+  } = useAppContexts();
 
-  const [worldSize, setWorldSize] = useState({ width: 800, height: 800 });
+  const [worldSize, setWorldSize] = useState({ width: 1920, height: 1080 });
   const [isMovedBackground, setIsMovedBackground] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
+  const zoomLevel = userSettings.zoom / 100;
 
   const [updatedImages, setUpdatedImages] = useState<any>();
+
+  const wrapperRef = useRef<ReactZoomPanPinchRef | null>(null);;
 
   let isDeleting = false;
 
@@ -238,116 +244,66 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     }
   }, [elementSelected?.id]);
 
+  const [loading, setLoading] = useState(true);
+  
+   // função utilitária para calcular o tamanho do mundo
+  const calculateWorldSize = (scenes: ISceneSettings[]) => {
+    const maxWidth = Math.max(1920, ...scenes.map(el => el.x + el.width));
+    const maxHeight = Math.max(1080, ...scenes.map(el => el.y + el.height));
+    return { width: maxWidth, height: maxHeight };
+  };
+
+  // useEffect para inicialização
   useEffect(() => {
-    if (elementSelected) {
-      setElementSelected(scenes.find(s => s.id === elementSelected.id));
+    if (scenes.length > 0) {
+      setWorldSize(calculateWorldSize(scenes));
+      setLoading(false);
     }
-  }, [scenes, elementSelected?.id]);
+  }, [scenes]);
 
   // Movendo tela de trabalho
   const handleMoveBackStart = () => {
     setIsMovedBackground(true);
-    console.log(isMovedBackground);
+    // console.log(isMovedBackground);
+  };
+
+  const zoomModifier: Modifier = ({ transform }: { transform: Transform }) => {
+    return {
+      ...transform,
+      x: Math.round(transform.x / gridValue) * (gridValue / zoomLevel),
+      y: Math.round(transform.y / gridValue) * (gridValue / zoomLevel),
+    };
   };
 
   // Lógica arranste do elemento
-  const handleDragEnd = useCallback((event: any) => {
+  const handleDragEnd = (event: DragEndEvent) =>{
     const { active, delta } = event;
     const draggedElement = scenes.find(el => el.id === active.id);
     if (draggedElement) {
-      const newX = draggedElement.x + (delta.x / state.scale);
-      const newY = draggedElement.y + (delta.y / state.scale);
+      const newX = draggedElement.x + delta.x;
+      const newY = draggedElement.y + delta.y;
 
-      // Ajuste para a grade (assumindo uma grade)
-      const gridSize = gridValue;
-      const snappedX = Math.max(leftLimite, Math.round(newX / gridSize) * gridSize);
-      const snappedY = Math.max(titleHeight, Math.round(newY / gridSize) * gridSize);
+      // Calcula com limite
+      const snappedX = Math.max(leftLimite, newX);
+      const snappedY = Math.max(titleHeight, newY);
 
-      // Verifica se há elementos além dos novos limites
-      // const elementsBeyondLimits = scenes.some(el =>
-      //   el.id !== active.id && (
-      //     el.x + el.width > snappedX ||
-      //     el.y + el.height > snappedY
-      //   )
-      // );
+      // Ajusta a posição do elemento arrastado
+      setScenes(prev => prev.map(el => 
+        el.id === active.id ? { ...el, x: snappedX, y: snappedY, _saved: false } : el
+      ));
 
-      // Ajusta o tamanho do mundo baseado na posição do elemento arrastado e se há elementos além dos limites
-      const newWorldWidth = Math.max(800, snappedX + draggedElement.width + 100, ...scenes.filter(el => el.id !== active.id).map(el => el.x + el.width));
-      const newWorldHeight = Math.max(800, snappedY + draggedElement.height + 100, ...scenes.filter(el => el.id !== active.id).map(el => el.y + el.height));
+      const newWorld = calculateWorldSize([
+        ...scenes.filter(el => el.id !== active.id),
+        { ...draggedElement, x: snappedX, y: snappedY }
+      ]);
 
-      // // Verifique se precisamos expandir o mundo
-      // const newWorldWidth = Math.max(800, snappedX + draggedElement.width + 200);
-      // const newWorldHeight = Math.max(800, snappedY + draggedElement.height + 200);
-
-      // Ajusta a posição do elemento arrastado e pede atualização no BE
-      setScenes(prev => prev.map(el => {
-        if (el.id === active.id) {
-          const elementUpdated = { ...el, x: snappedX, y: snappedY, _saved: false };
-          // window.electronAPI.updateSettings('scene', elementUpdated);
-          return { ...elementUpdated };
-        }
-        return el;
-      }));
-
-      if (newWorldWidth !== worldSize.width || newWorldHeight !== worldSize.height) {
-        setWorldSize({ width: newWorldWidth, height: newWorldHeight });
+      if (newWorld.width !== worldSize.width || newWorld.height !== worldSize.height) {
+        setWorldSize(newWorld);
       }
 
       setIsMovedBackground(false);
-      console.log("..: teste quantas vezes entra isMovedBackRef: ", isMovedBackground);
     }
-  }, [scenes, worldSize]);
-
-  // Lógica para mover barras de rolagem com botão esquerdo do mouse
-  // const handleMouseDown = useCallback((event) => {
-  //   // console.log("Mouse Down Event:", event);
-  //   if (event.button === 1 || ((event.button === 0 || event.button === 2) && !event.target.closest('.game-element'))) {
-  //     event.preventDefault();
-
-  //     const gameWorld = event.currentTarget as HTMLElement;
-
-  //     let startX = event.clientX;
-  //     let startY = event.clientY;
-  //     let scrollLeft = gameWorld.scrollLeft;
-  //     let scrollTop = gameWorld.scrollTop;
-
-  //     const onMouseMove = (e: MouseEvent) => {
-  //       document.body.style.cursor = 'grabbing';
-  //       setIsMovedBackground(true);
-  //       // console.log("..: Entrou no Centrado MOVENDO");
-  //       const deltaX = (e.clientX - startX); // Amplifica o movimento
-  //       const deltaY = (e.clientY - startY); // Amplifica o movimento
-  //       // console.log(`Grabbing: ${deltaX} ${deltaY}`); // Logs para ver os valores de deltaX e deltaY
-
-  //       gameWorld.scrollTo({
-  //         left: scrollLeft - deltaX,
-  //         top: scrollTop - deltaY,
-  //         behavior: 'instant' // Instantâneo para evitar suavidade indesejada
-  //       });
-  //       // console.log(`Grabbing GameWorld: ${gameWorld.scrollLeft} ${gameWorld.scrollTop}`)
-  //     };
-
-  //     const onMouseUp = () => {
-  //       // console.log("..: SOLTOU o mouse");
-  //       document.removeEventListener('mousemove', onMouseMove);
-  //       document.removeEventListener('mouseup', onMouseUp);
-  //       document.body.style.cursor = 'default';
-
-  //       // console.log("..: isMovedBackRef:", isMovedBackRef)
-  //       if (!isMovedBackRef) {
-  //         handleClickOutside(event);
-  //       }
-  //       setIsMovedBackground(false);
-  //     };
-
-  //     // console.log("..: Lado de fora Centrado");
-  //     document.addEventListener('mousemove', onMouseMove);
-  //     document.addEventListener('mouseup', onMouseUp);
-  //   } else if (event.button === 1) {
-  //     event.preventDefault();
-  //     console.log("..: Removendo função do Botão central no elemento :..");
-  //   }
-  // }, []);
+  };
 
   const handleImageUpload = async (file: File) => {
     const isImage = file.type.startsWith("image/");
@@ -456,55 +412,61 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   };
 
   // ZOOOM ------------------------------------------
-  // const handleZoom = (zoom: boolean) => {
-  //   setZoomLevel((prevZoom) => zoom ? Math.min(Math.max(0.5, prevZoom + 0.1), 8) : Math.min(Math.max(0.5, prevZoom - 0.1), 8));
-  // };
+  const [scaleGradientPixel, setScaleGradientPixel] = useState("1px, transparent 1px");
+  const [scaleBorderPixel, setScaleBorderPixel] = useState("16px 16px, 16px 16px, 80px 80px, 80px 80px");
 
-  // const handleZoomDefault = () => {
-  //   // console.log("..: Zoom Default", zoomLevel)
-  //   setZoomLevel(1);
-  // };
+  const handleZoomButtonEffect = () => {
+    const current = wrapperRef.current?.instance.transformState;
+    if (!current) return;
 
-  // useEffect(() => {
-  //   const handleKeyDown = (event: KeyboardEvent) => {
-  //     if (event.ctrlKey) {
-  //       event.preventDefault();
-  //       if (event.key === '+' || event.key === '=') {
-  //         handleZoom(true);
-  //       } else if (event.key === '-') {
-  //         handleZoom(false);
-  //       } else if (event.key === '0') {
-  //         handleZoomDefault();
-  //       }
-  //     }
-  //   };
+    const { positionX, positionY, scale } = current;
 
-  //   const handleWheel = (event: WheelEvent) => {
-  //     if (event.ctrlKey) {
-  //       const delta = Math.sign(event.deltaY) * -0.1;
-  //       setZoomLevel((prevZoom) => Math.min(Math.max(0.5, prevZoom + delta), 8));
-  //     }
-  //   };
+    const newScale = zoomLevel;
+    const ratio = newScale / scale;
 
-  //   window.addEventListener('keydown', handleKeyDown);
-  //   window.addEventListener('wheel', handleWheel);
+    // pega tamanho da viewport
+    const viewportWidth = wrapperRef.current?.instance.wrapperComponent?.offsetWidth ?? 0;
+    const viewportHeight = wrapperRef.current?.instance.wrapperComponent?.offsetHeight ?? 0;
 
-  //   return () => {
-  //     window.removeEventListener('keydown', handleKeyDown);
-  //     window.removeEventListener('wheel', handleWheel);
-  //   };
-  // }, []);
+    // ajusta pan proporcionalmente
+    const newX = positionX * ratio + (viewportWidth / 2) * (1 - ratio);
+    const newY = positionY * ratio + (viewportHeight / 2) * (1 - ratio);
 
-  const [state, setState] = useState({ scale: 1, positionX: 0, positionY: 0 });
-
-  const handleTransformed = (ref: any, { scale, positionX, positionY }: { scale: number, positionX: number, positionY: number }) => {
-    // console.log("..: Mudanca da escala, scale: %.2f, positionX: %d, positionY: %d", scale, positionX, positionY);
-    setState({ scale, positionX, positionY });
-    if (scale <= 1) {
-      // console.log("..: Entrou na escala!");
-      setState({ scale, positionX: 0, positionY: 0 });
-    }
+    wrapperRef.current?.setTransform(newX, newY, newScale);
   };
+
+  const handleChangeTransform = (transform: any) => {
+    console.log("transform: ", transform)
+    const zoomLevel = Math.trunc(transform.zoom * 100);
+    setUserSettings(prev => ({ ...prev, worldScrollX: transform.x, worldScrollY: transform.y, zoom: zoomLevel, _saved: false }));
+  }
+
+  useEffect(() => {
+    // console.log("Zoom -- level:", zoomLevel);
+    handleZoomButtonEffect();
+    setSettingUtils(prev => ({...prev, buttonZoomPressed: false}));
+  }, [settingUtils.buttonZoomPressed]);
+
+  useEffect(() => {
+    // console.log("Grid -- level:", zoomLevel);
+    setScaleGradientPixel(`${zoomLevel > 10 ? "0.3px" : zoomLevel > 5 ? "0.5px" : "1px"}, transparent ${zoomLevel > 10 ? "0.3px" : zoomLevel > 5 ? "0.5px" : "1px"}`);
+    setScaleBorderPixel(`${zoomLevel > 10 ? "4px 4px, 4px 4px, 40px 40px, 40px 40px" : zoomLevel > 5 ? "8px 8px, 8px 8px, 80px 80px, 80px 80px" : "16px 16px, 16px 16px, 80px 80px, 80px 80px"}`);
+  }, [zoomLevel]);
+
+  useEffect(() => {
+    if (elementSelected && elementSelected._recenter) {
+      const el = document.getElementById(elementSelected.id);
+      if (el && wrapperRef.current) {
+        // centraliza o elemento na viewport
+        wrapperRef.current.zoomToElement(el, userSettings.zoom / 100);
+        setTimeout(() => {
+          const { positionX, positionY, scale } = wrapperRef.current?.instance.transformState!;
+          handleChangeTransform({ x: positionX, y: positionY, zoom: scale });
+        }, 600); // tempo da animação
+      }
+    }
+  }, [elementSelected?.id, elementSelected?._recenter]);
+  // ZOOOM END ------------------------------------------
 
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(
     null
@@ -517,12 +479,6 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       const rectX = e.nativeEvent.offsetX - 120*1.5; // Centraliza o retângulo
       const rectY = e.nativeEvent.offsetY - 80*1.5;  // Centraliza o retângulo
       setMousePos({ x: rectX, y: rectY });
-
-      // const contentRect = e.currentTarget.getBoundingClientRect();
-      // setMousePos({
-      //   x: e.clientX - contentRect.left * 2,
-      //   y: e.clientY - contentRect.top * 2,
-      // });
     }
   };
 
@@ -531,7 +487,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       event.stopPropagation();
       console.log("Scene criada em:", mousePos);
 
-      const newScene = handleDropOrCreate(event, state.scale);
+      const newScene = handleDropOrCreate(event, zoomLevel);
 
       notification.success({
         message: 'Create New Scene',
@@ -550,16 +506,6 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
 
   const handleMouseLeave = () => {
     setMousePos(null); // Remove a silhueta quando o mouse sai da área
-  };
-
-  const updateSceneSize = (id: string, width: number, height: number) => {
-    setScenes(prev =>
-      prev.map(scene =>
-        scene.id === id
-          ? { ...scene, width, height }
-          : scene
-      )
-    );
   };
 
   const getImageSize = (src: string): Promise<{width: number, height: number}> => {
@@ -715,9 +661,20 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   //   });
   // }
 
+  if (loading) {
+    return (
+      <Layout style={{
+        width: '100%',
+        height: '100%',
+      }}>
+        <Spin fullscreen size="large" percent={50} indicator={<LayoutOutlined spin />} />
+      </Layout>
+    )
+  }
+
   return (
-    <DndContext onDragStart={handleMoveBackStart} onDragEnd={handleDragEnd}>
-      <Row >
+    <DndContext modifiers={[zoomModifier]} onDragStart={handleMoveBackStart} onDragEnd={handleDragEnd}>
+      <Row>
         <Affix offsetTop={65} onChange={(affixed) => console.log('AFIXADO:: ' + affixed)} >
           <FloatButttons 
             actions={actions} 
@@ -729,90 +686,115 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       </Row>
 
       <TransformWrapper
-        initialScale={1}
-        minScale={0.5} // Ajuste o nível mínimo de zoom out
-        maxScale={10}   // Ajuste o nível máximo de zoom in
+        ref={wrapperRef}
+        initialScale={userSettings.zoom / 100}
+        initialPositionX={userSettings.worldScrollX}
+        initialPositionY={userSettings.worldScrollY}
+        
+        minScale={0.25} // Ajuste o nível mínimo de zoom out
+        maxScale={16}   // Ajuste o nível máximo de zoom in
         zoomAnimation={{ disabled: true }}
-        limitToBounds={true}
+
+        // limitToBounds={true}
         // minPositionX={ 0 }
         // minPositionY={ 0 }
         // maxPositionX={ worldSize.width }
         // maxPositionY={ worldSize.height }
-        onTransformed={handleTransformed}
-        wheel={{ disabled: false, smoothStep: 0.005, step: 0.05, activationKeys: ['Control'] }}
+        // onTransformed={e => handleChangeTransform({ x: e.state.positionX, y: e.state.positionY, zoom: e.state.scale })}
+        wheel={{ disabled: false, smoothStep: 0.005, step: 1, activationKeys: ['Control'] }}
+        onWheelStop={e => handleChangeTransform({ x: e.state.positionX, y: e.state.positionY, zoom: e.state.scale })}
         disabled={isMovedBackground}
         panning={{
           disabled: false,
-          velocityDisabled: true,  // Desativar a animação de elástico
+          velocityDisabled: false,  // Desativar a animação de elástico
+          allowLeftClickPan: false,
+          allowMiddleClickPan: true,
+          allowRightClickPan: false,
         }}
-        pinch={{ disabled: false }}
+        onPanningStop={e => handleChangeTransform({ x: e.state.positionX, y: e.state.positionY, zoom: e.state.scale })}
+        pinch={{ disabled: true }}
       >
-        <Content
-          style={{
-            width: "100%",
-            height: "100%",
+        <TransformComponent wrapperStyle={{ width: "100%", height: "100%", overflow: "hidden" }} 
+          contentStyle={{
             position: "relative",
-            backgroundColor: token.colorBgContainer,
-            // overflow: "hidden",
-            // pointerEvents: activeSubButton.activeSubButton === "Scene" ? "none" : "auto",
-          }}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          onClick={(event) => handleMouseClick(event)}
-        >
-          <Grid size={gridValue} marginTop={titleHeight - 33} marginLeft={leftLimite} />
-          <DragAndDrop onDrop={(event) => handleDropOrCreate(event, state.scale)} /*height={worldSize.height + titleHeight} width={worldSize.width + leftLimite}*/ />
-
-          {/* Retângulo que segue o mouse */}
-          {mousePos && settingUtils.activeSubButton === "Scene" && (
-            <Content
+            width: worldSize.width + 100, 
+            height: worldSize.height + 50,
+            background: token.colorBgContainer, 
+          }}>
+          <Content 
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            onClick={(event) => handleMouseClick(event)}
+          >
+            {/* Grid */}
+            <Content 
               style={{
-                position: "absolute",
-                width: 240*1.5+`px`,
-                height: 160*1.5+"px",
-                left: `${mousePos.x}px`,
-                top: `${mousePos.y}px`,
-                borderRadius: token.borderRadius,
-                backgroundColor: `${token.colorBgMask}`, // Silhueta semitransparente
-                border: `2px dashed ${token.colorPrimary}`, // Bordas destacadas
-                pointerEvents: "none", // Ignora interação com o retângulo
-                zIndex: 6,
+                position: "relative",
+                width: "100%",
+                height: "100%",
+                overflow: "hidden",
+                top: `${titleHeight - 33}px`,
+                left: `${leftLimite}px`,
+                right: 0,
+                bottom: 0,
+                backgroundImage: `
+                  linear-gradient(to right, rgba(0,0,0,0.1) ${scaleGradientPixel}),
+                  linear-gradient(to bottom, rgba(0,0,0,0.1) ${scaleGradientPixel}),
+                  linear-gradient(to right, rgba(0,0,0,0.2) ${scaleGradientPixel}),
+                  linear-gradient(to bottom, rgba(0,0,0,0.2) ${scaleGradientPixel})
+                `,
+                backgroundSize: `${scaleBorderPixel}`,
+                backgroundAttachment: "local"
               }}
             />
-          )}
+            {/* Content */}
+            <Content 
+              onMouseDown={(e) => {
+                if (e.button === 1) {
+                  e.currentTarget.style.cursor = "grabbing";
+                }
+              }}
+              onMouseUp={(e) => {
+                if (e.button === 1) {
+                  e.currentTarget.style.cursor = "default";
+                }
+              }}
+            >
+              <DragAndDrop onDrop={(event) => handleDropOrCreate(event, zoomLevel)} /*height={worldSize.height + titleHeight} width={worldSize.width + leftLimite}*/ />
+              
+              {/* Retângulo que segue o mouse */}
+              {mousePos && settingUtils.activeSubButton === "Scene" && (
+                <Content
+                  style={{
+                    position: "absolute",
+                    width: 240*1.5+`px`,
+                    height: 160*1.5+"px",
+                    left: `${mousePos.x}px`,
+                    top: `${mousePos.y}px`,
+                    borderRadius: token.borderRadius,
+                    backgroundColor: `${token.colorBgMask}`, // Silhueta semitransparente
+                    border: `2px dashed ${token.colorPrimary}`, // Bordas destacadas
+                    pointerEvents: "none", // Ignora interação com o retângulo
+                    zIndex: 6,
+                  }}
+                />
+              )}
 
-          <Content style={{ backgroundColor: 'red', pointerEvents: settingUtils.activeSubButton === "Scene" ? "none" : "auto", }}>
-            {scenes.map((scene) => (
-             !scene._deleted ? 
-              <GameElement
-                sceneElement={scene}
-                isSelected={scene.id === elementSelected?.id}
-                onSelect={() => handleSelect(scene)}
-                // onResize={(width, height) => updateSceneSize(scene.id, width, height)}
-              /> : null
-            ))}
+              <Content style={{ pointerEvents: settingUtils.activeSubButton === "Scene" ? "none" : "auto", }}>
+                {scenesRef.current.map(scene => (
+                  !scene._deleted ? 
+                    <GameElement
+                      sceneElement={scene}
+                      isSelected={scene.id === elementSelected?.id}
+                      onSelect={() => handleSelect(scene)}
+                      // onElementHovered={(isHovered: boolean) => handleElementHovered(isHovered)}
+                    /> 
+                  : null
+                ))}
+              </Content>
+            </Content>
+            
           </Content>
-
-        </Content>
-        <TransformComponent>
-          <Space className="game-world" /*onMouseDown={handleMouseDown}*/
-          //  onMouseMove={handleMouseMove}
-          //  onMouseLeave={handleMouseLeave}
-          //  onClick={handleMouseClick}
-            style={{ background: token.colorBgContainer, overflow: 'scroll', width: worldSize.width, height: worldSize.height, }}
-          >
-            {/* TODO DragAndDrop para imagens */}
-            {/* <DragAndDrop onDrop={(event) => handleDrop(event, state.scale)} height={worldSize.height + titleHeight} width={worldSize.width + leftLimite} />
-            {elements.map((element) => (
-              <GameElement
-                key={element.id}
-                {...element}
-                isSelected={element.id === selectedElement}
-                onSelect={handleSelect}
-              />
-            ))} */}
-          </Space>
-          {/* <Grid size={gridValue} width={worldSize.width} height={worldSize.height} marginTop={titleHeight - 33} marginLeft={leftLimite} /> */}
         </TransformComponent>
       </TransformWrapper>
     </DndContext>

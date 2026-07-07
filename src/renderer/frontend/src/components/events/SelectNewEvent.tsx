@@ -1,4 +1,4 @@
-import { useElementContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
+import useAppContexts from '@/providers/contexts/AppContexts';
 import { IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { ArrowRightOutlined, PlusSquareOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 import { Button, Divider, Drawer, Empty, Flex, Input, InputRef, Menu, Space, Typography } from "antd";
@@ -102,10 +102,13 @@ interface ISelectEventProps {
 }
 
 const SelectNewEvent: React.FC<ISelectEventProps> = ({tabIndex, subTabIndex}) => {
-  const { scenes, setScenes, ignoredFields } = useSceneContext();
-  const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
-  const { elementSelected, setElementSelected } = useElementContext();
-  const favoriteEvents = settingUtils.favoriteEvents || [];
+  // const { scenes, setScenes, ignoredFields } = useSceneContext();
+  // const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
+  // const { elementSelected, setElementSelected } = useElementContext();
+
+  const { scenes, setScenes, setSettingUtils, elementSelected, setElementSelected, userSettings, setUserSettings } = useAppContexts();
+  
+  const favoriteEvents = userSettings.favoriteEvents || [];
   
   const [open, setOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
@@ -133,8 +136,8 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({tabIndex, subTabIndex}) =>
       ? favoriteEvents.filter(id => id !== eventId)
       : [...favoriteEvents, eventId];
 
-    setSettingUtils(prev => ({ ...prev, favoriteEvents: newFavorites }));
-    window.electronAPI.saveFavoriteEvents(newFavorites);
+    setUserSettings(prev => ({ ...prev, favoriteEvents: newFavorites, _saved: false }));
+    // window.electronAPI.saveFavoriteEvents(newFavorites);
   }, [favoriteEvents, setSettingUtils]);
 
   const filteredEventsList = useMemo(() => {

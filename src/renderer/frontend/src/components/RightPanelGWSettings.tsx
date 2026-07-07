@@ -1,5 +1,5 @@
 import imgPlaceholder from '@/img/placeholder.png';
-import { useBackgroundContext, useProjectContext, useSceneContext, useSettingsContext, useSettingsUtilsContext } from "@/providers/contexts/AppContexts";
+import useAppContexts from "@/providers/contexts/AppContexts";
 import { IProjectSettings } from "@/providers/contexts/interfaces/IProjectElement";
 import { ISceneSettings } from "@/providers/contexts/interfaces/ISceneElement";
 import { EColorMode, IMainSettings } from "@/providers/contexts/interfaces/ISettingElement";
@@ -14,7 +14,7 @@ const UserSettingsForm: React.FC = () => {
   const [form] = Form.useForm();
   const { token } = useToken();
   // const [loading, setLoading] = useState(true);
-  const { project, setProject } = useProjectContext();
+  const { project, setProject } = useAppContexts();
 
   // useEffect(() => {
   //   // Load settings when component mounts
@@ -98,10 +98,11 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
   const [customSpeed, setCustomSpeed] = useState(true);
   const [animDropDownOpen, setAnimDropdownOpen] = useState(false);
   const [moveDropdownOpen, setMoveDropdownOpen] = useState(false);
-  const { settings, setSettings } = useSettingsContext();
-  const { scenes, setScenes } = useSceneContext();
-  const { backgrounds, setBackgrounds } = useBackgroundContext();
-  const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
+
+  const { 
+    settings, setSettings,
+    scenes, backgrounds, settingUtils,
+  } = useAppContexts();
 
   const optionsMoveSpeed = [
     { value: 0.25, label: "Speed ¼ (Slower)", ppf: "0.25 PPF" },

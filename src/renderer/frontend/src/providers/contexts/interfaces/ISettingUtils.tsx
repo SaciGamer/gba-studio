@@ -12,11 +12,11 @@ interface IImages {
     localImagePathHD: string;
 }
 
-interface IFavoriteEvents {
-    favoriteEvents?: string[];
+interface IZoom {
+    buttonZoomPressed: boolean;
 }
 
-export interface ISettingUtils extends IBaseSettings, IActiveButtons, IImages, IFavoriteEvents {
+export interface ISettingUtils extends IBaseSettings, IActiveButtons, IImages, IZoom {
     _resourceType: string;
     projectPathFile: string | null;
     projectDirectory: string | null;
@@ -24,7 +24,6 @@ export interface ISettingUtils extends IBaseSettings, IActiveButtons, IImages, I
 }
 
 export interface SettingUtilsContextType {
-    // Main Settings
     settingUtils: ISettingUtils;
     setSettingUtils: React.Dispatch<React.SetStateAction<ISettingUtils>>;
 }

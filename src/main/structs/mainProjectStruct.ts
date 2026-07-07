@@ -1,11 +1,9 @@
-import { app } from 'electron';
-import path from 'path';
-import fs from 'fs';
-import { createGenericSettingsStruct } from './projectSettingsStruct';
 import { packageJson } from '@/main';
+import { app } from 'electron';
+import fs from 'fs';
+import path from 'path';
 import { defaultMainSettings, defaultProjectSettings } from './defaultValuesInterface';
-import { SettingsController } from '@/controllers/SettingsController';
-import { IProjectSettings } from '@/interfaces/MainSettingsInterface';
+import { createGenericSettingsStruct } from './projectSettingsStruct';
 
 // Controllers
 let projectSettings = defaultProjectSettings;
@@ -73,9 +71,10 @@ export function createProjectStruct(basePath: string, template?: string): void {
   // Criação de arquivo de settings
   const settingsPath = path.join(basePath, folders[2]);
   createGenericSettingsStruct(settingsPath, 'settings', defaultMainSettings);
+  // createGenericSettingsStruct(settingsPath, 'user_settings', defaultUserSettings);
+  // createGenericSettingsStruct(settingsPath, 'variables', defaultVariablesSettings);
 
   console.log('..: Criando estrutura de pastas - END :..');
- 
 }
 
 function createProjectByTemplate(basePath: string, template: string): void {

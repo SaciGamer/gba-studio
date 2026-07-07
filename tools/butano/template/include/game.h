@@ -2,6 +2,7 @@
 #define {{PROJECT_NAME_UPPER}}_GAME_H
 
 #include "graphics_manager.h"
+#include "script_command_manager.h"
 
 /**
  * Main Game class for {{PROJECT_NAME}}
@@ -10,7 +11,6 @@
 class Game {
 private:
     bool running;
-    GraphicsManager graphics;
     // bn::scene::status status;
 
 public:

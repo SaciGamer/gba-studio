@@ -1,12 +1,12 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Layout, Button, Space, Radio, InputNumber, Switch } from 'antd';
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { useElementContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
+import useAppContexts from '@/providers/contexts/AppContexts';
+import { ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
+import { AimOutlined, BorderlessTableOutlined, DeleteOutlined, EditOutlined, PictureFilled, ReloadOutlined, TagOutlined, ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons';
+import { Layout } from 'antd';
 import { Affix, Row } from 'antd/lib';
+import React, { useEffect, useRef, useState } from 'react';
+import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
 import FloatButttons from './FloatButtons';
 import { AntdToken } from './common/AntDToken';
-import { AimOutlined, AuditOutlined, BgColorsOutlined, BorderlessTableOutlined, BorderOutlined, CalculatorOutlined, CreditCardOutlined, DeleteOutlined, EditOutlined, PictureFilled, PlusSquareFilled, ReloadOutlined, TagOutlined, ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons';
-import { ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
 
 const { Content } = Layout;
 
@@ -46,8 +46,11 @@ interface TileEditorProps {
 
 const TileEditor: React.FC<TileEditorProps> = ({ scene, resetPanelSize, setShowFloatButton, showFloatButton }) => {
   const { token } = AntdToken();
-  const { setScenes } = useSceneContext();
-  const { elementSelected, setElementSelected } = useElementContext();
+  // const { setScenes } = useSceneContext();
+  // const { elementSelected, setElementSelected } = useElementContext();
+  // const { settingUtils } = useSettingsUtilsContext();
+
+  const { setScenes, elementSelected, setElementSelected, settingUtils } = useAppContexts();
 
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 });
@@ -55,7 +58,6 @@ const TileEditor: React.FC<TileEditorProps> = ({ scene, resetPanelSize, setShowF
   const [mapTiles, setMapTiles] = useState<number[][]>([]);
   const [isPainting, setIsPainting] = useState(false);
 
-  const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
   const [paintMode, setPaintMode] = useState<'move' | 'brush' | 'stamp' | 'fill' | 'erase' >('move');
   const [showGrid, setShowGrid] = useState(false);
   const zoomIn = () => transformRef.current?.zoomIn();

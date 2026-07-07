@@ -1,6 +1,6 @@
 import imgPlaceholder from '@/img/placeholder.png';
-import { useSceneContext, useSettingsUtilsContext } from "@/providers/contexts/AppContexts";
-import { IArgs, ISceneSettings, IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
+import useAppContexts from "@/providers/contexts/AppContexts";
+import { ISceneSettings, IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
 import { CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled } from "@ant-design/icons";
 import { Button, Flex, Form, InputNumber, Radio, Select, Space } from "antd";
 import { Content } from 'antd/es/layout/layout';
@@ -11,14 +11,16 @@ import { IChangeScene } from './interfaces/IChangeScene';
 interface ChangeSceneEventProps {
   event: IScriptsElement | undefined;
   customTitle: (newTitle: string) => void;
-  onValueChange: (eventId: string, eventArgs: IArgs) => void;
+  onValueChange: (eventId: string, eventArgs: IChangeScene) => void;
 }
 
 export function ChangeSceneEvent({ event, customTitle, onValueChange }: ChangeSceneEventProps) {
   const { token } = AntdToken();
-  const {scenes, setScenes} = useSceneContext();
-  const {backgrounds, setBackgrounds} = useSceneContext();
-  const {settingUtils, setSettingUtils} = useSettingsUtilsContext();
+  // const {scenes} = useSceneContext();
+  // const {backgrounds} = useSceneContext();
+  // const {settingUtils} = useSettingsUtilsContext();
+  const { scenes, backgrounds, settingUtils } = useAppContexts();
+  const args = event?.args as IChangeScene;
 
   const optSpeed = [
     { value: 1, label: "Speed 1 (Faster)" },
@@ -47,20 +49,20 @@ export function ChangeSceneEvent({ event, customTitle, onValueChange }: ChangeSc
 
   const defaultValues = useMemo(() => {
     const initValue = ChangeSceneEvent.defaultValue(scenes);
-    const scene = scenes.find(s => s.id === (event?.args?.sceneId || s.id === initValue.sceneId) && s._deleted !== true);
+    const scene = scenes.find(s => s.id === (args?.sceneId || s.id === initValue.sceneId) && s._deleted !== true);
     // const imagePath = getImagePath(scene!);
     const sceneName = scene?.name || 'Unknown Scene';
 
-    customTitle(` To ${sceneName} At {${event?.args?.x?.value ?? initValue.x?.value},${event?.args?.y?.value ?? initValue.y?.value}}`);
+    customTitle(` To ${sceneName} At {${args?.x?.value ?? initValue.x?.value},${args?.y?.value ?? initValue.y?.value}}`);
 
     return {
-      sceneId: event?.args?.sceneId ?? initValue.sceneId,
+      sceneId: args?.sceneId ?? initValue.sceneId,
       sceneName: sceneName,
       // imagePath: imagePath,
-      x: event?.args?.x ?? initValue.x,
-      y: event?.args?.y ?? initValue.y,
-      direction: event?.args?.direction ?? initValue.direction,
-      fadeSpeed: event?.args?.fadeSpeed ?? initValue.fadeSpeed,
+      x: args?.x ?? initValue.x,
+      y: args?.y ?? initValue.y,
+      direction: args?.direction ?? initValue.direction,
+      fadeSpeed: args?.fadeSpeed ?? initValue.fadeSpeed,
     };
   }, [event?.args, scenes]);
 

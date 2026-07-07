@@ -76,13 +76,32 @@ struct SceneLayer
     const char* path;
 };
 
+struct ScriptCommandData {
+    const char* id;
+    const char* command;
+    // ponteiro genérico para args, pode ser outro struct
+    const void* args;
+    const int argCount;
+    // const void* child;
+};
+
 struct Scenes
 {
     ResourceType type;                  // Tipo
     const char* id;                     // id da scene
     const char* name;                   // nome do arquivo de scene
 
-    // const char* background_id;       // ID do background da cena
+    const ScriptCommandData* onInitScripts;     // scripts de inicialização
+    int onInitCount;
+
+    // const ScriptCommandData* onPlayHit1Scripts;  // scripts de colisão 1 (futuro)
+    // int onPlayHit1Count;
+    // const ScriptCommandData* onPlayHit2Scripts;  // scripts de colisão 2 (futuro)
+    // int onPlayHit2Count;
+    // const ScriptCommandData* onPlayHit3Scripts;  // scripts de colisão 3 (futuro)
+    // int onPlayHit3Count;
+
+    // const char* background_id;           // ID do background da cena
     const SceneLayer* backgrounds_layers;   // Backgrounds com Layers
     const int backgrounds_layers_size;      // Tanho do backgrounds_layers
 

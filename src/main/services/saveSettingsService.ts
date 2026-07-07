@@ -88,7 +88,7 @@ export function saveChanges(dataToSave: any) {
                         
                         // Verifica se o elemento está marcado para deleção
                         if (subFile._deleted === true) {
-                            // Não salva o arquivo deletado
+                            // Deleta arquivo caso ainda exista e ignore o salvamento
                             return deleteSettings(projectPath, subFile._resourceType + 's', filenameFormatted!, subFile); 
                         }
                         

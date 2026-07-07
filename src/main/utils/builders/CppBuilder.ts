@@ -45,11 +45,14 @@ export class CppBuilder {
     }
 
     if (config.useGraphics) {
-      // Create graphics manager class
+      // Copy graphics manager class and state
       await this.generateGraphicsClassSupport(config);
-
-      // Create graphics manager state
       await this.generateGraphicsStateSupport(config);
+
+      // Copy script commands manager class and state
+      await this.generateScriptCommandsManagerClassSupport(config);
+      await this.generateScriptCommandsStateSupport(config);
+      // await this.generateEventFadeSupport(config);
     }
 
     console.log('..: C++ project structure generated');
@@ -369,6 +372,66 @@ public:
     }
   }
 
+  private async generateScriptCommandsManagerClassSupport(config: GameConfig): Promise<void> {
+    const scriptCmdMngPathSrc = path.join(this.srcDir, 'script_command_manager.cpp');
+
+    try {
+      if (this.templateDir) {
+        const tplPath = path.join(this.templateDir, 'src', 'script_command_manager.cpp');
+        if (fs.existsSync(tplPath)) {
+          let tpl = fs.readFileSync(tplPath, 'utf8');
+          fs.writeFileSync(scriptCmdMngPathSrc, tpl, 'utf8');
+          console.log('..: Copied template script_command_manager.cpp from template dir');
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('..: Error using template graphics_manager.h, falling back to generated content', e);
+    }  
+  }
+
+  private async generateScriptCommandsStateSupport(config: GameConfig): Promise<void> {
+    const scriptCmdMngPathInclude = path.join(this.includeDir, 'script_command_manager.h');
+
+    // If a template main.cpp exists in templateDir, copy and substitute placeholders
+    try {
+      if (this.templateDir) {
+        const tplPath = path.join(this.templateDir, 'include', 'script_command_manager.h');
+        if (fs.existsSync(tplPath)) {
+          let content = fs.readFileSync(tplPath, 'utf8');
+          content = content.replace(/\{\{PROJECT_NAME\}\}/g, config.projectName);
+          fs.writeFileSync(scriptCmdMngPathInclude, content, 'utf8');
+          console.log('..: Copied template script_command_manager.h from template dir');
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('..: Error using template main.cpp, falling back to generated content', e);
+    }
+  }
+
+  private async generateEventFadeSupport(config: GameConfig): Promise<void> {
+    const fadePathSrc = path.join(this.srcDir, 'event_fade.cpp');
+    const fadePathInclude = path.join(this.includeDir, 'event_fade.h');
+
+    try {
+      if (this.templateDir) {
+        const tplSrc = path.join(this.templateDir, 'src', 'event_fade.cpp');
+        const tplInclude = path.join(this.templateDir, 'include', 'event_fade.h');
+
+        if (fs.existsSync(tplSrc)) {
+          fs.copyFileSync(tplSrc, fadePathSrc);
+          console.log('..: Copied template event_fade.cpp');
+        }
+        if (fs.existsSync(tplInclude)) {
+          fs.copyFileSync(tplInclude, fadePathInclude);
+          console.log('..: Copied template event_fade.h');
+        }
+      }
+    } catch (e) {
+      console.warn('..: Error copying event_fade files', e);
+    }
+  }
 
 }
 

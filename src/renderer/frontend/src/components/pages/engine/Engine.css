@@ -180,12 +180,6 @@ h2.highlight:hover {
   border-radius: 3px;
 }
 
-.game-world {
-  background-color: #f0f0f0;
-  border: 1px solid #ccc;
-  overflow: hidden;
-}
-
 .handle {
   background-color: rgba(0, 0, 0, 0.5);
   color: white;
