@@ -63,6 +63,8 @@ export class TemplateBuilder {
       { src: 'graphics', dst: 'graphics' },
       { src: 'dmg_audio', dst: 'dmg_audio' },
       { src: 'audio', dst: 'audio' },
+      { src: 'maps', dst: 'maps' },
+      { src: 'src', dst: 'src' },
     ];
 
     for (const item of structureToCopy) {

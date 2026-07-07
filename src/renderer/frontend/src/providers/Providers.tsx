@@ -4,6 +4,7 @@ import { IBackgroundSettings } from "./contexts/interfaces/IBackgroundElement";
 import { IProjectSettings } from "./contexts/interfaces/IProjectElement";
 import { IMainSettings } from "./contexts/interfaces/ISettingElement";
 import { ISettingUtils } from "./contexts/interfaces/ISettingUtils";
+import { IUserSettings } from "./contexts/interfaces/IUserSettings";
 
 // Criar os providers com nomes personalizados
 export const { Context: SettingsUtilsContext, Provider: SettingsUtilsProvider } = createProvider<ISettingUtils>(
@@ -21,6 +22,11 @@ export const { Context: SettingsContext, Provider: SettingsProvider } = createPr
     { valueName: "settings", setValueName: "setSettings", ignoredFields: ["_saved"] }
 );
 
+export const { Context: UserSettingsContext, Provider: UserSettingsProvider } = createProvider<IUserSettings>(
+    {} as IUserSettings,
+    { valueName: "userSettings", setValueName: "setUserSettings", ignoredFields: ["_saved"] }
+);
+
 export const { Context: SceneContext, Provider: SceneProvider } = createProvider<ISceneSettings[]>(
     [], 
     { valueName: "scenes", setValueName: "setScenes", ignoredFields: ["_saved"] }
@@ -33,7 +39,7 @@ export const { Context: ElementContext, Provider: ElementProvider } = createProv
 
 export const { Context: BackgroundContext, Provider: BackgroundProvider } = createProvider<IBackgroundSettings[]>(
     [], 
-    { valueName: "backgrounds", setValueName: "setBackgrounds", ignoredFields: ["_saved"] }
+    { valueName: "backgrounds", setValueName: "setBackgrounds", ignoredFields: ["_saved"/*, "_deleted"*/] }
 );
 
 // Função genérica para criar providers com nomes personalizados para value e setValue

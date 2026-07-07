@@ -1,5 +1,5 @@
-import os from 'os';
 import { IMainSettings, IProjectSettings, ISettingsUtils } from "@/interfaces/MainSettingsInterface";
+import os from 'os';
 
 export const defaultSettingsUtils: ISettingsUtils = {
     _resourceType: 'main',
@@ -20,6 +20,14 @@ export const defaultMainSettings: IMainSettings = {
     colorMode: 'mono'
 };
 
+// export const defaultUserSettings: IUserSettings = {
+//     _resourceType: 'user_settings',
+//     worldScrollX: 0,
+//     worldScrollY: 0,
+//     zoom: 100,
+//     favoriteEvents: []
+// };
+
 export const defaultProjectSettings: IProjectSettings = {
     _resourceType: "project",
     name: null,
@@ -28,3 +36,8 @@ export const defaultProjectSettings: IProjectSettings = {
     _version: "",
     _release: "1"
 };
+
+// export const defaultVariablesSettings: IVariablesSettings = {
+//     _resourceType: 'variables',
+//     variables: []
+// };

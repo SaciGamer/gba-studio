@@ -95,6 +95,7 @@ export interface JsonResourceDefault {
   selectedTilesetId?: string;
   imageType?: string;
   backgrounds?: any[];
+  script?: any[];
 }
 
 export interface ResourceFile {

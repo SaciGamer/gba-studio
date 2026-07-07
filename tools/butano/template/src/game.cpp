@@ -11,7 +11,9 @@
 #include "bn_display.h"
 #include "bn_keypad.h"
 #include "bn_log.h"
+#include "bn_bg_palettes.h"
 // #include "bn_scene.h"
+#include "startup.h"
 
 /**
  * Game constructor - Initialize game systems
@@ -21,10 +23,16 @@ Game::Game() : running(true) {
 
     // Initialize Butano
     bn::core::init();
+
+    // show_start_screen();
+    start_screen_anim();
+    // play_startup_animation();
     
     // Initialize display
     // bn::display::set_mode(bn::display::mode::MODE_0);
-    
+
+    // bn::bg_palettes::set_transparent_color(bn::color(16, 16, 16));
+
     // Call user initialization
     initialize();
 }
@@ -47,25 +55,8 @@ void Game::initialize() {
     // - Initialize sounds
     // - Setup scene
     
-    
     // Inicializa gráficos e carrega o background inicial
-    const Scenes* scene = graphics.initialize();
-    
-    // 3. Valida tipo da cena
-    bn::string<64> scene_type = scene->scene_type;
-    BN_LOG("Scene type: ", scene_type.data());
-    if(scene_type != "Logo" && scene_type != "Point Click") {
-        // 4. Renderiza cena
-        BN_LOG("Renderizando cena com REGULAR BG");
-        graphics.render_scene_regular_bg(*scene);
-    } else {
-        BN_LOG("Renderizando cena com BITMAP BG");
-        // 5. Renderiza cena
-        graphics.render_scene_bitmap_bg(*scene);
-    }
-
-    // 6. Desenha tiles
-    graphics.initialize_tilemap(scene);
+    GraphicsManager::instance().initialize();
 }
 
 /**
@@ -77,6 +68,15 @@ void Game::update() {
     // - Physics
     // - Collision detection
     // - Sound management
+
+    // - Scripts OnInit
+    const Scenes* scene = GraphicsManager::instance().getScene();
+    int count = scene->onInitCount;
+
+    if(scene && scene->onInitScripts && count > 0) {
+        // scripts.execute(*scene->onInitScripts[currentScriptIndex], count); // processar por index
+        ScriptCommand::instance().execute(scene->id, scene->onInitScripts, count); // caso precise processar tudo de uma vez
+    }
 
     // For now, just check quit button
     if (bn::keypad::select_pressed()) {
@@ -93,7 +93,7 @@ void Game::render() {
     // - UI rendering
 
     // Aqui atualiza sprites ou backgrounds
-    graphics.update_sprites();
+    GraphicsManager::instance().update_sprites();
 }
 
 /**

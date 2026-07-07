@@ -19,6 +19,13 @@ export interface IMainSettings extends IBaseSettings {
     colorMode: string;
 }
 
+export interface IUserSettings extends IBaseSettings {
+    worldScrollX: number,
+    worldScrollY: number,
+    zoom: number,
+    favoriteEvents: Array<string>;
+}
+
 export interface IProjectSettings extends IFileSettings {
     name: string | null;
     author: string;
@@ -28,4 +35,8 @@ export interface IProjectSettings extends IFileSettings {
 export interface IFileSettings extends IBaseSettings {
     _version: string | null;
     _release: string;
+}
+
+export interface IVariablesSettings extends IBaseSettings {
+    variables?: any[];
 }

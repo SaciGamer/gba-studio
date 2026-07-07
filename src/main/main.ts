@@ -244,14 +244,14 @@ function createProjectWindow(projectFilePath: string): void {
   );
 
   // Detecta quando a janela perde o foco
-  windows.main?.on('blur', () => {
-    windows.main?.webContents.send('window-blurred');
-  });
+  // windows.main?.on('blur', () => {
+  //   windows.main?.webContents.send('window-blurred');
+  // });
 
-  // Detecta quando a janela ganha o foco
-  windows.main?.on('focus', () => {
-    windows.main?.webContents.send('window-focused');
-  });
+  // // Detecta quando a janela ganha o foco
+  // windows.main?.on('focus', () => {
+  //   windows.main?.webContents.send('window-focused');
+  // });
 
   windows.main?.once('ready-to-show', () => {
     windows.main?.show(); // Show the window when the content has been loaded
@@ -879,7 +879,7 @@ ipcMain.on('open-project-folder', async (event, projectPath) => {
 
 // Read opening documentation link
 ipcMain.on('open-documentation', async () => {
-  const url = 'https://www.google.com/?documentation'; // Substitua pelo URL da documentação
+  const url = 'https://sacigamer.github.io/gba-studio-site/docs/intro';
   await shell.openExternal(url); 
 });
 

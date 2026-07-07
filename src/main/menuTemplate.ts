@@ -135,8 +135,8 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                         { type: 'separator' },
                         { label: 'Light', type: 'checkbox', checked: currentTheme === 'light', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'light'); } },
                         { label: 'Dark', type: 'checkbox', checked: currentTheme === 'dark', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'dark'); } },
-                        { label: 'GameCube', type: 'checkbox',  checked: currentTheme === 'gamecube', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'gamecube'); } },
-                        { label: 'Nintendo', type: 'checkbox', checked: currentTheme === 'nintendo', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'nintendo'); } },
+                        { label: 'GameCubix', type: 'checkbox',  checked: currentTheme === 'gamecube', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'gamecube'); } },
+                        { label: 'S-Nintenbu', type: 'checkbox', checked: currentTheme === 'nintendo', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'nintendo'); } },
                         { label: 'Blue', type: 'checkbox', checked: currentTheme === 'blue', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'blue'); } },
                         { label: 'Silver', type: 'checkbox', checked: currentTheme === 'silver', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'silver'); } },
                     ]
@@ -199,7 +199,7 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                     label: 'Documentation',
                     click: () => {
                         console.log('..: Documentation clicado');
-                        openBrowser('https://sacigamer.github.io/gba-studio-site/');
+                        openBrowser('https://sacigamer.github.io/gba-studio-site/docs/intro');
                     }
                 },
                 {

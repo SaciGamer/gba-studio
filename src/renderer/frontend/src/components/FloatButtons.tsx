@@ -1,8 +1,8 @@
-import React, { CSSProperties, Dispatch, SetStateAction, useContext, useEffect, useState } from 'react';
-import { AppstoreAddOutlined, AuditOutlined, BgColorsOutlined, BlockOutlined, BorderInnerOutlined, ClearOutlined, CloseSquareOutlined, EditFilled, ExpandOutlined, ExperimentOutlined, FormatPainterFilled, FormatPainterOutlined, InsertRowAboveOutlined, LayoutFilled, PicLeftOutlined, PictureFilled, PlusSquareFilled, SelectOutlined, VerticalAlignMiddleOutlined, } from '@ant-design/icons';
-import { FloatButton, Dropdown, Row, Popover, Tooltip } from 'antd';
+import useAppContexts from '@/providers/contexts/AppContexts';
+import { LayoutFilled } from '@ant-design/icons';
+import { Dropdown, FloatButton, Popover, Row, Tooltip } from 'antd';
+import React, { CSSProperties, useEffect, useState } from 'react';
 import { AntdToken } from './common/AntDToken';
-import { useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
 
 enum SubMenuType {
   TOOLTIP = 'tooltip',
@@ -46,7 +46,7 @@ const FloatButttons: React.FC<IFloatButttons> = ({ actions, onResetPanelSize, on
   // const [activeButton, setActiveButton] = useState('select');
   // const [activeButtons, setActiveButtons] = useState<IActiveButtons>({activeButton: 'select', activeSubButton: ''});
 
-  const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
+  const { settingUtils, setSettingUtils } = useAppContexts();
   const [numberNofity, setNumberNofity] = useState<string | number>('0');
   const [notification, setNotification] = useState<boolean>(true);
 

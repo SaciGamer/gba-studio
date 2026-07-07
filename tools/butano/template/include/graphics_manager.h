@@ -21,8 +21,6 @@
 #include "resources.h"
 #include "resource_registry.h"
 
-struct Scenes; 
-
 /**
  * Graphics Manager for {{PROJECT_NAME}}
  * Handles sprite, background, tilemap rendering
@@ -32,6 +30,8 @@ private:
     static constexpr int MAX_SPRITES = 128;
     bn::optional<bn::sprite_ptr> sprites[MAX_SPRITES];
     int sprite_count = 0;
+
+    const Scenes* currentScene;
     bn::vector<bn::regular_bg_ptr, 4> current_bgs;
     bn::optional<bn::sp_direct_bitmap_bg_ptr> current_bitmap_bgs;
 
@@ -46,6 +46,14 @@ public:
     GraphicsManager();
     ~GraphicsManager();
 
+    static GraphicsManager& instance() {
+        static GraphicsManager gm;
+        return gm;
+    }
+
+    void startup_screen(bn::regular_bg_ptr gba_studio_logo);
+    void startup_screen_bitmap(bn::direct_bitmap_item gba_studio_logo);
+
     /**
      * Initialize graphics
      */
@@ -53,10 +61,21 @@ public:
     void initialize_tilemap(const Scenes* scene);
 
     /**
+     * Getter and Setter Manage Scene
+     */
+    void setScene(const Scenes* scene) { currentScene = scene; }
+    const Scenes* getScene() const { return currentScene; }
+
+    /**
      * Render scene
      */
     void render_scene_regular_bg(const Scenes& scene);
     void render_scene_bitmap_bg(const Scenes& scene);
+
+    /**
+     * Loading next scene
+     */
+    const Scenes* loadNextSceneById(const bn::string<64>& scene_id);
 
     /**
      * Create sprite

@@ -12,3 +12,21 @@ html, body, #root {
     /* padding: 0; */
     overflow: hidden;
 }
+
+.content {
+    position: relative;
+    background-color: #f0f0f0;
+  
+    /* linhas finas (grade menor) */
+    background-image:
+        linear-gradient(to right, rgba(0,0,0,0.1) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0,0,0,0.1) 1px, transparent 1px),
+
+        /* linhas mais fortes (a cada 5 células) */
+        linear-gradient(to right, rgba(0,0,0,0.2) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0,0,0,0.2) 1px, transparent 1px);
+
+    /* tamanho da célula menor */
+    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+    background-attachment: local;
+}

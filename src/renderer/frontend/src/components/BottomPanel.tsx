@@ -9,6 +9,7 @@ const { Text } = Typography;
 
 const BottomPanel: React.FC = () => {
   const { token } = AntdToken();
+  const [notificationApi, notificationContextHolder] = notification.useNotification();
   const [statusLines, setStatusLines] = useState<string[]>([]);
   const { isBuilding } = useBuildState();
   const listenersAttached = useRef(false);
@@ -29,7 +30,7 @@ const BottomPanel: React.FC = () => {
       console.log(`[BottomPanel-${listenerId.current}] Build finalizado, verificando sucesso`);
       const hasErrors = statusLines.some(line => line.startsWith('ERROR'));
       if (!hasErrors && statusLines.length > 0) {
-        notification.success({
+        notificationApi.success({
           message: 'Compilação concluída',
           description: 'Sucesso!',
           placement: 'bottomRight',
@@ -85,7 +86,7 @@ const BottomPanel: React.FC = () => {
       try {
         const msg = payload && payload.message ? String(payload.message) : JSON.stringify(payload);
         console.log(`[BottomPanel-${listenerId.current}] Error: ${msg}`);
-        notification.error({
+        notificationApi.error({
           message: 'Erro na compilação',
           description: msg,
           placement: 'bottomRight',
@@ -136,6 +137,7 @@ const BottomPanel: React.FC = () => {
 
   return (
     <div style={{ height: '100%' }}>
+      {notificationContextHolder}
       <div style={{ position: 'sticky', top: 0, backgroundColor: token.colorBorder, zIndex: 1, padding: '16px 24px', borderBottom: '1px solid #d9d9d9' }}>
         <Row justify="space-between" align="middle">
           <Typography.Text strong>Status do Compilador</Typography.Text>

@@ -1,18 +1,20 @@
-import { BuildOutlined, CaretRightFilled, CaretRightOutlined, EditOutlined, FileFilled, PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
-import {  Collapse, Input, Layout, Splitter, Tooltip, Tree, TreeDataNode, Typography } from 'antd';
+import useAppContexts from '@/providers/contexts/AppContexts';
+import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
+import { BuildOutlined, CaretRightFilled, CaretRightOutlined, FileFilled, PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
+import { Collapse, Input, Layout, Splitter, Tooltip, Tree, TreeDataNode, Typography } from 'antd';
 import React, { Key, useEffect, useMemo, useRef, useState } from 'react';
 import { AntdToken } from '../components/common/AntDToken';
-import { useElementContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
-import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
 
 const { Content } = Layout;
 const { Panel } = Collapse;
 const { Text } = Typography;
 
 const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScriptsAndVariables = true }) => {
-  const { scenes } = useSceneContext();
-  const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
-  const { elementSelected, setElementSelected } = useElementContext();
+  // const { scenes } = useSceneContext();
+  // const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
+  // const { elementSelected, setElementSelected } = useElementContext();
+
+  const { scenes, settingUtils, setSettingUtils, elementSelected, setElementSelected } = useAppContexts();
 
   const [isScenesOpen, setIsScenesOpen] = useState(true);
   const [isScriptsOpen, setIsScriptsOpen] = useState(true);
@@ -292,9 +294,11 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
   };
 
   const handleSelectElement = (element: ISceneSettings | null) => {
-    // setGlobalSelectedKey(elementId? `scenes-${elementId}` : null);
-    // setSelectBlockId(elementId? elementId : null);
-    setElementSelected(element);
+    setElementSelected((prev: any) => ({
+      ...prev,
+      ...element,
+      _recenter: true
+    }));
   }
 
   return (
@@ -319,7 +323,7 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
               extra: [functionAdd(), functionSearch()],
               style: panelStyle,
               children: isScenesOpen && (
-                <Content style={{ backgroundColor: token.colorBgBase }}>
+                <Content style={{ height: '100vh', backgroundColor: token.colorBgBase }}>
                   {isSearchVisible && (
                     <Input
                       ref={searchInputRef}
@@ -391,7 +395,7 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                       onSelect={(selectedKeys, info) =>
                         onSelectTree(selectedKeys, info, 'scripts')
                       }
-                      style={{ background: token.colorBgBase }}
+                      style={{ height: '100vh', background: token.colorBgBase }}
                     />
                   ),
                   style: panelStyle,
@@ -426,7 +430,7 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                       onSelect={(selectedKeys, info) =>
                         onSelectTree(selectedKeys, info, 'variables')
                       }
-                      style={{ backgroundColor: token.colorBgBase }}
+                      style={{ height: '100vh', backgroundColor: token.colorBgBase }}
                     />
                   ),
                   style: panelStyle,

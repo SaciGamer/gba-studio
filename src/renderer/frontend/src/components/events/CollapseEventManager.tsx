@@ -1,4 +1,4 @@
-import { useElementContext, useSceneContext, useSettingsUtilsContext } from "@/providers/contexts/AppContexts";
+import useAppContexts from "@/providers/contexts/AppContexts";
 import { IArgs, ISceneSettings, IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
 import { Collapse, Layout } from "antd";
 import { useState } from "react";
@@ -19,11 +19,10 @@ const getEventEnum = (command: string): string => {
 }
 
 export default function CollapseEventManager(parameters: CollapseEventProps) {
-  const {scenes, setScenes} = useSceneContext();
-  const {backgrounds, setBackgrounds} = useSceneContext();
-  const {settingUtils, setSettingUtils} = useSettingsUtilsContext();
-  const {elementSelected, setElementSelected} = useElementContext();
-  
+  // const {setScenes} = useSceneContext();
+  // const {elementSelected, setElementSelected} = useElementContext();
+
+  const { setScenes, elementSelected, setElementSelected } = useAppContexts();
   const [headerPanel, setHeaderPanel] = useState<Record<string, string>>({});
 
   const onRemoveScriptEvent = (id: string) => {

@@ -21,19 +21,16 @@ export interface IBackgroundElement {
     layerId: number;
     backgroundId?: string | null;
 }
-
-export interface IArgs extends IFade, IChangeScene, IWait {
+export interface IArgs {
   __comment?: boolean;
   __collapse?: boolean;
 }
-
 export interface IScriptsElement {
     id: string;
     command: string;
-    args?: IArgs;
+    args?: IFade | IChangeScene | IWait;
     children?: Object[];
 }
-
 interface IPosAndWidth {
     x: number;
     y: number;
@@ -41,7 +38,11 @@ interface IPosAndWidth {
     height: number;
 }
 
-export interface ISceneSettings extends IResourceSettings {
+interface ICameraSettings {
+    cameraPosition?: { x: number; y: number };
+    showCamera?: boolean;
+}
+export interface ISceneSettings extends IResourceSettings, ICameraSettings {
     _index: number;
     backgroundId?: string;  // REMOVER
     background?: string;    // Made optional
@@ -67,9 +68,7 @@ export interface ISceneSettings extends IResourceSettings {
     selectedTilesetId?: string;
     tileMap?: number[][];
     isEditingMap?: boolean;
-    cameraPosition?: { x: number; y: number };
 }
-
 export interface SceneContextType {
     // Scene Settings
     scenes: ISceneSettings[];

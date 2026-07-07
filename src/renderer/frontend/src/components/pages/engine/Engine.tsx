@@ -1,23 +1,18 @@
 import { App as AntDApp, Flex, Layout, Spin, Splitter, Typography } from 'antd';
 import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 
-// import Layout from './components/Layout.tsx';
 import BottomPanel from '../../BottomPanel';
 import LeftPanel from '../../LeftPanel';
 import RightPanel from '../../RightPanel';
 import TopBar from '../../TopBar';
-import { ZoomProvider } from '../../ZoomContext';
 
 // import './Engine.css';
 // import '.././styles.css';
 
 import GameWorld from '../../gameWorld/GameWorld';
 import TileEditor from '../../TileEditor';
-// import { ipcRenderer } from 'electron';
 
-// import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-
-import { useBackgroundContext, useElementContext, useProjectContext, useSceneContext, useSettingsContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
+import useAppContexts from '@/providers/contexts/AppContexts';
 import { IBackgroundSettings } from '@/providers/contexts/interfaces/IBackgroundElement';
 import { IProjectSettings } from '@/providers/contexts/interfaces/IProjectElement';
 import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
@@ -28,6 +23,7 @@ import ErrorBoundary from 'antd/es/alert/ErrorBoundary';
 import { Skeleton } from 'antd/lib';
 import { useLocation } from 'react-router-dom';
 import { AntdToken } from '../../common/AntDToken';
+import { IUserSettings } from '@/providers/contexts/interfaces/IUserSettings';
 
 const { Content } = Layout;
 
@@ -37,12 +33,35 @@ const Engine: React.FC = () => {
   const [contentView, setContentView] = useState<number>(1);
   const [loading, setLoading] = useState(true);
 
-  const { scenes, setScenes, scenesRef, ignoredFields: ignoredFieldsScenes} = useSceneContext();
-  const { project, setProject, projectRef, ignoredFields: ignoredFieldsProject } = useProjectContext();
-  const { settings, setSettings, settingsRef, ignoredFields: ignoredFieldsSettings } = useSettingsContext();
-  const { backgrounds, setBackgrounds, backgroundsRef, ignoredFields: ignoredFieldsBackgrounds } = useBackgroundContext();
-  const { settingUtils, setSettingUtils, settingUtilsRef } = useSettingsUtilsContext();
-  const { elementSelected } = useElementContext();
+  // const { scenes, setScenes, scenesRef, ignoredFields: ignoredFieldsScenes} = useSceneContext();
+  // const { project, setProject, projectRef, ignoredFields: ignoredFieldsProject } = useProjectContext();
+  // const { settings, setSettings, settingsRef, ignoredFields: ignoredFieldsSettings } = useSettingsContext();
+  // const { backgrounds, setBackgrounds, backgroundsRef, ignoredFields: ignoredFieldsBackgrounds } = useBackgroundContext();
+  // const { settingUtils, setSettingUtils, settingUtilsRef } = useSettingsUtilsContext();
+  // const { elementSelected } = useElementContext();
+  const {
+    scenes, setScenes, scenesRef, ignoredFieldsScenes,
+    project, setProject, projectRef, ignoredFieldsProject,
+    settings, setSettings, settingsRef, ignoredFieldsSettings,
+    backgrounds, setBackgrounds, backgroundsRef, ignoredFieldsBackgrounds,
+    settingUtils, setSettingUtils, settingUtilsRef,
+    elementSelected,
+    userSettings, setUserSettings, userSettingsRef, ignoredFieldsUserSettings
+  } = useAppContexts();
+
+  const initializeUserSettingUtils = useCallback(() => {
+    const defaultUserSettings: IUserSettings = {
+      _resourceType: 'user_settings',
+      _saved: false, 
+      _deleted: false,
+      worldScrollX: 0,
+      worldScrollY: 0,
+      zoom: 100,
+      favoriteEvents: [],
+    };
+
+    setUserSettings(defaultUserSettings);
+  }, []);
 
   // Update settings utils initialization
   const initializeSettingUtils = useCallback((projectFilePath: string) => {
@@ -58,10 +77,11 @@ const Engine: React.FC = () => {
       localImagePath: '',
       localImagePathHD: '',
       images: null,
-      imagesHD: null
+      imagesHD: null,
+      buttonZoomPressed: false
     };
 
-    setSettingUtils(prev => ({ ...prev, ...defaultSettingUtils }));
+    setSettingUtils(defaultSettingUtils);
   }, []);
 
   // const handleCompile = () => {
@@ -86,7 +106,6 @@ const Engine: React.FC = () => {
       </Typography.Title>
     </Flex>
   );
-
 
   const [panelSizes, setPanelSizes] = useState<number[]>([]); // Tamanho inicial do painel
   const [showFloatButton, setShowFloatButton] = useState<boolean>(false);
@@ -156,21 +175,21 @@ const Engine: React.FC = () => {
   }, []);
 
   // Loading Favorite Events
-  useLayoutEffect(() => {
-    if (!window.electronAPI) {
-      console.error('window.electronAPI is undefined');
-      return;
-    }
+  // useLayoutEffect(() => {
+  //   if (!window.electronAPI) {
+  //     console.error('window.electronAPI is undefined');
+  //     return;
+  //   }
 
-    const favoriteEvents = async () => {
-      const response = await window.electronAPI.loadFavoriteEvents();
-      console.log('>> FavoriteEvents: ', response);
+  //   const favoriteEvents = async () => {
+  //     const response = await window.electronAPI.loadFavoriteEvents();
+  //     console.log('>> FavoriteEvents: ', response);
       
-      setSettingUtils(prev => ({ ...prev, favoriteEvents: response }));
-    };
+  //     setSettingUtils(() => ({ ...settingUtilsRef.current, favoriteEvents: response }));
+  //   };
 
-    favoriteEvents();
-  }, []);
+  //   favoriteEvents();
+  // }, []);
 
   useLayoutEffect(() => {
     const query = new URLSearchParams(location.search);
@@ -185,6 +204,7 @@ const Engine: React.FC = () => {
         // Initialize settings utils first
         console.log("..: Engine - File Path:", projectFilePath);
         initializeSettingUtils(projectFilePath);
+        initializeUserSettingUtils();
         console.log('..: useEffect settingUtils default ', settingUtils);
 
         const file = await window.electronAPI.loadSettings(projectFilePath);
@@ -194,31 +214,22 @@ const Engine: React.FC = () => {
           return;
         }
 
-        const scenesFromFile: ISceneSettings[] = [];
-        const backgroundsFromFile: IBackgroundSettings[] = [];
-        let projectFromFile: IProjectSettings | null = null;
-        let settingsFromFile: IMainSettings | null = null;
-
-        file.forEach((obj) => {
+        const categorized = file.reduce((acc, obj) => {
           const objectJson = JSON.parse(obj);
-          switch (objectJson._resourceType) {
-            case 'scene':
-              scenesFromFile.push({ ...objectJson as ISceneSettings, _saved: true });
-              break;
-            case 'background':
-              backgroundsFromFile.push({ ...objectJson as IBackgroundSettings, _saved: true });
-              break;
-            case 'project':
-              projectFromFile = { ...objectJson as IProjectSettings, _saved: true };
-              break;
-            case 'settings':
-              settingsFromFile = { ...objectJson as IMainSettings, _saved: true };
-              break;
-            default:
-              console.log("..: Engine - Unknown Object:", objectJson);
-              break;
-          }
-        });
+          const type = objectJson._resourceType;
+
+          if (!acc[type]) acc[type] = [];
+
+          acc[type].push({ ...objectJson, _saved: true });
+          
+          return acc;
+        }, {} as Record<string, any[]>);
+
+        const scenesFromFile: ISceneSettings[] = categorized.scene || [];
+        const backgroundsFromFile: IBackgroundSettings[] = categorized.background || [];
+        const projectFromFile: IProjectSettings | null = categorized.project?.[0] || null;          // Assume apenas um projeto
+        const settingsFromFile: IMainSettings | null = categorized.settings?.[0] || null;           // Assume apenas uma configuração
+        const userSettingsFromFile: IUserSettings | null = categorized.user_settings?.[0] || null;  // Assume apenas uma configuração
 
         // Atualize os estados de uma vez só:
         if (scenesFromFile.length > 0) {
@@ -243,6 +254,10 @@ const Engine: React.FC = () => {
 
         if (settingsFromFile) {
           setSettings(settingsFromFile);
+        }
+
+        if (userSettingsFromFile) {
+          setUserSettings(userSettingsFromFile);
         }
 
         setTimeout(() => {
@@ -310,7 +325,7 @@ const Engine: React.FC = () => {
             Object.fromEntries(
                 Object.entries(field).filter(([key]) => !ignoredFields.includes(key))
             )
-          );;
+          );
         }
         return null;
       }
@@ -328,6 +343,7 @@ const Engine: React.FC = () => {
       console.log('..: all data to save project:', projectRef.current);
       console.log('..: all data to save backgrounds:', backgroundsRef.current);
       console.log('..: all data to save setting:', settingsRef.current);
+      console.log('..: all data to save user setting:', userSettingsRef.current);
       console.log('..: all data to save settingUtils:', settingUtilsRef.current);
 
       // Preparar os dados para salvar
@@ -335,6 +351,7 @@ const Engine: React.FC = () => {
         prepareForBackend(scenesRef.current.filter(s => s._saved === false), ignoredFieldsScenes!),
         projectRef.current?._saved === false ? prepareForBackend(projectRef.current, ignoredFieldsProject!) : null,
         settingsRef.current._saved === false ? prepareForBackend(settingsRef.current, ignoredFieldsSettings!) : null,
+        userSettingsRef.current._saved === false ? prepareForBackend(userSettingsRef.current, ignoredFieldsUserSettings!) : null,
         prepareForBackend(backgroundsRef.current.filter(s => s._saved === false), ignoredFieldsBackgrounds!),
         settingUtilsRef.current,
       ].filter(item => item != null && (!(Array.isArray(item)) || item.length > 0));
@@ -347,6 +364,7 @@ const Engine: React.FC = () => {
       setScenes(() => scenesRef.current.map(s => ({ ...s, _saved: true })));
       setProject(() => ({ ...projectRef.current!, _saved: true }));
       setSettings(() => ({ ...settingsRef.current, _saved: true }));
+      setUserSettings(() => ({ ...userSettingsRef.current, _saved: true }));
       setBackgrounds(() => backgroundsRef.current.map(b => ({ ...b, _saved: true })));
       // setSettingUtils(settingUtils => ({ ...settingUtils, _saved: true }));
 
@@ -385,7 +403,9 @@ const Engine: React.FC = () => {
 
     // Check todos para ver se tem algum com alteração para salvar
     const unsaved =
-      hasUnsaved(scenes) || hasUnsaved(backgrounds) || (project && project._saved === false) || (settings && settings._saved === false) || (settingUtils && settingUtils._saved === false);
+      hasUnsaved(scenes) || hasUnsaved(backgrounds) || (project && project._saved === false) 
+      || (settings && settings._saved === false) || (settingUtils && settingUtils._saved === false)
+      || (userSettings && userSettings._saved === false);
 
     // Call Electron API to update title - isSaved: true se não tem nada para salvar
     window.electronAPI.updateTitle('GBA Studio', project?.name || '', !unsaved);
@@ -393,7 +413,7 @@ const Engine: React.FC = () => {
     if (unsaved) {
       console.log('..: Engine.tsx tem alguma atualização!');
     }
-  }, [scenes, project, settings, backgrounds, settingUtils]);
+  }, [scenes, project, settings, userSettings, backgrounds, settingUtils]);
 
   // useEffect(() => {
   //   const handleResize = () => {
@@ -448,173 +468,171 @@ const Engine: React.FC = () => {
   return (
     <ErrorBoundary>
       <AntDApp>
-        <ZoomProvider>
-          <Layout style={{
-            width: '100vw',
-            height: '100vh',
-            overflow: 'hidden' // Previne scroll indesejado
-          }}>
-            {/* <div> */}
-            {/* <button style={{ width: '150px', display: 'flex', justifyContent: 'space-between' }} onClick={handleCompile}>
-                Compilar Projeto
-              </button> */}
-            {/* <button onClick={handleLaunchEmulator}>Iniciar Emulador</button> */}
-            {/* <button onClick={handleRunProject}>Executar Projeto</button> */}
-            {/* </div> */}
-            <TopBar contenView={contentView} setContentView={setContentView} />
-            {contentView == 1 && (<Layout style={{ display: 'block', flex: 1, overflow: 'hidden' }}>
-              {/* <Content> */}
+        <Layout style={{
+          width: '100vw',
+          height: '100vh',
+          overflow: 'hidden' // Previne scroll indesejado
+        }}>
+          {/* <div> */}
+          {/* <button style={{ width: '150px', display: 'flex', justifyContent: 'space-between' }} onClick={handleCompile}>
+              Compilar Projeto
+            </button> */}
+          {/* <button onClick={handleLaunchEmulator}>Iniciar Emulador</button> */}
+          {/* <button onClick={handleRunProject}>Executar Projeto</button> */}
+          {/* </div> */}
+          <TopBar contenView={contentView} setContentView={setContentView} />
+          {contentView == 1 && (<Layout style={{ display: 'block', flex: 1, overflow: 'hidden' }}>
+            {/* <Content> */}
+            <Splitter
+              // onResizeStart={handleResizeStart}
+              onResizeEnd={handleResizeEnd}
+              onResize={handleResizePanel}
+            >
+              {/* PAINEL ESQUERDO */}
+              <Splitter.Panel
+                defaultSize="25%"
+                min={130}
+                // max="80%"
+                size={panelSizes[0]}
+                style={{
+                  display: panelSizes[0] <= 140 ? 'grid' : 'flex',
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                  {panelSizes[0] <= 140 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        zIndex: 10,
+                        pointerEvents: 'none', // permite clicar através do overlay
+                      }}
+                    />
+                  )}
+                  <LeftPanel />
+                </div>
+              </Splitter.Panel>
+
+              {/* CENTRO */}
+              <Splitter.Panel /*size={panelSizes[1]}*/>
+                <Splitter layout="vertical">
+                  <Content style={{ backgroundColor: token.colorBgContainer }}>
+                    <GameWorld resetPanelSize={resetPanelSize} setShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton} />
+                  </Content>
+                  {/* <Splitter.Panel>
+                        <CentralEditor />
+                      </Splitter.Panel> */}
+                  <Splitter.Panel defaultSize="25%" min={40} max="90%">
+                    {/* <Footer> */}
+                    <BottomPanel />
+                    {/* </Footer> */}
+                  </Splitter.Panel>
+                </Splitter>
+              </Splitter.Panel>
+
+              {/* PAINEL DIREITO */}
+              <Splitter.Panel defaultSize="35%" min={350} size={panelSizes[2]} >
+                <RightPanel controllerView={setContentView} />
+              </Splitter.Panel>
+            </Splitter>
+            {/* </Content> */}
+            {/* <EmulatorView /> */}
+            {/* {showFloatButton && (
+            <FloatButton 
+              shape="square"
+              style={{ position: 'absolute', bottom: 50, right: 900 }}
+              icon={<LayoutOutlined />}
+              onClick={() => { setPanelSize(250); setShowFloatButton(false); }} // Voltar ao tamanho original
+            />
+          )} */}
+          </Layout>
+          )}
+          {contentView == 2 && (
+            <Layout style={{ display: 'block', flex: 1, overflow: 'hidden' }}>
               <Splitter
-                // onResizeStart={handleResizeStart}
                 onResizeEnd={handleResizeEnd}
                 onResize={handleResizePanel}
               >
                 {/* PAINEL ESQUERDO */}
-                <Splitter.Panel
-                  defaultSize="25%"
-                  min={130}
-                  // max="80%"
-                  size={panelSizes[0]}
-                  style={{
-                    display: panelSizes[0] <= 140 ? 'grid' : 'flex',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                    {panelSizes[0] <= 140 && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                          zIndex: 10,
-                          pointerEvents: 'none', // permite clicar através do overlay
-                        }}
-                      />
-                    )}
-                    <LeftPanel />
-                  </div>
+                <Splitter.Panel defaultSize="20%" min={200} size={panelSizes[0]}>
+                  <LeftPanel showScriptsAndVariables={false} />
                 </Splitter.Panel>
 
                 {/* CENTRO */}
-                <Splitter.Panel /*size={panelSizes[1]}*/>
+                <Splitter.Panel>
                   <Splitter layout="vertical">
                     <Content>
-                      <GameWorld resetPanelSize={resetPanelSize} setShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton} />
+                      {elementSelected && (elementSelected.sceneType === ETypeScene.LOGO || elementSelected.sceneType === ETypeScene.POINTNCLICK) ? (
+                        <TileEditor scene={elementSelected} resetPanelSize={resetPanelSize} setShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton} />
+                      ) : (
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', fontSize: '18px', color: token.colorTextSecondary }}>
+                          Select a scene to edit
+                        </div>
+                      )}
                     </Content>
-                    {/* <Splitter.Panel>
-                          <CentralEditor />
-                        </Splitter.Panel> */}
                     <Splitter.Panel defaultSize="25%" min={40} max="90%">
-                      {/* <Footer> */}
                       <BottomPanel />
-                      {/* </Footer> */}
                     </Splitter.Panel>
                   </Splitter>
                 </Splitter.Panel>
 
                 {/* PAINEL DIREITO */}
-                <Splitter.Panel defaultSize="35%" min={350} size={panelSizes[2]} >
-                  <RightPanel controllerView={setContentView} />
+                <Splitter.Panel defaultSize="35%" min={350} size={panelSizes[2]}>
+                  <RightPanel controllerView={setContentView} isTileEditor={true} />
                 </Splitter.Panel>
               </Splitter>
-              {/* </Content> */}
-              {/* <EmulatorView /> */}
-              {/* {showFloatButton && (
-              <FloatButton 
-                shape="square"
-                style={{ position: 'absolute', bottom: 50, right: 900 }}
-                icon={<LayoutOutlined />}
-                onClick={() => { setPanelSize(250); setShowFloatButton(false); }} // Voltar ao tamanho original
-              />
-            )} */}
             </Layout>
-            )}
-            {contentView == 2 && (
-              <Layout style={{ display: 'block', flex: 1, overflow: 'hidden' }}>
-                <Splitter
-                  onResizeEnd={handleResizeEnd}
-                  onResize={handleResizePanel}
-                >
-                  {/* PAINEL ESQUERDO */}
-                  <Splitter.Panel defaultSize="20%" min={200} size={panelSizes[0]}>
-                    <LeftPanel showScriptsAndVariables={false} />
-                  </Splitter.Panel>
-
-                  {/* CENTRO */}
-                  <Splitter.Panel>
-                    <Splitter layout="vertical">
-                      <Content>
-                        {elementSelected && (elementSelected.sceneType === ETypeScene.LOGO || elementSelected.sceneType === ETypeScene.POINTNCLICK) ? (
-                          <TileEditor scene={elementSelected} resetPanelSize={resetPanelSize} setShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton} />
-                        ) : (
-                          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', fontSize: '18px', color: token.colorTextSecondary }}>
-                            Select a scene to edit
-                          </div>
-                        )}
-                      </Content>
-                      <Splitter.Panel defaultSize="25%" min={40} max="90%">
-                        <BottomPanel />
-                      </Splitter.Panel>
-                    </Splitter>
-                  </Splitter.Panel>
-
-                  {/* PAINEL DIREITO */}
-                  <Splitter.Panel defaultSize="35%" min={350} size={panelSizes[2]}>
-                    <RightPanel controllerView={setContentView} isTileEditor={true} />
-                  </Splitter.Panel>
-                </Splitter>
-              </Layout>
-            )}
-          
-            {contentView == 3 && (
-              <Content style={{ margin: 50 }}>
-                <Skeleton.Node active style={{ height: 150, width: 250 }} />
-                <Skeleton active />
-                <Skeleton.Image active style={{ height: 150, width: 250 }} />
-              </Content>
-            )}
-            {contentView == 4 && (
-              <Content style={{ display: 'flex', flex: 'grid', margin: 50 }}>
-                <Skeleton.Image active style={{ height: 150, width: 250 }} />
-                <Skeleton active style={{ paddingInline: 20 }} />
-                <Skeleton.Image active style={{ height: 150, width: 250 }} />
-              </Content>
-            )}
-            {contentView == 5 && (
-              <Content style={{ margin: 50 }}>
-                <Skeleton active />
-                <Skeleton.Node active style={{ height: 150, width: 250 }} />
-              </Content>
-            )}
-            {contentView == 6 && (
-              <Content style={{ margin: 50 }}>
-                <Skeleton active />
-                <Skeleton.Node active style={{ height: 150, width: 250 }} />
-                <Skeleton active />
-              </Content>
-            )}
-            {contentView == 7 && (
-              <Content style={{ margin: 50 }}>
-                <Skeleton active />
-              </Content>
-            )}
-            {contentView == 8 && (
-              <Content style={{ margin: 50 }}>
-                <Skeleton.Node active style={{ height: 150, width: 250 }} />
-                <Skeleton active />
-              </Content>
-            )}
-            {contentView == 9 && (
-              <Content style={{ margin: 50 }}>
-                <Skeleton.Node active style={{ height: 600, width: 350 }} />
-              </Content>
-            )}
-          </Layout>
-        </ZoomProvider>
+          )}
+        
+          {contentView == 3 && (
+            <Content style={{ margin: 50 }}>
+              <Skeleton.Node active style={{ height: 150, width: 250 }} />
+              <Skeleton active />
+              <Skeleton.Image active style={{ height: 150, width: 250 }} />
+            </Content>
+          )}
+          {contentView == 4 && (
+            <Content style={{ display: 'flex', flex: 'grid', margin: 50 }}>
+              <Skeleton.Image active style={{ height: 150, width: 250 }} />
+              <Skeleton active style={{ paddingInline: 20 }} />
+              <Skeleton.Image active style={{ height: 150, width: 250 }} />
+            </Content>
+          )}
+          {contentView == 5 && (
+            <Content style={{ margin: 50 }}>
+              <Skeleton active />
+              <Skeleton.Node active style={{ height: 150, width: 250 }} />
+            </Content>
+          )}
+          {contentView == 6 && (
+            <Content style={{ margin: 50 }}>
+              <Skeleton active />
+              <Skeleton.Node active style={{ height: 150, width: 250 }} />
+              <Skeleton active />
+            </Content>
+          )}
+          {contentView == 7 && (
+            <Content style={{ margin: 50 }}>
+              <Skeleton active />
+            </Content>
+          )}
+          {contentView == 8 && (
+            <Content style={{ margin: 50 }}>
+              <Skeleton.Node active style={{ height: 150, width: 250 }} />
+              <Skeleton active />
+            </Content>
+          )}
+          {contentView == 9 && (
+            <Content style={{ margin: 50 }}>
+              <Skeleton.Node active style={{ height: 600, width: 350 }} />
+            </Content>
+          )}
+        </Layout>
       </AntDApp>
     </ErrorBoundary>
   );

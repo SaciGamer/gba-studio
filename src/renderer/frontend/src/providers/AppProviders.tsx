@@ -1,6 +1,6 @@
 import { ComponentType, ReactNode } from 'react';
-import { ElementProvider, BackgroundProvider, ProjectProvider, SceneProvider, SettingsProvider, SettingsUtilsProvider } from "./Providers";
 import { BuildStateProvider } from './BuildStateProvider';
+import { BackgroundProvider, ElementProvider, ProjectProvider, SceneProvider, SettingsProvider, SettingsUtilsProvider, UserSettingsProvider } from "./Providers";
 
 const composeProviders = (...providers: ComponentType<{ children: ReactNode }>[]) => {
     return ({ children }: { children: ReactNode }) => 
@@ -8,9 +8,9 @@ const composeProviders = (...providers: ComponentType<{ children: ReactNode }>[]
 }
 
 const AppProvider = composeProviders(
+    BuildStateProvider, // BuildStateProvider is placed early so UI can read building/running state
     SettingsUtilsProvider,
-    BuildStateProvider,
-    // BuildStateProvider is placed early so UI can read building/running state
+    UserSettingsProvider,
     ProjectProvider,
     SettingsProvider, 
     BackgroundProvider,

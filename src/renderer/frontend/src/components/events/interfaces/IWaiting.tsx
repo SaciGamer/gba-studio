@@ -1,5 +1,7 @@
-export interface IWait {
-  time?: number;
-  frames?: number;
-  units?: String;
+import { IArgs } from "@/providers/contexts/interfaces/ISceneElement";
+
+export interface IWait extends IArgs {
+  time: number;
+  frames: number;
+  units: string;
 }

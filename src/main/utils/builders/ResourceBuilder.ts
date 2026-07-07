@@ -111,12 +111,85 @@ export class ResourceBuilder {
     };
   }
 
+  private createStructureFromJson(baseName: string, key: string, val: any, resourceType: string): string {
+    let response = "";
+
+    switch(resourceType) {
+      // case "background":
+      //   response += "" + "\n";
+      //   break;
+      case "scene":
+        // Backgrounds layers
+        if (key === 'backgrounds' && val && Array.isArray(val)) {
+          let sceneBackgroundsLayerTemplate = `static const SceneLayer {{SCENE_NAME}}_LAYERS[] = {{{BACKGROUNDS_LAYERS_CONTENT}}};\n`;
+          sceneBackgroundsLayerTemplate = sceneBackgroundsLayerTemplate.replace("{{SCENE_NAME}}", baseName);
+
+          val.forEach((bg: any) => {
+            sceneBackgroundsLayerTemplate = sceneBackgroundsLayerTemplate.replace("{{BACKGROUNDS_LAYERS_CONTENT}}", `\n    { ${bg.layerId}, "${bg.backgroundId}", ${bg.name ? `${bg.name.toUpperCase()}_NAME` : 'nullptr'}, ${bg.path ? `${bg.path.toUpperCase()}_FILENAME` : 'nullptr'} },{{BACKGROUNDS_LAYERS_CONTENT}}`);
+          });
+          
+          response += sceneBackgroundsLayerTemplate.replaceAll("{{BACKGROUNDS_LAYERS_CONTENT}}", '\n');
+        }
+        // Scripts
+        if (key === 'script' && val && Array.isArray(val)) {
+          // Script format: { id, command, args }
+          let sceneScriptsTemplate = `static const ScriptCommandData {{SCENE_NAME}}S[] = {{{SCRIPTS_CONTENT}}};\n`;
+          sceneScriptsTemplate = sceneScriptsTemplate.replace("{{SCENE_NAME}}", baseName);
+
+          val.forEach((script: any, index: number) => {
+            if (script.args?.__comment)
+              return;
+
+            let argsName = `${baseName}_ARGS_${index}`;
+            let argsDecl = "";
+            let argsCount = 0;
+            // let sceneArgsTemplate = `static const char* {{SCENE_NAME}}_ARGS[] = {{{SCRIPT_ARGS_CONTENT}}};\n`;
+            // sceneArgsTemplate = sceneArgsTemplate.replace("{{SCENE_NAME}}", baseName);
+
+            if (script.args && typeof script.args === 'object' /*&& Array.isArray(script.args)*/) {
+              argsDecl += `static const char* ${argsName}[] = { `;
+              Object.entries(script.args).forEach(([key, argValue]) => {
+                if (key.startsWith('__'))
+                  return;
+
+                if (typeof argValue === 'string' || typeof argValue === 'number') {
+                  argsDecl += `"${argValue}", `;
+                  argsCount ++;
+                } else {
+                  argsDecl += `nullptr, `;
+                }
+
+              });
+              argsDecl += `};\n`;
+            }
+            
+            response += argsDecl;
+            sceneScriptsTemplate = sceneScriptsTemplate.replace("{{SCRIPTS_CONTENT}}", `\n    { "${script.id}", "${script.command}", ${argsName}, ${argsCount} },{{SCRIPTS_CONTENT}}`);
+          });
+          
+          response += sceneScriptsTemplate.replaceAll("{{SCRIPTS_CONTENT}}", '\n');
+        }
+
+        break;
+      // case "settings":
+      //   response += "" + "\n";
+      //   break;
+      default:
+        const encoded = JSON.stringify(val).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        response += `static const char ${baseName}_JSON[] = \"${encoded}\";\n`;
+        break;
+    }
+
+    return response;
+  }
+
   /**
    * Generate a header file from parsed JSON or raw JSON string
    */
   private generateHeaderFromJson(baseName: string, jsonObj: any, rawJson: string): string {
     const guardName = `${baseName.toUpperCase()}_RES_H`;
     let header = `#ifndef ${guardName}\n#define ${guardName}\n\n`;
+    header += `#include "resource_types.h"\n\n`;
     header += `/* Auto-generated resource header for: ${baseName} */\n\n`;
 
     if (jsonObj && typeof jsonObj === 'object') {
@@ -131,24 +204,38 @@ export class ResourceBuilder {
           header += `static const int ${cleanKey} = ${val};\n`;
         } else if (typeof val === 'boolean') {
           header += `static const int ${cleanKey} = ${val ? 1 : 0};\n`;
-        } else if (Array.isArray(val) && val.every(row => Array.isArray(row) && row.every(v => typeof v === 'number'))) {
-          // É um array 2D de números -> gera como int[][]
-          const rowCount = val.length;
-          const colCount = val[0].length;
-          const rows = val.map(row => `{ ${row.join(', ')} }`).join(',\n    ');
+        } else if (key === 'tileMap' && Array.isArray(val) && val.every(row => Array.isArray(row) && row.every(v => typeof v === 'number'))) {
+          if (val.length > 0 && val[0].length > 0) {
+            // É um array 2D de números -> gera como int[][]
+            const rowCount = val.length;
+            const colCount = val[0].length;
+            const rows = val.map(row => `{ ${row.join(', ')} }`).join(',\n    ');
 
-          header += `#define ${cleanKey}_ROWS ${rowCount}\n`;
-          header += `#define ${cleanKey}_COLS ${colCount}\n`;
-          header += `static const int ${cleanKey}[${cleanKey}_ROWS][${cleanKey}_COLS] = {\n    ${rows}\n};\n`;
+            header += `#define ${cleanKey}_ROWS ${rowCount}\n`;
+            header += `#define ${cleanKey}_COLS ${colCount}\n`;
+            header += `static const int ${cleanKey}[${cleanKey}_ROWS][${cleanKey}_COLS] = {\n    ${rows}\n};\n`;
+          } 
+          // else {
+          //   // matriz vazia
+          //   header += `static const int* ${cleanKey} = nullptr;\n`;
+          //   header += `#define ${cleanKey}_ROWS 0\n`;
+          //   header += `#define ${cleanKey}_COLS 0\n`;
+          // }
         } else if (Array.isArray(val) && val.every(v => typeof v === 'number')) {
-          // Array 1D de números -> gera como int[]
-          const values = val.join(', ');
-          header += `static const int ${cleanKey}[] = { ${values} };\n`;
-          header += `static const int ${cleanKey}_SIZE = sizeof(${cleanKey}) / sizeof(int);\n`;
+          if (val.length > 0) {
+            // Array 1D de números -> gera como int[]
+            const values = val.join(', ');
+            header += `static const int ${cleanKey}[] = { ${values} };\n`;
+            header += `static const int ${cleanKey}_SIZE = sizeof(${cleanKey}) / sizeof(int);\n`;
+          } 
+          // else {
+          //   // lista vazia -> define como NULL
+          //   header += `static const int* ${cleanKey} = nullptr;\n`;
+          //   header += `static const int ${cleanKey}_SIZE = 0;\n`;
+          // }
         } else {
-          // For arrays/objects, embed JSON string literal
-          const encoded = JSON.stringify(val).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-          header += `static const char ${cleanKey}_JSON[] = \"${encoded}\";\n`;
+          // Para objetos complexos ou arrays de objetos
+          header += this.createStructureFromJson(cleanKey, key, val, jsonObj._resourceType);
         }
       }
     } else {
@@ -213,7 +300,6 @@ export class ResourceBuilder {
     };
   }
 
-
   /**
    * Write resource header file
    */
@@ -245,7 +331,6 @@ export class ResourceBuilder {
       let registry_template = fs.readFileSync(tplPath, 'utf8');
       // let objects = "";
       let backgrounds = "";
-      let backgroundsLayers = "";
       let scenes = "";
       let settings = "";
 
@@ -256,17 +341,6 @@ export class ResourceBuilder {
             break;
           case "scene":
             scenes += parseResourceFile(file) + "\n";
-
-            if (file.jsonContent?.backgrounds) {
-              let sceneBackgroundsLayerTemplate = `static const SceneLayer {{SCENE_NAME}}_LAYERS[] = {{{BACKGROUNDS_LAYERS_CONTENT}}};\n\n`;
-              sceneBackgroundsLayerTemplate = sceneBackgroundsLayerTemplate.replace("{{SCENE_NAME}}", file.resourceName.replace('_res.h', '').toUpperCase());
-
-              file.jsonContent?.backgrounds.forEach((bg: any) => {
-                sceneBackgroundsLayerTemplate = sceneBackgroundsLayerTemplate.replace("{{BACKGROUNDS_LAYERS_CONTENT}}", `\n    { ${bg.layerId}, "${bg.backgroundId}", ${bg.name ? `${bg.name.toUpperCase()}_NAME` : 'nullptr'}, ${bg.path ? `${bg.path.toUpperCase()}_FILENAME` : 'nullptr'} },{{BACKGROUNDS_LAYERS_CONTENT}}`);
-              });
-              
-              backgroundsLayers += sceneBackgroundsLayerTemplate;
-           }
             break;
           case "settings":
             settings += parseResourceFile(file) + "\n";
@@ -276,15 +350,10 @@ export class ResourceBuilder {
         // objects += parseResourceFile(file) + "\n";
       }
 
-      if (backgroundsLayers) {
-        backgroundsLayers = backgroundsLayers.replaceAll("{{BACKGROUNDS_LAYERS_CONTENT}}", '\n');
-      }
-
       registry_template = registry_template.replace("{{PROJECT_NAME}}", config.projectName);
       registry_template = registry_template.replace("{{AUTHOR}}", config.authorName || '');
       registry_template = registry_template.replace("{{VERSION}}", config.version || '1.0.0');
       // registry_template = registry_template.replace("{{OBJECT_CONSTANTS}}", objects);
-      registry_template = registry_template.replace("{{BACKGROUNDS_LAYERS_CONSTANTS}}", backgroundsLayers);
       registry_template = registry_template.replace("{{BACKGROUNDS_CONSTANTS}}", backgrounds);
       registry_template = registry_template.replace("{{SCENES_CONSTANTS}}", scenes);
       registry_template = registry_template.replace("{{SETTINGS_CONSTANTS}}", settings);
@@ -345,7 +414,7 @@ function parseResourceFile(file: ResourceFile): string {
   } else if (type === "scene") {
     const required = [
       `${baseNameUpper}_ID`,
-      `${baseNameUpper}_BACKGROUNDS_JSON`,
+      `${baseNameUpper}_BACKGROUNDS_LAYERS`,
     ];
     if (required.every(hasSymbol)) {
       // Format: { name, id, name_const, background_id, selected_tileset_id, width, height, scene_type, image_type }
@@ -353,12 +422,14 @@ function parseResourceFile(file: ResourceFile): string {
       const tileSetId = file.jsonContent?.selectedTilesetId !== undefined ? `${baseNameUpper}_SELECTEDTILESETID` : '0';
       const imageType = file.jsonContent?.imageType !== undefined ? `${baseNameUpper}_IMAGETYPE` : '0';
       const backgroundLayerCount = file.jsonContent?.backgrounds ? file.jsonContent.backgrounds.length : 0;
+      const script = file.jsonContent?.script && file.jsonContent.script.length > 0 ? `${baseNameUpper}_SCRIPTS` : `nullptr`;
+      const scriptCount = file.jsonContent?.script ? file.jsonContent.script.length : 0;
 
-      return `    { ResourceType::${type}, ${baseNameUpper}_ID, ${baseNameUpper}_NAME, ${baseNameUpper}_LAYERS, ${backgroundLayerCount}, ${tileSetId}, ${baseNameUpper}_WIDTH, ${baseNameUpper}_HEIGHT, ${baseNameUpper}_SCENETYPE, ${imageType}, ${tilemap} },`;
+      return `    { ResourceType::${type}, ${baseNameUpper}_ID, ${baseNameUpper}_NAME, ${script}, ${scriptCount}, ${baseNameUpper}_BACKGROUNDS_LAYERS, ${backgroundLayerCount}, ${tileSetId}, ${baseNameUpper}_WIDTH, ${baseNameUpper}_HEIGHT, ${baseNameUpper}_SCENETYPE, ${imageType}, ${tilemap} },`;
     } else {
       const backgroundLayerCount = file.jsonContent?.backgrounds ? file.jsonContent.backgrounds.length : 0;
 
-      return `    { ResourceType::${type}, ${baseNameUpper}_ID, "${name}", nullptr, ${backgroundLayerCount}, nullptr, 0, 0, ${baseNameUpper}_SCENETYPE, nullptr, 0, 0, 0 },`;
+      return `    { ResourceType::${type}, ${baseNameUpper}_ID, "${name}", nullptr, 0, nullptr, ${backgroundLayerCount}, nullptr, 0, 0, ${baseNameUpper}_SCENETYPE, nullptr, 0, 0, 0 },`;
     }
   }
 

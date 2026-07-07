@@ -1,4 +1,4 @@
-import { IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
+import { IArgs, IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
 import ChangeSceneEvent from "./ChangeSceneEvent";
 import FadeEvent from "./FadeEvent";
 import { EEvents } from "./interfaces/IEvents";
@@ -7,7 +7,7 @@ import WaitEvent from "./WaitEvent";
 interface PanelEventsProps {
   event: IScriptsElement | null;
   customTitle: (newTitle: string) => void;
-  onValueChange: (eventId: string, eventArgs: any) => void;
+  onValueChange: (eventId: string, eventArgs: IArgs) => void;
 }
 
 export default function PanelEvents({ event, customTitle, onValueChange }: PanelEventsProps) {

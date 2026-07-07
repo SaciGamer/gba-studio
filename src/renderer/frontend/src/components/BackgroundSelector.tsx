@@ -1,4 +1,4 @@
-import { useBackgroundContext, useSceneContext, useSettingsUtilsContext } from '@/providers/contexts/AppContexts';
+import useAppContexts from '@/providers/contexts/AppContexts';
 import { ETypeScene } from '@/providers/contexts/interfaces/ISceneElement';
 import { Select, theme } from 'antd';
 import React, { useState } from 'react';
@@ -15,22 +15,39 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
   layerKey,
 }) => {
   const { token } = useToken();
-  const { scenes, setScenes } = useSceneContext();
-  const { backgrounds, setBackgrounds, backgroundsRef } = useBackgroundContext();
-  const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
+  // const { scenes, setScenes } = useSceneContext();
+  // const { backgrounds, setBackgrounds, backgroundsRef } = useBackgroundContext();
+  // const { settingUtils } = useSettingsUtilsContext();
+  const { scenes, setScenes, backgroundsRef, settingUtils } = useAppContexts();
   const elementSelected = scenes.find(s => s.id === selectedElementId);
   const isHDScene = elementSelected?.sceneType === ETypeScene.LOGO || elementSelected?.sceneType === ETypeScene.POINTNCLICK;
   const backgroundsAvaible = backgroundsRef.current.filter(b => !b._deleted && b.hd === isHDScene);
   const [haveValueChange, setHaveValueChange] = useState(false);
 
-  // const [listBackgrounds, setListBackgrounds] = useState<IBackgroundSettings[]>([]);
-  
   const updateSceneBackground = (newBackgroundId: string | null) => {
+    let maxWidth = 240;
+    let maxHeight = 160;
+
+    if (elementSelected!= undefined && elementSelected?.backgrounds) {
+      const elementBackgroundsId = elementSelected?.backgrounds?.map(bg => bg.backgroundId); 
+      const sceneBackgrounds = backgroundsAvaible.filter(bg => elementBackgroundsId.includes(bg.id));
+
+      if (sceneBackgrounds.length > 0) {
+        const calcWidth = Math.max(...sceneBackgrounds.map(img => img.imageWidth));
+        const calcHeight = Math.max(...sceneBackgrounds.map(img => img.imageHeight));
+
+        maxWidth = calcWidth > 240 ? calcWidth : 240;
+        maxHeight = calcHeight > 160 ? calcWidth : 160;
+      } 
+    }
+    
     setScenes(prevScenes =>
       prevScenes.map((s) =>
         s.id === selectedElementId
           ? {
               ...s,
+              width: maxWidth,
+              height: maxHeight,
               backgrounds: (() => {
                 const exists = s.backgrounds?.some(bg => bg.layerId === layerKey);
                 if (exists) {
@@ -59,6 +76,7 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
     <Select
       showSearch
       optionFilterProp="label"
+      suffixIcon={null}
       value={backgroundsAvaible.find(ba => ba.id === elementSelected?.backgrounds?.find(bg => bg.layerId === layerKey)?.backgroundId)?.id ?? null}
       onChange={(newBackgroundId) => updateSceneBackground(newBackgroundId)}
       style={{ width: '100%' }}

@@ -1,7 +1,7 @@
-import { useElementContext, useSceneContext } from '@/providers/contexts/AppContexts';
+import useAppContexts from '@/providers/contexts/AppContexts';
 import { EImageType, ETypeScene, IBackgroundElement, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { BgColorsOutlined, PictureOutlined } from '@ant-design/icons';
-import { Button, Divider, Input, InputNumber, Layout, Select, Space, Tabs, theme, Typography } from 'antd';
+import { Button, Checkbox, Divider, Input, InputNumber, Layout, Select, Space, Tabs, theme, Typography } from 'antd';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BackgroundSelector } from './BackgroundSelector';
 import CollapseEventManager from './events/CollapseEventManager';
@@ -18,8 +18,9 @@ interface IRightPanelProps {
 
 const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor = false }) => {
   const { token } = useToken();
-  const { scenes, setScenes, ignoredFields } = useSceneContext();
-  const { elementSelected, setElementSelected } = useElementContext();
+  // const { scenes, setScenes, ignoredFields } = useSceneContext();
+  // const { elementSelected, setElementSelected } = useElementContext();
+  const { scenes, setScenes, ignoredFieldsScenes, elementSelected, setElementSelected } = useAppContexts();
 
   const [isEditingTitle, setIsEditingTitle ] = useState(false);
   const [availableTilesets, setAvailableTilesets] = useState<any[]>([]);
@@ -104,6 +105,18 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
   //     console.log(`..: RightPanel background file ${backgroundData.file}`);
   //   }
   // };
+
+  const handleChangeCameraView = (value: boolean) => {
+    if (elementSelected) {
+      const updatedElement = { ...elementSelected, showCamera: value };
+      setElementSelected(updatedElement);
+      setScenes(prevScenes => prevScenes.map(scene => 
+        scene.id === updatedElement.id 
+          ? { ...scene, ...updatedElement, _saved: false }
+          : scene
+      ));
+    }
+  };
 
   const handleTitleClick = () => {
     setIsEditingTitle(true);
@@ -718,6 +731,25 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
           // Game World Mode - Basic scene properties + Tiles Editor button
           <Content>
             <Space direction="vertical" style={{ width: '100%', padding: 10 }}>
+              <Typography.Text>Camera View</Typography.Text>
+              <Checkbox 
+                defaultChecked={elementSelected.showCamera} 
+                onChange={check => handleChangeCameraView(check.target.checked)}
+              >
+                Show Camera on View
+              </Checkbox>
+              <Typography.Text>Scene type</Typography.Text>
+              <Select
+                title="Select scene type"
+                placeholder="Select scene type"
+                value={elementSelected.sceneType || sceneTypes[0].value}
+                onChange={handleSceneTypeChange}
+                style={{ width: '100%' }}
+                options={sceneTypes.map(ts => ({ label: ts.label, value: ts.value }))}
+              />
+              
+              <Divider style={{ margin: `${token.margin}px 0` }} />
+
               <Typography.Text>Backgrounds</Typography.Text>
               <Tabs 
                 activeKey={activeLayerKey}
@@ -737,18 +769,6 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
                   }))
                 }
               />
-
-              <Divider style={{ margin: `${token.margin}px 0` }} />
-
-              <Typography.Text>Scene type</Typography.Text>
-              <Select
-                title="Select scene type"
-                placeholder="Select scene type"
-                value={elementSelected.sceneType || sceneTypes[0].value}
-                onChange={handleSceneTypeChange}
-                style={{ width: '100%' }}
-                options={sceneTypes.map(ts => ({ label: ts.label, value: ts.value }))}
-              />
               { (elementSelected.sceneType === ETypeScene.LOGO || elementSelected.sceneType === ETypeScene.POINTNCLICK) && (
                 <Button 
                   type="default" 
@@ -758,9 +778,22 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
                   Open Tiles Editor
                 </Button>
               )}
-            </Space>
+              <Divider variant="solid" style={{ margin: `${token.margin}px 0` }} />
 
-            <Divider variant="solid" style={{ margin: `${token.margin}px 0` }} />
+              { (elementSelected.sceneType !== ETypeScene.LOGO) && (
+                <Content>
+                <Typography.Text>Player Sprite Sheet</Typography.Text>
+                <Select
+                  title="Select player sprite sheet"
+                  placeholder="Select type default"
+                  suffixIcon={null}
+                  onChange={handleSceneTypeChange}
+                  style={{ width: '100%' }}
+                />
+                </Content>
+              )}
+              
+            </Space>
 
             <Tabs 
               // activeKey={'oninit'}

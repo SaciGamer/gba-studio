@@ -1,3 +1,4 @@
+import { IArgs } from "@/providers/contexts/interfaces/ISceneElement";
 
 interface CustomField {
   type: string,
@@ -6,7 +7,7 @@ interface CustomField {
   valueB?: CustomField
 }
 
-export interface IChangeScene {
+export interface IChangeScene extends IArgs {
   sceneId?: string | null,
   x?: CustomField,
   y?: CustomField,
