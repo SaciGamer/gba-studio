@@ -122,9 +122,10 @@
     "start": "concurrently \"yarn workspace @gba-studio/frontend dev\" \"wait-on --httpTimeout 5000 http://localhost:5173 && electron .\"",
     "dev": "concurrently \"yarn workspace @gba-studio/frontend dev\" \"wait-on --httpTimeout 5000 http://localhost:5173 && electron .\"",
     "compile-scripts": "tsc -p scripts/tsconfig.scripts.json",
-    "prebuild": "node scripts-dist/setupMagick.js",
-    "build": "rm -rf dist && yarn build:main && yarn build:renderer && electron-builder",
+    "prebuild": "node scripts-dist/setupMagick.js && node scripts-dist/bundle-iodine.js",
     "prebuild:main": "node scripts-dist/setupMagick.js",
+    "prebuild:renderer": "node scripts-dist/bundle-iodine.js",
+    "build": "rm -rf dist && yarn build:main && yarn build:renderer && electron-builder",
     "build:main": "yarn workspace @gba-studio/main build",
     "build:renderer": "yarn workspace @gba-studio/frontend build",
     "preview": "yarn workspace @gba-studio/frontend preview && electron ."
