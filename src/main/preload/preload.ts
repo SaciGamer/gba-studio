@@ -10,6 +10,7 @@ const electronAPI = {
   // Toolchain helpers
   getDevkitPath: () => ipcRenderer.invoke('get-devkit-path'),
   setDevkitPath: (p: string) => ipcRenderer.invoke('set-devkit-path', p),
+  // Emulator --------------------------------------------
   getEmulatorPath: () => ipcRenderer.invoke('get-emulator-path'),
   setEmulatorPath: (p: string) => ipcRenderer.invoke('set-emulator-path', p),
   getTempBuildPath: () => ipcRenderer.invoke('get-temp-build-path'),

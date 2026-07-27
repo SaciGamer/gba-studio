@@ -15,6 +15,7 @@
       "electron-window-state": "^5.0.3"
     },
     "devDependencies": {
+      "@types/express": "^5.0.6",
       "@types/node": "^20.11.19",
       "tsc-alias": "^1.8.5",
       "typescript": "^5.2.2"

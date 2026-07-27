@@ -8,5 +8,5 @@
     "resolveJsonModule": true,
     "outDir": "../scripts-dist"
   },
-  "include": ["setupMagick.ts", "bundle-iodine.ts", "types/**/*.d.ts"]
+  "include": ["setupMagick.ts", "types/**/*.d.ts"]
 }

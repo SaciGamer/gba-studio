@@ -20,6 +20,8 @@ import initializeIpcHandlers from './controllers/HandlerController';
 import { startWatch, stopAllWatchers } from './services/imagemService';
 import { SettingsController } from './controllers/SettingsController';
 
+import express from 'express';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -53,6 +55,7 @@ interface Windows {
   splash: BrowserWindow | null;
   launcher: BrowserWindow | null;
   main: BrowserWindow | null;
+  emulator: BrowserWindow | null;
   about: BrowserWindow | null;
 }
 
@@ -61,6 +64,7 @@ export const windows: Windows = {
   splash: null,
   launcher: null,
   main: null,
+  emulator: null,
   about: null
 };
 
@@ -332,6 +336,62 @@ export function createAboutWindow() {
   });
 };
 
+function launchEmulatorWindow(romPath: string) {
+  if (windows.emulator) {
+    windows.emulator.close();
+    windows.emulator = null;
+  }
+
+  windows.emulator = new BrowserWindow({
+    width: 720,
+    height: 480,
+    useContentSize: true,
+    show: false, // Don't show the window until it's ready
+    // resizable: false,
+    icon: iconPath,
+    title: 'GBA Studio - Emulator',
+    // frame: false,          // remove bordas e botões padrão
+    // transparent: true,        // permite fundo transparente
+    alwaysOnTop: true,   // mantém acima das outras
+    // skipTaskbar: true,   // não aparece na barra de tarefas
+    webPreferences: {
+      preload: preloadPath,
+      nodeIntegration: false, // Importante para segurança
+      contextIsolation: true, // Importante para segurança
+      webSecurity: false,     // desabilita CSP
+    },
+  });
+
+  windows.emulator?.setMenu(null);
+
+  // passa o caminho da ROM via query string ou IPC
+  windows.emulator.loadURL(
+    isDev
+    ? `http://localhost:5173#emulator?rom=${encodeURIComponent(romPath)}`
+    : `file://${path.join(__dirname, '../renderer', 'index.html')}#/emulator?rom=${encodeURIComponent(romPath)}`
+  );
+
+  // Carregar modo de desenvolvedor
+  if (isDev) {
+    windows.emulator?.webContents.openDevTools();
+  }
+
+  windows.emulator?.once('ready-to-show', () => {
+    windows.emulator?.show();
+    // notifica outras janelas
+    BrowserWindow.getAllWindows().forEach(win => {
+      try { win.webContents.send('emulator-started'); } catch {}
+    });
+  });
+
+  windows.emulator.on('closed', () => {
+    windows.emulator = null;
+    BrowserWindow.getAllWindows().forEach(win => {
+      try { win.webContents.send('emulator-stopped'); } catch {}
+    });
+  });
+}
+
 // Função para trocar temas
 export function changeTheme(theme: string) {
   currentTheme = theme;
@@ -383,6 +443,14 @@ app.whenReady().then(() => {
         headers: { 'Content-Type': 'text/plain' },
       });
     }
+  });
+
+  const server = express();
+  const romDir = path.join(app.getPath("userData"), "gba-studio-play", "roms");
+  fs.mkdirSync(romDir, { recursive: true });
+  server.use("/roms", express.static(romDir));
+  server.listen(3000, () => {
+    console.log("ROM server running at http://localhost:3000/roms");
   });
 
   createSplashWindow();
@@ -497,57 +565,7 @@ function launchEmulator(romPath: string) {
   });
 }
 
-// Track emulator process so we can stop it from the IDE
-let emulatorProcess: any = null;
-
-function launchEmulatorAndTrack(romPath: string) {
-  // Launch and keep reference
-  const proc = spawn(((): string => {
-    const prefs = getPreferences();
-    const prefEmu = (prefs && (prefs as any).emulatorPath) ? (prefs as any).emulatorPath : '';
-
-    // Prefer project-local tools/mGBA
-    const repoRoot = path.resolve(__dirname, '..', '..');
-    const toolsMgba1 = path.join(repoRoot, 'tools', 'mGBA', 'mGBA.exe');
-    const toolsMgba2 = path.join(repoRoot, 'tools', 'mGBA', 'mgba.exe');
-    const bundledVba = path.join(__dirname, 'emulator', 'visualboyadvance-m.exe');
-
-    if (fs.existsSync(toolsMgba1)) return toolsMgba1;
-    if (fs.existsSync(toolsMgba2)) return toolsMgba2;
-    if (prefEmu && fs.existsSync(prefEmu)) return prefEmu;
-    return bundledVba;
-  })(), [
-    // "--nogui",    // remove menus/GUI
-    // "-f",         // fullscreen
-    "-2",         // escala 2x
-    romPath       // caminho da ROM
-  ]);
-
-  emulatorProcess = proc;
-
-  // Notify renderer
-  BrowserWindow.getAllWindows().forEach(win => {
-    try { win.webContents.send('emulator-started'); } catch (e) { }
-  });
-
-  proc.on('close', (code) => {
-    emulatorProcess = null;
-    BrowserWindow.getAllWindows().forEach(win => {
-      try { win.webContents.send('emulator-stopped'); } catch (e) { }
-    });
-  });
-
-  proc.stdout?.on('data', (d) => console.log('Emu:', d.toString()));
-  proc.stderr?.on('data', (d) => console.error('Emu-err:', d.toString()));
-  return proc;
-}
-
-ipcMain.on('stop-emulator', (event) => {
-  if (emulatorProcess) {
-    try { emulatorProcess.kill(); } catch (e) { console.warn('Failed to stop emulator', e); }
-  }
-});
-
+// TODO remover caso não utilize
 function getCaminhoAppData() {
   const appDataPath = path.join(os.homedir(), 'AppData', 'Local', 'gbaStudio'); 
   if (!fs.existsSync(appDataPath)) { 
@@ -569,16 +587,13 @@ app.on('activate', () => {
   }
 });
 
-ipcMain.on('change-theme', (event, theme) => {
-  console.log("..: Entrando evento %s", theme);
-  changeTheme(theme);
-});
-
-
-// IPC para comunicação entre janelas
-ipcMain.on('load-project-window', (event, filePath) => {
-  loadProject(filePath);
-});
+function closeAllWindowsExcept(exceptWindow: BrowserWindow | null) {
+  BrowserWindow.getAllWindows().forEach((win) => {
+    if (win !== exceptWindow) {
+      win.close();
+    }
+  });
+}
 
 async function changeLauncher(tab: string, isSplash: boolean) {
   if (windows.main) {
@@ -589,10 +604,28 @@ async function changeLauncher(tab: string, isSplash: boolean) {
       return; // Interrompe o fluxo
     }
 
-    windows.main.close();
+    closeAllWindowsExcept(null);
     createLauncherWindow(tab, isSplash);
   }
 }
+
+// IPC para comunicação entre janelas
+// Track emulator process so we can stop it from the IDE
+ipcMain.on('stop-emulator', (event) => {
+  if (windows.emulator) {
+    windows.emulator.close();
+    windows.emulator = null;
+  }
+});
+
+ipcMain.on('change-theme', (event, theme) => {
+  console.log("..: Entrando evento %s", theme);
+  changeTheme(theme);
+});
+
+ipcMain.on('load-project-window', (event, filePath) => {
+  loadProject(filePath);
+});
 
 ipcMain.on('change-to-launcher', (event, tab, isSplash) => {
   console.log('..: ipcMain changeLauncher parametros:', tab, isSplash);
@@ -604,6 +637,12 @@ ipcMain.on('run-project', (event) => {
   console.log('..: Recebida solicitação para executar o projeto');
   console.log('..: Running project...');
   // Inicie o emulador com a ROM compilada
+});
+
+ipcMain.handle("get-emulator-rom-buffer", async (event, filePath) => {
+  if (!filePath) throw new Error("filePath not exists!");
+  const file = await fs.promises.readFile(filePath);
+  return file.buffer; // return with ArrayBuffer
 });
 
 // Run using serialized project from renderer (no save requested)
@@ -642,8 +681,6 @@ ipcMain.on('run-live', async (event) => {
       });
     }
 
-    // const tmpPath = tmpRoot;
-
     // Transcode project with new parameter-based interface
     const transRes: any = await transcodeProject({
       projectDir: directoryPathProject,
@@ -667,13 +704,21 @@ ipcMain.on('run-live', async (event) => {
 
     if (compileRes && compileRes.gbaPath) {
       // For Play, copy the generated .gba into a temp location and launch that
-      const playTmp = path.join(os.tmpdir(), 'gba-studio-temp', 'gba-studio-play');
-      if (fs.existsSync(playTmp)) fs.rmSync(playTmp, { recursive: true, force: true });
-      fs.mkdirSync(playTmp, { recursive: true });
-      const destGba = path.join(playTmp, path.basename(compileRes.gbaPath));
-      try { fs.copyFileSync(compileRes.gbaPath, destGba); } catch (e) { console.warn('Could not copy gba to play tmp', e); }
-      const rel = path.relative(__dirname, destGba);
-      launchEmulatorAndTrack(rel);
+      const romDir = path.join(app.getPath("userData"), 'gba-studio-play', 'roms');
+      const destGba = path.join(romDir, path.basename(compileRes.gbaPath));
+
+      if (fs.existsSync(destGba)) {
+        fs.rmSync(destGba, { force: true });
+      }
+      
+      try { 
+        fs.copyFileSync(compileRes.gbaPath, destGba); 
+      } catch (e) { 
+        console.warn('Could not copy .gba to play', e); 
+      }
+      
+      const romUrl  = `http://localhost:3000/roms/${path.basename(destGba)}`;
+      launchEmulatorWindow(romUrl);
     } else {
       console.warn('run-live: compile did not produce a .gba');
     }
