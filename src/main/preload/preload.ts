@@ -10,19 +10,16 @@ const electronAPI = {
   // Toolchain helpers
   getDevkitPath: () => ipcRenderer.invoke('get-devkit-path'),
   setDevkitPath: (p: string) => ipcRenderer.invoke('set-devkit-path', p),
-  // Emulator --------------------------------------------
-  getEmulatorPath: () => ipcRenderer.invoke('get-emulator-path'),
-  setEmulatorPath: (p: string) => ipcRenderer.invoke('set-emulator-path', p),
+  checkToolsExe: (toolsName: string, exeRelativePath: string) => ipcRenderer.invoke('check-tools-exe', toolsName, exeRelativePath),
+  // Temp folder --------------------------------------------
   getTempBuildPath: () => ipcRenderer.invoke('get-temp-build-path'),
   setTempBuildPath: (p: string) => ipcRenderer.invoke('set-temp-build-path', p),
   importTools: (toolsName: string, srcPath: string) => ipcRenderer.invoke('import-tools', toolsName, srcPath),
-  checkToolsExe: (toolsName: string, exeRelativePath: string) => ipcRenderer.invoke('check-tools-exe', toolsName, exeRelativePath),
   openBrowser: (url: string) => ipcRenderer.invoke('abrir-navegador', url),
   getVersionsAPI: () => ipcRenderer.invoke('get-versions'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   createProjectPath: (projectPath: any, template?: string) => ipcRenderer.invoke('create-project-path', projectPath, template),
   checkProjectFile: (projectPath: any) => ipcRenderer.invoke('check-project-file', projectPath),
-  compileProjectDemo: (projectPath: any) => ipcRenderer.invoke('compile-project-demo', projectPath),
   loadPreferences: () => ipcRenderer.invoke('loadPreferences'),
   removePreferences: (key: any, value: any) => ipcRenderer.invoke('removePreferences', key, value),
   loadLastUsedPath: () => ipcRenderer.invoke('loadLastUsedPath'),
@@ -50,16 +47,3 @@ const electronAPI = {
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
-
-// // contextBridge.exposeInMainWorld('api', {
-// //   saveFile: (filePath, data) => ipcRenderer.invoke('save-file', filePath, data),
-// //   loadFile: (filePath) => ipcRenderer.invoke('load-file', filePath),
-// //   applyTheme: (theme) => ipcRenderer.send('apply-theme', theme),
-// //   onThemeChange: (callback) => ipcRenderer.on('change-theme', (event, theme) => callback(theme))
-// // });
-
-// // contextBridge.exposeInMainWorld('ipcRenderer', {
-// //   on: (channel, callback) => ipcRenderer.on(channel, (event, ...args) => callback(...args))
-// //   send: (channel, data) => ipcRenderer.send(channel, data),
-// // });
-// // --------------------------------------------------------------------------------------------------------------------------------

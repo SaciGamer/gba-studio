@@ -15,6 +15,9 @@ export interface IMainSettings extends IBaseSettings {
     startAnimSpeed: number;
     startDirection: 'up' | 'down' | 'left' | 'right';
     colorMode: EColorMode;
+    controls?: Object[];
+    demoShowFPS?: boolean;
+    demoFilter?: string;
 }
 
 export interface MainSettingsContextType {

@@ -38,14 +38,3 @@ async function setupMagick() {
 setupMagick().catch(err => {
   console.error("Erro ao configurar ImageMagick:", err);
 });
-
-
-// exemplo para executar 
-/* 
-* 
-    import path from "path";
-
-    const magickPath = path.join(process.resourcesPath, "bin", "magick.exe");
-    const butanoPath = path.join(process.resourcesPath, "bin", "butano.exe");
-    const mgbaPath   = path.join(process.resourcesPath, "bin", "mgba.exe");
-*/

@@ -24,6 +24,7 @@ import { Skeleton } from 'antd/lib';
 import { useLocation } from 'react-router-dom';
 import { AntdToken } from '../../common/AntDToken';
 import { IUserSettings } from '@/providers/contexts/interfaces/IUserSettings';
+import Settings from './Settings';
 
 const { Content } = Layout;
 
@@ -87,11 +88,6 @@ const Engine: React.FC = () => {
   // const handleCompile = () => {
   //   console.log('Solicitando compilação...');
   //   ipcRenderer.send('compile-project');
-  // };
-
-  // const handleLaunchEmulator = () => {
-  //   console.log('Solicitando inicialização do emulador...');
-  //   ipcRenderer.send('launch-emulator', 'caminho/para/sua/rom.gba');
   // };
 
   // const handleRunProject = () => {
@@ -541,7 +537,6 @@ const Engine: React.FC = () => {
               </Splitter.Panel>
             </Splitter>
             {/* </Content> */}
-            {/* <EmulatorView /> */}
             {/* {showFloatButton && (
             <FloatButton 
               shape="square"
@@ -628,8 +623,9 @@ const Engine: React.FC = () => {
             </Content>
           )}
           {contentView == 9 && (
-            <Content style={{ margin: 50 }}>
-              <Skeleton.Node active style={{ height: 600, width: 350 }} />
+            <Content style={{ margin: 25 }}>
+              {/* <Skeleton.Node active style={{ height: 600, width: 350 }} /> */}
+              <Settings />
             </Content>
           )}
         </Layout>
