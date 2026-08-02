@@ -80,8 +80,8 @@ struct LetraAnim
 
 };
 
-void show_start_screen();
+// void show_start_screen();
 
 void start_screen_anim();
 
-void play_startup_animation();
+// void play_startup_animation();

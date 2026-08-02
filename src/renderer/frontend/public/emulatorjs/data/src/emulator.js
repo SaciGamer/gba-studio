@@ -7,6 +7,7 @@ import { cyrb53 } from "./utils.js";
 import { EJS_SETUP } from "./setup.js";
 import { Netplay } from "./netplay.js";
 import { EJS_license } from "./license.js";
+import { EJS_UI_CONFIG } from "./uiConfig.js";
 import * as CONSTS from "./consts.js";
 
 import "./vendor/nipplejs.js";
@@ -214,6 +215,9 @@ class EmulatorJS {
         this.setup.cacheDefaults();
         this.setup.browserMode();
         this.setup.shaders();
+
+        this.uiConfig = new EJS_UI_CONFIG(this);
+        this.uiConfig.checkUISettings();
         
         this.config.buttonOpts = this.buildButtonOptions(this.config.buttonOpts);
         this.config.settingsLanguage = window.EJS_settingsLanguage || false;
@@ -1501,7 +1505,10 @@ class EmulatorJS {
                 visible: true,
                 icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2023 Fonticons, Inc.--><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg>',
                 displayName: "Context Menu"
-            }
+            },
+            rightClick: {
+                visible: true
+            },
         };
         this.defaultButtonAliases = {
             volume: "volumeSlider"
@@ -1598,7 +1605,7 @@ class EmulatorJS {
         this.elements.contextmenu.classList.add("ejs_context_menu");
         this.addEventListener(this.game, "contextmenu", (e) => {
             e.preventDefault();
-            if ((this.config.buttonOpts && this.config.buttonOpts.rightClick === false) || !this.started || this.lightgunActive) return;
+            if ((this.config.buttonOpts && this.config.buttonOpts.rightClick.visible === false) || !this.started || this.lightgunActive) return;
             const parentRect = this.elements.parent.getBoundingClientRect();
             this.elements.contextmenu.style.display = "block";
             const rect = this.elements.contextmenu.getBoundingClientRect();
@@ -1967,6 +1974,7 @@ class EmulatorJS {
         }
 
         const show = () => {
+            if (!this.config.showBottomMenu) return;
             clearTimeout(timeout);
             timeout = setTimeout(hide, 3000);
             this.elements.menu.classList.remove("ejs_menu_bar_hidden");
@@ -1974,16 +1982,19 @@ class EmulatorJS {
 
         this.menu = {
             close: () => {
+                if (!this.config.showBottomMenu) return;
                 clearTimeout(timeout);
                 this.elements.menu.classList.add("ejs_menu_bar_hidden");
             },
             open: (force) => {
+                if (!this.config.showBottomMenu) return;
                 if (!this.started && force !== true) return;
                 clearTimeout(timeout);
                 if (force !== true) timeout = setTimeout(hide, 3000);
                 this.elements.menu.classList.remove("ejs_menu_bar_hidden");
             },
             toggle: () => {
+                if (!this.config.showBottomMenu) return;
                 if (!this.started) return;
                 clearTimeout(timeout);
                 if (this.elements.menu.classList.contains("ejs_menu_bar_hidden")) {
@@ -2535,7 +2546,7 @@ class EmulatorJS {
                 pauseButton.style.display = "none";
                 playButton.style.display = "none";
             }
-            if (this.config.buttonOpts.contextMenu.visible === false && this.config.buttonOpts.rightClick !== false && this.isMobile === false) contextMenuButton.style.display = "none"
+            if (this.config.buttonOpts.contextMenu.visible === false && this.isMobile === false) contextMenuButton.style.display = "none"
             if (this.config.buttonOpts.restart.visible === false) restartButton.style.display = "none"
             if (this.config.buttonOpts.settings.visible === false) settingButton[0].style.display = "none"
             if (this.config.buttonOpts.fullscreen.visible === false) {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Dropdown, Input, Button, Tooltip, Space } from 'antd';
-import { DownOutlined, FolderOpenOutlined, ExportOutlined, PlaySquareOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { DownOutlined, FolderOpenOutlined, ExportOutlined, PlaySquareOutlined, CloseCircleOutlined, ToolFilled } from '@ant-design/icons';
 import { AntdToken } from '../components/common/AntDToken';
 import { useBuildState } from '../providers/BuildStateProvider';
 import useAppContexts from '@/providers/contexts/AppContexts';
@@ -12,7 +12,7 @@ interface TopBarProps {
 
 const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerView }) => {
   const { token } = AntdToken();
-  const { userSettings, setUserSettings, setSettingUtils } = useAppContexts();
+  const { settings, userSettings, setUserSettings, setSettingUtils } = useAppContexts();
   const zoomSteps = [25, 50, 100, 200, 400, 800, 1600];
 
   const resetZoom = () => {
@@ -97,6 +97,13 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
   // emulator start/stop handled by BuildStateProvider; no local listeners needed
   useEffect(() => {}, [isBuilding, isRunning]);
 
+  // save config on localstorage to build and play
+  useEffect(() => {
+    if (settings) {
+      localStorage.setItem("appSettings", JSON.stringify(settings));
+    }
+  }, [settings]);
+
   return (
     <Space style={{ display: 'flex', alignItems: 'center', paddingInline: '10px', paddingBlock: '5px', justifyContent: 'space-between', backgroundColor: token.colorBgBase }}>
       <Dropdown menu={menu} placement="bottomLeft" trigger={['click']}>
@@ -146,7 +153,7 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
         </Tooltip>
         <Tooltip title="Build">
           <Button 
-            icon={<PlaySquareOutlined />} 
+            icon={<ToolFilled />} 
             loading={isBuilding}
             disabled={isRunning}
             onClick={() => { 

@@ -142,16 +142,6 @@ const setDevkitPath = (devkitPath: string): void => {
   updatePreferences('devkitPath', devkitPath);
 };
 
-const getEmulatorPath = (): string => {
-  const prefs = getPreferences();
-  return prefs.emulatorPath || '';
-};
-
-const setEmulatorPath = (emulatorPath: string): void => {
-  console.log('..: Setting emulatorPath to', emulatorPath);
-  updatePreferences('emulatorPath', emulatorPath);
-};
-
 const getTempBuildPath = (): string => {
   const prefs = getPreferences();
   
@@ -228,8 +218,6 @@ export const configurarPreferenceHandlers = () => {
   //--
   ipcMain.handle('get-devkit-path', () => getDevkitPath());
   ipcMain.handle('set-devkit-path', (_event: IpcMainInvokeEvent, devkitPath: string) => setDevkitPath(devkitPath));
-  ipcMain.handle('get-emulator-path', () => getEmulatorPath());
-  ipcMain.handle('set-emulator-path', (_event: IpcMainInvokeEvent, emulatorPath: string) => setEmulatorPath(emulatorPath));
   ipcMain.handle('get-temp-build-path', () => getTempBuildPath());
   ipcMain.handle('set-temp-build-path', (_event: IpcMainInvokeEvent, tempBuildPath: string) => setTempBuildPath(tempBuildPath));
   // Build config handlers

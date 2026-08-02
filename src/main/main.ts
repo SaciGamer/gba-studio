@@ -528,43 +528,6 @@ async function loadProject(filePath: string) {
   createProjectWindow(filePath);
 };
 
-// Função para iniciar o Emulador
-function launchEmulator(romPath: string) {
-  console.log("..: Iniciando Emulação :..");
-  const prefs = getPreferences();
-  const prefEmu = (prefs && (prefs as any).emulatorPath) ? (prefs as any).emulatorPath : '';
-
-  // Prefer project-local tools/mGBA
-  const repoRoot = path.resolve(__dirname, '..', '..');
-  const toolsMgba1 = path.join(repoRoot, 'tools', 'mGBA', 'mGBA.exe');
-  const toolsMgba2 = path.join(repoRoot, 'tools', 'mGBA', 'mgba.exe');
-  const bundledVba = path.join(__dirname, 'emulator', 'visualboyadvance-m.exe');
-
-  let emulatorExec = '';
-  if (fs.existsSync(toolsMgba1)) emulatorExec = toolsMgba1;
-  else if (fs.existsSync(toolsMgba2)) emulatorExec = toolsMgba2;
-  else if (prefEmu && fs.existsSync(prefEmu)) emulatorExec = prefEmu;
-  else emulatorExec = bundledVba;
-
-  romPath = path.join(__dirname, romPath);
-  console.log(`..: Using emulator: ${emulatorExec}`);
-  console.log(`..: diretorio do projeto: ${romPath}`);
-  const emulator = spawn(emulatorExec, [romPath]);
-  //emulator.setApplicationMenu(null) // remover menu
-
-  emulator.stdout.on('data', (data) => {
-    console.log(`Emulator output: ${data}`);
-  });
-
-  emulator.stderr.on('data', (data) => {
-    console.error(`Emulator error: ${data}`);
-  });
-
-  emulator.on('close', (code) => {
-    console.log(`Emulator exited with code ${code}`);
-  });
-}
-
 // TODO remover caso não utilize
 function getCaminhoAppData() {
   const appDataPath = path.join(os.homedir(), 'AppData', 'Local', 'gbaStudio'); 
@@ -793,94 +756,6 @@ ipcMain.on('compile-project', async (event)  => {
     console.log('..: Erro Compiling ' + error);
     return { success: false, message: error};
   }
-});
-
-ipcMain.handle('compile-project-demo', async (event, projectPath) => {
-    try {
-    // Ensure latest FE data is saved
-    requestSaveChanges();
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Save timeout')) , 10000);
-      saveEvents.once('saved', () => { clearTimeout(timeout); resolve(true); });
-    });
-  console.log('..: compile-project-demo for', projectPath);
-  try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: '>> Iniciando compilação demo...' })); } catch (e) {}
-    
-    // Resolve temp build path: use preference if set, otherwise use OS tmpdir
-    const prefs = getPreferences();
-    const tempBuildPreference = prefs.tempBuildPath;
-    const tempBuild = tempBuildPreference && fs.existsSync(tempBuildPreference)
-      ? path.join(tempBuildPreference, 'gba-studio-build')
-      : path.join(os.tmpdir(), 'gba-project-temp', 'gba-studio-build');
-
-    // Clean temp
-    if (fs.existsSync(tempBuild)) {
-      fs.rmSync(tempBuild, { recursive: true, force: true });
-    }
-    fs.mkdirSync(tempBuild, { recursive: true });
-
-    // Copy project files into path build (look for main.c or any .c in project folder)
-    try {
-      const projectSrc = path.join(projectPath);
-      if (fs.existsSync(projectSrc)) {
-        const copyRecursive = (src: string, dest: string) => {
-          const stat = fs.statSync(src);
-          if (stat.isDirectory()) {
-            if (!fs.existsSync(dest)) fs.mkdirSync(dest);
-            const entries = fs.readdirSync(src);
-            for (const e of entries) {
-              copyRecursive(path.join(src, e), path.join(dest, e));
-            }
-          } else {
-            const ext = path.extname(src).toLowerCase();
-            if (['.c', '.h', '.s', '.o', '.bin', '.data', '.txt'].includes(ext) || ext === '') {
-              fs.copyFileSync(src, dest);
-            }
-          }
-        };
-
-        // Try to copy project's 'project' folder or root
-        const candidate1 = path.join(projectPath, 'project');
-        const candidate2 = projectPath;
-        if (fs.existsSync(candidate1)) copyRecursive(candidate1, tempBuild);
-        else copyRecursive(candidate2, tempBuild);
-      }
-    } catch (err) {
-      console.warn('Could not copy project files for demo compile:', err);
-    }
-
-    // Now run compileGBA which will pick up repo gba-project
-    try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: '>> Iniciando compilação demo (repo gba-project)...' })); } catch (e) {}
-    const buildCfg = getBuildConfig();
-    const result = await compileGBA({
-      buildDir: path.join(__dirname, '..', '..', 'gba-project'),
-      devkitPath: prefs.devkitPath,
-      parallel: buildCfg?.parallel,
-      optimizationLevel: buildCfg?.optimizationLevel as any,
-      verbose: buildCfg?.verbose,
-    });
-
-    // Auto-launch using returned path
-    try {
-      if (result && result.gbaPath) {
-        const rel = path.relative(__dirname, result.gbaPath);
-        launchEmulator(rel);
-      }
-    } catch (err) {
-      console.warn('Could not auto-launch emulator after demo compile:', err);
-    }
-
-    return { success: true, message: result };
-  } catch (error) {
-    console.error('Demo compile error', error);
-    return { success: false, message: error };
-  }
-});
-
-ipcMain.on('launch-emulator', (event, romPath) => {
-  // Implemente a lógica de emulador aqui
-  console.log(`Recebida solicitação para iniciar o emulador com a ROM: ${romPath}`);
-  launchEmulator(romPath);
 });
 
 // Read ON IPC requests //Abrir Project

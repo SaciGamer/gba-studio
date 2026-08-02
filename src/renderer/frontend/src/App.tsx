@@ -13,6 +13,7 @@ import About from './components/pages/about/About';
 import Engine from './components/pages/engine/Engine';
 import Launcher from './components/pages/launcher/Launcher';
 import SplashScreen from './components/pages/splashScreen/SplashScreen';
+import Emulator from './components/pages/emulator/Emulator';
 import PreferencesModal from './components/PreferencesModal';
 import './components/themes/globalStyles.css'; // Importe o arquivo CSS global
 import Themes from './components/themes/Themes';
@@ -234,6 +235,7 @@ const App: React.FC = () => {
               <Route path="/launcher" element={<Launcher />} />
               <Route path="/engine" element={<Engine />} />
               <Route path="/splash" element={<SplashScreen />} />
+              <Route path="/emulator" element={<Emulator />} />
               <Route path="/about" element={<About />} />
               <Route path="*" element={<Navigate to="/launcher" replace />} />
             </Routes>

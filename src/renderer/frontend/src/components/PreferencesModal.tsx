@@ -4,11 +4,9 @@ import { FolderOutlined, CheckCircleOutlined, ExclamationCircleOutlined, CloudDo
 
 const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const [devkitPath, setDevkitPath] = useState('');
-  const [emulatorPath, setEmulatorPath] = useState('');
   const [tempBuildPath, setTempBuildPath] = useState('');
   const [loading, setLoading] = useState(false);
   const [devkitValid, setDevkitValid] = useState<boolean | null>(null);
-  const [emulatorValid, setEmulatorValid] = useState<boolean | null>(null);
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
@@ -16,10 +14,8 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
     (async () => {
       try {
         const dk = await window.electronAPI.getDevkitPath();
-        const em = await window.electronAPI.getEmulatorPath();
         const tb = await window.electronAPI.getTempBuildPath();
         setDevkitPath(dk || '');
-        setEmulatorPath(em || '');
         setTempBuildPath(tb || '');
         
         // Validar caminhos
@@ -30,12 +26,6 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
           setDevkitValid(false);
         }
         
-        if (em) {
-          const isValid = await window.electronAPI.checkToolsExe('mGBA', 'mGBA.exe');
-          setEmulatorValid(isValid);
-        } else {
-          setEmulatorValid(null);
-        }
       } catch (err) {
         console.error(err);
       }
@@ -51,18 +41,6 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
     } catch (err) {
       console.error(err);
       message.error('Failed to select devkit path');
-    }
-  };
-
-  const selectEmulatorPath = async () => {
-    try {
-      const res = await window.electronAPI.selectFolder();
-      if (res && res.filePath) {
-        setEmulatorPath(res.filePath);
-      }
-    } catch (err) {
-      console.error(err);
-      message.error('Failed to select emulator path');
     }
   };
 
@@ -100,7 +78,6 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
     setLoading(true);
     try {
       await window.electronAPI.setDevkitPath(devkitPath);
-      await window.electronAPI.setEmulatorPath(emulatorPath);
       await window.electronAPI.setTempBuildPath(tempBuildPath);
       message.success('Preferences saved');
       onClose();
@@ -116,7 +93,7 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
       <Form layout="vertical">
         <Space direction="vertical" size={0} style={{ marginBottom: 24, display: 'flex' }}>
           <Typography.Text strong>GBA Studio Configuration</Typography.Text>
-          <Typography.Text type="secondary">Configure paths for DevKit Pro, emulator and temporary build files.</Typography.Text>
+          <Typography.Text type="secondary">Configure paths for DevKit Pro, temporary build files.</Typography.Text>
         </Space>
 
         <Divider>Development Tools</Divider>
@@ -140,26 +117,6 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
             />
             <Button icon={<FolderOutlined />} onClick={selectDevkitPath}>Browse</Button>
             <Button icon={<CloudDownloadOutlined />} onClick={downloadDevkitPro} loading={downloading}>Download</Button>
-          </Space.Compact>
-        </Form.Item>
-
-        {/* Emulator Path */}
-        <Form.Item 
-          label={
-            <Space>
-              <span>Emulator Path (mGBA)</span>
-              {getStatusTag(emulatorValid)}
-            </Space>
-          }
-        >
-          <Space.Compact style={{ width: '100%' }}>
-            <Input 
-              value={emulatorPath} 
-              onChange={(e) => setEmulatorPath(e.target.value)} 
-              placeholder="Path to mGBA executable or folder"
-              readOnly
-            />
-            <Button icon={<FolderOutlined />} onClick={selectEmulatorPath}>Browse</Button>
           </Space.Compact>
         </Form.Item>
 
