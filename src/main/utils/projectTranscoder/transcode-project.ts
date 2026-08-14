@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { GameConfig, TranscodeOptions, TranscodeResult } from '../types/BuildTypes';
 import TemplateBuilder from '../builders/TemplateBuilder';
@@ -120,11 +121,17 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
       }
     }
 
-    // Create Graphics Header by dir build output
-    const buildDir = templateBuilder.getOutputDir();
-    let graphicHeaderGeneratedByButano: string[] = [];
+    // Generate Butano assets before reading generated graphic headers.
+    const buildDir = templateBuilder.getBuildDir();
+    const outputBuildDir = templateBuilder.getOutputDir();
+
     if (fs.existsSync(buildDir)) {
-      graphicHeaderGeneratedByButano = await resourceBuilder.writeGraphicsHeader(buildDir);
+      await generateButanoAssetHeaders(buildDir, outputBuildDir);
+    }
+
+    let graphicHeaderGeneratedByButano: string[] = [];
+    if (fs.existsSync(outputBuildDir)) {
+      graphicHeaderGeneratedByButano = await resourceBuilder.writeGraphicsHeader(outputBuildDir);
     }
 
     // Generate C++ base project structure using CppBuilder
@@ -156,20 +163,28 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
 
 /**
  * Extract project name from project configuration files
+ * @param projectDir - The original project directory
+ * @param defaultName - Default name to use if no project name is found
+ * @returns The extracted project name or the default name
  */
 async function extractProjectName(projectDir: string, defaultName: string): Promise<string> {
-  const projectFolder = path.join(projectDir, 'project');
+  const candidateDirs = [projectDir, path.join(projectDir, 'project')].filter(Boolean);
 
-  if (!fs.existsSync(projectFolder)) {
-    return defaultName;
-  }
+  for (const candidateDir of candidateDirs) {
+    if (!fs.existsSync(candidateDir)) {
+      continue;
+    }
 
-  try {
-    const files = fs.readdirSync(projectFolder);
-    for (const f of files) {
-      if (f.endsWith('.gbasres') || f.endsWith('.gbaproj')) {
+    try {
+      const files = fs.readdirSync(candidateDir);
+      for (const f of files) {
+        if (!f.endsWith('.gbaproj') && !f.endsWith('.gbasres')) {
+          continue;
+        }
+
         try {
-          const content = fs.readFileSync(path.join(projectFolder, f), 'utf8');
+          const filePath = path.join(candidateDir, f);
+          const content = fs.readFileSync(filePath, 'utf8');
           const obj = JSON.parse(content);
           if (obj._resourceType === 'project' && obj.name) {
             return obj.name;
@@ -178,9 +193,9 @@ async function extractProjectName(projectDir: string, defaultName: string): Prom
           // ignore parse errors, continue searching
         }
       }
+    } catch (e) {
+      console.warn('..: Could not inspect project configuration directory:', candidateDir, e);
     }
-  } catch (e) {
-    console.warn('..: Could not extract project name from configuration:', e);
   }
 
   return defaultName;
@@ -188,6 +203,9 @@ async function extractProjectName(projectDir: string, defaultName: string): Prom
 
 /**
  * Generate main.c entry point
+ * @param sourceDir - The source directory where main.c will be created
+ * @param projectName - The name of the project to include in the header comment
+ * @returns Promise<void>
  */
 async function generateMainC(sourceDir: string, projectName: string): Promise<void> {
   const mainC = `#include <gba_systemcalls.h>
@@ -221,6 +239,8 @@ int main(void) {
 
 /**
  * Overload for backward compatibility - accepts projectDir string instead of options
+ * @param projectDir - The original project directory
+ * @returns Result indicating success/failure and paths to generated files
  */
 export async function transcodeProjectLegacy(projectDir: string): Promise<any> {
   const result = await transcodeProject({
@@ -236,9 +256,113 @@ export async function transcodeProjectLegacy(projectDir: string): Promise<any> {
   };
 }
 
+/**
+ * Resolve the executable path for a given tool, checking environment variables and system PATH
+ * @param toolName - The name of the tool to resolve (e.g., 'grit', 'mmutil')
+ * @returns The resolved path to the executable, or the tool name if not found
+ */
+function resolveToolExecutable(toolName: string): string {
+  const executableName = process.platform === 'win32' ? `${toolName}.exe` : toolName;
+  const candidates = [
+    process.env.DEVKITPRO ? path.join(process.env.DEVKITPRO, 'tools', 'bin', executableName) : '',
+    process.env.DEVKITARM ? path.join(path.dirname(process.env.DEVKITARM), '..', 'tools', 'bin', executableName) : '',
+    process.env.PATH ? process.env.PATH.split(path.delimiter)
+      .map((dir) => path.join(dir, executableName))
+      .filter(Boolean) : [],
+  ].flat();
+
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  const whereResult = spawnSync(process.platform === 'win32' ? 'where' : 'which', [toolName], {
+    encoding: 'utf8',
+    shell: false,
+  });
+
+  if (whereResult.status === 0 && whereResult.stdout) {
+    const firstMatch = whereResult.stdout.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
+    if (firstMatch) {
+      return firstMatch;
+    }
+  }
+
+  return toolName;
+}
+
+/**
+ * This function generates the Butano asset headers by invoking the Butano asset tool.
+ * It ensures that the necessary directories exist and handles the execution of the tool.
+ * @param buildDir - The build directory where the Butano asset headers will be generated
+ * @param outputBuildDir - The output build directory where the generated headers will be placed 
+ * @returns 
+ */
+async function generateButanoAssetHeaders(buildDir: string, outputBuildDir: string): Promise<void> {
+  const repoRoot = path.resolve(__dirname, '..', '..');
+  const toolsRoot = path.join(repoRoot, '..', '..', 'tools');
+  const assetToolPath = path.join(toolsRoot, 'butano', 'butano', 'tools', 'butano_assets_tool.py');
+  const graphicsDir = path.join(buildDir, 'graphics');
+  const audioDir = path.join(buildDir, 'audio');
+  const dmgAudioDir = path.join(buildDir, 'dmg_audio');
+
+  if (!fs.existsSync(assetToolPath)) {
+    console.warn('..: Butano asset tool not found, skipping asset generation:', assetToolPath);
+    return;
+  }
+
+  for (const dir of [outputBuildDir, buildDir, graphicsDir, audioDir, dmgAudioDir]) {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  }
+
+  const gritExecutable = resolveToolExecutable('grit');
+  const audioToolExecutable = resolveToolExecutable('mmutil');
+  const pythonExecutable = process.env.PYTHON || 'python';
+
+  const result = spawnSync(
+    pythonExecutable,
+    [
+      '-B',
+      assetToolPath,
+      '--grit', gritExecutable,
+      '--audio', audioDir,
+      '--audio_backend', 'maxmod',
+      '--audio_tool', audioToolExecutable,
+      '--dmg_audio', dmgAudioDir,
+      '--dmg_audio_backend', 'default',
+      '--graphics', graphicsDir,
+      '--build', outputBuildDir,
+    ],
+    {
+      cwd: buildDir,
+      env: process.env,
+      windowsHide: true,
+      stdio: 'pipe',
+    }
+  );
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if (result.status !== 0) {
+    throw new Error(`Butano asset generation failed with exit code ${result.status}.`);
+  }
+
+  console.log('..: Butano asset generation completed for:', buildDir);
+}
 
 /**
  * Function validate if is the same project
+ * @param projectDir - The original project directory
+ * @param outputDir - The output build directory
+ * @returns void
+ * 
+ * This function checks if the output directory already exists and if it corresponds to the same project.
+ * If it is a different project, it will clean the output directory before proceeding.
  */
 function prepareBuildDir(projectDir: string, outputDir: string) {
   const markerFile = path.join(outputDir, '.project.json');

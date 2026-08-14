@@ -1,3 +1,11 @@
+/**
+ * {{PROJECT_NAME}} - GBA Game
+ * Author: {{AUTHOR}}
+ * Version: {{VERSION}}
+ * 
+ * Built with GBA Studio engine for Butano
+ */
+
 #include "script_command_manager.h"
 #include "event_registry.h"
 #include "bn_log.h"
@@ -7,14 +15,14 @@
 ScriptCommand::ScriptCommand() : currentScriptIndex(0) {}
 ScriptCommand::~ScriptCommand() {}
 
-void ScriptCommand::execute(bn::string<64> scene_id, const ScriptCommandData* data, int count) 
+void ScriptCommand::execute(bn::string<64> scene_id_param, const ScriptCommandData* data, int count) 
 {
     
-    if(scene_id != this->scene_id) {
-        this->scene_id = scene_id;
+    if(scene_id_param != this->scene_id) {
+        this->scene_id = scene_id_param;
         ScriptCommand::instance().resetIndex();
     } else {
-        this->scene_id = scene_id;
+        this->scene_id = scene_id_param;
     }
 
     if(currentScriptIndex >= count) {

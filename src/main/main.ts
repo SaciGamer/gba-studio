@@ -5,20 +5,19 @@ import os from 'os';
 import isDev from 'electron-is-dev';
 import { dirname } from 'path'
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
 
 import windowStateKeeper from 'electron-window-state';
 import { getPreferences, updatePreferences, initializeDefaultPaths, getBuildConfig } from './handlers/preferenceHandlers';
-import { requestSaveChanges, setProjectDirectory, setProjectFile } from './services/saveSettingsService';
+import { prepareProjectSandbox, requestSaveChanges, setProjectDirectory, setProjectFile, waitForSaveComplete, copyDirectoryContents } from './services/saveSettingsService';
 import { saveEvents } from './services/saveSettingsService';
 import { createProjectStruct } from './structs/mainProjectStruct';
 import menuTemplate from './menuTemplate';
-// import { loadSettings } from './services/loadSettingsService';
 import compileGBA from './utils/gbaCompiler/compile-gba';
 import transcodeProject from './utils/projectTranscoder/transcode-project';
 import initializeIpcHandlers from './controllers/HandlerController';
 import { startWatch, stopAllWatchers } from './services/imagemService';
 import { SettingsController } from './controllers/SettingsController';
+import { setCurrentActiveSandboxDirectory } from './states/tempProjectState';
 
 import express from 'express';
 
@@ -33,7 +32,14 @@ const packageJsonPath = isDev
   : path.join(app.getAppPath(), 'package.json');  // Em produção, usa o app.getAppPath()
 
 export const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-export let directoryPathProject: any;
+export let directoryPathProject: string | null = null;
+export let originalProjectDirectory: string | null = null;
+
+export function setProjectWorkspacePaths(activeDirectory: string | null, sourceDirectory: string | null): void {
+  directoryPathProject = activeDirectory;
+  originalProjectDirectory = sourceDirectory;
+  setCurrentActiveSandboxDirectory(activeDirectory);
+}
 
 // If the app was started with a project file, store it here so splash can route to Engine
 export let startupProjectToOpen: string | null = null;
@@ -512,12 +518,12 @@ async function loadProject(filePath: string) {
   // Cria a janela
   console.log('..: loadProject filePath %s received', filePath);
   
-  // await loadSettings(filePath);
-
   const file = path.basename(filePath);
   const directory = path.dirname(filePath);
+  const { sandboxDirectory } = prepareProjectSandbox(filePath);
 
-  directoryPathProject = setProjectDirectory(directory);
+  setProjectWorkspacePaths(sandboxDirectory, directory);
+  directoryPathProject = setProjectDirectory(sandboxDirectory);
   setProjectFile(file);
 
   console.log('..: File:', file);
@@ -595,60 +601,136 @@ ipcMain.on('change-to-launcher', (event, tab, isSplash) => {
   changeLauncher(tab, isSplash);
 });
 
-ipcMain.on('run-project', (event) => {
-  // Implemente a lógica para executar o projeto compilado
-  console.log('..: Recebida solicitação para executar o projeto');
-  console.log('..: Running project...');
-  // Inicie o emulador com a ROM compilada
-});
+// ## SAVE AS ##########################################################
+ipcMain.on('save-project-as', async (event) => {
+  console.log('..: save-project-as requested');
+  if (!windows.main) return;
 
+  const currentProjectFile = SettingsController.getInstance().getProjectFile() || 'NewProject.gbaproj';
+  const currentProjectDirectory = originalProjectDirectory || directoryPathProject || app.getPath('documents');
+  const defaultPath = path.join(currentProjectDirectory, currentProjectFile);
+
+  const result = await dialog.showSaveDialog(windows.main, {
+    title: 'Save Project As',
+    defaultPath,
+    filters: [{ name: 'GBA Studio Project', extensions: ['gbaproj'] }],
+  });
+
+  if (result.canceled || !result.filePath) {
+    return;
+  }
+
+  const saveAsPath = result.filePath;
+  const saveAsName = path.basename(saveAsPath);
+  const saveAsDirectory = path.dirname(saveAsPath);
+  const saveAsProjectName = path.basename(saveAsName, '.gbaproj');
+  const targetProjectDirectory = path.join(saveAsDirectory, saveAsProjectName);
+  const targetProjectFilePath = path.join(targetProjectDirectory, saveAsName);
+
+  try {
+    if (!directoryPathProject && !originalProjectDirectory) {
+      console.warn('save-project-as: no active project sandbox or original project directory available');
+      return;
+    }
+
+    requestSaveChanges({ persistToOriginal: false, markAsSaved: true, source: 'save-as', saveAsPath });
+    await waitForSaveComplete(10000);
+
+    const sourceSandbox = directoryPathProject || originalProjectDirectory || '';
+    if (!fs.existsSync(targetProjectDirectory)) {
+      fs.mkdirSync(targetProjectDirectory, { recursive: true });
+    }
+
+    copyDirectoryContents(sourceSandbox, targetProjectDirectory);
+
+    const currentProjectFileName = currentProjectFile;
+    const currentProjectFilePath = path.join(targetProjectDirectory, currentProjectFileName);
+    const currentProjectBackupPath = `${currentProjectFilePath}.bak`;
+    const targetProjectBackupPath = `${targetProjectFilePath}.bak`;
+
+    if (currentProjectFileName !== saveAsName && fs.existsSync(currentProjectFilePath)) {
+      fs.renameSync(currentProjectFilePath, targetProjectFilePath);
+      if (fs.existsSync(currentProjectBackupPath)) {
+        if (fs.existsSync(targetProjectBackupPath)) {
+          fs.rmSync(targetProjectBackupPath, { force: true });
+        }
+        fs.renameSync(currentProjectBackupPath, targetProjectBackupPath);
+      }
+    }
+
+    try {
+      if (fs.existsSync(targetProjectFilePath)) {
+        const projectJson = JSON.parse(fs.readFileSync(targetProjectFilePath, 'utf8'));
+        if (typeof projectJson === 'object' && projectJson !== null) {
+          projectJson.name = saveAsProjectName;
+          fs.writeFileSync(targetProjectFilePath, JSON.stringify(projectJson, null, 2), 'utf8');
+        }
+      }
+    } catch (writeErr) {
+      console.warn('save-project-as: failed to update project name in .gbasproj', writeErr);
+    }
+
+    const { sandboxDirectory: newSandbox } = prepareProjectSandbox(targetProjectFilePath);
+    setProjectWorkspacePaths(newSandbox, targetProjectDirectory);
+    setProjectFile(saveAsName);
+
+    BrowserWindow.getAllWindows().forEach((win) => {
+      try {
+        win.webContents.send('project-saved-as', {
+          projectPathFile: saveAsName,
+          projectDirectory: saveAsDirectory,
+          projectName: saveAsProjectName,
+        });
+      } catch (e) {
+        /* ignore */
+      }
+    });
+
+    updatePreferences('recentProjects', { title: saveAsName, path: saveAsDirectory });
+  } catch (err) {
+    console.error('save-project-as error', err);
+  }
+});
+// ## SAVE AS END ######################################################
+
+// ## GET EMULATOR ROM BUFFER ##########################################
 ipcMain.handle("get-emulator-rom-buffer", async (event, filePath) => {
   if (!filePath) throw new Error("filePath not exists!");
   const file = await fs.promises.readFile(filePath);
   return file.buffer; // return with ArrayBuffer
 });
+// ## GET EMULATOR ROM BUFFER END ######################################
 
-// Run using serialized project from renderer (no save requested)
+// ## RUN-LIVE #########################################################
+// This is used for "Run Live" feature, which runs the project without saving changes to disk
 ipcMain.on('run-live', async (event) => {
   console.log('..: run-live requested');
   try {
     if (!windows.main) return;
-    // Ask renderer to provide serialized project via a global helper that FE should implement
-    const resp = await windows.main.webContents.executeJavaScript('window.__getSerializedProject ? window.__getSerializedProject() : null');
-    if (!resp) {
-      console.warn('Renderer did not provide serialized project');
+
+    const activeProjectDir = directoryPathProject || originalProjectDirectory || '';
+    if (!activeProjectDir) {
+      console.warn('run-live: no active project directory available');
       return;
     }
 
-    // Write the serialized data to a temp folder here (same logic as send-serialized handler)
-    const tmpRoot = path.join(os.tmpdir(), 'gba-studio-temp', 'gba-studio-serialized');
-    if (fs.existsSync(tmpRoot))
-      fs.rmSync(tmpRoot, { recursive: true, force: true });
-    fs.mkdirSync(tmpRoot, { recursive: true });
+    requestSaveChanges({ persistToOriginal: false, markAsSaved: false, source: 'run-live' });
 
-    if (resp.projectFiles) {
-      resp.projectFiles.forEach((f: any) => {
-        const target = path.join(tmpRoot, f.path);
-        const dir = path.dirname(target);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(target, JSON.stringify(f.content, null, 2), 'utf8');
-      });
-    }
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Save timeout for run-live')), 10000);
+      saveEvents.once('saved', () => { clearTimeout(timeout); resolve(true); });
+    });
 
-    if (resp.assets) {
-      resp.assets.forEach((a: any) => {
-        const target = path.join(tmpRoot, a.path);
-        const dir = path.dirname(target);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(target, Buffer.from(a.base64, 'base64'));
-      });
-    }
-
-    // Transcode project with new parameter-based interface
+    // Transcode project using the sandbox workspace directly
     const transRes: any = await transcodeProject({
-      projectDir: directoryPathProject,
+      projectDir: activeProjectDir,
       includeAssets: true,
     });
+
+    if (!transRes.success || !transRes.outputDir) {
+      throw new Error(`Transcode failed: ${transRes.message}`);
+    }
+
     const tempBuild = transRes.outputDir;
 
     // Notify renderer that transcode finished and compilation will start
@@ -657,13 +739,14 @@ ipcMain.on('run-live', async (event) => {
     // Compile with new parameter-based interface (use saved build config)
     const prefsRunLive = getPreferences();
     const buildCfg = getBuildConfig();
-    const compileRes = await compileGBA({
+    let compileRes = await compileGBA({
       buildDir: tempBuild,
       devkitPath: prefsRunLive.devkitPath,
       parallel: buildCfg?.parallel,
       optimizationLevel: buildCfg?.optimizationLevel as any,
       verbose: buildCfg?.verbose,
     });
+
 
     if (compileRes && compileRes.gbaPath) {
       // For Play, copy the generated .gba into a temp location and launch that
@@ -689,14 +772,16 @@ ipcMain.on('run-live', async (event) => {
     console.error('run-live error', err);
   }
 });
+// ## RUN-LIVE END #####################################################
 
+// ## COMPILE PROJECT  #################################################
 ipcMain.on('compile-project', async (event)  => {
   // Implemente a lógica de compilação aqui
   console.log('..: Recebida solicitação para compilar o projeto :..');
   console.log('..: Compiling project...');
   try {
     // Ask renderer to save current project data to disk first
-    requestSaveChanges();
+    requestSaveChanges({ source: 'build', persistToOriginal: false, markAsSaved: false });
 
     // Wait for save to complete (timeout 10s)
     await new Promise((resolve, reject) => {
@@ -710,8 +795,9 @@ ipcMain.on('compile-project', async (event)  => {
       try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: '>> Iniciando transcodificação do projeto...' })); } catch (e) {}
 
       // Transcode with new parameter-based interface
+      const activeProjectDir = directoryPathProject || originalProjectDirectory || '';
       const transRes: any = await transcodeProject({
-        projectDir: directoryPathProject,
+        projectDir: activeProjectDir,
         includeAssets: true,
       });
 
@@ -723,7 +809,7 @@ ipcMain.on('compile-project', async (event)  => {
       {
         const prefsCompile = getPreferences();
         const buildCfg = getBuildConfig();
-        const compileRes = await compileGBA({
+        let compileRes = await compileGBA({
           buildDir: tempBuild,
           devkitPath: prefsCompile.devkitPath,
           parallel: buildCfg?.parallel,
@@ -733,7 +819,7 @@ ipcMain.on('compile-project', async (event)  => {
 
         // On successful compile, copy outputs (.gba, .elf, .map) into project's build folder
         if (compileRes && compileRes.gbaPath) {
-          const outDir = path.join(directoryPathProject, 'build');
+          const outDir = path.join(/*directoryPathProject ||*/ originalProjectDirectory || '', 'build');
           if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
           // Copy .gba
@@ -757,8 +843,9 @@ ipcMain.on('compile-project', async (event)  => {
     return { success: false, message: error};
   }
 });
+// ## COMPILE PROJECT  END #############################################
 
-// Read ON IPC requests //Abrir Project
+// ## OPEN PROJECT #####################################################
 ipcMain.on('open-project-window', async (event) => {
   console.log("..: chamado abertura de projeto");
   try {
@@ -789,20 +876,22 @@ ipcMain.on('open-project-folder', async (event, projectPath) => {
     if (projectPath) {
       await shell.openPath(projectPath);
     } else {
-      console.log('No project path provided, tentando abrir o diretório do projeto: ', directoryPathProject);
-      await shell.openPath(directoryPathProject);
+      const originalPath = originalProjectDirectory || directoryPathProject || '';
+      console.log('No project path provided, tentando abrir o diretório do projeto original: ', originalPath);
+      await shell.openPath(originalPath);
     }
   } catch (error) {
     console.error('Error opening project folder:', error);
   }
 });
+// ## OPEN PROJECT END #################################################
 
-// Read opening documentation link
+// ## OPEN DOCUMENTATION LINK ##########################################
 ipcMain.on('open-documentation', async () => {
   const url = 'https://sacigamer.github.io/gba-studio-site/docs/intro';
   await shell.openExternal(url); 
 });
-
+// ## OPEN DOCUMENTATION LINK END ######################################
 // ## Read ON IPC requests END #########################################
 
 // ## Handle Preferences ###############################################
@@ -838,6 +927,7 @@ ipcMain.handle('check-project-file', async (event, projectPath) => {
   return fs.existsSync(projectPath);
 });
 
+// Handle create project path
 ipcMain.handle('create-project-path', async (event, projectPath, template) => {
   const normalizedPath = projectPath.replace(/[/\\]/g, path.sep);
 
@@ -859,6 +949,7 @@ ipcMain.handle('select-folder', async () => {
   }
 });
 
+// Handle select file to open project
 ipcMain.handle('abrir-navegador', async (event, url) => {
   try {
     console.log(`Navegador aberto: ${url}`);
@@ -868,6 +959,7 @@ ipcMain.handle('abrir-navegador', async (event, url) => {
   }
 });
 
+// Handle get versions
 ipcMain.handle('get-versions', () => ({
   electron: process.versions.electron,
   chrome: process.versions.chrome,
@@ -876,7 +968,7 @@ ipcMain.handle('get-versions', () => ({
   projectVersion: packageJson.version,
 }));
 
-// Recebendo o arquivo do frontend
+// Handle get project path - files from Frontend
 ipcMain.handle('save-image', async (event, { filePath, filename, data }) => {
   try {
     const pathToSave = filePath || directoryPathProject;
@@ -896,9 +988,9 @@ ipcMain.handle('save-image', async (event, { filePath, filename, data }) => {
   }
 });
 
-// Pegar caminho das imagens do projeto
+// Handle fetch images from assets folder
 ipcMain.handle('fetch-images', async (event, folderName) => {
-  const assetsPath = path.join(directoryPathProject, 'assets', folderName);
+  const assetsPath = path.join(directoryPathProject || originalProjectDirectory || '', 'assets', folderName);
 
   if (!fs.existsSync(assetsPath)) {
     return { status: 'error', message: '>> Directory not found.' };
@@ -908,9 +1000,11 @@ ipcMain.handle('fetch-images', async (event, folderName) => {
   return startWatch(windows.main, assetsPath/*, targetUserDir*/);
 });
 
+// Initialize IPC handlers for preferences and other functionalities
 initializeIpcHandlers();
 // ## Handle Preferences END ###########################################
 
+// ## Handle Project File Operations ###################################
 // Tools import and checks
 ipcMain.handle('import-tools', async (event, toolsName: string, srcPath: string) => {
   try {
@@ -938,43 +1032,4 @@ ipcMain.handle('import-tools', async (event, toolsName: string, srcPath: string)
     return { success: false, message: String(err) };
   }
 });
-
-ipcMain.handle('check-tools-exe', async (event, toolsName: string, exeRelativePath: string) => {
-  try {
-    const repoRoot = path.resolve(__dirname, '..', '..');
-    const toolsExe = path.join(repoRoot, 'tools', toolsName, exeRelativePath);
-    return fs.existsSync(toolsExe);
-  } catch (err) {
-    console.error('check-tools-exe error', err);
-    return false;
-  }
-});
-
-// ## SAVE AS ##########################################################
-/*const saveProjectAs = (projectData) => {
-  const filePath = dialog.showSaveDialogSync(mainWindow, {
-    title: 'Save Project As',
-    defaultPath: path.join(app.getPath('documents'), 'NewProject.gbasproj'),
-    filters: [{ name: 'GBA Studio Project', extensions: ['gbasproj'] }]
-  });
-  
-  if (filePath) {
-    fs.writeFileSync(filePath, JSON.stringify(projectData), 'utf-8');
-  }
-};*/
-// ## SAVE AS END ######################################################
-
-
-// ## OPEN PROJECT #####################################################
-/*const loadProject = () => {
-  const filePath = dialog.showOpenDialogSync(mainWindow, {
-    title: 'Open Project',
-    filters: [{ name: 'GBA Studio Project', extensions: ['gbasproj'] }]
-  });
-  
-  if (filePath && filePath.length > 0) {
-    const projectData = JSON.parse(fs.readFileSync(filePath[0], 'utf-8'));
-    mainWindow.webContents.send('load-project', projectData);
-  }
-};*/
-// ## OPEN PROJECT END #################################################
+// ## Handle Project File Operations END ###############################

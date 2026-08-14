@@ -1,7 +1,15 @@
+/**
+ * {{PROJECT_NAME}} - GBA Game
+ * Author: {{AUTHOR}}
+ * Version: {{VERSION}}
+ * 
+ * Built with GBA Studio engine for Butano
+ */
+
 #include "startup.h"
 
-#include "bn_regular_bg_items_gba_studio.h"
-#include "bn_regular_bg_items_light_bg.h"
+// #include "bn_regular_bg_items_gba_studio.h"
+// #include "bn_regular_bg_items_light_bg.h"
 
 // #include "bn_regular_bg_items_gba_studio_startup_anim.h"
 #include "bn_direct_bitmap_items_gba_studio_startup_anim.h"

@@ -7,13 +7,13 @@ const electronAPI = {
   removeListener: (channel: any, listener: any) => ipcRenderer.removeListener(channel, listener),
   // Customized ------------------------------------------
   pathJoin: (...args: any) => ipcRenderer.invoke('path-join', args),
-  // Toolchain helpers
-  getDevkitPath: () => ipcRenderer.invoke('get-devkit-path'),
-  setDevkitPath: (p: string) => ipcRenderer.invoke('set-devkit-path', p),
-  checkToolsExe: (toolsName: string, exeRelativePath: string) => ipcRenderer.invoke('check-tools-exe', toolsName, exeRelativePath),
   // Temp folder --------------------------------------------
   getTempBuildPath: () => ipcRenderer.invoke('get-temp-build-path'),
   setTempBuildPath: (p: string) => ipcRenderer.invoke('set-temp-build-path', p),
+  getTempProjectBackupLimit: () => ipcRenderer.invoke('get-temp-project-backup-limit'),
+  setTempProjectBackupLimit: (limit: number) => ipcRenderer.invoke('set-temp-project-backup-limit', limit),
+  clearTempProjectData: () => ipcRenderer.invoke('clear-temp-project-data'),
+  // -------------------------------------------------------
   importTools: (toolsName: string, srcPath: string) => ipcRenderer.invoke('import-tools', toolsName, srcPath),
   openBrowser: (url: string) => ipcRenderer.invoke('abrir-navegador', url),
   getVersionsAPI: () => ipcRenderer.invoke('get-versions'),

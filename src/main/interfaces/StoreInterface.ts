@@ -5,6 +5,7 @@ export interface IPreferences {
     devkitPath?: string;
     emulatorPath?: string;
     tempBuildPath?: string;
+    tempProjectBackupLimit?: number;
 }
 export interface IRecentProject {
     path: string;

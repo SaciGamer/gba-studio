@@ -85,16 +85,6 @@ const Engine: React.FC = () => {
     setSettingUtils(defaultSettingUtils);
   }, []);
 
-  // const handleCompile = () => {
-  //   console.log('Solicitando compilação...');
-  //   ipcRenderer.send('compile-project');
-  // };
-
-  // const handleRunProject = () => {
-  //   console.log('Solicitando execução do projeto...');
-  //   ipcRenderer.send('run-project');
-  // };
-
   const Desc: React.FC<Readonly<{ text?: string | number }>> = (props) => (
     <Flex justify="center" align="center" style={{ height: '100%' }}>
       <Typography.Title type="secondary" level={5} style={{ whiteSpace: 'nowrap' }}>
@@ -311,7 +301,7 @@ const Engine: React.FC = () => {
     return () => { try { delete (window as any).__getSerializedProject; } catch (e) {} };
   }, []);
 
-  // TODO pegar requisição para save
+  // Pega informações do projeto aberto para salvar
   useEffect(() => {
     const prepareForBackend = (fields: any, ignoredFields: string[]) => {
       if (Array.isArray(fields)) {
@@ -331,7 +321,14 @@ const Engine: React.FC = () => {
       );
     };
 
-    const callback = (requestToSave: string) => {
+    const callback = (requestToSave: string | { type?: string; markAsSaved?: boolean; persistToOriginal?: boolean }) => {
+      const requestType = typeof requestToSave === 'string' ? requestToSave : requestToSave?.type;
+      const saveOptions = typeof requestToSave === 'object' ? requestToSave : {};
+
+      if (requestType !== 'SAVE_DATA') {
+        return;
+      }
+
       console.log('..: BE requisitou FE para saves:', requestToSave);
 
       // Use refs para garantir dados atualizados
@@ -356,24 +353,44 @@ const Engine: React.FC = () => {
       // Enviar dados para o Backend
       window.electronAPI.responseProjectToSave(allToSave);
 
-      // Marcar todos os elementos como salvos
-      setScenes(() => scenesRef.current.map(s => ({ ...s, _saved: true })));
-      setProject(() => ({ ...projectRef.current!, _saved: true }));
-      setSettings(() => ({ ...settingsRef.current, _saved: true }));
-      setUserSettings(() => ({ ...userSettingsRef.current, _saved: true }));
-      setBackgrounds(() => backgroundsRef.current.map(b => ({ ...b, _saved: true })));
-      // setSettingUtils(settingUtils => ({ ...settingUtils, _saved: true }));
+      if (saveOptions.markAsSaved !== false) {
+        // Marcar todos os elementos como salvos
+        setScenes(() => scenesRef.current.map(s => ({ ...s, _saved: true })));
+        setProject(() => ({ ...projectRef.current!, _saved: true }));
+        setSettings(() => ({ ...settingsRef.current, _saved: true }));
+        setUserSettings(() => ({ ...userSettingsRef.current, _saved: true }));
+        setBackgrounds(() => backgroundsRef.current.map(b => ({ ...b, _saved: true })));
+        // setSettingUtils(settingUtils => ({ ...settingUtils, _saved: true }));
 
-      console.log('..: Todos os itens agora estão com _saved = true.');
+        console.log('..: Todos os itens agora estão com _saved = true.');
+      }
     };
 
     window.electronAPI.onRequestProjectToSave(callback);
 
+    const handleProjectSavedAs = (event: any, data: { projectPathFile: string; projectDirectory: string; projectName: string }) => {
+      console.log('..: project saved as:', data);
+      setSettingUtils(prev => ({
+        ...prev,
+        projectPathFile: data.projectPathFile,
+        projectDirectory: data.projectDirectory,
+        baseTitle: data.projectName,
+      }));
+
+      // Update project state name if current project object is loaded
+      if (project) {
+        setProject({ ...project, name: data.projectName, _saved: true });
+      }
+    };
+
+    window.electronAPI.on('project-saved-as', handleProjectSavedAs);
+
     // Remover o listener ao desmontar o componente
     return () => {
       window.electronAPI.onRequestProjectToSave(() => {});
+      window.electronAPI.removeListener('project-saved-as', handleProjectSavedAs);
     };
-  }, []);
+  }, [project, setProject, setSettingUtils]);
 
   // Listener para mudança de view pelo menu (atalhos e itens de menu View)
   useEffect(() => {
@@ -520,9 +537,6 @@ const Engine: React.FC = () => {
                   <Content style={{ backgroundColor: token.colorBgContainer }}>
                     <GameWorld resetPanelSize={resetPanelSize} setShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton} />
                   </Content>
-                  {/* <Splitter.Panel>
-                        <CentralEditor />
-                      </Splitter.Panel> */}
                   <Splitter.Panel defaultSize="25%" min={40} max="90%">
                     {/* <Footer> */}
                     <BottomPanel />

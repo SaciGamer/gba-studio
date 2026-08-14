@@ -34,7 +34,7 @@
 TARGET      	:=  $(notdir $(CURDIR))
 BUILD       	:=  build
 LIBBUTANO   	:=  $(BUTANO)/butano
-LIBBUTANOTILED 	:=  $(BUTANOTILED)
+# LIBBUTANOTILED 	:=  $(BUTANOTILED)
 PYTHON      	:=  python
 SOURCES     	:=  src $(BUILD)/src
 INCLUDES    	:=  include $(BUILD)/include $(BUTANO)/common/include
@@ -57,7 +57,7 @@ DEFAULTLIBS 	:=
 STACKTRACE		:=	
 USERBUILD   	:=  
 MAPS			:=	maps
-EXTTOOL			:=  @$(PYTHON) -B $(LIBBUTANOTILED)/bntmx.py --target=butano --build=$(BUILD) $(MAPS)
+EXTTOOL			:=  #@$(PYTHON) -B $(LIBBUTANOTILED)/bntmx.py --target=butano --build=$(BUILD) $(MAPS)
 
 #---------------------------------------------------------------------------------------------------------------------
 # Export absolute butano path:

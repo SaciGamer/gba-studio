@@ -397,9 +397,11 @@ function parseResourceFile(file: ResourceFile): string {
       `${baseNameUpper}_STARTDIRECTION`,
       `${baseNameUpper}_COLORMODE`,
     ];
+    const colorMode = file.jsonContent?.colorMode === 'mixed' ? 1 : 0;
+
     if (required.every(hasSymbol)) {
-      // Format: { name, start_scene_id, start_x, start_y, move_speed, anim_speed, direction }
-      return ` { ResourceType::${type}, ${baseNameUpper}_STARTSCENEID, ${baseNameUpper}_STARTX, ${baseNameUpper}_STARTY, ${baseNameUpper}_STARTMOVESPEED, ${baseNameUpper}_STARTANIMSPEED, ${baseNameUpper}_STARTDIRECTION, ${baseNameUpper}_COLORMODE }`;
+      // Format: { name, start_scene_id, start_x, start_y, move_speed, anim_speed, direction, color_mode }
+      return ` { ResourceType::${type}, ${baseNameUpper}_STARTSCENEID, ${baseNameUpper}_STARTX, ${baseNameUpper}_STARTY, ${baseNameUpper}_STARTMOVESPEED, ${baseNameUpper}_STARTANIMSPEED, ${baseNameUpper}_STARTDIRECTION, ${colorMode} }`;
     }
   } else if (type === "background") {
     const required = [

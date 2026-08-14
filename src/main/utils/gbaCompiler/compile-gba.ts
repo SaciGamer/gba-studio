@@ -16,7 +16,13 @@ const __dirname = path.dirname(__filename);
  * Compile GBA project using make
  * Handles environment setup, progress reporting, and output detection
  * 
- * Supports both new interface (CompileOptions) and legacy interface ({ cwd?: string })
+ * @param options - CompileOptions object containing buildDir, devkitPath, parallel, verbose, optimizationLevel
+ * @returns Promise<CompileResult> - Resolves with the result of the compilation
+ * 
+ * Supports both new interface (CompileOptions) and legacy interface (`cwd: string`)
+ * 
+ * Note: Butano asset generation (graphics, audio) is handled upstream in transcodeProject.
+ * This function only invokes make to compile the project.
  */
 const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<CompileResult> => {
   // Handle legacy interface
@@ -81,7 +87,9 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
         LIBGBA: envForMake.LIBGBA,
       });
 
-      // Spawn make process
+      let fullStdout = '';
+      let fullStderr = '';
+
       const proc = spawn('make', makeArgs, {
         cwd: compileOptions.buildDir,
         env: envForMake,
@@ -91,64 +99,47 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
       let stdout = '';
       let stderr = '';
 
-      // Collect stdout
       proc.stdout.on('data', (data: Buffer) => {
         const text = data.toString();
         stdout += text;
+        fullStdout += text;
         broadcast('compile-progress', { status: 'running', message: text });
       });
 
-      // Collect stderr
       proc.stderr.on('data', (data: Buffer) => {
         const text = data.toString();
         stderr += text;
+        fullStderr += text;
         broadcast('compile-progress', { status: 'running', message: text });
       });
 
-      // Handle process errors
       proc.on('error', (err) => {
         console.error('..: Erro ao executar make:', err);
         broadcast('compile-error', { message: String(err) });
         reject(err);
       });
 
-      // Handle process completion
       proc.on('close', (code) => {
         if (code !== 0) {
           const errMsg = `make exited with code ${code}`;
           console.error('..: ' + errMsg);
-          // Ensure logs directory exists and write full make output for debugging
-          try {
-            const logsDir = path.join(compileOptions.buildDir, 'build-logs');
-            if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
-            const logPath = path.join(logsDir, `make.log`);
-            fs.writeFileSync(logPath, `=== STDOUT ===\n${stdout}\n\n=== STDERR ===\n${stderr}\n`, 'utf8');
-            console.log('..: Wrote make log to', logPath);
-            broadcast('compile-error', {
-              message: errMsg,
-              stdout,
-              stderr,
-              logPath,
-            });
-            reject(new Error(`${errMsg}\nSee log: ${logPath}\n${stderr}`));
-          } catch (e) {
-            broadcast('compile-error', { message: errMsg, stdout, stderr });
-            reject(new Error(`${errMsg}\n${stderr}`));
-          }
+          const logsDir = path.join(compileOptions.buildDir, 'build-logs');
+          if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+          const logPath = path.join(logsDir, `make.log`);
+          fs.writeFileSync(logPath, `=== STDOUT ===\n${fullStdout}\n\n=== STDERR ===\n${fullStderr}\n`, 'utf8');
+          console.log('..: Wrote make log to', logPath);
+          broadcast('compile-error', { message: errMsg, stdout: fullStdout, stderr: fullStderr, logPath });
+          reject(new Error(`${errMsg}\nSee log: ${logPath}\n${stderr}`));
           return;
         }
 
-        // On successful completion, notify renderer
         broadcast('compile-progress', {
           status: 'finished',
           message: '>> Compilação finalizada',
         });
 
-        // Try to locate produced .gba file
         const outputResult = locateCompiledOutput(compileOptions.buildDir);
-
         console.log('..: Compilação completa. Arquivos encontrados:', outputResult);
-
         resolve({
           success: true,
           stdout,
@@ -168,6 +159,8 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
 
 /**
  * Setup environment variables for compilation
+ * @param options - CompileOptions containing buildDir, devkitPath, etc.
+ * @returns - Record of environment variables 
  */
 function setupEnvironment(options: CompileOptions): Record<string, string> {
   const prefs = getPreferences();
@@ -217,6 +210,8 @@ function setupEnvironment(options: CompileOptions): Record<string, string> {
 
 /**
  * Normalize environment variables for make/msys (convert backslashes to forward slashes)
+ * @param env - Record of environment variables
+ * @returns - Normalized environment variables
  */
 function normalizeEnvForMake(env: Record<string, string>): Record<string, string> {
   const normalize = (p: string | undefined) => (p ? p.replace(/\\/g, '/') : '');
@@ -231,6 +226,8 @@ function normalizeEnvForMake(env: Record<string, string>): Record<string, string
 
 /**
  * Build make command arguments
+ * @param options - CompileOptions containing parallel, optimizationLevel, verbose
+ * @returns - Array of make command arguments
  */
 function buildMakeArgs(options: CompileOptions): string[] {
   const args: string[] = [];
@@ -260,6 +257,8 @@ function buildMakeArgs(options: CompileOptions): string[] {
 
 /**
  * Locate compiled output files (gba, elf, map)
+ * @param buildDir - The directory where the build output is located
+ * @returns - Object containing paths to gba, elf, and map files (or null if not found)
  */
 function locateCompiledOutput(buildDir: string): {
   gbaPath: string | null;
