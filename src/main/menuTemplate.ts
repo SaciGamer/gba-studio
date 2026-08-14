@@ -49,11 +49,11 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                     accelerator: 'CmdOrCtrl+S', 
                     click: () => { 
                         console.log('..: Chamada para save pelo menu'); 
-                        requestSaveChanges();
+                        requestSaveChanges({ source: 'save', persistToOriginal: true });
                     } },
                 { 
                     label: 'Save As...', 
-                    click: () => { console.log('..: Save As clicado'); } 
+                    click: () => { console.log('..: Save As clicado'); ipcMain.emit('save-project-as', null); } 
                 },
                 { type: 'separator' },
                 { label: 'Reload Assets', click: () => { console.log('..: Recarregar Assets clicado'); } },

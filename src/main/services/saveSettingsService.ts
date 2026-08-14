@@ -1,35 +1,38 @@
+import os from 'os';
 import path from 'path';
 import fs from 'fs';
-import { BrowserWindow } from 'electron';
 import { EventEmitter } from 'events';
 import { SettingsController } from '@/controllers/SettingsController';
 import { createGenericSettingsStruct } from '@/structs/projectSettingsStruct';
-import { IMainSettings, IProjectSettings } from '@/interfaces/MainSettingsInterface';
-import { ISceneSettings } from '@/interfaces/SceneInterface';
-import { windows } from '@/main';
-import { directoryPathProject } from '@/main';
+import { getPreferences } from '@/handlers/preferenceHandlers';
+import { windows, directoryPathProject, originalProjectDirectory } from '@/main';
+import { setCurrentActiveSandboxDirectory } from '@/states/tempProjectState';
 
 //Controllers
 const settingsController = SettingsController.getInstance();
 let processingToSaved = false;
+let pendingSaveOptions: SaveOptions | null = null;
 // Event emitter to signal save completion so other modules (eg. build) can wait
 export const saveEvents = new EventEmitter();
 
-export function updateWindowTitle(baseTitle: string, projectName: string, isSaved: boolean): void {
-    // console.log('..: updateWindowTitle fields:', baseTitle, projectName, isSaved);
+export interface SaveOptions {
+    persistToOriginal?: boolean;
+    markAsSaved?: boolean;
+    source?: 'save' | 'save-as' | 'build' | 'run-live' | 'close';
+    saveAsPath?: string;
+}
 
+export function updateWindowTitle(baseTitle: string, projectName: string, isSaved: boolean): void {
     if (windows.main) {
-        // console.log('..: updateWindowTitle windows:', windows.main?.getTitle());
         const title = `${baseTitle ? baseTitle : ''} - ${projectName ? projectName : ''}`;
         windows.main.setTitle(`${title}${!isSaved ? ' (Modified)' : ''}`);
         settingsController.setIsSaved(isSaved);
-        // console.log('..: updateWindowTitle title changed:',  windows.main?.getTitle());
     }
 }
 
 // Default project path
-export function setProjectDirectory(path: string): string | null {
-    return settingsController.setProjectDirectory(path);;
+export function setProjectDirectory(projectPath: string): string | null {
+    return settingsController.setProjectDirectory(projectPath);
 };
 
 export function setProjectFile(file: string): string | null {
@@ -39,128 +42,202 @@ export function setProjectFile(file: string): string | null {
 export function changesPending<T>(type: 'main' | 'project' | 'settings' | 'scene', newData: Partial<T>) {
     settingsController.setIsSaved(false);
     settingsController.updateSettings(newData);
-    // updateWindowTitle();
 }
 
 export function deletePending(type: 'scene', id: string): boolean {
     settingsController.setIsSaved(false);
     const response = settingsController.deleteSettings(type, id);
-    // updateWindowTitle();
     return response;
 }
 
+export function prepareProjectSandbox(projectFilePath: string): { sandboxDirectory: string; originalDirectory: string } {
+    const originalDirectory = path.resolve(path.dirname(projectFilePath));
+    const sandboxDirectory = createProjectSandboxDirectory(originalDirectory);
+    setCurrentActiveSandboxDirectory(sandboxDirectory);
+    return { sandboxDirectory, originalDirectory };
+}
+
 // Requisitar FE para mandar arquivos para o Save
-export function requestSaveChanges() {
-    console.log('..: requestSaveChanges processingToSaved:', processingToSaved)
+export function requestSaveChanges(options: SaveOptions = {}) {
+    const mergedOptions: SaveOptions = { source: 'save', ...options };
+    console.log('..: requestSaveChanges processingToSaved:', processingToSaved, 'source:', mergedOptions.source);
     if (windows.main && !processingToSaved) {
         processingToSaved = true;
-        windows.main.webContents.send('get-data', 'SAVE_DATA');
+        pendingSaveOptions = mergedOptions;
+        windows.main.webContents.send('get-data', { type: 'SAVE_DATA', ...mergedOptions });
     }
+}
+
+export function waitForSaveComplete(timeoutMs = 10000): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            saveEvents.removeListener('saved', onSaved);
+            reject(new Error('Save timeout'));
+        }, timeoutMs);
+
+        const onSaved = () => {
+            clearTimeout(timeout);
+            resolve();
+        };
+
+        saveEvents.once('saved', onSaved);
+    });
 }
 
 // Response FE para salvar nos arquivos
 export function responseSaveChanges(dataToSave: any) {
     console.log('..: DATA response to save:', dataToSave);
-    processingToSaved = saveChanges(dataToSave);
+    processingToSaved = saveChanges(dataToSave, pendingSaveOptions || {});
+    pendingSaveOptions = null;
 }
 
 // Function to save changes
-export function saveChanges(dataToSave: any) {
+export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
     console.log('..: Salvando alterações');
-    if (processingToSaved) {
-        try {
-            const settingsUtils = dataToSave.filter((data: any) => data._resourceType === 'setting-utils')
-                .reduce((obj: any, item: any) => {
-                    return {...obj, ...item};
-                }, {});
-            const filesToSave = dataToSave.filter((data: any) => data._resourceType !== 'setting-utils');
-
-            console.log('..: saveChanges settings Datas:', settingsUtils);
-            console.log('..: saveChanges all Datas:', filesToSave);
-
-            filesToSave.forEach((fileData: any) => {
-                // Para elementos que podem ser salvos/deletados
-                if (fileData! && Array.isArray(fileData)) {
-                    fileData.forEach((subFile: any) => {
-                        const projectPath = path.join(directoryPathProject, 'project');
-                        // Transformar em minúsculas e substituir o espaço por underscore
-                        const filenameFormatted = subFile.name.toLowerCase().replace(/ /g, "_");
-                        
-                        // Verifica se o elemento está marcado para deleção
-                        if (subFile._deleted === true) {
-                            // Deleta arquivo caso ainda exista e ignore o salvamento
-                            return deleteSettings(projectPath, subFile._resourceType + 's', filenameFormatted!, subFile); 
-                        }
-                        
-                        // Salvar arquivo caso não tenha sido flegado para deletar
-                        const scenesSaved = saveSettingsToStore(projectPath, subFile._resourceType + 's', filenameFormatted!, subFile);
-                        console.log(`..: Configurações scene ${subFile._index} saved:`, scenesSaved);
-                    });
-                    return;
-                }
-
-                if (fileData! && fileData._resourceType === 'project')
-                    saveSettingsToStore(settingsUtils.projectDirectory, '', path.basename(settingsUtils.projectPathFile), fileData);
-                else {
-                    saveSettingsToStore(settingsUtils.projectDirectory, 'project', fileData._resourceType, fileData);
-                }
-            });
-            
-            console.log('..: Finalizando save :..');
-            // updateWindowTitle();
+    try {
+        if (!Array.isArray(dataToSave)) {
+            console.warn('..: Dados de save inválidos, ignorando');
+            emitSaveComplete(options);
             return false;
-        } catch (error) {
-            console.error('..: Erro ao salvar configurações:', error);
+        }
+
+        const settingsUtils = dataToSave.filter((data: any) => data._resourceType === 'setting-utils')
+            .reduce((obj: any, item: any) => ({ ...obj, ...item }), {});
+        const filesToSave = dataToSave.filter((data: any) => data._resourceType !== 'setting-utils');
+
+        console.log('..: saveChanges settings Datas:', settingsUtils);
+        console.log('..: saveChanges all Datas:', filesToSave);
+
+        const activeProjectDirectory = options.persistToOriginal === false
+            ? (directoryPathProject || '')
+            : (directoryPathProject || settingsUtils.projectDirectory || path.dirname(settingsUtils.projectPathFile || ''));
+
+        if (options.persistToOriginal === false && !activeProjectDirectory) {
+            console.warn('..: Skip project write for implicit build/run-live save because no sandbox directory is active');
+            emitSaveComplete(options);
             return false;
+        }
+
+        filesToSave.forEach((fileData: any) => {
+            if (fileData && Array.isArray(fileData)) {
+                fileData.forEach((subFile: any) => {
+                    const projectPath = path.join(activeProjectDirectory, 'project');
+                    const filenameFormatted = subFile.name.toLowerCase().replace(/ /g, '_');
+
+                    if (subFile._deleted === true) {
+                        return deleteSettings(projectPath, subFile._resourceType + 's', filenameFormatted!, subFile);
+                    }
+
+                    const scenesSaved = saveSettingsToStore(projectPath, subFile._resourceType + 's', filenameFormatted!, subFile);
+                    console.log(`..: Configurações scene ${subFile._index} saved:`, scenesSaved);
+                });
+                return;
+            }
+
+            if (fileData && fileData._resourceType === 'project') {
+                saveSettingsToStore(activeProjectDirectory, '', path.basename(settingsUtils.projectPathFile || 'project.gbaproj'), fileData);
+            } else {
+                saveSettingsToStore(activeProjectDirectory, 'project', fileData._resourceType, fileData);
+            }
+        });
+
+        if (options.persistToOriginal === true) {
+            copySandboxToOriginalProject(activeProjectDirectory);
+        }
+
+        console.log('..: Finalizando save :..');
+        if (options.markAsSaved !== false) {
+            settingsController.setIsSaved(true);
+        }
+        emitSaveComplete(options);
+        return false;
+    } catch (error) {
+        console.error('..: Erro ao salvar configurações:', error);
+        emitSaveComplete(options);
+        return false;
+    }
+}
+
+function emitSaveComplete(options: SaveOptions) {
+    try {
+        saveEvents.emit('saved', { success: true, options });
+    } catch (e) {
+        console.warn('saveEvents emit failed', e);
+    }
+}
+
+function createProjectSandboxDirectory(originalDirectory: string): string {
+    const sandboxRoot = path.join(os.tmpdir(), 'gba-studio-temp', 'projects');
+    fs.mkdirSync(sandboxRoot, { recursive: true });
+
+    const preferences = getPreferences();
+    const maxBackups = Number(preferences.tempProjectBackupLimit ?? 5);
+    const safeMaxBackups = Number.isFinite(maxBackups) && maxBackups >= 0 ? Math.floor(maxBackups) : 5;
+
+    if (safeMaxBackups >= 0) {
+        const entries = fs.readdirSync(sandboxRoot, { withFileTypes: true })
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => ({ name: entry.name, fullPath: path.join(sandboxRoot, entry.name) }))
+            .sort((a, b) => fs.statSync(a.fullPath).mtimeMs - fs.statSync(b.fullPath).mtimeMs);
+
+        while (entries.length >= safeMaxBackups && entries.length > 0) {
+            const oldest = entries.shift();
+            if (oldest) {
+                fs.rmSync(oldest.fullPath, { recursive: true, force: true });
+            }
         }
     }
 
+    const sandboxName = `${path.basename(originalDirectory || 'project')}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const sandboxDirectory = path.join(sandboxRoot, sandboxName);
 
-    // if (!settingsController.isSaved() && settingsController.getProjectFile()) {
-    //     try {
-    //         const directory = settingsController.getProjectDirectory();
-    //         const projectFilenamePrincipal = settingsController.getProjectFile() || `unknow`;
+    if (fs.existsSync(sandboxDirectory)) {
+        fs.rmSync(sandboxDirectory, { recursive: true, force: true });
+    }
 
-    //         console.log('..: saveChanges all Datas:', settingsController.getSettingsData('all'));
+    fs.mkdirSync(sandboxDirectory, { recursive: true });
+    copyDirectoryContents(originalDirectory, sandboxDirectory);
+    return sandboxDirectory;
+}
 
-    //         // Salvar todos os arquivos TODO Arruma o getData para pegar do Controller
-    //         const settingsData = settingsController.getSettingsData('settings') as IMainSettings;
-    //         const settingsSaved = saveSettingsToStore(directory, 'project', 'settings', settingsData);
-    //         console.log('..: Configurações settings saved:', settingsSaved);
+function copySandboxToOriginalProject(activeProjectDirectory: string) {
+    console.log('..: Copying sandbox project back to original project directory');
+    if (!originalProjectDirectory || !activeProjectDirectory) {
+        return;
+    }
 
-    //         const projectData = settingsController.getSettingsData('project') as IProjectSettings;
-    //         const projectSaved = saveSettingsToStore(directory, '', projectFilenamePrincipal, projectData);
-    //         console.log('..: Configurações project saved:', projectSaved);
+    const normalizedActiveDir = path.resolve(activeProjectDirectory);
+    const normalizedOriginalDir = path.resolve(originalProjectDirectory);
 
-    //         // Salvar os arquivos de cena
-    //         // Deletar a pasta de cenas para evitar duplicação
-    //         // TODO revisar o delete
-    //         fs.rmSync(path.join(directory!, 'project', 'scenes'), { recursive: true, force: true });
-    //         const scenesData = settingsController.getSettingsData<ISceneSettings>('scene')!;
-    //         if (Array.isArray(scenesData)) {
-    //             scenesData.forEach((sceneData) => {
-    //                 const projectPath = path.join(directory!, 'project', 'scenes');
-    //                 // Transformar em minúsculas e substituir o espaço por underscore
-    //                 const filenameFormatted = sceneData.name.toLowerCase().replace(/ /g, "_");
-    //
-    //                 const scenesSaved = saveSettingsToStore(projectPath, filenameFormatted!, 'scene', sceneData);
-    //                 console.log(`..: Configurações scene ${sceneData._index} saved:`, scenesSaved);
-    //             });
-    //         }
+    if (normalizedActiveDir === normalizedOriginalDir) {
+        return;
+    }
 
-    //         // Salvo
-    //         settingsController.setIsSaved(true);
-    //         // updateWindowTitle();
-    //         return true;
-    //     } catch (error) {
-    //         console.error('..: Erro ao salvar configurações:', error);
-    //         return false;
-    //     }
-    // }
-    console.log('..: Nenhuma alteração para salvar');
-    // Emit save complete even when nothing to save so build flows can continue
-    try { saveEvents.emit('saved', true); } catch (e) { console.warn('saveEvents emit failed', e); }
-    return false;
+    if (fs.existsSync(normalizedOriginalDir)) {
+        fs.rmSync(normalizedOriginalDir, { recursive: true, force: true });
+    }
+    fs.mkdirSync(normalizedOriginalDir, { recursive: true });
+    copyDirectoryContents(normalizedActiveDir, normalizedOriginalDir);
+}
+
+export function copyDirectoryContents(sourceDir: string, targetDir: string) {
+    if (!fs.existsSync(sourceDir)) {
+        return;
+    }
+
+    fs.mkdirSync(targetDir, { recursive: true });
+    const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
+
+    entries.forEach((entry) => {
+        const sourcePath = path.join(sourceDir, entry.name);
+        const targetPath = path.join(targetDir, entry.name);
+
+        if (entry.isDirectory()) {
+            copyDirectoryContents(sourcePath, targetPath);
+        } else {
+            fs.copyFileSync(sourcePath, targetPath);
+        }
+    });
 }
 
 // Função para atualizar configurações
@@ -173,7 +250,7 @@ function saveSettingsToStore<T>(basePath: any, folder: string, filename: string,
             fs.renameSync(pathFileToSave, pathFileToBak);
             fs.writeFileSync(pathFileToSave, JSON.stringify(newSettings, null, 2));
         } else {
-            const pathFileToCreate = path.join(basePath, folder ? folder : '')
+            const pathFileToCreate = path.join(basePath, folder ? folder : '');
             if (!fs.existsSync(pathFileToSave)) {
                 fs.mkdirSync(pathFileToCreate, { recursive: true });
             }

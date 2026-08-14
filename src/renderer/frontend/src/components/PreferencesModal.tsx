@@ -3,46 +3,23 @@ import { Modal, Input, Button, Space, message, Form, Tag, Divider, Typography } 
 import { FolderOutlined, CheckCircleOutlined, ExclamationCircleOutlined, CloudDownloadOutlined } from '@ant-design/icons';
 
 const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
-  const [devkitPath, setDevkitPath] = useState('');
   const [tempBuildPath, setTempBuildPath] = useState('');
+  const [tempProjectBackupLimit, setTempProjectBackupLimit] = useState<number | ''>(5);
   const [loading, setLoading] = useState(false);
-  const [devkitValid, setDevkitValid] = useState<boolean | null>(null);
-  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     (async () => {
       try {
-        const dk = await window.electronAPI.getDevkitPath();
         const tb = await window.electronAPI.getTempBuildPath();
-        setDevkitPath(dk || '');
+        const backupLimit = await window.electronAPI.getTempProjectBackupLimit();
         setTempBuildPath(tb || '');
-        
-        // Validar caminhos
-        if (dk) {
-          const isValid = await window.electronAPI.checkToolsExe('devkitPro', 'devkitARM/bin/arm-none-eabi-gcc.exe');
-          setDevkitValid(isValid);
-        } else {
-          setDevkitValid(false);
-        }
-        
+        setTempProjectBackupLimit(backupLimit ?? 5);
       } catch (err) {
         console.error(err);
       }
     })();
   }, [open]);
-
-  const selectDevkitPath = async () => {
-    try {
-      const res = await window.electronAPI.selectFolder();
-      if (res && res.filePath) {
-        setDevkitPath(res.filePath);
-      }
-    } catch (err) {
-      console.error(err);
-      message.error('Failed to select devkit path');
-    }
-  };
 
   const selectTempBuildPath = async () => {
     try {
@@ -56,29 +33,12 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
     }
   };
 
-  const downloadDevkitPro = async () => {
-    setDownloading(true);
-    try {
-      message.info('DevKit Pro download not yet implemented. Please configure path manually or use Import Tools.');
-    } catch (err) {
-      console.error(err);
-      message.error('Failed to download DevKit Pro');
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const getStatusTag = (isValid: boolean | null) => {
-    if (isValid === null) return null;
-    if (isValid) return <Tag icon={<CheckCircleOutlined />} color="success">Valid</Tag>;
-    return <Tag icon={<ExclamationCircleOutlined />} color="error">Invalid</Tag>;
-  };
-
   const save = async () => {
     setLoading(true);
     try {
-      await window.electronAPI.setDevkitPath(devkitPath);
+      // await window.electronAPI.setDevkitPath(devkitPath);
       await window.electronAPI.setTempBuildPath(tempBuildPath);
+      await window.electronAPI.setTempProjectBackupLimit(Number(tempProjectBackupLimit || 0));
       message.success('Preferences saved');
       onClose();
     } catch (err) {
@@ -88,40 +48,30 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
     }
   };
 
+  const clearTemporaryData = async () => {
+    const confirmed = window.confirm('This will clear temporary project data. The currently open project sandbox will be preserved. Continue?');
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await window.electronAPI.clearTempProjectData();
+      message.success('Temporary project data cleared');
+    } catch (err) {
+      console.error(err);
+      message.error('Failed to clear temporary project data');
+    }
+  };
+
   return (
     <Modal open={open} title="Preferences" onCancel={onClose} footer={null} width={800}>
       <Form layout="vertical">
         <Space direction="vertical" size={0} style={{ marginBottom: 24, display: 'flex' }}>
           <Typography.Text strong>GBA Studio Configuration</Typography.Text>
-          <Typography.Text type="secondary">Configure paths for DevKit Pro, temporary build files.</Typography.Text>
+          <Typography.Text type="secondary">General configurations to GBA Studio build.</Typography.Text>
         </Space>
 
-        <Divider>Development Tools</Divider>
-
-        {/* DevkitARM Path */}
-        <Form.Item 
-          label={
-            <Space>
-              <span>DevKitARM Path</span>
-              {getStatusTag(devkitValid)}
-            </Space>
-          } 
-          required
-        >
-          <Space.Compact style={{ width: '100%' }}>
-            <Input 
-              value={devkitPath} 
-              onChange={(e) => setDevkitPath(e.target.value)} 
-              placeholder="Path to devkitPro/devkitARM"
-              readOnly
-            />
-            <Button icon={<FolderOutlined />} onClick={selectDevkitPath}>Browse</Button>
-            <Button icon={<CloudDownloadOutlined />} onClick={downloadDevkitPro} loading={downloading}>Download</Button>
-          </Space.Compact>
-        </Form.Item>
-
         <Divider>Build Configuration</Divider>
-
         {/* Temporary Build Path */}
         <Form.Item 
           label="Temporary Build Path" 
@@ -136,6 +86,24 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
             />
             <Button icon={<FolderOutlined />} onClick={selectTempBuildPath}>Browse</Button>
           </Space.Compact>
+        </Form.Item>
+
+        <Form.Item label="Temporary Project Backups Limit">
+          <Input
+            type="number"
+            min={0}
+            max={50}
+            step={1}
+            value={tempProjectBackupLimit}
+            onChange={(e) => setTempProjectBackupLimit(e.target.value === '' ? '' : Number(e.target.value))}
+            placeholder="Maximum temp project backups to keep"
+          />
+        </Form.Item>
+
+        <Form.Item>
+          <Space>
+            <Button danger onClick={clearTemporaryData}>Clear Temp Folder</Button>
+          </Space>
         </Form.Item>
 
         {/* Action Buttons */}

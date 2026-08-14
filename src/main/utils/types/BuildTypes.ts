@@ -96,6 +96,7 @@ export interface JsonResourceDefault {
   imageType?: string;
   backgrounds?: any[];
   script?: any[];
+  colorMode?: 'mono' | 'mixed' | undefined;
 }
 
 export interface ResourceFile {

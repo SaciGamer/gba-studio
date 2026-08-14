@@ -1,3 +1,11 @@
+/**
+ * {{PROJECT_NAME}} - GBA Game
+ * Author: {{AUTHOR}}
+ * Version: {{VERSION}}
+ * 
+ * Built with GBA Studio engine for Butano
+ */
+
 #include "event_wait.h"
 
 #include "bn_log.h"

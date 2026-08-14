@@ -67,6 +67,12 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
     console.log('..:: Open Project Folder ::..') ;
     window.electronAPI.send('open-project-folder', null);
   }
+
+  const handleSaveSettingsLocalStorage = () => {
+    if (settings) {
+      localStorage.setItem("appSettings", JSON.stringify(settings));
+    }
+  }
   
   const menuItems = [
     { key: '1', label: 'Game World'},
@@ -96,13 +102,6 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
 
   // emulator start/stop handled by BuildStateProvider; no local listeners needed
   useEffect(() => {}, [isBuilding, isRunning]);
-
-  // save config on localstorage to build and play
-  useEffect(() => {
-    if (settings) {
-      localStorage.setItem("appSettings", JSON.stringify(settings));
-    }
-  }, [settings]);
 
   return (
     <Space style={{ display: 'flex', alignItems: 'center', paddingInline: '10px', paddingBlock: '5px', justifyContent: 'space-between', backgroundColor: token.colorBgBase }}>
@@ -156,7 +155,8 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
             icon={<ToolFilled />} 
             loading={isBuilding}
             disabled={isRunning}
-            onClick={() => { 
+            onClick={(e) => { 
+              e.stopPropagation();
               console.log('..: TopBar Build - request compile'); 
               setBuilding(true);
               window.electronAPI.send('compile-project', null); 
@@ -168,9 +168,17 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
           <Button 
             icon={ isRunning ? <CloseCircleOutlined /> : <PlaySquareOutlined /> }
             disabled={isBuilding}
-            onClick={() => { 
-              if (isRunning) { window.electronAPI.send('stop-emulator', null); console.log('..: TopBar Stop emulator'); }
-              else { window.electronAPI.send('run-live', null); console.log('..: TopBar Run-live requested'); }
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isRunning) { 
+                console.log('..: TopBar Stop emulator'); 
+                window.electronAPI.send('stop-emulator', null); 
+              }
+              else { 
+                handleSaveSettingsLocalStorage();
+                console.log('..: TopBar Run-live requested'); 
+                window.electronAPI.send('run-live', null); 
+              }
             }}
             style={{ marginLeft: '8px', padding: '10px' }}
           />

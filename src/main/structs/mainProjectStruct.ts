@@ -99,16 +99,6 @@ function createProjectByTemplate(basePath: string, template: string): void {
       }
     };
 
-    // Arquivo para demostração de gba em .c
-    if (template === 'DemoShowcase') {
-      const templateDir = path.join(repoRoot, 'src', 'main', 'templates', 'demo-showcase');
-      console.log('..: Copying DemoShowcase template from', templateDir);
-      if (fs.existsSync(templateDir)) {
-        copyRecursive(templateDir, basePath);
-        console.log('..: DemoShowcase template copied.');
-      }
-    }
-
     // When the renderer requests the sample project, copy the prepared sample_project_example folder
     if (template === 'sample_project_example') {
       const templateDir = path.resolve(repoRoot, template);

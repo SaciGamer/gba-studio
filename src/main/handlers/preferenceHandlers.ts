@@ -1,8 +1,10 @@
 import { IpcMainInvokeEvent, ipcMain } from 'electron';
 import Store from 'electron-store';
+import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { IPreferences, IRecentProject, IStoreData } from '@/interfaces/StoreInterface';
+import { getCurrentActiveSandboxDirectory } from '@/states/tempProjectState';
 
 const __store = new Store<IStoreData>();
 
@@ -11,6 +13,7 @@ const defaultPreferences: IPreferences = {
   theme: 'systemDefault',
   language: 'pt_BR',
   recentProjects: [],
+  tempProjectBackupLimit: 5,
 };
 
 // THEME --------------------------------------------------------
@@ -58,9 +61,10 @@ export const updatePreferences = (key: keyof IPreferences, value: any): void => 
       console.log('..: updatePreferences NO exite: ', value);
       recentProjects.unshift(value);
     }
-  } else { 
-    // Atualizar outra preferência 
-    preferences[key] = value;
+  } else {
+    // Atualizar outra preferência
+    const prefs = preferences as unknown as Record<string, unknown>;
+    prefs[key as string] = value;
   }
        
   savePreferences(preferences); 
@@ -118,30 +122,7 @@ const getLastPositionSplitters = () => {
 }
 // LAST POSITION SPLITTERS END ---------------------------------------------
 
-// DEVKIT & BUILD PATHS ------------------------------------------------
-const getDevkitPath = (): string => {
-  const prefs = getPreferences();
-  
-  // 1. Primeiro tenta usar o valor salvo nas preferências
-  if (prefs.devkitPath) {
-    return prefs.devkitPath;
-  }
-  
-  // 2. Se não tiver, tenta buscar a variável de ambiente DEVKITPRO
-  const devkitEnv = process.env.DEVKITPRO;
-  if (devkitEnv) {
-    console.log('..: DevKit encontrado em env var DEVKITPRO:', devkitEnv);
-    return devkitEnv;
-  }
-  
-  return '';
-};
-
-const setDevkitPath = (devkitPath: string): void => {
-  console.log('..: Setting devkitPath to', devkitPath);
-  updatePreferences('devkitPath', devkitPath);
-};
-
+// TEMP BUILD PATH ---------------------------------------------------------
 const getTempBuildPath = (): string => {
   const prefs = getPreferences();
   
@@ -161,7 +142,58 @@ const setTempBuildPath = (tempBuildPath: string): void => {
   console.log('..: Setting tempBuildPath to', tempBuildPath);
   updatePreferences('tempBuildPath', tempBuildPath);
 };
-// DEVKIT & BUILD PATHS END -----------------------------------------------
+
+const getTempProjectBackupLimit = (): number => {
+  const prefs = getPreferences();
+  const limit = Number(prefs.tempProjectBackupLimit ?? 5);
+  return Number.isFinite(limit) && limit >= 0 ? Math.floor(limit) : 5;
+};
+
+const setTempProjectBackupLimit = (tempProjectBackupLimit: number): void => {
+  const safeLimit = Math.max(0, Math.floor(Number(tempProjectBackupLimit) || 0));
+  console.log('..: Setting tempProjectBackupLimit to', safeLimit);
+  updatePreferences('tempProjectBackupLimit', safeLimit);
+};
+
+const clearTempProjectData = (): void => {
+  const tempRoot = path.join(os.tmpdir(), 'gba-studio-temp');
+  if (!fs.existsSync(tempRoot)) {
+    fs.mkdirSync(tempRoot, { recursive: true });
+    return;
+  }
+
+  const activeSandbox = getCurrentActiveSandboxDirectory();
+  const projectRoot = path.join(tempRoot, 'projects');
+
+  if (fs.existsSync(projectRoot)) {
+    const entries = fs.readdirSync(projectRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(projectRoot, entry.name));
+
+    entries.forEach((entryPath) => {
+      const normalizedEntry = path.resolve(entryPath);
+      const normalizedActive = activeSandbox ? path.resolve(activeSandbox) : null;
+
+      if (normalizedActive && normalizedEntry === normalizedActive) {
+        return;
+      }
+
+      fs.rmSync(normalizedEntry, { recursive: true, force: true });
+    });
+  }
+
+  if (fs.existsSync(tempRoot)) {
+    const buildRoot = path.join(tempRoot, 'gba-studio-build');
+    if (fs.existsSync(buildRoot)) {
+      fs.rmSync(buildRoot, { recursive: true, force: true });
+    }
+  }
+
+  fs.mkdirSync(tempRoot, { recursive: true });
+  fs.mkdirSync(projectRoot, { recursive: true });
+  return;
+};
+// TEMP BUILD PATH END -----------------------------------------------------
 
 // BUILD CONFIG -----------------------------------------------------------
 export const getBuildConfig = () => {
@@ -216,10 +248,11 @@ export const configurarPreferenceHandlers = () => {
   ipcMain.handle('lastPositionSplitters', (_event: IpcMainInvokeEvent, lastPositionSplitters: number[]) => saveLastPositionSplitters(lastPositionSplitters));
   ipcMain.handle('loadLastPositionSplitters', () => getLastPositionSplitters());
   //--
-  ipcMain.handle('get-devkit-path', () => getDevkitPath());
-  ipcMain.handle('set-devkit-path', (_event: IpcMainInvokeEvent, devkitPath: string) => setDevkitPath(devkitPath));
   ipcMain.handle('get-temp-build-path', () => getTempBuildPath());
   ipcMain.handle('set-temp-build-path', (_event: IpcMainInvokeEvent, tempBuildPath: string) => setTempBuildPath(tempBuildPath));
+  ipcMain.handle('get-temp-project-backup-limit', () => getTempProjectBackupLimit());
+  ipcMain.handle('set-temp-project-backup-limit', (_event: IpcMainInvokeEvent, tempProjectBackupLimit: number) => setTempProjectBackupLimit(tempProjectBackupLimit));
+  ipcMain.handle('clear-temp-project-data', () => clearTempProjectData());
   // Build config handlers
   ipcMain.handle('get-build-config', () => getBuildConfig());
   ipcMain.handle('set-build-config', (_event: IpcMainInvokeEvent, cfg: any) => setBuildConfig(cfg));

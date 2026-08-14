@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { SettingsController } from '../controllers/SettingsController';
+import { directoryPathProject } from '@/main';
 
 // Controllers
 const settingsController = SettingsController.getInstance();
@@ -9,7 +10,7 @@ export async function loadSettings(filePath: string): Promise<any[]>{
   console.log('..: Carregando configurações :..');
   console.log('..: filePath:', filePath);
 
-  const directory = path.dirname(filePath);
+  const directory = directoryPathProject || path.dirname(filePath);
   const resources: any[] = [];
 
   try {

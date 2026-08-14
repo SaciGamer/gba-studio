@@ -4,6 +4,8 @@ const { useEffect, useState, useRef } = React;
 import { Typography, Spin, Row, Space, notification } from 'antd';
 import { useBuildState } from '../providers/BuildStateProvider';
 import { AntdToken } from './common/AntDToken';
+import { Content } from 'antd/es/layout/layout';
+import Layout from 'antd/lib/layout/layout';
 
 const { Text } = Typography;
 
@@ -136,9 +138,9 @@ const BottomPanel: React.FC = () => {
   }, []);
 
   return (
-    <div style={{ height: '100%' }}>
+    <Layout style={{ height: '100%' }}>
       {notificationContextHolder}
-      <div style={{ position: 'sticky', top: 0, backgroundColor: token.colorBorder, zIndex: 1, padding: '16px 24px', borderBottom: '1px solid #d9d9d9' }}>
+      <Content style={{ position: 'sticky', top: 0, backgroundColor: token.colorBorder, zIndex: 1, padding: '16px 24px', borderBottom: '1px solid #d9d9d9' }}>
         <Row justify="space-between" align="middle">
           <Typography.Text strong>Status do Compilador</Typography.Text>
           <Space>
@@ -148,9 +150,9 @@ const BottomPanel: React.FC = () => {
             </Typography.Text>
           </Space>
         </Row>
-      </div>
-      <div style={{ height: 'calc(100% - 55px)', overflow: 'auto', padding: 0, display: 'flex', flexDirection: 'column' }}>
-        <div ref={logRef} style={{ flex: 1, overflow: 'auto', width: '100%', fontFamily: 'monospace', fontSize: '12px', backgroundColor: '#000', color: '#fff', padding: '8px', borderRadius: 0 }}>
+      </Content>
+      <Content style={{ height: 'calc(100% - 55px)', overflow: 'auto', padding: 0, display: 'flex', flexDirection: 'column' }}>
+        <Content ref={logRef} style={{ flex: 1, overflow: 'auto', width: '100%', fontFamily: 'monospace', fontSize: '12px', backgroundColor: '#000', color: '#fff', padding: '8px', borderRadius: 0 }}>
           {statusLines.length === 0 ? (
             <Text type="secondary" style={{ color: '#666' }}>Aguardando ações do compilador...</Text>
           ) : (
@@ -158,9 +160,9 @@ const BottomPanel: React.FC = () => {
               <div key={i} style={{ color: l.startsWith('ERROR') ? '#ff4d4f' : '#fff' }}>{l}</div>
             ))
           )}
-        </div>
-      </div>
-    </div>
+        </Content>
+      </Content>
+    </Layout>
   );
 };
 

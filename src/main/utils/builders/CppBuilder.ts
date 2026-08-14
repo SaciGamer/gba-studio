@@ -7,6 +7,14 @@ import fs from 'fs';
 import path from 'path';
 import { GameConfig } from '../types/BuildTypes';
 
+function sanitizeMacroName(value: string): string {
+  return value
+    .trim()
+    .replace(/[^A-Za-z0-9_]/g, '_')
+    .replace(/^[^A-Za-z_]+/, '')
+    .toUpperCase();
+}
+
 export class CppBuilder {
   private srcDir: string;
   private includeDir: string;
@@ -63,7 +71,7 @@ export class CppBuilder {
    */
   private async generateGameClass(config: GameConfig): Promise<void> {
     const gameHPath = path.join(this.includeDir, 'game.h');
-    const guard = config.projectName.toUpperCase();
+    const guard = sanitizeMacroName(config.projectName || 'PROJECT');
 
     try {
       if (this.templateDir) {

@@ -3,7 +3,7 @@
  * Author: {{AUTHOR}}
  * Version: {{VERSION}}
  * 
- * Built with Butano engine for GBA
+ * Built with GBA Studio engine for Butano
  */
 
 #include "bn_core.h"
