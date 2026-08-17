@@ -36,7 +36,6 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
   const save = async () => {
     setLoading(true);
     try {
-      // await window.electronAPI.setDevkitPath(devkitPath);
       await window.electronAPI.setTempBuildPath(tempBuildPath);
       await window.electronAPI.setTempProjectBackupLimit(Number(tempProjectBackupLimit || 0));
       message.success('Preferences saved');

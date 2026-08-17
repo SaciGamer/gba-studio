@@ -82,7 +82,7 @@ async function example3_TemplateBuilder() {
   // Acessar paths configurados
   const srcDir = builder.getSrcDir();
   const includeDir = builder.getIncludeDir();
-  const outputDir = builder.getOutputDir();
+  const outputDir = builder.getOutputBuildDir();
 
   console.log('Source:', srcDir);
   console.log('Include:', includeDir);

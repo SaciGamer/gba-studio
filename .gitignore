@@ -23,6 +23,7 @@ build/
 **/dist
 **/build
 scripts-dist/
+bin/
 
 # Testes
 coverage/

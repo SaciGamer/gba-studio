@@ -454,14 +454,19 @@ app.whenReady().then(() => {
   const server = express();
   const romDir = path.join(app.getPath("userData"), "gba-studio-play", "roms");
   fs.mkdirSync(romDir, { recursive: true });
+  const emulatorjsBasePath = isDev
+      ? path.join(__dirname, "..", "renderer", "emulatorjs", "data")
+      : path.join(process.resourcesPath, "bin", "tools", "emulatorjs", "data");
+
   server.use("/roms", express.static(romDir));
+  server.use("/emulatorjs-data", express.static(emulatorjsBasePath));
+
   server.listen(3000, () => {
     console.log("ROM server running at http://localhost:3000/roms");
+    console.log("EMULATORJS server running at http://localhost:3000/emulatorjs");
   });
 
   createSplashWindow();
-  // Launcher creation is handled by the splash screen (it will create/show launcher
-  // if no startup project was provided). This avoids duplicating windows.
 });
 
 async function handleWindowClose(window: BrowserWindow) {
@@ -737,11 +742,9 @@ ipcMain.on('run-live', async (event) => {
     try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: '>> Transcodificação concluída.' })); } catch (e) {}
 
     // Compile with new parameter-based interface (use saved build config)
-    const prefsRunLive = getPreferences();
     const buildCfg = getBuildConfig();
     let compileRes = await compileGBA({
       buildDir: tempBuild,
-      devkitPath: prefsRunLive.devkitPath,
       parallel: buildCfg?.parallel,
       optimizationLevel: buildCfg?.optimizationLevel as any,
       verbose: buildCfg?.verbose,
@@ -807,11 +810,9 @@ ipcMain.on('compile-project', async (event)  => {
 
       // Compile with new parameter-based interface (use saved build config)
       {
-        const prefsCompile = getPreferences();
         const buildCfg = getBuildConfig();
         let compileRes = await compileGBA({
           buildDir: tempBuild,
-          devkitPath: prefsCompile.devkitPath,
           parallel: buildCfg?.parallel,
           optimizationLevel: buildCfg?.optimizationLevel as any,
           verbose: buildCfg?.verbose,

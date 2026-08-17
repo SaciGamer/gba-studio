@@ -167,7 +167,7 @@ export class TemplateBuilder {
   /**
    * Get configured build directory
    */
-  public getBuildDir(): string {
+  public getProjectBuildDir(): string {
     return this.buildDir;
   }
 
@@ -195,7 +195,7 @@ export class TemplateBuilder {
   /**
    * Get build output directory path
    */
-  public getOutputDir(): string {
+  public getOutputBuildDir(): string {
     return path.join(this.buildDir, 'build');
   }
 }

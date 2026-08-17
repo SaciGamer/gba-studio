@@ -211,16 +211,6 @@ export const initializeDefaultPaths = (): void => {
   const prefs = getPreferences();
   let shouldUpdate = false;
 
-  // Se não tem devkitPath mas tem env var, salva
-  if (!prefs.devkitPath) {
-    const devkitEnv = process.env.DEVKITPRO;
-    if (devkitEnv) {
-      console.log('..: Inicializando devkitPath de env var:', devkitEnv);
-      prefs.devkitPath = devkitEnv;
-      shouldUpdate = true;
-    }
-  }
-
   // Se não tem tempBuildPath, seta o padrão
   if (!prefs.tempBuildPath) {
     const tempDefault = path.join(os.homedir(), 'AppData', 'Local', 'Temp', 'gba-studio-temp','gba-studio-build');

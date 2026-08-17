@@ -29,8 +29,7 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
   if (!('buildDir' in options)) {
     const legacyOpts = options as { cwd?: string };
     const cwd = legacyOpts.cwd || path.join(
-      path.resolve(__dirname, '..', '..', '..', '..'),
-      'gba-project'
+      path.resolve(__dirname, '..', '..', '..', '..'), 'gba-project'
     );
     return compileGBA({ buildDir: cwd });
   }
@@ -72,7 +71,7 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
 
     try {
       // Setup environment
-      const env = setupEnvironment(compileOptions);
+      const env = setupEnvironmentWithDevkitPro();
 
       // Normalize for make/msys
       const envForMake = normalizeEnvForMake(env);
@@ -158,31 +157,17 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
 };
 
 /**
- * Setup environment variables for compilation
- * @param options - CompileOptions containing buildDir, devkitPath, etc.
+ * Setup environment variables for compilation with DevkitPro
  * @returns - Record of environment variables 
  */
-function setupEnvironment(options: CompileOptions): Record<string, string> {
-  const prefs = getPreferences();
-  const devkitFromPrefs = (prefs && (prefs as any).devkitPath)
-    ? (prefs as any).devkitPath
-    : '';
-
-  // Prefer project-local tools/devkitPro/devkitARM
+function setupEnvironmentWithDevkitPro(): Record<string, string> {
   const repoRoot = path.resolve(__dirname, '..', '..', '..', '..');
-  const localDevkitPath = isDev
-    ? path.resolve(repoRoot, 'tools', 'devkitPro', 'devkitARM')
-    : path.join(app.getAppPath(), 'tools', 'devkitPro', 'devkitARM');
+  const localDevkitProPath = isDev
+    ? path.resolve(repoRoot, 'tools', 'devkitPro')
+    : path.join(process.resourcesPath, "bin", 'tools', 'devkitPro');
 
-  let devkitArm = options.devkitPath || '';
-
-  if (fs.existsSync(localDevkitPath)) {
-    devkitArm = localDevkitPath;
-  } else if (fs.existsSync(devkitFromPrefs)) {
-    devkitArm = devkitFromPrefs;
-  } else {
-    devkitArm = process.env.DEVKITARM || '';
-  }
+  const devkitArm = path.join(localDevkitProPath, 'devkitARM');
+  console.log('..: Using DEVKITARM at', devkitArm);
 
   if (!devkitArm || devkitArm.trim() === '') {
     throw new Error(
@@ -191,19 +176,13 @@ function setupEnvironment(options: CompileOptions): Record<string, string> {
     );
   }
 
-  console.log('..: Using DEVKITARM at', devkitArm);
-
   // Setup DEVKITPRO paths
-  const repoToolsRoot = options.devkitPro
-    ? options.devkitPro
-    : path.resolve(repoRoot, 'tools', 'devkitPro');
-
-  const libgbaPath = path.join(repoToolsRoot, 'libgba');
+  const libgbaPath = path.join(localDevkitProPath, 'libgba');
 
   return {
     ...process.env,
     DEVKITARM: devkitArm,
-    DEVKITPRO: fs.existsSync(repoToolsRoot) ? repoToolsRoot : process.env.DEVKITPRO || '',
+    DEVKITPRO: fs.existsSync(localDevkitProPath) ? localDevkitProPath : process.env.DEVKITPRO || '',
     LIBGBA: libgbaPath,
   } as Record<string, string>;
 }

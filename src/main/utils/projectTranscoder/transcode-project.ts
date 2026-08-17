@@ -9,6 +9,7 @@ import ResourceBuilder from '../builders/ResourceBuilder';
 import AssetBuilder from '../builders/AssetBuilder';
 import { CppBuilder } from '../builders/CppBuilder';
 import { packageJson } from '@/main';
+import isDev from 'electron-is-dev';
 
 // Obter o caminho do diretório atual
 const __filename = fileURLToPath(import.meta.url);
@@ -45,9 +46,10 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
     projectName = await extractProjectName(projectDir, projectName);
 
     // Locate template and tools
-    const repoRoot = path.resolve(__dirname, '..', '..');
-    const toolsRoot = path.join(repoRoot, '..', '..', 'tools');
-    const templateDir = path.join(toolsRoot, 'butano', 'template');
+    const toolsRoot = isDev 
+      ? path.resolve(__dirname, '..', '..', '..', '..', 'tools') 
+      : path.join(process.resourcesPath, "bin", 'tools');
+    const templateDir = path.join(toolsRoot , 'butano', 'template');
 
     // Validate template exists
     if (!fs.existsSync(templateDir)) {
@@ -122,11 +124,11 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
     }
 
     // Generate Butano assets before reading generated graphic headers.
-    const buildDir = templateBuilder.getBuildDir();
-    const outputBuildDir = templateBuilder.getOutputDir();
+    const buildDir = templateBuilder.getProjectBuildDir();
+    const outputBuildDir = templateBuilder.getOutputBuildDir();
 
     if (fs.existsSync(buildDir)) {
-      await generateButanoAssetHeaders(buildDir, outputBuildDir);
+      await generateButanoAssetHeaders(buildDir, outputBuildDir, toolsRoot);
     }
 
     let graphicHeaderGeneratedByButano: string[] = [];
@@ -297,11 +299,10 @@ function resolveToolExecutable(toolName: string): string {
  * It ensures that the necessary directories exist and handles the execution of the tool.
  * @param buildDir - The build directory where the Butano asset headers will be generated
  * @param outputBuildDir - The output build directory where the generated headers will be placed 
+ * @param toolsRoot - The toolsRoot directory where have the butano tools
  * @returns 
  */
-async function generateButanoAssetHeaders(buildDir: string, outputBuildDir: string): Promise<void> {
-  const repoRoot = path.resolve(__dirname, '..', '..');
-  const toolsRoot = path.join(repoRoot, '..', '..', 'tools');
+async function generateButanoAssetHeaders(buildDir: string, outputBuildDir: string, toolsRoot: string): Promise<void> {
   const assetToolPath = path.join(toolsRoot, 'butano', 'butano', 'tools', 'butano_assets_tool.py');
   const graphicsDir = path.join(buildDir, 'graphics');
   const audioDir = path.join(buildDir, 'audio');
