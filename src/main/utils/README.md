@@ -123,8 +123,6 @@ Output: TranscodeResult
 ```
 Input: CompileOptions
   ├─ buildDir: diretório de build
-  ├─ devkitPath: opcional
-  ├─ devkitPro: opcional
   ├─ parallel: número de jobs
   └─ verbose: logging detalhado
 

@@ -59,6 +59,8 @@ bool runFade(const int fadeSpeed, FadeType fadeType, bool active) {
             }
         }
     }
+
+    return false;
 }
 
 bool runFade(const void* args, FadeType fadeType) {

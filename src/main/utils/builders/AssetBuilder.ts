@@ -303,8 +303,8 @@ export class AssetBuilder {
     let args: string[];
 
     const magickPath = isDev 
-      ? path.join(this.__dirname, "tools", "image-magick", process.platform === "win32" ? "magick.exe" : "magick") 
-      : path.join(process.resourcesPath, "bin", process.platform === "win32" ? "magick.exe" : "magick");
+      ? path.join(this.__dirname, "..", "bin", "image-magick", process.platform === "win32" ? "magick.exe" : "magick") 
+      : path.join(process.resourcesPath, "bin", "image-magick", process.platform === "win32" ? "magick.exe" : "magick");
 
     switch (mode) {
       case "title":

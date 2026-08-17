@@ -3,7 +3,7 @@
   "author": "GBA Studio",
   "productName": "GBA Studio",
   "description": "Project for creating and compiling GBA",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "license": "GPL-2.0 license",
   "private": true,
   "type": "module",
@@ -18,58 +18,31 @@
   "build": {
     "appId": "com.gba-studio.app",
     "productName": "GBA Studio",
+    "artifactName": "gba-studio-${os}-${arch}.${ext}",
     "directories": {
-      "output": "release",
+      "output": "release/${version}",
       "buildResources": "icon"
     },
     "extraResources": [
       {
-        "from": "tools/image-magick/win32/magick.exe",
-        "to": "bin/magick.exe"
+        "from": "bin/",
+        "to": "bin",
+        "filter": ["**/*"]
       },
       {
-        "from": "tools/image-magick/darwin/magick",
-        "to": "bin/magick"
+        "from": "tools/devkitPro",
+        "to": "bin/tools/devkitPro",
+        "filter": ["**/*"]
       },
       {
-        "from": "tools/image-magick/linux/magick",
-        "to": "bin/magick"
+        "from": "tools/butano/",
+        "to": "bin/tools/butano",
+        "filter": ["**/*"]
       },
       {
-        "from": "tools/butano/win32/butano.exe",
-        "to": "bin/butano.exe"
-      },
-      {
-        "from": "tools/butano/darwin/butano",
-        "to": "bin/butano"
-      },
-      {
-        "from": "tools/butano/linux/butano",
-        "to": "bin/butano"
-      },
-      {
-        "from": "tools/butano-tile/win32/butano-tile.exe",
-        "to": "bin/butano-tile.exe"
-      },
-      {
-        "from": "tools/butano-tile/darwin/butano-tile",
-        "to": "bin/butano-tile"
-      },
-      {
-        "from": "tools/butano-tile/linux/butano-tile",
-        "to": "bin/butano-tile"
-      },
-      {
-        "from": "tools/tiled/win32/tiled.exe",
-        "to": "bin/tiled.exe"
-      },
-      {
-        "from": "tools/tiled/darwin/tiled",
-        "to": "bin/tiled"
-      },
-      {
-        "from": "tools/tiled/linux/tiled",
-        "to": "bin/tiled"
+        "from": "src/renderer/frontend/public/emulatorjs/data",
+        "to": "bin/tools/emulatorjs/data",
+        "filter": ["**/*"]
       }
     ],
     "files": [
@@ -77,23 +50,27 @@
       "!**/*.md",
       "dist/**/*",
       "icon/**/*",
-      "tools/**/*",
       "sample_project_example",
       "package.json"
     ],
     "mac": {
       "icon": "icon/defaultIcon.icns",
-      "target": "dmg"
+      "artifactName": "gba-studio-macos-${arch}-installer.${ext}",
+      "target": ["dmg", "zip"]
     },
     "win": {
       "icon": "icon/defaultIcon.ico",
-      "target": [
-        "nsis"
-      ],
+      "artifactName": "gba-studio-windows-${arch}-installer.${ext}",
+      "target": ["nsis", "portable", "zip"],
       "signAndEditExecutable": true
     },
     "linux": {
-      "icon": "icon/defaultImgIcon.png"
+      "icon": "icon/defaultImgIcon.png",
+      "artifactName": "gba-studio-linux-${arch}-installer.${ext}",
+      "target": ["snap", "deb", "AppImage"]
+    },
+    "portable": {
+      "artifactName": "gba-studio-${os}-${arch}-standalone.${ext}"
     },
     "asar": true,
     "asarUnpack": [
@@ -105,10 +82,18 @@
     "dev": "concurrently \"yarn workspace @gba-studio/frontend dev\" \"wait-on --httpTimeout 5000 http://localhost:5173 && electron .\"",
     "compile-scripts": "tsc -p scripts/tsconfig.scripts.json",
     "prebuild": "node scripts-dist/setupMagick.js",
-    "prebuild:main": "node scripts-dist/setupMagick.js",
-    "build": "rm -rf dist && yarn build:main && yarn build:renderer && electron-builder",
+    "prebuild:main": "node scripts-dist/setupMagick.js win64",
+    "clean": "rm -rf dist",
+
+    "build": "yarn clean && yarn build:main && yarn build:renderer",
     "build:main": "yarn workspace @gba-studio/main build",
     "build:renderer": "yarn workspace @gba-studio/frontend build",
+    
+    "build:win32": "yarn clean && node scripts-dist/setupMagick.js win32 && yarn build:main && yarn build:renderer && electron-builder --win --ia32",
+    "build:win64": "yarn clean && node scripts-dist/setupMagick.js win64 && yarn build:main && yarn build:renderer && electron-builder --win --x64",
+    "build:linux": "yarn clean && node scripts-dist/setupMagick.js linux && yarn build:main && yarn build:renderer && electron-builder --linux",
+    "build:mac": "yarn clean && nonode scripts-dist/setupMagick.js darwin && yarn build:main && yarn build:renderer && electron-builder --mac",
+    
     "preview": "yarn workspace @gba-studio/frontend preview && electron ."
   },
   "dependencies": {

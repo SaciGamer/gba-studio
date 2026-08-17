@@ -47,8 +47,6 @@ export interface TranscodeResult {
 
 export interface CompileOptions {
   buildDir: string;
-  devkitPath?: string;
-  devkitPro?: string;
   parallel?: number;
   verbose?: boolean;
   optimizationLevel?: 'O0' | 'O1' | 'O2' | 'O3' | 'Og' | 'Os';

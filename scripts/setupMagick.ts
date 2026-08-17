@@ -6,33 +6,41 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function setupMagick() {
-  const platform = process.platform;
-  const arch = process.arch;
-  const dest = path.join(__dirname, "..", "dist/tools/image-magick");
-
-  fs.mkdirSync(dest, { recursive: true });
-
-  if (platform === "win32") {
-    const file = arch === "x64" ? "win-magick-x64.zip" : "win-magick-x86.zip";
-    console.log(" Extracting ImageMagick for Windows:", file);
-    
-    await decompress(
-      path.join(__dirname, "..", "tools/image-magick", file),
-      dest
-    );
-  } else if (platform === "darwin") {
-    await decompress(
-      path.join(__dirname, "..", "tools/image-magick/apple-magick.tar.gz"),
-      dest
-    );
-  } else if (platform === "linux") {
-    fs.copyFileSync(
-      path.join(__dirname, "..", "tools/image-magick/magick"),
-      path.join(dest, "magick")
-    );
-    fs.chmodSync(path.join(dest, "magick"), 0o755);
+function cleanDir(dir: string) {
+  if (fs.existsSync(dir)) {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
+  fs.mkdirSync(dir, { recursive: true });
+}
+
+async function setupMagick() {
+  const target = process.argv[2]; // winx64, winx86, linux, mac
+  const dest = path.join(__dirname, "..", "bin", "image-magick");
+  cleanDir(dest);
+
+  switch (target) {
+    case "win64":
+      console.log("Extracting ImageMagick for:", target);
+      await decompress(path.join(__dirname, "..", "tools/image-magick/", "win-magick-x64.zip"), dest);
+      break;
+    case "win32":
+      console.log("Extracting ImageMagick for:", target);
+      await decompress(path.join(__dirname, "..", "tools/image-magick/", "win-magick-x86.zip"), dest);
+      break;
+    case "darwin": // ERROR
+      console.log("Extracting ImageMagick for:", target);
+      await decompress(path.join(__dirname, "..", "tools/image-magick/", "apple-magick.tar.gz"), dest);
+      break;
+    case "linux":
+      console.log("Extracting ImageMagick for:", target);
+      fs.copyFileSync(path.join(__dirname, "..", "tools/image-magick/", "magick"), path.join(dest, "magick"));
+      fs.chmodSync(path.join(dest, "magick"), 0o755);
+      break;
+    default:
+      console.error("Plataforma não suportada:", target);
+      process.exit(1);
+  }
+
 }
 
 setupMagick().catch(err => {

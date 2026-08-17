@@ -147,7 +147,7 @@ const Emulator: React.FC = () => {
     emulatorJs.EJS_core = "gba";
     emulatorJs.EJS_color = token.colorPrimary;
     emulatorJs.EJS_backgroundColor = token.colorBgContainer;
-    emulatorJs.EJS_pathtodata = "/emulatorjs/data/";
+    emulatorJs.EJS_pathtodata = "http://localhost:3000/emulatorjs-data/";
     emulatorJs.EJS_gameUrl = romPath;
     emulatorJs.EJS_startOnLoaded = true;
     emulatorJs.EJS_hideSettings = [/*'fps',*/ 'videoRotation', 'vsync', 'webgl2Enabled'];
@@ -218,7 +218,7 @@ const Emulator: React.FC = () => {
     emulatorJs.EJS_showBottomMenu = showBottomMenu;
 
     const script = document.createElement("script");
-    script.src = "/emulatorjs/data/loader.js";
+    script.src = "http://localhost:3000/emulatorjs-data/loader.js";
     script.async = true;
     document.body.appendChild(script);
 
