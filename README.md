@@ -11,13 +11,11 @@ Este README explica o que é necessário para rodar e construir o projeto em des
 - Node.js LTS (recomenda-se Node 18 ou 20). Verifique com `node -v`.
 - Yarn (opcional, mas usado nos scripts do projeto). Instale com `npm install -g yarn` ou use `corepack enable` nas versões modernas do Node.
 - Git (para clonar o repositório).
-- Ferramentas para build de GBA (devkitPro / devkitARM) para a parte de geração de ROMs — veja seção abaixo.
-- (Opcional) mGBA ou outro emulador GBA para testes (uma cópia está disponível em `tools/mGBA` neste repositório).
 
-**Requisitos específicos para Windows**
+**Específicos para Windows**
 
 - PowerShell 5.1 (ou superior) já é o shell padrão — instruções abaixo usam PowerShell.
-- Se for usar `devkitPro` do repositório local (fornecido em `tools/devkitPro`), defina as variáveis de ambiente `DEVKITPRO` e `DEVKITARM` apontando para as pastas corretas ou instale devkitPro normalmente (`devkitPro` install) e adicione `devkitARM` ao `PATH`.
+- O GBA Studio trabalha com o `devkitPro` para fazer o build em conjunto como o `butano`, ele fará alocação de variáveis de ambiente temporários enquanto building, repositório local (fornecido em `tools/devkitPro`), não é necessário configurar as variáveis de ambiente `DEVKITPRO` e `DEVKITARM`. Porém se for fazer um build manual será necessário configurar ou instale devkitPro normalmente (`devkitPro install`) e adicione `devkitARM` ao `PATH`.
 
 Exemplo (PowerShell) para apontar para a cópia do repositório (ajuste o caminho se necessário):
 
@@ -43,8 +41,6 @@ cd X:\gba-studio
 
 ```powershell
 yarn install
-# ou, se preferir npm:
-# npm install
 ```
 
 Observação: o repositório contém subprojetos (por exemplo `src/main`, `src/renderer/frontend`); `yarn install` na raiz trata das dependências monorepo conforme os scripts do projeto.
@@ -61,61 +57,62 @@ Você pode usar as tasks configuradas no VS Code ou os scripts do `package.json`
 
 Exemplos (PowerShell, em terminais separados):
 
-- Iniciar frontend (Vite):
-
-```powershell
-cd src/renderer/frontend
-yarn dev
-```
-
-- Iniciar Electron (main) — dependendo do script disponível no `package.json`:
-
-```powershell
-# a partir da raiz do projeto
-yarn dev:electron
-# ou
-yarn dev
-```
-
-Também há uma task pronta no workspace chamada `Start Vite Frontend` (veja a paleta de tarefas do VS Code ou `Run Task`).
-
 ---
 
 **Build/Empacotamento**
 
-- Build da aplicação (frontend + main):
+- Criação de script necessário para conversão de imagens (scripts-dist):
 
 ```powershell
 # na raiz do projeto
+yarn compile-scripts
+```
+
+- Build específico do frontend (separado):
+
+```powershell
+# na raiz do projeto
+yarn build:renderer
+# ou em frontend
+cd src/renderer/frontend 
 yarn build
 ```
 
 - Build específico do main (separado):
 
 ```powershell
+# na raiz do projeto
 yarn build:main
+# ou em main
+cd src/main
+yarn build
+```
+
+- Iniciar frontend (Vite) + Electron (main):
+
+```powershell
+# na raiz do projeto
+cd X:\gba-studio
+yarn start
+# ou yarn dev
 ```
 
 - Empacotar instalador (electron-builder) — ver scripts do `package.json`:
 
 ```powershell
-yarn dist
-# ou
-yarn build:package
+# na raiz do projeto
+yarn build:win32
+# ou yarn build:win64
 ```
 
 - Build do GBA (gera ROM) — requer `devkitARM` e utilitários `make`:
 
 ```powershell
-# exemplo genérico, pode haver um script específico:
-# navegue até a pasta do projeto GBA e rode make
-cd gba-project
+# exemplo genérico:
+# navegue até a pasta do build gerado pelo butano
+cd my-temp-project
 make
-# ou use o script do repo
-yarn build-gba
 ```
-
-Verifique `package.json` para os scripts exatos usados pelo projeto.
 
 ---
 
@@ -123,8 +120,7 @@ Verifique `package.json` para os scripts exatos usados pelo projeto.
 
 - `src/main/` — código do processo principal do Electron (window management, IPC, handlers)
 - `src/renderer/frontend/` — frontend React + Vite
-- `tools/` — ferramentas e bibliotecas empacotadas (ex.: `devkitPro`, `mGBA`, outras ferramentas auxiliares)
-- `gba-project/` — (quando presente) Makefile e arquivos do projeto GBA que são compilados para gerar ROM
+- `tools/` — ferramentas e bibliotecas empacotadas (ex.: `devkitPro`, `butano`, outras ferramentas auxiliares)
 - `release/`, `icon/` e outros diretórios de empacotamento e assets
 
 ---
@@ -180,11 +176,7 @@ Cada recurso tem um tipo (`ResourceType`) e campos correspondentes:
 
 **Geração de Headers**
 
-Durante o build:
-
-```powershell
-yarn build:main
-```
+Durante o build (ao clicar em `build` ou `play`:
 
 O `ResourceBuilder` (em `src/main/utils/builders/ResourceBuilder.ts`):
 1. Lê todos os arquivos `.gbasres` de `sample_project_example/project/`
@@ -214,23 +206,17 @@ auto bg_ptr = bn::regular_bg_ptr::create(bg_item);
 
 ---
 
-
-
-Se o repositório incluir testes (ver `package.json`), rode:
-
-```powershell
-yarn test
-```
-
-Caso não haja uma suíte de testes, use os passos de desenvolvimento para garantir que o aplicativo abre e se comporta corretamente.
-
----
-
 **Contribuindo**
 
 - Faça um branch por feature/fix. Este repositório usa branches (ex.: `feature/xxx`).
 - Abra PRs com descrição clara e passos para reproduzir.
 - Atualize documentação (`README.md`, `tasks.md`) ao alterar scripts ou adicionar novas dependências.
+
+**Erros ou Bug**
+
+- Favor abrir uma issue em https://github.com/SaciGamer/gba-studio/issues
+- Descreva o problema e como reproduzi-lo, lembre-se que a engine está em contante update, verifique se existe alguma issue com o mesmo problema encontrado.
+- As issues vão sendo fechadas de acordo com as resoluções!
 
 ---
 
@@ -242,5 +228,3 @@ Caso não haja uma suíte de testes, use os passos de desenvolvimento para garan
 - React: https://reactjs.org/
 
 ---
-
-Se algo aqui não bater com sua configuração local (por exemplo, scripts com nomes diferentes em `package.json`), diga-me que eu ajusto o README com os comandos exatos — posso também extrair automaticamente os scripts do `package.json` e atualizar o README se você quiser.
