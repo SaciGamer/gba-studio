@@ -90,7 +90,9 @@ export function responseSaveChanges(dataToSave: any) {
     console.log('..: DATA response to save:', dataToSave);
     stopAllWatchers();
     processingToSaved = saveChanges(dataToSave, pendingSaveOptions || {});
-    startWatch(windows.main, originalProjectDirectory, "backgrounds");
+
+    var foldersToWatch = ["backgrounds", "backgrounds-hd", "tilesets"];
+    foldersToWatch.forEach((folder) => startWatch(windows.main, originalProjectDirectory, folder));
     pendingSaveOptions = null;
 }
 
