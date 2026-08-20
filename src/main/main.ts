@@ -282,6 +282,8 @@ function createProjectWindow(projectFilePath: string): void {
         console.log('..: createProjectWindow Fluxo interrompido. O fechamento da janela foi cancelado.');
         return; // Interrompe o fluxo
       }
+
+      stopAllWatchers();
       windows.main.close();
     }
   });
@@ -512,7 +514,6 @@ async function loadProject(filePath: string) {
     windows.main.close();
   }
   
-  stopAllWatchers();
   // cleanAllTargetDir();
   
   // Criar o menu a partir do template
@@ -972,7 +973,7 @@ ipcMain.handle('get-versions', () => ({
 // Handle get project path - files from Frontend
 ipcMain.handle('save-image', async (event, { filePath, filename, data }) => {
   try {
-    const pathToSave = filePath || directoryPathProject;
+    const pathToSave = filePath || originalProjectDirectory;
     const uploadDir = path.join(pathToSave, 'assets', 'backgrounds'); // Diretório de destino
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir);
@@ -982,6 +983,10 @@ ipcMain.handle('save-image', async (event, { filePath, filename, data }) => {
 
     // Escreve o arquivo no disco
     fs.writeFileSync(destinationPath, data, 'base64');
+
+    // Copia para projeto temporario
+    fs.copyFileSync(destinationPath, path.join(directoryPathProject || originalProjectDirectory || '', 'assets', 'backgrounds', filename));
+
     return { status: 'success', message: destinationPath };
   } catch (error) {
     console.error('Error saving image:', error);
@@ -991,14 +996,7 @@ ipcMain.handle('save-image', async (event, { filePath, filename, data }) => {
 
 // Handle fetch images from assets folder
 ipcMain.handle('fetch-images', async (event, folderName) => {
-  const assetsPath = path.join(directoryPathProject || originalProjectDirectory || '', 'assets', folderName);
-
-  if (!fs.existsSync(assetsPath)) {
-    return { status: 'error', message: '>> Directory not found.' };
-  }
-
-  // const targetUserDir = createUserPathTargetDir(folderName);
-  return startWatch(windows.main, assetsPath/*, targetUserDir*/);
+  return startWatch(windows.main, originalProjectDirectory, folderName);
 });
 
 // Initialize IPC handlers for preferences and other functionalities

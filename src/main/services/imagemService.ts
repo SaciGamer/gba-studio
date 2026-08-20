@@ -121,7 +121,13 @@ const watchImages = (win: any, monitoredDir: string, targetUserDir: string | nul
 };
 
 // Iniciar o monitoramento
-export function startWatch(win: BrowserWindow | null, projectPath: string/*, targetUserDir: string*/) {
+export function startWatch(win: BrowserWindow | null, originalProjectDirectory: string | null, monitoringFolderPath: string) {
+  const projectPath = path.join(originalProjectDirectory || '', 'assets', monitoringFolderPath);
+
+  if (!fs.existsSync(projectPath)) {
+    return { status: 'error', message: '>> Directory not found.' };
+  }
+
   if (!win) {
     return { status: 'error', message: '>> Nenhuma janela ativa encontrada' };
   }
