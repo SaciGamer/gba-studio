@@ -133,7 +133,7 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
                         return deleteSettings(projectPath, filenameFormatted!, subFile);
                     }
 
-                    saveScene(projectPath, filenameFormatted, subFile);
+                    saveWithFolders(projectPath, filenameFormatted, subFile);
                     console.log(`..: Configurações scene ${subFile._index} saved:`, subFile);
                 });
                 return;
@@ -290,21 +290,22 @@ function saveSettingsToStore<T>(basePath: any, folder: string, filename: string,
        
 // }
 
-function saveScene(basePath: string, name: string, newSettings: any) {
+function saveWithFolders(basePath: string, name: string, newSettings: any) {
   const folderBase = path.join(basePath, name.replace(/\s+/g, ""));
+  const fileName = newSettings._resourceType + ".gbasres";
   let targetFolder = folderBase;
   let counter = 1;
 
   // verifica se já existe pasta com esse nome
   while (fs.existsSync(targetFolder)) {
-    const sceneFile = path.join(targetFolder, "scene.gbasres");
+    const filePath = path.join(targetFolder, fileName);
 
-    if (fs.existsSync(sceneFile)) {
-      const oldData = JSON.parse(fs.readFileSync(sceneFile, "utf-8"));
+    if (fs.existsSync(filePath)) {
+      const oldData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
       if (oldData.id === newSettings.id) {
         // mesmo id → renomeia e sobrescreve
-        fs.renameSync(sceneFile, sceneFile + ".bak");
-        fs.writeFileSync(sceneFile, JSON.stringify(newSettings, null, 2));
+        fs.renameSync(filePath, filePath + ".bak");
+        fs.writeFileSync(filePath, JSON.stringify(newSettings, null, 2));
         return;
       } else {
         // id diferente → tenta próxima pasta
@@ -318,21 +319,21 @@ function saveScene(basePath: string, name: string, newSettings: any) {
 
   // cria nova pasta
   fs.mkdirSync(targetFolder, { recursive: true });
-  const sceneFile = path.join(targetFolder, "scene.gbasres");
-  fs.writeFileSync(sceneFile, JSON.stringify(newSettings, null, 2));
+  const filePath = path.join(targetFolder, fileName);
+  fs.writeFileSync(filePath, JSON.stringify(newSettings, null, 2));
 
   // remove duplicados em outras pastas
-  cleanupDuplicateScenes(basePath, newSettings.id, targetFolder);
+  cleanupDuplicateScenes(basePath, newSettings.id, targetFolder, fileName);
 }
 
-function cleanupDuplicateScenes(basePath: string, id: string, keepFolder: string) {
+function cleanupDuplicateScenes(basePath: string, id: string, keepFolder: string, fileName: string) {
   const folders = fs.readdirSync(basePath);
   for (const folder of folders) {
-    const sceneFile = path.join(basePath, folder, "scene.gbasres");
-    if (fs.existsSync(sceneFile)) {
-      const data = JSON.parse(fs.readFileSync(sceneFile, "utf-8"));
+    const filePath = path.join(basePath, folder, fileName);
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
       if (data.id === id && path.join(basePath, folder) !== keepFolder) {
-        fs.unlinkSync(sceneFile);
+        fs.unlinkSync(filePath);
         console.log("..: removido duplicado em", folder);
       }
     }
@@ -342,29 +343,30 @@ function cleanupDuplicateScenes(basePath: string, id: string, keepFolder: string
 function deleteSettings(basePath: string, folder: string, newSettings: any): void {
   // pasta alvo (ex: basePath/MyScene)
   const targetFolder = path.join(basePath, folder.replace(/\s+/g, ""));
-  const sceneFile = path.join(targetFolder, "scene.gbasres");
+  const fileName = newSettings._resourceType + ".gbasres";
+  const filePath = path.join(targetFolder, fileName);
 
-  console.log("..: caminho para deletar a configuração:", sceneFile);
+  console.log("..: caminho para deletar a configuração:", filePath);
 
   try {
-    if (fs.existsSync(sceneFile)) {
+    if (fs.existsSync(filePath)) {
       // lê o arquivo para pegar o id
-      const oldData = JSON.parse(fs.readFileSync(sceneFile, "utf-8"));
+      const oldData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
       const oldId = oldData.id;
 
       // remove o arquivo principal
-      fs.unlinkSync(sceneFile);
-      console.log(`..: Arquivo deletado: ${sceneFile}`);
+      fs.unlinkSync(filePath);
+      console.log(`..: Arquivo deletado: ${filePath}`);
 
       // remove backup se existir
-      const bakFile = sceneFile + ".bak";
+      const bakFile = filePath + ".bak";
       if (fs.existsSync(bakFile)) {
         fs.unlinkSync(bakFile);
         console.log(`..: Arquivo .bak deletado: ${bakFile}`);
       }
 
       // opcional: remover duplicados em outras pastas com o mesmo id
-      cleanupDuplicateScenes(basePath, oldId, targetFolder);
+      cleanupDuplicateScenes(basePath, oldId, targetFolder, fileName);
 
       // se a pasta ficou vazia, pode remover também
       const remaining = fs.readdirSync(targetFolder);
