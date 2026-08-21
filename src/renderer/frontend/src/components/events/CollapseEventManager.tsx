@@ -80,10 +80,10 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
       ...prev,
       script: prev.script?.map(s => ({
         ...s,
-        args: [{ 
+        args: { 
           ...s.args, 
           __collapse: Array.isArray(keys) ? keys.includes(s.id) : keys === s.id 
-        }]
+        }
       })),
     }));
 

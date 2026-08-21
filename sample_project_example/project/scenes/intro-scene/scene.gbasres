@@ -1,0 +1,139 @@
+{
+  "id": "738ec3e3-374f-44a8-8bda-8a027cce1d08",
+  "_resourceType": "scene",
+  "_index": 1,
+  "_deleted": false,
+  "name": "Intro-Scene",
+  "backgroundId": "52b92763-062a-4233-84f5-74ac7496c05d",
+  "background": "local://E:/GameBoyProjetos/testImageViewer/assets/backgrounds/castle.png",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": null,
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 1,
+      "backgroundId": null,
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 2,
+      "backgroundId": "0e5bf5a3-ab18-40e6-aed4-d727c05749c0",
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 3,
+      "backgroundId": null,
+      "name": "",
+      "path": ""
+    }
+  ],
+  "x": 106,
+  "y": 82,
+  "width": 256,
+  "height": 256,
+  "sceneType": "Top Down",
+  "script": [
+    {
+      "id": "d9611427-5b47-4170-af66-27212e0495d3",
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "0": {
+          "0": {
+            "sceneId": "fc5bbc70-e5f3-4da5-8c9d-c370c444c1f1",
+            "x": {
+              "type": "number",
+              "value": 0
+            },
+            "y": {
+              "type": "number",
+              "value": 0
+            },
+            "direction": "right",
+            "fadeSpeed": 2,
+            "__collapse": true
+          },
+          "__collapse": false
+        },
+        "__comment": true,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "8e0a079d-098c-4d70-8481-ae3728ca7108",
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "fc5bbc70-e5f3-4da5-8c9d-c370c444c1f1",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "right",
+        "fadeSpeed": 2,
+        "__comment": true,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "a6330c11-5ce4-4850-9365-9bca77170df3",
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "fc5bbc70-e5f3-4da5-8c9d-c370c444c1f1",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "right",
+        "fadeSpeed": 2,
+        "__comment": true,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "0895ab53-eb05-4b19-ad0d-044dc57eeae2",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 2,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "c559ec0f-c025-459a-97d4-a69f02c3d734",
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "fc5bbc70-e5f3-4da5-8c9d-c370c444c1f1",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "right",
+        "fadeSpeed": 2,
+        "__collapse": true
+      }
+    }
+  ],
+  "selectedTilesetId": "tileset1",
+  "imageType": "palette_bitmap_bg",
+  "selectedTiles": [
+    0
+  ],
+  "playerHit1Script": [],
+  "playerHit2Script": [],
+  "playerHit3Script": []
+}

@@ -89,10 +89,22 @@ const syncImagesIncrementally = (monitoredDir: string, targetUserDir: string | n
 let watchers: any[] = [];
 
 // Para desligar todos os watchers
-export function stopAllWatchers() {
-  watchers.forEach((watcher) => watcher.close());
+export async function stopAllWatchers() {
+  watchers.forEach((watcher) => {
+    try {
+      watcher.close()
+    } catch (err) {
+      console.error("Erro ao fechar watcher:", err);
+    }
+  });
   console.log('..: Todos os watchers foram desligados.');
 };
+
+export async function clearWatchers() {
+  await stopAllWatchers();
+  watchers = [];
+  console.log('..: Watchers limpos.');
+}
 
 // Monitorar alterações na pasta
 const watchImages = (win: any, monitoredDir: string, targetUserDir: string | null) => {

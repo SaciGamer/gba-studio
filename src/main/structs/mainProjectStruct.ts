@@ -2,7 +2,7 @@ import { packageJson } from '@/main';
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import { defaultMainSettings, defaultProjectSettings } from './defaultValuesInterface';
+import { defaultMainSettings, defaultProjectSettings, defaultUserSettings } from './defaultValuesInterface';
 import { createGenericSettingsStruct } from './projectSettingsStruct';
 
 // Controllers
@@ -62,8 +62,8 @@ export function createProjectStruct(basePath: string, template?: string): void {
   });
 
   // Cria apenas com template se selecionado
-  if (template) {
-    createProjectByTemplate(basePath, template);
+  if (template != 'blank') {
+    createProjectByTemplate(basePath, template!);
     console.log('..: createProjectStruct copia de template - END :..');
     return;
   } 
@@ -71,7 +71,7 @@ export function createProjectStruct(basePath: string, template?: string): void {
   // Criação de arquivo de settings
   const settingsPath = path.join(basePath, folders[2]);
   createGenericSettingsStruct(settingsPath, 'settings', defaultMainSettings);
-  // createGenericSettingsStruct(settingsPath, 'user_settings', defaultUserSettings);
+  createGenericSettingsStruct(settingsPath, 'user_settings', defaultUserSettings);
   // createGenericSettingsStruct(settingsPath, 'variables', defaultVariablesSettings);
 
   console.log('..: Criando estrutura de pastas - END :..');

@@ -1,8 +1,8 @@
 {
   "_resourceType": "project",
-  "name": "sample_project",
-  "author": "",
+  "name": "SampleProject",
+  "author": "SampleProject",
   "notes": "",
-  "_version": "0.2.0",
+  "_version": "0.4.1",
   "_release": "1"
 }

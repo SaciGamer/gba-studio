@@ -15,7 +15,7 @@ import menuTemplate from './menuTemplate';
 import compileGBA from './utils/gbaCompiler/compile-gba';
 import transcodeProject from './utils/projectTranscoder/transcode-project';
 import initializeIpcHandlers from './controllers/HandlerController';
-import { startWatch, stopAllWatchers } from './services/imagemService';
+import { clearWatchers, startWatch } from './services/imagemService';
 import { SettingsController } from './controllers/SettingsController';
 import { setCurrentActiveSandboxDirectory } from './states/tempProjectState';
 
@@ -283,7 +283,7 @@ function createProjectWindow(projectFilePath: string): void {
         return; // Interrompe o fluxo
       }
 
-      stopAllWatchers();
+      await clearWatchers();
       windows.main.close();
     }
   });
@@ -562,9 +562,12 @@ app.on('activate', () => {
   }
 });
 
-function closeAllWindowsExcept(exceptWindow: BrowserWindow | null) {
+async function closeAllWindowsExcept(exceptWindow: BrowserWindow | null) {
   BrowserWindow.getAllWindows().forEach((win) => {
     if (win !== exceptWindow) {
+      if (win == windows.main) {
+        clearWatchers();
+      }
       win.close();
     }
   });
@@ -579,7 +582,7 @@ async function changeLauncher(tab: string, isSplash: boolean) {
       return; // Interrompe o fluxo
     }
 
-    closeAllWindowsExcept(null);
+    await closeAllWindowsExcept(null);
     createLauncherWindow(tab, isSplash);
   }
 }
