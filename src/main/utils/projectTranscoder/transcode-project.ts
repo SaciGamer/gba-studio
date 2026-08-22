@@ -204,42 +204,6 @@ async function extractProjectName(projectDir: string, defaultName: string): Prom
 }
 
 /**
- * Generate main.c entry point
- * @param sourceDir - The source directory where main.c will be created
- * @param projectName - The name of the project to include in the header comment
- * @returns Promise<void>
- */
-async function generateMainC(sourceDir: string, projectName: string): Promise<void> {
-  const mainC = `#include <gba_systemcalls.h>
-
-/**
- * Auto-generated main entry point
- * Project: ${projectName}
- * 
- * This is the entry point for the GBA application.
- * Modify this file to implement your game logic.
- */
-
-int main(void) {
-    // Initialize system
-    // TODO: Add initialization code here
-
-    // Main loop
-    while (1) {
-        VBlankIntrWait();
-        // TODO: Add game logic here
-    }
-
-    return 0;
-}
-`;
-
-  const mainPath = path.join(sourceDir, 'main.c');
-  fs.writeFileSync(mainPath, mainC, 'utf8');
-  console.log('..: Generated main.c at:', mainPath);
-}
-
-/**
  * Overload for backward compatibility - accepts projectDir string instead of options
  * @param projectDir - The original project directory
  * @returns Result indicating success/failure and paths to generated files

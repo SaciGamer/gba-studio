@@ -7,6 +7,7 @@ import { createGenericSettingsStruct } from '@/structs/projectSettingsStruct';
 import { getPreferences } from '@/handlers/preferenceHandlers';
 import { windows, directoryPathProject, originalProjectDirectory } from '@/main';
 import { setCurrentActiveSandboxDirectory } from '@/states/tempProjectState';
+import { startWatch, stopAllWatchers } from './imagemService';
 
 //Controllers
 const settingsController = SettingsController.getInstance();
@@ -87,7 +88,11 @@ export function waitForSaveComplete(timeoutMs = 10000): Promise<void> {
 // Response FE para salvar nos arquivos
 export function responseSaveChanges(dataToSave: any) {
     console.log('..: DATA response to save:', dataToSave);
+    stopAllWatchers();
     processingToSaved = saveChanges(dataToSave, pendingSaveOptions || {});
+
+    var foldersToWatch = ["backgrounds", "backgrounds-hd", "tilesets"];
+    foldersToWatch.forEach((folder) => startWatch(windows.main, originalProjectDirectory, folder));
     pendingSaveOptions = null;
 }
 
@@ -121,15 +126,15 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
         filesToSave.forEach((fileData: any) => {
             if (fileData && Array.isArray(fileData)) {
                 fileData.forEach((subFile: any) => {
-                    const projectPath = path.join(activeProjectDirectory, 'project');
-                    const filenameFormatted = subFile.name.toLowerCase().replace(/ /g, '_');
+                    const projectPath = path.join(activeProjectDirectory, 'project', subFile._resourceType + 's');
+                    const filenameFormatted = subFile.name.toLowerCase().replace(/ /g, '');
 
                     if (subFile._deleted === true) {
-                        return deleteSettings(projectPath, subFile._resourceType + 's', filenameFormatted!, subFile);
+                        return deleteSettings(projectPath, filenameFormatted!, subFile);
                     }
 
-                    const scenesSaved = saveSettingsToStore(projectPath, subFile._resourceType + 's', filenameFormatted!, subFile);
-                    console.log(`..: Configurações scene ${subFile._index} saved:`, scenesSaved);
+                    saveWithFolders(projectPath, filenameFormatted, subFile);
+                    console.log(`..: Configurações scene ${subFile._index} saved:`, subFile);
                 });
                 return;
             }
@@ -265,22 +270,113 @@ function saveSettingsToStore<T>(basePath: any, folder: string, filename: string,
     }
 }
 
-function deleteSettings<T>(basePath: any, folder: string, filename: string, newSettings: Partial<T>): void {
-    const pathFileToDelete = path.join(basePath, folder ? path.join(`${folder}`, `${filename}.gbasres`) : filename);
-    console.log('..: caminho para deletar a configuração: ', pathFileToDelete);
+// function deleteSettings<T>(basePath: any, folder: string, filename: string, newSettings: Partial<T>): void {
+//     const pathFileToDelete = path.join(basePath, folder ? path.join(`${folder}`, `${filename}.gbasres`) : filename);
+//     console.log('..: caminho para deletar a configuração: ', pathFileToDelete);
     
-    try {
-        if (fs.existsSync(pathFileToDelete)) {
-            fs.unlinkSync(pathFileToDelete);
-            console.log(`..: Arquivo deletado: ${pathFileToDelete}`);
-            const pathFileToBak = `${pathFileToDelete}.bak`;
-            if (fs.existsSync(pathFileToBak)) {
-                fs.unlinkSync(pathFileToBak);
-                console.log(`..: Arquivo .bak deletado: ${pathFileToBak}`);
-            }
-        }
-    } catch (error) {
-        console.error('..: Erro ao deletar configurações:', error);
-    }
+//     try {
+//         if (fs.existsSync(pathFileToDelete)) {
+//             fs.unlinkSync(pathFileToDelete);
+//             console.log(`..: Arquivo deletado: ${pathFileToDelete}`);
+//             const pathFileToBak = `${pathFileToDelete}.bak`;
+//             if (fs.existsSync(pathFileToBak)) {
+//                 fs.unlinkSync(pathFileToBak);
+//                 console.log(`..: Arquivo .bak deletado: ${pathFileToBak}`);
+//             }
+//         }
+//     } catch (error) {
+//         console.error('..: Erro ao deletar configurações:', error);
+//     }
        
+// }
+
+function saveWithFolders(basePath: string, name: string, newSettings: any) {
+  const folderBase = path.join(basePath, name.replace(/\s+/g, ""));
+  const fileName = newSettings._resourceType + ".gbasres";
+  let targetFolder = folderBase;
+  let counter = 1;
+
+  // verifica se já existe pasta com esse nome
+  while (fs.existsSync(targetFolder)) {
+    const filePath = path.join(targetFolder, fileName);
+
+    if (fs.existsSync(filePath)) {
+      const oldData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+      if (oldData.id === newSettings.id) {
+        // mesmo id → renomeia e sobrescreve
+        fs.renameSync(filePath, filePath + ".bak");
+        fs.writeFileSync(filePath, JSON.stringify(newSettings, null, 2));
+        return;
+      } else {
+        // id diferente → tenta próxima pasta
+        targetFolder = folderBase + "_" + counter++;
+      }
+    } else {
+      // pasta existe mas está vazia → reaproveita
+      break;
+    }
+  }
+
+  // cria nova pasta
+  fs.mkdirSync(targetFolder, { recursive: true });
+  const filePath = path.join(targetFolder, fileName);
+  fs.writeFileSync(filePath, JSON.stringify(newSettings, null, 2));
+
+  // remove duplicados em outras pastas
+  cleanupDuplicateScenes(basePath, newSettings.id, targetFolder, fileName);
 }
+
+function cleanupDuplicateScenes(basePath: string, id: string, keepFolder: string, fileName: string) {
+  const folders = fs.readdirSync(basePath);
+  for (const folder of folders) {
+    const filePath = path.join(basePath, folder, fileName);
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+      if (data.id === id && path.join(basePath, folder) !== keepFolder) {
+        fs.unlinkSync(filePath);
+        console.log("..: removido duplicado em", folder);
+      }
+    }
+  }
+}
+
+function deleteSettings(basePath: string, folder: string, newSettings: any): void {
+  // pasta alvo (ex: basePath/MyScene)
+  const targetFolder = path.join(basePath, folder.replace(/\s+/g, ""));
+  const fileName = newSettings._resourceType + ".gbasres";
+  const filePath = path.join(targetFolder, fileName);
+
+  console.log("..: caminho para deletar a configuração:", filePath);
+
+  try {
+    if (fs.existsSync(filePath)) {
+      // lê o arquivo para pegar o id
+      const oldData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+      const oldId = oldData.id;
+
+      // remove o arquivo principal
+      fs.unlinkSync(filePath);
+      console.log(`..: Arquivo deletado: ${filePath}`);
+
+      // remove backup se existir
+      const bakFile = filePath + ".bak";
+      if (fs.existsSync(bakFile)) {
+        fs.unlinkSync(bakFile);
+        console.log(`..: Arquivo .bak deletado: ${bakFile}`);
+      }
+
+      // opcional: remover duplicados em outras pastas com o mesmo id
+      cleanupDuplicateScenes(basePath, oldId, targetFolder, fileName);
+
+      // se a pasta ficou vazia, pode remover também
+      const remaining = fs.readdirSync(targetFolder);
+      if (remaining.length === 0) {
+        fs.rmdirSync(targetFolder);
+        console.log(`..: Pasta removida: ${targetFolder}`);
+      }
+    }
+  } catch (error) {
+    console.error("..: Erro ao deletar configurações:", error);
+  }
+}
+

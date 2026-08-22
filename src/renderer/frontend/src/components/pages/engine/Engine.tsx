@@ -50,20 +50,6 @@ const Engine: React.FC = () => {
     userSettings, setUserSettings, userSettingsRef, ignoredFieldsUserSettings
   } = useAppContexts();
 
-  const initializeUserSettingUtils = useCallback(() => {
-    const defaultUserSettings: IUserSettings = {
-      _resourceType: 'user_settings',
-      _saved: false, 
-      _deleted: false,
-      worldScrollX: 0,
-      worldScrollY: 0,
-      zoom: 100,
-      favoriteEvents: [],
-    };
-
-    setUserSettings(defaultUserSettings);
-  }, []);
-
   // Update settings utils initialization
   const initializeSettingUtils = useCallback((projectFilePath: string) => {
     const defaultSettingUtils: ISettingUtils = {
@@ -190,7 +176,6 @@ const Engine: React.FC = () => {
         // Initialize settings utils first
         console.log("..: Engine - File Path:", projectFilePath);
         initializeSettingUtils(projectFilePath);
-        initializeUserSettingUtils();
         console.log('..: useEffect settingUtils default ', settingUtils);
 
         const file = await window.electronAPI.loadSettings(projectFilePath);

@@ -39,7 +39,6 @@ export class TemplateBuilder {
     const dirs = [
       this.buildDir,
       path.join(this.buildDir, 'src'),
-      path.join(this.buildDir, 'maps'),
       path.join(this.buildDir, 'include'),
       path.join(this.buildDir, 'graphics'),
       path.join(this.buildDir, 'dmg_audio'),

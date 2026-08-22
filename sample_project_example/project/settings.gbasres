@@ -1,10 +1,11 @@
 {
   "_resourceType": "settings",
-  "startSceneId": "810c10e7-5f61-48a2-a4e2-a62a9ecd07fd",
-  "startX": 9,
-  "startY": 9,
+  "startSceneId": "738ec3e3-374f-44a8-8bda-8a027cce1d08",
+  "startX": 0,
+  "startY": 0,
   "startMoveSpeed": 1,
   "startAnimSpeed": 4,
   "startDirection": "right",
-  "colorMode": false
+  "colorMode": false,
+  "demoFilter": "crt-easymode.glslp"
 }

@@ -87,11 +87,11 @@ export class ResourceBuilder {
       newFilename = `${headerFilename}${extension}`;
 
       if (jsonObj?.name !== undefined) {
-        jsonObj.name = jsonObj?.name?.toLowerCase().replace(/ /g, '_');
+        jsonObj.name = jsonObj?.name?.toLowerCase().replace(/ /g, '_').replaceAll('-', '_');
       }
 
       if(jsonObj?.filename !== undefined) {
-        jsonObj.filename = jsonObj?.filename?.toLowerCase().replace(/ /g, '_');
+        jsonObj.filename = jsonObj?.filename?.toLowerCase().replace(/ /g, '_').replaceAll('-', '_');
       }
     }
 

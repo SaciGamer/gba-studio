@@ -321,7 +321,8 @@ const Scenes* GraphicsManager::loadNextSceneById(const bn::string<64>& scene_id)
     const Scenes* scene = get_scene_by_id(scene_id);
     if(!scene)
     {
-        BN_LOG("loadNextSceneById - Scene não encontrada com ID: ", scene_id);
+        BN_LOG("loadNextSceneById - Scene: ", scene->name);
+        BN_LOG("loadNextSceneById - Scene não encontrada com ID: ", scene->id);
         return nullptr;
     }
     BN_LOG("loadNextSceneById - Scene encontrada: ", scene->name);
@@ -343,7 +344,7 @@ const Scenes* GraphicsManager::loadNextSceneById(const bn::string<64>& scene_id)
     }
 
     // 6. Desenha tiles
-    GraphicsManager::initialize_tilemap(scene);
+    //GraphicsManager::initialize_tilemap(scene);
 
     return scene;
 }

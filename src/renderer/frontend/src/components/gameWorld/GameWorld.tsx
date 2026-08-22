@@ -257,8 +257,8 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   useEffect(() => {
     if (scenes.length > 0) {
       setWorldSize(calculateWorldSize(scenes));
-      setLoading(false);
     }
+    setLoading(false);
   }, [scenes]);
 
   // Movendo tela de trabalho

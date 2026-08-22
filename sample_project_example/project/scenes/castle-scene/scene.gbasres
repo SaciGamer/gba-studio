@@ -1,0 +1,101 @@
+{
+  "id": "fc5bbc70-e5f3-4da5-8c9d-c370c444c1f1",
+  "_resourceType": "scene",
+  "_index": 0,
+  "_deleted": false,
+  "name": "Castle-Scene",
+  "backgroundId": "b582937e-6223-4ee5-aba6-e5c810d4d32f",
+  "background": "local://E:/GameBoyProjetos/testImageViewer/assets/backgrounds/castle.png",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": "cbadfea7-bdcf-41c5-8d3b-113471be8897",
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 1,
+      "backgroundId": "cbadfea7-bdcf-41c5-8d3b-113471be8897",
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 2,
+      "backgroundId": "cbadfea7-bdcf-41c5-8d3b-113471be8897",
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 3,
+      "backgroundId": "cbadfea7-bdcf-41c5-8d3b-113471be8897",
+      "name": "",
+      "path": ""
+    }
+  ],
+  "x": 394,
+  "y": 82,
+  "width": 256,
+  "height": 256,
+  "sceneType": "Top Down",
+  "script": [
+    {
+      "id": "0718cc26-5063-4356-8c63-9d70c0513d55",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 2,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "5179d937-0c0e-4572-9af6-c67877353ee0",
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "738ec3e3-374f-44a8-8bda-8a027cce1d08",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "right",
+        "fadeSpeed": 2,
+        "__collapse": false,
+        "__comment": true
+      }
+    },
+    {
+      "id": "b6999b07-e645-4188-8d90-a5f8b95ca522",
+      "command": "EVENT_WAIT",
+      "args": {
+        "time": 5,
+        "frames": 30,
+        "units": "time",
+        "__collapse": true
+      }
+    },
+    {
+      "id": "55b885dc-64a7-4525-b363-9f2e2fedd401",
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "738ec3e3-374f-44a8-8bda-8a027cce1d08",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "right",
+        "fadeSpeed": 1,
+        "__collapse": true
+      }
+    }
+  ],
+  "playerHit1Script": [],
+  "playerHit2Script": [],
+  "playerHit3Script": [],
+  "showCamera": true
+}
