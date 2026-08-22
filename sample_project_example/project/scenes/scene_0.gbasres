@@ -1,0 +1,12 @@
+{
+  "id": "810c10e7-5f61-48a2-a4e2-a62a9ecd07fd",
+  "_resourceType": "scene",
+  "_index": 0,
+  "_deleted": false,
+  "name": "SCENE 0",
+  "background": "/src/img/placeholder.png",
+  "x": 106,
+  "y": 82,
+  "width": 240,
+  "height": 160
+}
