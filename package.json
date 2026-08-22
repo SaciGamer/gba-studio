@@ -3,7 +3,7 @@
   "author": "GBA Studio",
   "productName": "GBA Studio",
   "description": "Project for creating and compiling GBA",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "license": "GPL-2.0 license",
   "private": true,
   "type": "module",
