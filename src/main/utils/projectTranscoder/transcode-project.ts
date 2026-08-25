@@ -229,33 +229,8 @@ export async function transcodeProjectLegacy(projectDir: string): Promise<any> {
  */
 function resolveToolExecutable(toolName: string): string {
   const executableName = process.platform === 'win32' ? `${toolName}.exe` : toolName;
-  const candidates = [
-    process.env.DEVKITPRO ? path.join(process.env.DEVKITPRO, 'tools', 'bin', executableName) : '',
-    process.env.DEVKITARM ? path.join(path.dirname(process.env.DEVKITARM), '..', 'tools', 'bin', executableName) : '',
-    process.env.PATH ? process.env.PATH.split(path.delimiter)
-      .map((dir) => path.join(dir, executableName))
-      .filter(Boolean) : [],
-  ].flat();
-
-  for (const candidate of candidates) {
-    if (candidate && fs.existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  const whereResult = spawnSync(process.platform === 'win32' ? 'where' : 'which', [toolName], {
-    encoding: 'utf8',
-    shell: false,
-  });
-
-  if (whereResult.status === 0 && whereResult.stdout) {
-    const firstMatch = whereResult.stdout.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
-    if (firstMatch) {
-      return firstMatch;
-    }
-  }
-
-  return toolName;
+  checkDevkitPro();
+  return path.join(process.env.DEVKITPRO!, 'tools', 'bin', executableName);
 }
 
 /**
@@ -385,5 +360,18 @@ function prepareBuildDir(projectDir: string, outputDir: string) {
   }, null, 2));
 }
 
+function checkDevkitPro() {
+  const devkitPro = process.env.DEVKITPRO;
+  const devkitArm = process.env.DEVKITARM;
+
+  if (!devkitPro || !devkitArm) {
+    throw new Error("DevkitPro não encontrado. Instale e configure DEVKITPRO/DEVKITARM.");
+  }
+
+  const gccPath = path.join(devkitArm, 'bin', process.platform === 'win32' ? 'arm-none-eabi-gcc.exe' : 'arm-none-eabi-gcc');
+  if (!fs.existsSync(gccPath)) {
+    throw new Error("arm-none-eabi-gcc não encontrado. Verifique a instalação do DevkitPro.");
+  }
+}
 
 export default transcodeProject;

@@ -57,8 +57,10 @@ bool runWait(const void* args) {
             // decrementa tempo
             wait.countFixed += bn::fixed(1) / 60; // supondo 60 fps
             // BN_LOG("runWait Secounds: ", wait.countFixed);
+            BN_LOG("runWait Time: ", wait.countFixed);
 
             if(wait.countFixed >= wait.time) {
+                wait.countFixed = 0;
                 wait.active = false;
                 return true;
             }
