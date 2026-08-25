@@ -48,12 +48,6 @@ const BottomPanel: React.FC = () => {
       console.log(`[BottomPanel-${listenerId.current}] Listeners já anexados, pulando`);
       return;
     }
-    
-    const api = (window as any).electronAPI;
-    if (!api || !api.on) {
-      console.log(`[BottomPanel-${listenerId.current}] API não disponível`);
-      return;
-    }
 
     console.log(`[BottomPanel-${listenerId.current}] Anexando listeners`);
 
@@ -117,20 +111,20 @@ const BottomPanel: React.FC = () => {
       }
     };
 
-    api.on('compile-progress', progressHandler);
-    api.on('compile-error', errorHandler);
+    window.electronAPI.on('compile-progress', progressHandler);
+    window.electronAPI.on('compile-error', errorHandler);
     listenersAttached.current = true;
 
     return () => {
       console.log(`[BottomPanel-${listenerId.current}] Removendo listeners`);
       try { 
-        api.removeListener('compile-progress', progressHandler); 
+        window.electronAPI.removeListener('compile-progress', progressHandler); 
         listenersAttached.current = false;
       } catch (e) { 
         console.error(`[BottomPanel-${listenerId.current}] Error removing progress listener:`, e);
       }
       try { 
-        api.removeListener('compile-error', errorHandler); 
+        window.electronAPI.removeListener('compile-error', errorHandler); 
       } catch (e) { 
         console.error(`[BottomPanel-${listenerId.current}] Error removing error listener:`, e);
       }

@@ -1,4 +1,3 @@
-import { app, BrowserWindow } from 'electron';
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -6,7 +5,7 @@ import fs from 'fs';
 import os from 'os';
 import isDev from 'electron-is-dev';
 import { CompileOptions, CompileResult } from '../types/BuildTypes';
-import { getPreferences } from '../../handlers/preferenceHandlers';
+import { windows } from '@/main';
 
 // Obter o caminho do diretório atual
 const __filename = fileURLToPath(import.meta.url);
@@ -50,17 +49,7 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
 
     // Helper to broadcast progress/errors to all renderer windows
     const broadcast = (channel: string, payload: any) => {
-      try {
-        BrowserWindow.getAllWindows().forEach((win) => {
-          try {
-            win.webContents.send(channel, payload);
-          } catch (e) {
-            /* ignore */
-          }
-        });
-      } catch (e) {
-        /* ignore */
-      }
+      windows.main?.webContents.send(channel, payload);
     };
 
     // Notify renderer that compilation started
@@ -71,10 +60,7 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
 
     try {
       // Setup environment
-      const env = setupEnvironmentWithDevkitPro();
-
-      // Normalize for make/msys
-      const envForMake = normalizeEnvForMake(env);
+      const envForMake = setupEnvironmentWithDevkitPro();
 
       // Build make arguments
       const makeArgs = buildMakeArgs(compileOptions);
@@ -84,6 +70,7 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
         DEVKITPRO: envForMake.DEVKITPRO,
         DEVKITARM: envForMake.DEVKITARM,
         LIBGBA: envForMake.LIBGBA,
+        BUTANO: envForMake.BUTANO!,
       });
 
       let fullStdout = '';
@@ -161,46 +148,25 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
  * @returns - Record of environment variables 
  */
 function setupEnvironmentWithDevkitPro(): Record<string, string> {
-  const repoRoot = path.resolve(__dirname, '..', '..', '..', '..');
-  const localDevkitProPath = isDev
-    ? path.resolve(repoRoot, 'tools', 'devkitPro')
-    : path.join(process.resourcesPath, "bin", 'tools', 'devkitPro');
+  const devkitProPath = process.env.DEVKITPRO!;
 
-  const devkitArm = path.join(localDevkitProPath, 'devkitARM');
-  console.log('..: Using DEVKITARM at', devkitArm);
-
-  if (!devkitArm || devkitArm.trim() === '') {
-    throw new Error(
-      'DEVKITARM not found. Please configure DEVKITARM path in Preferences, ' +
-        'import a devkit into the tools folder or set the DEVKITARM environment variable.'
-    );
-  }
-
-  // Setup DEVKITPRO paths
-  const libgbaPath = path.join(localDevkitProPath, 'libgba');
-
-  return {
+  return {        
     ...process.env,
-    DEVKITARM: devkitArm,
-    DEVKITPRO: fs.existsSync(localDevkitProPath) ? localDevkitProPath : process.env.DEVKITPRO || '',
-    LIBGBA: libgbaPath,
+    PATH: [
+      path.join(devkitProPath, 'msys2', 'usr', 'bin'),
+      path.join(devkitProPath, 'tools', 'bin'),
+      path.join(devkitProPath, 'devkitARM', 'bin'),
+      process.env.PATH
+    ].join(path.delimiter),
+    BUTANO: path.resolve(
+      isDev 
+      ? path.join(__dirname, '..', '..', '..', '..', 'tools', 'butano')
+      : path.join(process.resourcesPath, 'bin', 'tools', 'butano')
+    ),
+    DEVKITPRO: devkitProPath,
+    DEVKITARM: path.join(devkitProPath, 'devkitARM'),
+    LIBGBA: path.join(devkitProPath, 'libgba'),
   } as Record<string, string>;
-}
-
-/**
- * Normalize environment variables for make/msys (convert backslashes to forward slashes)
- * @param env - Record of environment variables
- * @returns - Normalized environment variables
- */
-function normalizeEnvForMake(env: Record<string, string>): Record<string, string> {
-  const normalize = (p: string | undefined) => (p ? p.replace(/\\/g, '/') : '');
-
-  return {
-    ...env,
-    DEVKITARM: normalize(env.DEVKITARM) || env.DEVKITARM,
-    DEVKITPRO: normalize(env.DEVKITPRO) || env.DEVKITPRO,
-    LIBGBA: normalize(env.LIBGBA) || env.LIBGBA,
-  };
 }
 
 /**

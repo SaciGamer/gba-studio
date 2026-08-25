@@ -20,6 +20,7 @@ import { SettingsController } from './controllers/SettingsController';
 import { setCurrentActiveSandboxDirectory } from './states/tempProjectState';
 
 import express from 'express';
+import { CompileResult } from './utils/types/BuildTypes';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -386,17 +387,13 @@ function launchEmulatorWindow(romPath: string) {
 
   windows.emulator?.once('ready-to-show', () => {
     windows.emulator?.show();
-    // notifica outras janelas
-    BrowserWindow.getAllWindows().forEach(win => {
-      try { win.webContents.send('emulator-started'); } catch {}
-    });
+    // notifica main to start emulator
+    windows.main?.webContents.send('emulator-started');
   });
 
   windows.emulator.on('closed', () => {
     windows.emulator = null;
-    BrowserWindow.getAllWindows().forEach(win => {
-      try { win.webContents.send('emulator-stopped'); } catch {}
-    });
+    windows.main?.webContents.send('emulator-stopped');
   });
 }
 
@@ -406,7 +403,7 @@ export function changeTheme(theme: string) {
   console.log("..: Função changeTheme chamada: ", currentTheme);
 
   // Envia o evento para todas as janelas ativas
-  BrowserWindow.getAllWindows().forEach((window) => {
+  Object.values(windows).forEach((window) => {
     window.webContents.send('change-theme', theme);
   });
 
@@ -683,16 +680,10 @@ ipcMain.on('save-project-as', async (event) => {
     setProjectWorkspacePaths(newSandbox, targetProjectDirectory);
     setProjectFile(saveAsName);
 
-    BrowserWindow.getAllWindows().forEach((win) => {
-      try {
-        win.webContents.send('project-saved-as', {
-          projectPathFile: saveAsName,
-          projectDirectory: saveAsDirectory,
-          projectName: saveAsProjectName,
-        });
-      } catch (e) {
-        /* ignore */
-      }
+    windows.main?.webContents.send('project-saved-as', {
+      projectPathFile: saveAsName,
+      projectDirectory: saveAsDirectory,
+      projectName: saveAsProjectName,
     });
 
     updatePreferences('recentProjects', { title: saveAsName, path: saveAsDirectory });
@@ -715,45 +706,7 @@ ipcMain.handle("get-emulator-rom-buffer", async (event, filePath) => {
 ipcMain.on('run-live', async (event) => {
   console.log('..: run-live requested');
   try {
-    if (!windows.main) return;
-
-    const activeProjectDir = directoryPathProject || originalProjectDirectory || '';
-    if (!activeProjectDir) {
-      console.warn('run-live: no active project directory available');
-      return;
-    }
-
-    requestSaveChanges({ persistToOriginal: false, markAsSaved: false, source: 'run-live' });
-
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Save timeout for run-live')), 10000);
-      saveEvents.once('saved', () => { clearTimeout(timeout); resolve(true); });
-    });
-
-    // Transcode project using the sandbox workspace directly
-    const transRes: any = await transcodeProject({
-      projectDir: activeProjectDir,
-      includeAssets: true,
-    });
-
-    if (!transRes.success || !transRes.outputDir) {
-      throw new Error(`Transcode failed: ${transRes.message}`);
-    }
-
-    const tempBuild = transRes.outputDir;
-
-    // Notify renderer that transcode finished and compilation will start
-    try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: '>> Transcodificação concluída.' })); } catch (e) {}
-
-    // Compile with new parameter-based interface (use saved build config)
-    const buildCfg = getBuildConfig();
-    let compileRes = await compileGBA({
-      buildDir: tempBuild,
-      parallel: buildCfg?.parallel,
-      optimizationLevel: buildCfg?.optimizationLevel as any,
-      verbose: buildCfg?.verbose,
-    });
-
+    const compileRes = await transcodeAndCompile();
 
     if (compileRes && compileRes.gbaPath) {
       // For Play, copy the generated .gba into a temp location and launch that
@@ -775,79 +728,88 @@ ipcMain.on('run-live', async (event) => {
     } else {
       console.warn('run-live: compile did not produce a .gba');
     }
-  } catch (err) {
-    console.error('run-live error', err);
+  } catch (error) {
+    console.error('run-live error', error);
+    windows.main?.webContents.send('compile-error', error);
   }
 });
 // ## RUN-LIVE END #####################################################
 
 // ## COMPILE PROJECT  #################################################
 ipcMain.on('compile-project', async (event)  => {
-  // Implemente a lógica de compilação aqui
-  console.log('..: Recebida solicitação para compilar o projeto :..');
   console.log('..: Compiling project...');
   try {
-    // Ask renderer to save current project data to disk first
-    requestSaveChanges({ source: 'build', persistToOriginal: false, markAsSaved: false });
+    const compileRes = await transcodeAndCompile();
 
-    // Wait for save to complete (timeout 10s)
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Save timeout')) , 10000);
-      saveEvents.once('saved', () => { clearTimeout(timeout); resolve(true); });
-    });
+    // On successful compile, copy outputs (.gba, .elf, .map) into project's build folder
+    if (compileRes && compileRes.gbaPath) {
+      const outDir = path.join(originalProjectDirectory!, 'build');
+      if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
-    // Transcode project files into path build before compiling
-    try {
-      // Notify renderer that transcode is starting
-      try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: '>> Iniciando transcodificação do projeto...' })); } catch (e) {}
+      // Copy .gba
+      try { fs.copyFileSync(compileRes.gbaPath, path.join(outDir, path.basename(compileRes.gbaPath))); } catch (e) { console.warn('Could not copy .gba to project build', e); }
 
-      // Transcode with new parameter-based interface
-      const activeProjectDir = directoryPathProject || originalProjectDirectory || '';
-      const transRes: any = await transcodeProject({
-        projectDir: activeProjectDir,
-        includeAssets: true,
-      });
-
-      // Compile using path build
-      const tempBuild = transRes.outputDir;
-      try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('compile-progress', { status: 'started', message: '>> Transcodificação concluída.' })); } catch (e) {}
-
-      // Compile with new parameter-based interface (use saved build config)
-      {
-        const buildCfg = getBuildConfig();
-        let compileRes = await compileGBA({
-          buildDir: tempBuild,
-          parallel: buildCfg?.parallel,
-          optimizationLevel: buildCfg?.optimizationLevel as any,
-          verbose: buildCfg?.verbose,
-        });
-
-        // On successful compile, copy outputs (.gba, .elf, .map) into project's build folder
-        if (compileRes && compileRes.gbaPath) {
-          const outDir = path.join(/*directoryPathProject ||*/ originalProjectDirectory || '', 'build');
-          if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
-
-          // Copy .gba
-          try { fs.copyFileSync(compileRes.gbaPath, path.join(outDir, path.basename(compileRes.gbaPath))); } catch (e) { console.warn('Could not copy .gba to project build', e); }
-
-          // Try to copy .elf and .map if present in same folder
-          const possibleElf = compileRes.gbaPath.replace(/\.gba$/i, '.elf');
-          const possibleMap = compileRes.gbaPath.replace(/\.gba$/i, '.map');
-          try { if (fs.existsSync(possibleElf)) fs.copyFileSync(possibleElf, path.join(outDir, path.basename(possibleElf))); } catch (e) { console.warn('Could not copy .elf to project build', e); }
-          try { if (fs.existsSync(possibleMap)) fs.copyFileSync(possibleMap, path.join(outDir, path.basename(possibleMap))); } catch (e) { console.warn('Could not copy .map to project build', e); }
-        }
-
-        return { success: true, message: compileRes };
-      }
-    } catch (e) {
-      console.warn('Transcode/compile failed', e);
-      return { success: false, message: e };
+      // Try to copy .elf and .map if present in same folder
+      const possibleElf = compileRes.gbaPath.replace(/\.gba$/i, '.elf');
+      const possibleMap = compileRes.gbaPath.replace(/\.gba$/i, '.map');
+      try { if (fs.existsSync(possibleElf)) fs.copyFileSync(possibleElf, path.join(outDir, path.basename(possibleElf))); } catch (e) { console.warn('Could not copy .elf to project build', e); }
+      try { if (fs.existsSync(possibleMap)) fs.copyFileSync(possibleMap, path.join(outDir, path.basename(possibleMap))); } catch (e) { console.warn('Could not copy .map to project build', e); }
     }
+
+    return { success: true, message: compileRes };
   } catch (error) {
-    console.log('..: Erro Compiling ' + error);
-    return { success: false, message: error};
+    console.error('Transcode/compile error ', error);
+    windows.main?.webContents.send('compile-error', error);
   }
 });
+
+async function transcodeAndCompile(): Promise<CompileResult> {
+  if (!windows.main) return { success: false, stdout: '', stderr: '' };
+
+  requestSaveChanges({ source: 'build', persistToOriginal: false, markAsSaved: false });
+  
+  // Wait for save to complete (timeout 10s)
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Save timeout for build')), 10000);
+    saveEvents.once('saved', () => { clearTimeout(timeout); resolve(true); });
+  });
+  
+  // Notify renderer that transcode is starting
+  windows.main?.webContents.send('compile-progress', { status: 'started', message: '>> Iniciando transcodificação do projeto...' });
+
+  const activeProjectDir = directoryPathProject || originalProjectDirectory || '';
+  if (!activeProjectDir) {
+    console.warn('transcodeAndCompile: no active project directory available');
+    return { success: false, stdout: '', stderr: '' };
+  }
+
+  // Transcode project using the sandbox workspace directly
+  const transRes: any = await transcodeProject({
+    projectDir: activeProjectDir,
+    includeAssets: true,
+  });
+
+  if (!transRes.success || !transRes.outputDir) {
+    throw new Error(`Transcode failed: ${transRes.message}`);
+  }
+
+  // Compile using path build
+  const tempBuild = transRes.outputDir;
+
+  // Notify renderer that transcode finished and compilation will start
+  windows.main?.webContents.send('compile-progress', { status: 'started', message: '>> Transcodificação concluída.' });
+
+  // Compile with new parameter-based interface (use saved build config)
+  const buildCfg = getBuildConfig();
+  const compileRes = await compileGBA({
+    buildDir: tempBuild,
+    parallel: buildCfg?.parallel,
+    optimizationLevel: buildCfg?.optimizationLevel as any,
+    verbose: buildCfg?.verbose,
+  });
+
+  return compileRes;
+}
 // ## COMPILE PROJECT  END #############################################
 
 // ## OPEN PROJECT #####################################################

@@ -5,29 +5,28 @@ Este repositório contém o código-fonte do GBA Studio — uma aplicação desk
 Este README explica o que é necessário para rodar e construir o projeto em desenvolvimento e em produção, e inclui dicas específicas para Windows, onde este repositório está sendo desenvolvido.
 
 ---
-
-**Requisitos (essenciais)**
-
-- Node.js LTS (recomenda-se Node 18 ou 20). Verifique com `node -v`.
-- Yarn (opcional, mas usado nos scripts do projeto). Instale com `npm install -g yarn` ou use `corepack enable` nas versões modernas do Node.
-- Git (para clonar o repositório).
-
-**Específicos para Windows**
+# Instalação
+**Pré-Requisitos (essenciais)**
 
 - PowerShell 5.1 (ou superior) já é o shell padrão — instruções abaixo usam PowerShell.
-- O GBA Studio trabalha com o `devkitPro` para fazer o build em conjunto como o `butano`, ele fará alocação de variáveis de ambiente temporários enquanto building, repositório local (fornecido em `tools/devkitPro`), não é necessário configurar as variáveis de ambiente `DEVKITPRO` e `DEVKITARM`. Porém se for fazer um build manual será necessário configurar ou instale devkitPro normalmente (`devkitPro install`) e adicione `devkitARM` ao `PATH`.
+- O GBA Studio trabalha com o `devkitPro` para fazer o build em conjunto como o `butano`, ele fará alocação de variáveis de ambiente temporários enquanto compila, é necessário a instalação e configuração para que exista as variáveis de ambiente `DEVKITPRO` e `DEVKITARM`.
 
 Exemplo (PowerShell) para apontar para a cópia do repositório (ajuste o caminho se necessário):
 
 ```powershell
-$env:DEVKITPRO = "X:\gba-studio\tools\devkitPro"
+$env:DEVKITPRO = "X:\user\devkitPro"
 $env:DEVKITARM = "$env:DEVKITPRO\devkitARM"
-$env:PATH = "$env:DEVKITARM\bin;$env:PATH"
 ```
 
-Se preferir instalar devkitPro globalmente, siga as instruções oficiais em https://devkitpro.org.
+Pode ser feito a instalação devkitPro globalmente, siga as instruções oficiais [devkitPro install](https://devkitpro.org/wiki/Getting_Started).
 
 ---
+## Desenvolvimento
+**Pré-Requisitos (essenciais)**
+
+- Node.js LTS (recomenda-se Node 18 ou 20). Verifique com `node -v`.
+- Yarn (opcional, mas usado nos scripts do projeto). Instale com `npm install -g yarn` ou use `corepack enable` nas versões modernas do Node.
+- Git (para clonar o repositório).
 
 **Instalação (dependências do projeto)**
 
@@ -94,24 +93,25 @@ yarn build
 # na raiz do projeto
 cd X:\gba-studio
 yarn start
-# ou yarn dev
+# ou $yarn dev
 ```
 
 - Empacotar instalador (electron-builder) — ver scripts do `package.json`:
 
 ```powershell
 # na raiz do projeto
-yarn build:win32
-# ou yarn build:win64
+yarn build:win64
+# ou $yarn build:win32
 ```
 
-- Build do GBA (gera ROM) — requer `devkitARM` e utilitários `make`:
+- Build do GBA (gera ROM - build manual) — requer `devkitARM` e utilitários `make`:
 
 ```powershell
 # exemplo genérico:
 # navegue até a pasta do build gerado pelo butano
 cd my-temp-project
 make
+# ou com alguns parâmetros $make -j6 CFLAGS_OPT=-O2 
 ```
 
 ---
@@ -226,5 +226,6 @@ auto bg_ptr = bn::regular_bg_ptr::create(bg_item);
 - electron-builder: https://www.electron.build/
 - Vite: https://vitejs.dev/
 - React: https://reactjs.org/
-
+- EmulatoJs: https://emulatorjs.org/ 
+- Butano: https://github.com/GValiente/butano
 ---

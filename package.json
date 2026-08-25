@@ -3,7 +3,7 @@
   "author": "GBA Studio",
   "productName": "GBA Studio",
   "description": "Project for creating and compiling GBA",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "license": "GPL-2.0 license",
   "private": true,
   "type": "module",
@@ -27,11 +27,6 @@
       {
         "from": "bin/",
         "to": "bin",
-        "filter": ["**/*"]
-      },
-      {
-        "from": "tools/devkitPro",
-        "to": "bin/tools/devkitPro",
         "filter": ["**/*"]
       },
       {
@@ -82,7 +77,7 @@
     "dev": "concurrently \"yarn workspace @gba-studio/frontend dev\" \"wait-on --httpTimeout 5000 http://localhost:5173 && electron .\"",
     "compile-scripts": "tsc -p scripts/tsconfig.scripts.json",
     "prebuild:main": "node scripts-dist/setupMagick.js win64",
-    "clean": "rm -rf dist",
+    "clean": "rmdir /S /Q dist",
 
     "build": "yarn clean && yarn build:main && yarn build:renderer",
     "build:main": "yarn workspace @gba-studio/main build",
