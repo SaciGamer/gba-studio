@@ -30,11 +30,6 @@
         "filter": ["**/*"]
       },
       {
-        "from": "tools/devkitPro",
-        "to": "bin/tools/devkitPro",
-        "filter": ["**/*"]
-      },
-      {
         "from": "tools/butano/",
         "to": "bin/tools/butano",
         "filter": ["**/*"]
