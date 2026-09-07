@@ -1,0 +1,58 @@
+{
+  "id": "86889357-1de2-4fe1-a995-7d7a7b7b89eb",
+  "_resourceType": "scene",
+  "_index": 2,
+  "_deleted": false,
+  "name": "Title",
+  "backgroundId": "c383b905-1c1f-47f1-9478-883b7b4202dc",
+  "background": "local://E:/VisualStudio/GBAStudioProject/gba-studio/sample_project_example/assets/backgrounds/butano_logo.bmp",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": "c00c9c5b-af66-4fb8-bfbb-e63ca7ab66f4",
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 2,
+      "backgroundId": "b6d20ec8-fd2a-4643-9237-7786573e54b2",
+      "name": "",
+      "path": ""
+    }
+  ],
+  "x": 231,
+  "y": 395.13000106811523,
+  "width": 256,
+  "height": 256,
+  "sceneType": "Top Down",
+  "showCamera": true,
+  "script": [
+    {
+      "id": "584fc1a7-4429-4f28-95b7-14ffe5aa0105",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 1,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "a14be5a3-8216-4044-8f67-00210f329e4f",
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "b9f21dc1-5606-41ee-bca2-8ec1a6059245",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "right",
+        "fadeSpeed": 2,
+        "__collapse": false,
+        "__comment": true
+      }
+    }
+  ]
+}

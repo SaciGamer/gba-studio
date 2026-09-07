@@ -1,7 +1,8 @@
-import { IChangeScene } from "@/components/events/interfaces/IChangeScene";
+import { IChangeScene } from "@/components/events/interfaces/IScene";
 import { IFade } from "@/components/events/interfaces/IFade";
 import { IWait } from "@/components/events/interfaces/IWaiting";
 import { IResourceSettings } from "./IBaseSettings";
+import { LayerMultiProps } from "@/components/events/interfaces/ILayer";
 
 export enum ETypeScene {
     TOPDOWN = 'Top Down',
@@ -28,7 +29,7 @@ export interface IArgs {
 export interface IScriptsElement {
     id: string;
     command: string;
-    args?: IFade | IChangeScene | IWait;
+    args?: IFade | IChangeScene | IWait | LayerMultiProps;
     children?: Object[];
 }
 interface IPosAndWidth {

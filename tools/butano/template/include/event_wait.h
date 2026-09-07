@@ -21,6 +21,6 @@ struct Wait {
     int countInt;
 };
 
-bool runWait(const void* args);
+bool run_wait(const void* args);
 
 #endif // EVENT_WAIT_H

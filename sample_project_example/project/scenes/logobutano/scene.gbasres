@@ -1,0 +1,141 @@
+{
+  "id": "738ec3e3-374f-44a8-8bda-8a027cce1d08",
+  "_resourceType": "scene",
+  "_index": 1,
+  "_deleted": false,
+  "name": "Logo Butano",
+  "backgroundId": "52b92763-062a-4233-84f5-74ac7496c05d",
+  "background": "local://E:/GameBoyProjetos/testImageViewer/assets/backgrounds/castle.png",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": "44563d9d-f6a1-490f-95cb-26b164cc24de",
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 1,
+      "backgroundId": null,
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 2,
+      "backgroundId": "c383b905-1c1f-47f1-9478-883b7b4202dc",
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 3,
+      "backgroundId": null,
+      "name": "",
+      "path": ""
+    }
+  ],
+  "x": 106,
+  "y": 82,
+  "width": 512,
+  "height": 256,
+  "sceneType": "Top Down",
+  "script": [
+    {
+      "id": "0895ab53-eb05-4b19-ad0d-044dc57eeae2",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 1,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "c121a3b4-38a7-4115-9d82-3936c11b8334",
+      "command": "EVENT_WAIT",
+      "args": {
+        "time": 8,
+        "frames": 100,
+        "units": "frames",
+        "__collapse": true
+      }
+    },
+    {
+      "id": "e88eaecc-c2b7-4e0a-8dcc-11d45bd13c51",
+      "command": "EVENT_FADE_OUT",
+      "args": {
+        "speed": 1,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "2bb7e775-3c07-4243-8d5e-a05a1d484a90",
+      "command": "EVENT_CHANGE_LAYER",
+      "args": {
+        "__collapse": true,
+        "layers": [
+          {
+            "layerId": 0,
+            "backgroundId": "44563d9d-f6a1-490f-95cb-26b164cc24de",
+            "visible": true
+          },
+          {
+            "layerId": 1,
+            "backgroundId": "cbadfea7-bdcf-41c5-8d3b-113471be8897",
+            "visible": false
+          },
+          {
+            "layerId": 2,
+            "backgroundId": "ee10f14b-7604-4235-99c3-a5d862264666",
+            "visible": true
+          },
+          {
+            "layerId": 3,
+            "backgroundId": "c383b905-1c1f-47f1-9478-883b7b4202dc",
+            "visible": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "f74749ad-7a0d-4683-94e4-ffdc870fcda2",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 1,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "77086696-0768-4cd5-a344-c480672469c7",
+      "command": "EVENT_WAIT",
+      "args": {
+        "time": 0.5,
+        "frames": 100,
+        "units": "frames",
+        "__collapse": true
+      }
+    },
+    {
+      "id": "7e41b858-5bc1-42a3-8206-083c266e62ec",
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "86889357-1de2-4fe1-a995-7d7a7b7b89eb",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "right",
+        "fadeSpeed": 1,
+        "__collapse": true
+      }
+    }
+  ],
+  "selectedTilesetId": "tileset1",
+  "imageType": "palette_bitmap_bg",
+  "selectedTiles": [
+    0
+  ],
+  "playerHit1Script": [],
+  "playerHit2Script": [],
+  "playerHit3Script": []
+}

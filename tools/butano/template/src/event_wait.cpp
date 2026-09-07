@@ -11,47 +11,13 @@
 #include "bn_log.h"
 #include "bn_core.h"
 #include "bn_string.h"
+#include "bn_fixed.h"
+
+#include "utils.h"
 
 Wait wait;
 
-namespace wait_functions {
-    int to_int(const char* str) {
-        int result = 0;
-        while(*str) {
-            if(*str >= '0' && *str <= '9') {
-                result = result * 10 + (*str - '0');
-            }
-            ++str;
-        }
-        return result;
-    }
-
-    bn::fixed to_fixed(const char* str) {
-        int integerPart = 0;
-        int fractionalPart = 0;
-        int divisor = 1;
-        bool afterDecimal = false;
-
-        while (*str) {
-            if (*str == '.') {
-                afterDecimal = true;
-            } else if (*str >= '0' && *str <= '9') {
-                if (!afterDecimal) {
-                    integerPart = integerPart * 10 + (*str - '0');
-                } else {
-                    fractionalPart = fractionalPart * 10 + (*str - '0');
-                    divisor *= 10;
-                }
-            }
-            ++str;
-        }
-
-        float result = integerPart + (divisor > 1 ? (float)fractionalPart / divisor : 0.0f);
-        return bn::fixed(result);
-    }
-}
-
-bool runWait(const void* args) {
+bool run_wait(const void* args) {
     if (wait.active) {
         if (wait.type == WaitType::TIME) {
             // decrementa tempo
@@ -75,11 +41,14 @@ bool runWait(const void* args) {
             }
         }
     } else {
-        const char* const* strArgs = static_cast<const char* const*>(args);
+        const void* const* strArgs = static_cast<const void* const*>(args);
 
-        wait.time = wait_functions::to_fixed(strArgs[0]);  // "5.5" → 5.5
-        wait.frames = wait_functions::to_int(strArgs[1]);  // "45"  → 45
-        bn::string<64> units = strArgs[2];                 // secounds(time) or frames
+        const float* time = static_cast<const float*>(strArgs[0]);
+        const int* frames = static_cast<const int*>(strArgs[1]);
+
+        wait.time = bn::fixed(*time);
+        wait.frames = *frames;
+        bn::string<64> units = static_cast<const char*>(strArgs[2]);
         
         wait.active = true;
 

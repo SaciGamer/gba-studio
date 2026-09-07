@@ -1,4 +1,4 @@
-import { theme } from 'antd'
+import { Layout, theme } from 'antd'
 
 const Themes: Record<string, any> = {
   light: {
@@ -12,6 +12,8 @@ const Themes: Record<string, any> = {
       // colorError: '#f5222d',
       // colorBgContainer: '#f0f0f0',
       // colorBgContainerDisabled: '#d9d9d9',
+      colorBgSolidActive: '#ffa500',
+      controlItemBgActive: '#ffa500',
       // colorBgElevated: '#ffffff',
       // colorTextPlaceholder: '#000000', // Placeholder cinza
       colorBorder: '#808080',
@@ -32,12 +34,14 @@ const Themes: Record<string, any> = {
       // colorError: '#f5222d',
       colorBgContainer: '#6E6E6E',
       // colorBgContainerDisabled: '#505050',
+     
+      colorBgSolidActive: '#ffa500',
+      controlItemBgActive: '#ffa500',
       colorBgElevated: '#353535',
       // colorTextPlaceholder: '#ffffff', // Placeholder cinza
       controlHeightLG: '50px', // Define a altura dos componentes grandes
       // paddingXXS: '4px', // Define o padding extra pequeno
       // borderRadiusSM: '14px', // Define o border radius pequeno
-
       // Splitter: {
       //   splitBarDraggableSize: 100,
       //   splitBarSize: 10,
@@ -90,6 +94,8 @@ const Themes: Record<string, any> = {
       colorError: '#ff3333', // Vermelho
       // colorBgContainer: '#088A08',
       colorBgContainerDisabled: '#2c2c2c',
+      colorBgSolidActive: '#6A5ACD',
+      controlItemBgActive: '#6A5ACD',
       colorBgElevated: '#088A08',
       colorFill: '#e60012',
       // colorTextPlaceholder: '#ffffff',
@@ -126,6 +132,8 @@ const Themes: Record<string, any> = {
       colorError: '#f5222d',
       colorBgContainer: '#505050', // Cor de fundo dos botões e inputs
       colorBgContainerDisabled: '#D8D8D8', // Cor de fundo desabilitada dos botões e inputs
+      colorBgSolidActive: '#e60012',
+      controlItemBgActive: '#e60012',
       colorBgElevated: '#000000', // Cor de fundo dos menus suspensos
       colorTextPlaceholder: '#979797', // Placeholder cinza
       colorFill: '#e60012',
@@ -162,13 +170,15 @@ const Themes: Record<string, any> = {
     token: {
       colorPrimary: '#007BFF',
       colorTextBase: '#ffffff',
-      colorBgBase: '#0080FF',
+      colorBgBase: '#0026ff',
       borderRadius: '6px',
       colorSuccess: '#52c41a',
       colorWarning: '#faad14',
       colorError: '#f5222d',
       colorBgContainer: '#0489B1',
       colorBgContainerDisabled: '#003f7f',
+      colorBgSolidActive: '#007BFF',
+      controlItemBgActive: '#007BFF',
       colorBgElevated: '#045FB4',
       // colorTextPlaceholder: '#ffffff',
 
@@ -177,7 +187,7 @@ const Themes: Record<string, any> = {
     components: {
       Collapse: {
         // headerBg: '#6E6E6E', // Caso não use a config no painel
-        contentBg:'#0080FF', // caso precise trocar a cor do fundo do colapse
+        contentBg:'#0026ff', // caso precise trocar a cor do fundo do colapse
         padding: 10,
       },
     }

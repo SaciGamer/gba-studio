@@ -1,0 +1,50 @@
+{
+  "id": "fe360787-c3a4-4adc-9606-d0262568cd14",
+  "_resourceType": "scene",
+  "_index": 4,
+  "_deleted": false,
+  "name": "Pintura",
+  "backgroundId": "5165e71e-3624-4e34-a6a4-00354207319d",
+  "background": "local://E:/VisualStudio/GBAStudioProject/gba-studio/sample_project_example/assets/backgrounds/background.bmp",
+  "backgrounds": [
+    {
+      "layerId": 2,
+      "backgroundId": "a525e43c-eb61-4858-8b94-9bcebf88fbc7",
+      "name": "",
+      "path": ""
+    }
+  ],
+  "x": 722.6400146484375,
+  "y": 354,
+  "width": 240,
+  "height": 160,
+  "sceneType": "Point Click",
+  "script": [
+    {
+      "id": "c8d66189-0dd5-43e3-93ab-1bcb00443655",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 2,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "9a917174-59ba-4181-84b0-f28adc374625",
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "b9f21dc1-5606-41ee-bca2-8ec1a6059245",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "right",
+        "fadeSpeed": 2,
+        "__collapse": true
+      }
+    }
+  ]
+}

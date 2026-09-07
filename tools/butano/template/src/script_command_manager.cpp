@@ -17,7 +17,6 @@ ScriptCommand::~ScriptCommand() {}
 
 void ScriptCommand::execute(bn::string<64> scene_id_param, const ScriptCommandData* data, int count) 
 {
-    
     if(scene_id_param != this->scene_id) {
         this->scene_id = scene_id_param;
         ScriptCommand::instance().resetIndex();
@@ -36,13 +35,15 @@ void ScriptCommand::execute(bn::string<64> scene_id_param, const ScriptCommandDa
     auto args = data[currentScriptIndex].args;
 
     if(command == "EVENT_FADE_IN") {
-        finished = runFade(args, FadeType::IN);
+        finished = run_fade(args, FadeType::IN);
     } else if(command == "EVENT_FADE_OUT") {
-        finished = runFade(args, FadeType::OUT);
+        finished = run_fade(args, FadeType::OUT);
     } else if(command == "EVENT_WAIT") {
-        finished = runWait(args);
+        finished = run_wait(args);
     } else if(command == "EVENT_CHANGE_SCENE") {
-        finished = runChangeScene(args);
+        finished = run_change_scene(args);
+    } else if(command == "EVENT_CHANGE_LAYER") {
+        finished = run_change_layer(args, this->scene_id);
     }
 
     if(finished) {

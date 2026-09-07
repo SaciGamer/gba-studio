@@ -36,7 +36,7 @@ const About: React.FC = () => {
         />
         <Typography.Title level={4} style={{ lineHeight: '0.5' }}>GBA Studio {versions.projectVersion}</Typography.Title>
         <Typography.Title level={5} style={{ lineHeight: '0.5' }}>Engine Game Boy Advance</Typography.Title>
-        <div style={{ marginBlock: '15px' }}>Distributed under MIT license.</div>  
+        <div style={{ marginBlock: '15px' }}>Distributed under GPL-2.0 license.</div>  
         <Space direction="vertical" style={{ rowGap: 0 }}>
           <Typography.Text type="secondary"> electron  : {versions.electron} </Typography.Text>
           <Typography.Text type="secondary"> chrome    : {versions.chrome} </Typography.Text>

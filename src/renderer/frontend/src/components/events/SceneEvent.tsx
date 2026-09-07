@@ -6,7 +6,7 @@ import { Button, Flex, Form, InputNumber, Radio, Select, Space } from "antd";
 import { Content } from 'antd/es/layout/layout';
 import { useMemo } from 'react';
 import { AntdToken } from '../common/AntDToken';
-import { IChangeScene } from './interfaces/IChangeScene';
+import { IChangeScene } from './interfaces/IScene';
 
 interface ChangeSceneEventProps {
   event: IScriptsElement | undefined;
@@ -14,7 +14,7 @@ interface ChangeSceneEventProps {
   onValueChange: (eventId: string, eventArgs: IChangeScene) => void;
 }
 
-export function ChangeSceneEvent({ event, customTitle, onValueChange }: ChangeSceneEventProps) {
+export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEventProps) {
   const { token } = AntdToken();
   // const {scenes} = useSceneContext();
   // const {backgrounds} = useSceneContext();
@@ -48,7 +48,7 @@ export function ChangeSceneEvent({ event, customTitle, onValueChange }: ChangeSc
   };
 
   const defaultValues = useMemo(() => {
-    const initValue = ChangeSceneEvent.defaultValue(scenes);
+    const initValue = SceneEvent.defaultValue(scenes);
     const scene = scenes.find(s => s.id === (args?.sceneId || s.id === initValue.sceneId) && s._deleted !== true);
     // const imagePath = getImagePath(scene!);
     const sceneName = scene?.name || 'Unknown Scene';
@@ -87,7 +87,7 @@ export function ChangeSceneEvent({ event, customTitle, onValueChange }: ChangeSc
               </Content>
             ),
           }))}
-          onChange={(value) => onValueChange(event?.id!, { ...event?.args, sceneId: value })}
+          onChange={(value) => onValueChange(event?.id!, { ...event?.args as IChangeScene, sceneId: value })}
         >
         </Select>
       </Form.Item>
@@ -101,7 +101,7 @@ export function ChangeSceneEvent({ event, customTitle, onValueChange }: ChangeSc
                 min={0} 
                 defaultValue={defaultValues.x.value as number} 
                 style={{ flex: 1, textAlign: 'center' }} 
-                onChange={(value) => onValueChange(event?.id!, { ...event?.args, x: { type: 'number', value: value! } })}
+                onChange={(value) => onValueChange(event?.id!, { ...event?.args as IChangeScene, x: { type: 'number', value: value! } })}
               />
             )}
           </Space.Compact>
@@ -114,7 +114,7 @@ export function ChangeSceneEvent({ event, customTitle, onValueChange }: ChangeSc
                 min={0} 
                 defaultValue={defaultValues.y?.value as number} 
                 style={{ flex: 1 }}
-                onChange={(value) => onValueChange(event?.id!, { ...event?.args, y: { type: 'number', value: value! } })}
+                onChange={(value) => onValueChange(event?.id!, { ...event?.args as IChangeScene, y: { type: 'number', value: value! } })}
               />
             )}
           </Space.Compact>
@@ -127,7 +127,7 @@ export function ChangeSceneEvent({ event, customTitle, onValueChange }: ChangeSc
             optionType="button" 
             buttonStyle="solid" 
             defaultValue={defaultValues.direction} 
-            onChange={(e) => onValueChange(event?.id!, { ...event?.args, direction: e.target.value })}
+            onChange={(e) => onValueChange(event?.id!, { ...event?.args as IChangeScene, direction: e.target.value })}
           >
               <Radio value="left" ><CaretLeftFilled /></Radio>
               <Radio value="right" ><CaretRightFilled /></Radio>
@@ -139,7 +139,7 @@ export function ChangeSceneEvent({ event, customTitle, onValueChange }: ChangeSc
           <Select
             showSearch
             defaultValue={defaultValues.fadeSpeed} 
-            onChange={(value) => onValueChange(event?.id!, { ...event?.args, fadeSpeed: Number(value) })}
+            onChange={(value) => onValueChange(event?.id!, { ...event?.args as IChangeScene, fadeSpeed: Number(value) })}
             options={optSpeed}
           />
         </Form.Item>
@@ -149,7 +149,7 @@ export function ChangeSceneEvent({ event, customTitle, onValueChange }: ChangeSc
 	);
 }
 
-ChangeSceneEvent.defaultValue = (scenes: ISceneSettings[]): IChangeScene => ({
+SceneEvent.defaultValue = (scenes: ISceneSettings[]): IChangeScene => ({
   sceneId: scenes[0]?.id || null,
   x: { type: 'number', value: 0 },
   y: { type: 'number', value: 0 },
@@ -157,4 +157,4 @@ ChangeSceneEvent.defaultValue = (scenes: ISceneSettings[]): IChangeScene => ({
   fadeSpeed: 2,
 });
 
-export default ChangeSceneEvent;
+export default SceneEvent;

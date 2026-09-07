@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Dropdown, Input, Button, Tooltip, Space } from 'antd';
-import { DownOutlined, FolderOpenOutlined, ExportOutlined, PlaySquareOutlined, CloseCircleOutlined, ToolFilled } from '@ant-design/icons';
+import { Dropdown, Input, Button, Tooltip, Flex } from 'antd';
+import { DownOutlined, FolderOpenOutlined, ExportOutlined, PlaySquareOutlined, CloseCircleOutlined, ToolFilled, CloseOutlined } from '@ant-design/icons';
 import { AntdToken } from '../components/common/AntDToken';
 import { useBuildState } from '../providers/BuildStateProvider';
 import useAppContexts from '@/providers/contexts/AppContexts';
@@ -51,10 +51,6 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
   const [menuName, setMenuName] = useState<string>('Game World');
   const { isBuilding, isRunning, setBuilding } = useBuildState();
 
-  const clearSearch = () => {
-    setSearchValue('');
-  };
-
   const handleMenuClick = (item: any) => {
     setSelectedKey(item.key);
     setMenuName(item.label);
@@ -104,51 +100,54 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
   useEffect(() => {}, [isBuilding, isRunning]);
 
   return (
-    <Space style={{ display: 'flex', alignItems: 'center', paddingInline: '10px', paddingBlock: '5px', justifyContent: 'space-between', backgroundColor: token.colorBgBase }}>
+    <Flex style={{ 
+      paddingInline: '10px', 
+      paddingBlock: '5px', 
+      backgroundColor: token.colorBgBase, 
+      alignItems: 'center', 
+      justifyContent: 'space-between'  
+    }}>
       <Dropdown menu={menu} placement="bottomLeft" trigger={['click']}>
         <Button style={{ width: '150px', display: 'flex', justifyContent: 'space-between' }}>
           {menuName}
           <DownOutlined />
         </Button>
       </Dropdown>
-      {(selectedKey == 1 || selectedKey == 2 || selectedKey <= 3) && (<Space style={{ marginLeft: '5px', display: 'flex', alignItems: 'center', justifyContent: 'start' }}>
-        <Tooltip title="Zoom Out">
-          <Button onClick={() => handleZoomChange(-1)}>-</Button>
-        </Tooltip>
-        <Tooltip title="Reset Zoom">
-          <span style={{ marginLeft: '10px', marginRight: '10px', cursor: 'pointer' }} onClick={resetZoom}>{userSettings.zoom}%</span>
-        </Tooltip>
-        <Tooltip title="Zoom In">
-          <Button onClick={() => handleZoomChange(1)}>+</Button>
-        </Tooltip>
-      </Space>)}
-      <div style={{ marginLeft: '5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+      {(selectedKey == 1 || selectedKey == 2 || selectedKey <= 3) && (
+        <Flex style={{ gap: 5, alignItems: 'center' }}>
+          <Tooltip title="Zoom Out">
+            <Button size="middle" style={{ height: 32, width: 32 }} onClick={() => handleZoomChange(-1)}>-</Button>
+          </Tooltip>
+          <Tooltip title="Reset Zoom">
+            <Button size="middle" color="default" variant="text" style={{ paddingInline: '10px' }} onClick={resetZoom}>{userSettings.zoom}%</Button>
+          </Tooltip>
+          <Tooltip title="Zoom In">
+            <Button size="middle" style={{ height: 32, width: 32 }} onClick={() => handleZoomChange(1)}>+</Button>
+          </Tooltip>
+        </Flex>
+      )}
+      <Flex style={{ gap: 8, alignItems: 'center' }}>
         <Input.Search 
           placeholder="Search"
+          allowClear
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
-          style={{ paddingRight: '5px' }}
-          // disabled={true}
+          onSearch={(value) => setSearchValue(value)}
+          disabled={true}
         />
-        {searchValue && (
-          <CloseCircleOutlined
-            onClick={clearSearch}
-            style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer' }}
-          />
-        )}
         <Tooltip title="Open Project Folder" >
           <Button 
             icon={ <FolderOpenOutlined /> } 
             onClick={() => handleProjectFolder()}
-            style={{ padding: '10px' }}
+            style={{ paddingInline: '10px' }}
           />
         </Tooltip>
         <Tooltip title="Export As...">
           <Button 
             icon={<ExportOutlined />} 
             onClick={() => console.log('..: TopBar Export As...')}
-            style={{ padding: '10px', marginLeft: '5px' }}>
-          </Button>
+            style={{ paddingInline: '10px' }}
+          />
         </Tooltip>
         <Tooltip title="Build">
           <Button 
@@ -161,8 +160,8 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
               setBuilding(true);
               window.electronAPI.send('compile-project', null); 
             }}
-            style={{ marginLeft: '15px', padding: '10px' }}>
-          </Button>
+            style={{ marginLeft: '15px', paddingInline: '10px' }}
+          />
         </Tooltip>
         <Tooltip title={isRunning ? 'Stop' : 'Play'}>
           <Button 
@@ -180,11 +179,11 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
                 window.electronAPI.send('run-live', null); 
               }
             }}
-            style={{ marginLeft: '8px', padding: '10px' }}
+            style={{ paddingInline: '10px' }}
           />
         </Tooltip>
-      </div>
-    </Space >
+      </Flex>
+    </Flex >
   );
 };
 

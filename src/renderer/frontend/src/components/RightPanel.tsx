@@ -18,9 +18,7 @@ interface IRightPanelProps {
 
 const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor = false }) => {
   const { token } = useToken();
-  // const { scenes, setScenes, ignoredFields } = useSceneContext();
-  // const { elementSelected, setElementSelected } = useElementContext();
-  const { scenes, setScenes, ignoredFieldsScenes, elementSelected, setElementSelected } = useAppContexts();
+  const { scenes, setScenes, elementSelected, setElementSelected } = useAppContexts();
 
   const [isEditingTitle, setIsEditingTitle ] = useState(false);
   const [availableTilesets, setAvailableTilesets] = useState<any[]>([]);

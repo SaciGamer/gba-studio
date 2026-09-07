@@ -64,22 +64,22 @@ function menuTemplate(): MenuItemConstructorOptions[] {
         {
             label: 'Edit',
             submenu: [
-                { label: 'Undo', role: 'undo' },
-                { label: 'Redo', role: 'redo' },
-                { type: 'separator' },
-                { label: 'Cut', role: 'cut' },
-                { label: 'Copy', role: 'copy' },
-                { label: 'Past', role: 'paste' },
-                { label: 'Past in Place', role: 'pasteAndMatchStyle', click: () => { console.log('..: Past in Place clicado'); } },
-                { label: 'Delete', role: 'delete' },
-                { label: 'Select All', role: 'selectAll', click: () => { console.log('..: Selecionar Tudo clicado'); } },
-                { type: 'separator' },
-                {
-                    label: 'Spelling and Grammar', submenu: [
-                        { label: 'Checke Spelling While Typing', click: () => { console.log('..: Spelling While Typing clicado'); } },
-                    ]
-                },
-                { type: 'separator' },
+                // { label: 'Undo', role: 'undo' },
+                // { label: 'Redo', role: 'redo' },
+                // { type: 'separator' },
+                // { label: 'Cut', role: 'cut' },
+                // { label: 'Copy', role: 'copy' },
+                // { label: 'Past', role: 'paste' },
+                // { label: 'Past in Place', role: 'pasteAndMatchStyle', click: () => { console.log('..: Past in Place clicado'); } },
+                // { label: 'Delete', role: 'delete' },
+                // { label: 'Select All', role: 'selectAll', click: () => { console.log('..: Selecionar Tudo clicado'); } },
+                // { type: 'separator' },
+                // {
+                //     label: 'Spelling and Grammar', submenu: [
+                //         { label: 'Checke Spelling While Typing', click: () => { console.log('..: Spelling While Typing clicado'); } },
+                //     ]
+                // },
+                // { type: 'separator' },
                 { label: 'Preferences...', click: () => { 
                     console.log('..: Preferences clicado'); 
                     if (windows.main) {
@@ -91,31 +91,31 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                 } }
             ]
         },
-        {
-            label: 'Game',
-            submenu: [
-                { label: 'Run', click: () => { console.log('..: Run clicado'); } },
-                { label: 'Run with Debugging', click: () => { console.log('..: Run with Debugging clicado'); } },
-                {
-                    label: 'Export As',
-                    submenu: [
-                        { label: 'Export ROM', click: () => { console.log('..: Export as ROM clicado'); } },
-                        { label: 'Exprot WEB', click: () => { console.log('..: Export as WEB clicado'); } },
-                        { label: 'Export POCKET', click: () => { console.log('..: Export as POCKET clicado'); } },
-                    ]
-                },
-                { type: 'separator' },
-                {
-                    label: 'Advanced',
-                    submenu: [
-                        { label: 'Eject Engine', click: () => { console.log('..: Eject Engine clicado'); } },
-                        { type: 'separator' },
-                        { label: 'Exprot Project Source', click: () => { console.log('..: Export Project Source clicado'); } },
-                        { label: 'Export Project Data', click: () => { console.log('..: Export Project Data clicado'); } },
-                    ]
-                },
-            ]
-        },
+        // {
+        //     label: 'Game',
+        //     submenu: [
+        //         { label: 'Run', click: () => { console.log('..: Run clicado'); } },
+        //         { label: 'Run with Debugging', click: () => { console.log('..: Run with Debugging clicado'); } },
+        //         {
+        //             label: 'Export As',
+        //             submenu: [
+        //                 { label: 'Export ROM', click: () => { console.log('..: Export as ROM clicado'); } },
+        //                 { label: 'Exprot WEB', click: () => { console.log('..: Export as WEB clicado'); } },
+        //                 { label: 'Export POCKET', click: () => { console.log('..: Export as POCKET clicado'); } },
+        //             ]
+        //         },
+        //         { type: 'separator' },
+        //         {
+        //             label: 'Advanced',
+        //             submenu: [
+        //                 { label: 'Eject Engine', click: () => { console.log('..: Eject Engine clicado'); } },
+        //                 { type: 'separator' },
+        //                 { label: 'Exprot Project Source', click: () => { console.log('..: Export Project Source clicado'); } },
+        //                 { label: 'Export Project Data', click: () => { console.log('..: Export Project Data clicado'); } },
+        //             ]
+        //         },
+        //     ]
+        // },
         {
             label: 'View',
             submenu: [
@@ -151,35 +151,35 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                         { label: 'pt_BR', type: 'checkbox', checked: currentLanguage === 'pt_BR', click: (menuItem: MenuItem) => { updateLanguage(menuItem, 'pt_BR'); } },
                     ]
                 },
-                { type: 'separator' },
-                {
-                    label: 'Show Collisions',
-                    type: 'checkbox',
-                    checked: isShowCollisionsChecked,
-                    click: (menuItem: MenuItem) => {
-                        isShowCollisionsChecked = !isShowCollisionsChecked;
-                        menuItem.checked = isShowCollisionsChecked;
-                        console.log('..: Show Collisions clicado');
-                    }
-                },
-                {
-                    label: 'Show Connections', submenu: [
-                        { label: 'All', click: () => { console.log('..: All clicado'); } },
-                        { label: 'Current Scene', click: () => { console.log('..: Current Scene clicado'); } },
-                        { type: 'separator' },
-                        { label: 'None', click: () => { console.log('..: None clicado'); } },
-                    ]
-                },
-                {
-                    label: 'Show Navigator',
-                    type: 'checkbox',
-                    checked: isShowNavigatorChecked,
-                    click: (menuItem: MenuItem) => {
-                        isShowNavigatorChecked = !isShowNavigatorChecked;
-                        menuItem.checked = isShowNavigatorChecked;
-                        console.log('..: Show Navigator clicado');
-                    }
-                },
+                // { type: 'separator' },
+                // {
+                //     label: 'Show Collisions',
+                //     type: 'checkbox',
+                //     checked: isShowCollisionsChecked,
+                //     click: (menuItem: MenuItem) => {
+                //         isShowCollisionsChecked = !isShowCollisionsChecked;
+                //         menuItem.checked = isShowCollisionsChecked;
+                //         console.log('..: Show Collisions clicado');
+                //     }
+                // },
+                // {
+                //     label: 'Show Connections', submenu: [
+                //         { label: 'All', click: () => { console.log('..: All clicado'); } },
+                //         { label: 'Current Scene', click: () => { console.log('..: Current Scene clicado'); } },
+                //         { type: 'separator' },
+                //         { label: 'None', click: () => { console.log('..: None clicado'); } },
+                //     ]
+                // },
+                // {
+                //     label: 'Show Navigator',
+                //     type: 'checkbox',
+                //     checked: isShowNavigatorChecked,
+                //     click: (menuItem: MenuItem) => {
+                //         isShowNavigatorChecked = !isShowNavigatorChecked;
+                //         menuItem.checked = isShowNavigatorChecked;
+                //         console.log('..: Show Navigator clicado');
+                //     }
+                // },
                 { type: 'separator' },
                 { label: 'Actual Size', role: 'resetZoom', click: () => { console.log('..: Actual Size clicado'); } },
                 { label: 'Zoom In', role: 'zoomIn', click: () => { console.log('..: Zoon In clicado'); } },
@@ -215,7 +215,7 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                         console.log('..: About GBA Studio clicado');
                     }
                 },
-                { label: 'Check for Updates...', click: () => { console.log('..: Check for Updates clicado'); } }
+                // { label: 'Check for Updates...', click: () => { console.log('..: Check for Updates clicado'); } }
             ]
         }
     ]

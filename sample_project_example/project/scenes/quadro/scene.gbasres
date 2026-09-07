@@ -1,0 +1,50 @@
+{
+  "id": "b9f21dc1-5606-41ee-bca2-8ec1a6059245",
+  "_resourceType": "scene",
+  "_index": 3,
+  "_deleted": false,
+  "name": "Quadro",
+  "backgroundId": "5165e71e-3624-4e34-a6a4-00354207319d",
+  "background": "local://E:/VisualStudio/GBAStudioProject/gba-studio/sample_project_example/assets/backgrounds/background.bmp",
+  "backgrounds": [
+    {
+      "layerId": 2,
+      "backgroundId": "bd4f4380-c0a8-4f67-81e2-33e8ee800110",
+      "name": "",
+      "path": ""
+    }
+  ],
+  "x": 719.6400146484375,
+  "y": 114,
+  "width": 240,
+  "height": 160,
+  "sceneType": "Logo",
+  "script": [
+    {
+      "id": "49f0f09f-1338-41d0-aa4c-5bfc1a452e2c",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 2,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "bb38176e-d132-476d-883f-bf0f2f9a0e2c",
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "fe360787-c3a4-4adc-9606-d0262568cd14",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "right",
+        "fadeSpeed": 2,
+        "__collapse": true
+      }
+    }
+  ]
+}

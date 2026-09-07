@@ -19,6 +19,6 @@ struct ChangeScene {
     bn::fixed countFixed;
 };
 
-bool runChangeScene(const void* args);
+bool run_change_scene(const void* args);
 
 #endif // EVENT_CHANGE_SCENE_H
