@@ -109,8 +109,8 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
         items: [
           { key: '8px', icon: <ExpandOutlined />, iconSize: 16, tooltip: 'Pincel 8 px', active: settingUtils.activeSubButton == '8px', onClick: () => <></> },
           { key: '16px', icon: <ExpandOutlined />, iconSize: 24, tooltip: 'Pincel 16 px', active: settingUtils.activeSubButton == '16px', onClick: () => <></> },
-          { key: 'subAction1', icon: <ExperimentOutlined />,  tooltip: 'Add Scene(s)', separator: true, active: settingUtils.activeSubButton == 'subAction1', onClick: () => <></>},
-          { key: 'subAction2', icon: <CloseSquareOutlined />, tooltip: 'Add Scene(s)', active: settingUtils.activeSubButton == 'subAction2', onClick: () => <></>},
+          { key: 'subAction1', icon: <ExperimentOutlined />,  tooltip: 'New Command', separator: true, active: settingUtils.activeSubButton == 'subAction1', onClick: () => <></>},
+          { key: 'subAction2', icon: <CloseSquareOutlined />, tooltip: 'New Command', active: settingUtils.activeSubButton == 'subAction2', onClick: () => <></>},
         ],
       }
     },
@@ -125,9 +125,9 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
         items: [
           { key: 'subAction1', icon: <ExpandOutlined />, iconSize: 16, tooltip: 'Pincel 8 px', active: settingUtils.activeSubButton == 'subAction1', onClick: () => <></> },
           { key: 'subAction2', icon: <ExpandOutlined />, iconSize: 24, tooltip: 'Pincel 16 px', active: settingUtils.activeSubButton == 'subAction2', onClick: () => <></> },
-          { key: 'subAction3', icon: <VerticalAlignMiddleOutlined />, tooltip: 'Add Scene(s)', separator: true, active: settingUtils.activeSubButton == 'subAction3', onClick: () => <></>},
-          { key: 'subAction4', icon: <PicLeftOutlined />, tooltip: 'Add Scene(s)', active: settingUtils.activeSubButton == 'subAction4', onClick: () => <></>},
-          { key: 'subAction5', icon: <BlockOutlined />, tooltip: 'Add Scene(s)', active: settingUtils.activeSubButton == 'subAction5', onClick: () => <></>},
+          { key: 'subAction3', icon: <VerticalAlignMiddleOutlined />, tooltip: 'New Command', separator: true, active: settingUtils.activeSubButton == 'subAction3', onClick: () => <></>},
+          { key: 'subAction4', icon: <PicLeftOutlined />, tooltip: 'New Command', active: settingUtils.activeSubButton == 'subAction4', onClick: () => <></>},
+          { key: 'subAction5', icon: <BlockOutlined />, tooltip: 'New Command', active: settingUtils.activeSubButton == 'subAction5', onClick: () => <></>},
         ],
       }
     },
@@ -472,6 +472,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     null
   );
 
+  // MOUSE ---------------------------------------------
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     // console.log('..: handleMouseMove activeSubButton:', activeSubButton);
     if (settingUtils.activeSubButton === "Scene") {
@@ -499,14 +500,15 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     }
   };
 
+  const handleMouseLeave = () => {
+    setMousePos(null); // Remove a silhueta quando o mouse sai da área
+  };
+  // MOUSE END -----------------------------------------
+
   const handleOpenProjectFolderWithPath = (path:string) => {
     console.log(`..: Open Project Folder: ${path}`);
     window.electronAPI.send('open-project-folder', path);
   }
-
-  const handleMouseLeave = () => {
-    setMousePos(null); // Remove a silhueta quando o mouse sai da área
-  };
 
   const getImageSize = (src: string): Promise<{width: number, height: number}> => {
     return new Promise((resolve, reject) => {

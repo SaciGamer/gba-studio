@@ -13,21 +13,8 @@
 
 Fade fade;
 
-namespace fade_functions {
-    int to_int(const char* str) {
-        int result = 0;
-        while(*str) {
-            if(*str >= '0' && *str <= '9') {
-                result = result * 10 + (*str - '0');
-            }
-            ++str;
-        }
-        return result;
-    }
-}
-
 // Funções auxiliares privadas (não expostas no .h)
-bool runFade(const int fadeSpeed, FadeType fadeType, bool active) {
+bool run_fade(const int fadeSpeed, FadeType fadeType, bool active) {
     if(active) {
         int skipped = bn::core::skip_frames();
         int fps = 60 / (skipped + 1);   // se skip=0 → 60, se skip=1 → 30, etc.
@@ -63,13 +50,13 @@ bool runFade(const int fadeSpeed, FadeType fadeType, bool active) {
     return false;
 }
 
-bool runFade(const void* args, FadeType fadeType) {
+bool run_fade(const void* args, FadeType fadeType) {
     if (!fade.active) {
         // converte o ponteiro genérico para array de strings
-        const char* const* strArgs = static_cast<const char* const*>(args);
+        const int* const* strArgs = static_cast<const int* const*>(args);
 
         // pega o tempo do fade (em frames)
-        fade.speed = fade_functions::to_int(strArgs[0]);
+        fade.speed = *strArgs[0];
         BN_LOG("runFade: fadeTime = ", fade.speed);
         fade.active = true;
 
@@ -81,5 +68,5 @@ bool runFade(const void* args, FadeType fadeType) {
         }
     }
 
-    return runFade(fade.speed, fadeType, fade.active);
+    return run_fade(fade.speed, fadeType, fade.active);
 }

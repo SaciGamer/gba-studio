@@ -3,12 +3,15 @@
 
 #include "bn_string.h"
 
-// CUSTOM FUNCTIONS
+// CUSTOM FUNCTIONS ------------
 // FUNCTION TO FADE
 #include "event_fade.h"
 // FUNCTION TO WAIT
 #include "event_wait.h"
 // FUNCTION TO CHANGE SCENE
 #include "event_change_scene.h"
+// FUNCTION TO CHANGE LAYER
+#include "event_change_layer.h"
+// CUSTOM FUNCTIONS END --------
 
 #endif // RESOURCE_REGISTRY_H

@@ -1,0 +1,12 @@
+{
+  "_resourceType": "background",
+  "id": "c00c9c5b-af66-4fb8-bfbb-e63ca7ab66f4",
+  "autoColor": false,
+  "name": "background",
+  "filename": "background.png",
+  "imageWidth": 256,
+  "imageHeight": 256,
+  "hd": false,
+  "tileColors": "",
+  "_deleted": false
+}

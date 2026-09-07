@@ -10,6 +10,8 @@ export enum EEvents {
     ZOOM = 'EVENT_ZOOM',
     ROTATE_CAMERA = 'EVENT_ROTATE_CAMERA',
     CHANGE_SCENE = 'EVENT_CHANGE_SCENE',
+    CHANGE_LAYER = 'EVENT_CHANGE_LAYER',
+    MOVE_LAYER = 'EVENT_MOVE_LAYER',
     REPLC_TL_AT_POS = 'EVENT_REPLC_TL_AT_POSITION',
     REPLC_TL_AT_POS_FROM_SQNCE = 'EVENT_REPLC_TL_AT_POSITION_F_SQNCE',
     FADE_IN = 'EVENT_FADE_IN',
@@ -21,6 +23,8 @@ export enum EEvents {
 
 export const EVENT_INFO: Record<EEvents, { name: string }> = {
   [EEvents.CHANGE_SCENE]: { name: 'Change Scene' },
+  [EEvents.CHANGE_LAYER]: { name: 'Change Background' },
+  [EEvents.MOVE_LAYER]: { name: 'Move Background' },
   [EEvents.DISPLAY_DIALOGUE]: { name: 'Display Dialogue' },
   [EEvents.SHOW_MENU]: { name: 'Show Menu' },
   [EEvents.HIDE_MENU]: { name: 'Hide Menu' },

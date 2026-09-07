@@ -287,13 +287,20 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
       
       {/* Start Position */}
       <Typography.Paragraph >Start Position</Typography.Paragraph>
-      <Flex>
-        <Form.Item name={"startX"} noStyle>
-          <InputNumber min={0} max={getSceneMax(settings.startSceneId, 15)} addonBefore="X" style={{ flex: 1, textAlign: 'center' }} />
-        </Form.Item>
-        <Form.Item name={"startY"} noStyle>
-          <InputNumber min={0} max={getSceneMax(settings.startSceneId, 10)} addonBefore="Y" style={{ flex: 1, textAlign: 'center', marginLeft: "10px" }} />
-        </Form.Item>
+      <Flex >
+        <Space.Compact style={{ flex: 1 }}>
+          <Space.Addon>X</Space.Addon>
+          <Form.Item name={"startX"} noStyle>
+            <InputNumber min={0} max={getSceneMax(settings.startSceneId, 15)} style={{ flex: 1 }}/>
+          </Form.Item>
+        </Space.Compact>
+
+        <Space.Compact style={{ flex: 1, marginLeft: '10px' }}>
+          <Space.Addon>Y</Space.Addon>
+          <Form.Item name={"startY"} noStyle>
+            <InputNumber min={0} max={getSceneMax(settings.startSceneId, 10)} style={{ flex: 1 }}/>
+          </Form.Item>
+        </Space.Compact>
       </Flex>
 
       <Divider style={{ margin: `${token.margin}px 0` }} />
@@ -355,7 +362,7 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
                     setCustomSpeed(isCustom);
                   }
                 }}
-                onDropdownVisibleChange={(open) => {
+                onOpenChange={(open) => {
                   console.log('..: Abriu drop de Movement: ', open);
                   setMoveDropdownOpen(open);
                 }}
@@ -378,7 +385,7 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
           <Select
             showSearch
             optionFilterProp="label"
-            onDropdownVisibleChange={(open) => {
+            onOpenChange={(open) => {
               console.log('..: Abriu drop de animation: ', open);
               setAnimDropdownOpen(open);
             }}

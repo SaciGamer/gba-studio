@@ -32,7 +32,9 @@ private:
     int sprite_count = 0;
 
     const Scenes* currentScene;
-    bn::vector<bn::regular_bg_ptr, 4> current_bgs;
+
+    bn::vector<bn::string<64>, 4> current_bgs_id;
+    bn::vector<bn::optional<bn::regular_bg_ptr>, 4> current_bgs;
     bn::optional<bn::sp_direct_bitmap_bg_ptr> current_bitmap_bgs;
 
     bn::optional<bn::palette_bitmap_bg_ptr> current_palette_btmp_bg;
@@ -67,6 +69,11 @@ public:
     const Scenes* getScene() const { return currentScene; }
 
     /**
+     * Initialize slots of layers
+     */
+    void init_bg_slots();
+
+    /**
      * Render scene
      */
     void render_scene_regular_bg(const Scenes& scene);
@@ -75,7 +82,18 @@ public:
     /**
      * Loading next scene
      */
-    const Scenes* loadNextSceneById(const bn::string<64>& scene_id);
+    const Scenes* load_next_scene_by_id(const bn::string<64>& scene_id);
+
+    /**
+     * Loading next regular backgrounds
+     */
+    bn::vector<bn::regular_bg_ptr, 4> load_next_regular_background_by_id(const bn::vector<LayerArgs, 4>& changeLayer);
+
+    /**
+     * Loading next bitmap backgrounds
+     */
+    bn::optional<bn::sp_direct_bitmap_bg_ptr> load_next_bitmap_background_by_id(const bn::vector<LayerArgs, 4>& changeLayer);
+    void change_layer(const bn::vector<LayerArgs, 4>& changeLayer);
 
     /**
      * Create sprite

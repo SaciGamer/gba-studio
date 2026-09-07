@@ -15,7 +15,7 @@
 
 bn::optional<bn::regular_bg_item> get_bg_item_from_name(const bn::string<64>& name)
 {
-    BN_LOG("..: get_bg_item_from_name, name:", name.data(), ":..");
+    BN_LOG("..: get_bg_item_from_name, name: ", name.data(), " :..");
 
     {{BACKGROUND_CONDITIONALS_FROM_NAME}}
     /* Example if
@@ -27,7 +27,7 @@ bn::optional<bn::regular_bg_item> get_bg_item_from_name(const bn::string<64>& na
 
 bn::optional<bn::direct_bitmap_item> get_bitmap_bg_item_from_name(const bn::string<64>& name)
 {
-    BN_LOG("..: get_bitmap_bg_item_from_name, name:", name.data(), ":..");
+    BN_LOG("..: get_bitmap_bg_item_from_name, name: ", name.data(), " :..");
 
     {{BITMAP_BACKGROUND_CONDITIONALS_FROM_NAME}}
     /* Exemplo:
@@ -132,18 +132,33 @@ const Scenes* GraphicsManager::initialize()
         return nullptr;
     }
 
-    return GraphicsManager::loadNextSceneById(settings->start_scene_id);
+    return GraphicsManager::load_next_scene_by_id(settings->start_scene_id);
 }
+
+void GraphicsManager::init_bg_slots()
+{
+    current_bgs.clear();
+    current_bgs_id.clear();
+    for(int i = 0; i < 4; i++)
+    {
+        current_bgs.push_back(bn::optional<bn::regular_bg_ptr>());
+        current_bgs_id.push_back(bn::string<64>());
+    }
+}
+
 
 void GraphicsManager::render_scene_regular_bg(const Scenes& scene) 
 {
     // Limpa backgrounds ativos
     current_bgs.clear();
     current_bitmap_bgs.reset();
+    current_bgs_id.clear();
 
-    // bn::core::update();  
+    bn::core::update();  
 
-    BN_LOG("..: render_scene :..");
+    GraphicsManager::init_bg_slots();
+
+    BN_LOG("..: render_scene_regular_bg :..");
     for(int i = 0; i < scene.backgrounds_layers_size; i++)
     {
         const SceneLayer& layer = scene.backgrounds_layers[i];
@@ -159,7 +174,6 @@ void GraphicsManager::render_scene_regular_bg(const Scenes& scene)
             }
             BN_LOG("Background encontrado: ", bg_resource->name);
 
-
             // 4.2 Cria o background ativo
             auto bg_item = get_bg_item_from_name(bg_resource->name);
             if(bg_item.has_value())
@@ -174,7 +188,8 @@ void GraphicsManager::render_scene_regular_bg(const Scenes& scene)
                 bg_ptr.set_z_order(priority);
                 bg_ptr.set_blending_enabled(true);
 
-                current_bgs.push_back(bg_ptr);
+                current_bgs[layer.layerId] = bg_ptr;
+                current_bgs_id[layer.layerId] = layer.backgroundId;
 
                 BN_LOG("Background carregado com sucesso: ", bg_resource->name);
             }
@@ -182,6 +197,16 @@ void GraphicsManager::render_scene_regular_bg(const Scenes& scene)
             {
                 BN_LOG("Background item não encontrado: ", bg_resource->name);
             }
+        } 
+        else
+        {
+            // Se não há backgroundId, garante que a posição fique vazia
+            if(layer.layerId >= current_bgs_id.size())
+            {
+                current_bgs_id.resize(layer.layerId + 1);
+            }
+            // current_bgs_id[layer.layerId] = bn::string<64>();
+            current_bgs_id.push_back(bn::string<64>());
         }
     }
 }
@@ -191,10 +216,11 @@ void GraphicsManager::render_scene_bitmap_bg(const Scenes& scene)
     // Limpa backgrounds ativos
     current_bgs.clear();
     current_bitmap_bgs.reset();
+    current_bgs_id.clear();
 
     bn::core::update();  
 
-    BN_LOG("..: render_scene :..");
+    BN_LOG("..: render_scene_bitmap_bg :..");
 
     for(int i = 0; i < scene.backgrounds_layers_size; i++)
     {
@@ -209,6 +235,8 @@ void GraphicsManager::render_scene_bitmap_bg(const Scenes& scene)
                 BN_LOG("Background não encontrado com ID: ", layer.backgroundId);
                 continue;
             }
+
+            BN_LOG("Background encontrado: ", bg_resource->name);
 
             // Cria o bitmap background ativo
             auto bmp_bg_item = get_bitmap_bg_item_from_name(bg_resource->name);
@@ -237,15 +265,236 @@ void GraphicsManager::render_scene_bitmap_bg(const Scenes& scene)
 
                 // Guarda no current_bitmap_bg
                 current_bitmap_bgs = bmp_bg;
+                current_bgs_id.push_back(layer.backgroundId);
 
                 BN_LOG("Bitmap BG carregado com sucesso: ", bg_resource->name);
-                break;
+                continue;
             }
             else
             {
                 BN_LOG("Bitmap BG item não encontrado: ", bg_resource->name);
             }
         }
+        current_bgs_id.push_back(bn::string<64>());
+    }
+}
+
+// Load regular backgrounds by ID
+bn::vector<bn::regular_bg_ptr, 4> GraphicsManager::load_next_regular_background_by_id(
+    const bn::vector<LayerArgs, 4>& changeLayer)
+{
+    bn::vector<bn::regular_bg_ptr, 4> result;
+    result.clear();
+    current_bitmap_bgs.reset();
+    bn::core::update();
+    // current_bgs.clear();
+
+    BN_LOG("..: loadNextRegularBackgroundById :..");
+
+    for(int i = 0; i < changeLayer.size(); i++)
+    {
+        const LayerArgs& layer = changeLayer[i];
+
+        if(!layer.background_id.empty())
+        {
+            const Backgrounds* bg_resource = get_background_by_id(layer.background_id);
+            if(!bg_resource)
+            {
+                BN_LOG("Background não encontrado com ID: ", layer.background_id);
+                continue;
+            }
+
+            auto bg_item = get_bg_item_from_name(bg_resource->name);
+            if(!bg_item.has_value())
+            {
+                BN_LOG("Background item não encontrado: ", bg_resource->name);
+                continue;
+            }
+
+            BN_LOG("Background item POS: ", i);
+            BN_LOG("Background item current_bgs: ", current_bgs.size());
+
+            // Se já existe um regular BG nessa posição
+            if(i < current_bgs[i].has_value() && !current_bgs_id[i].empty())
+            {
+                if(current_bgs_id[i] == layer.background_id)
+                {
+                    BN_LOG("..: Regular BG já existe :..");
+                    // Mesmo ID → só atualiza propriedades
+                    current_bgs[i]->set_visible(layer.visible);
+                    int priority = changeLayer.size() - 1 - layer.layer_id;
+
+                    current_bgs[i]->set_z_order(bn::clamp(priority, 0, 3));
+                    result.push_back(current_bgs[i].value());
+
+                    BN_LOG("Regular BG atualizado: ", bg_resource->name);
+                }
+                else
+                {
+                    // ID diferente → substitui imagem
+                    BN_LOG("..: Regular BG substituindo imagem :..");
+                    current_bgs[i].reset();
+
+                    auto bg_ptr = bn::regular_bg_ptr::create(bg_item.value());
+                    int priority = changeLayer.size() - 1 - layer.layer_id;
+                    bg_ptr.set_z_order(bn::clamp(priority, 0, 3));
+                    bg_ptr.set_blending_enabled(true);
+                    bg_ptr.set_visible(layer.visible);
+
+                    current_bgs[i] = bg_ptr;
+                    current_bgs_id[i] = layer.background_id;
+                    result.push_back(bg_ptr);
+
+                    BN_LOG("Regular BG substituído: ", bg_resource->name);
+                }
+            }
+            else
+            {
+                // Não existe → cria novo
+                BN_LOG("..: Regular BG criando novo :..");
+                current_bgs[i].reset();
+
+                auto bg_ptr = bn::regular_bg_ptr::create(bg_item.value());
+                int priority = changeLayer.size() - 1 - layer.layer_id;
+                bg_ptr.set_z_order(bn::clamp(priority, 0, 3));
+                bg_ptr.set_blending_enabled(true);
+                bg_ptr.set_visible(layer.visible);
+
+                if(i < current_bgs.size())
+                {
+                    current_bgs[i] = bg_ptr;
+                }
+                else
+                {
+                    current_bgs.push_back(bg_ptr);
+                }
+                current_bgs_id[i] = layer.background_id;
+                result.push_back(bg_ptr);
+
+                BN_LOG("Regular BG criado: ", bg_resource->name);
+            }
+        }
+        else
+        {
+            // Se não há background_id, limpa posição
+            if(i < current_bgs_id.size())
+            {
+                current_bgs_id[i] = bn::string<64>();
+            }
+            BN_LOG("Regular BG ID vazio na posição: ", i);
+        }
+    }
+
+    return result;
+}
+
+// Load bitmap backgrounds by ID
+bn::optional<bn::sp_direct_bitmap_bg_ptr> GraphicsManager::load_next_bitmap_background_by_id(
+    const bn::vector<LayerArgs, 4>& changeLayer)
+{
+    BN_LOG("..: loadNextBitmapBackgroundById :..");
+    current_bgs.clear();
+    bn::core::update();
+
+    for(int i = 0; i < changeLayer.size(); i++)
+    {
+        const LayerArgs& layer = changeLayer[i];
+
+        if(!layer.background_id.empty() && i == 2)
+        {
+            const Backgrounds* bg_resource = get_background_by_id(layer.background_id);
+            if(!bg_resource)
+            {
+                BN_LOG("Background não encontrado com ID: ", layer.background_id);
+                continue;
+            }
+
+            auto bmp_bg_item = get_bitmap_bg_item_from_name(bg_resource->name);
+            if(!bmp_bg_item.has_value())
+            {
+                BN_LOG("Bitmap BG item não encontrado: ", bg_resource->name);
+                continue;
+            }
+
+            // Se já existe um bitmap carregado
+            if(current_bitmap_bgs.has_value())
+            {
+                BN_LOG("..: Background Bitmap existe :..");
+
+                // Se for o mesmo ID, só atualiza visibilidade
+                if(!current_bgs_id[i].empty() && current_bgs_id[i] == layer.background_id)
+                {
+                    BN_LOG("..: Background Bitmap alterando propriedades :..");
+
+                    current_bitmap_bgs->set_visible(layer.visible);
+                    return current_bitmap_bgs;
+                }
+                else
+                {
+                    // Se for diferente, reaproveita o mesmo objeto e substitui a imagem
+                    BN_LOG("..: Background Bitmap alterando imagem :..");
+
+                    bn::sp_direct_bitmap_bg_painter painter(*current_bitmap_bgs);
+                    bn::size s = bmp_bg_item.value().dimensions();
+                    int x = (240 - s.width()) / 2;
+                    int y = (160 - s.height()) / 2;
+
+                    painter.fill(bn::color(0, 0, 0));
+                    painter.blit(x, y, bmp_bg_item.value());
+
+                    current_bitmap_bgs->set_visible(layer.visible);
+                    current_bgs_id[i] = layer.background_id;
+                    
+                    BN_LOG("Bitmap BG substituído: ", bg_resource->name);
+                    return current_bitmap_bgs;
+                }
+            }
+            else
+            {
+                // Se não existe, cria novo
+                BN_LOG("..: Background Bitmap criando novo :..");
+
+                current_bitmap_bgs.reset();
+                bn::core::update(); 
+
+                bn::sp_direct_bitmap_bg_ptr bmp_bg = bn::sp_direct_bitmap_bg_ptr::create();
+                bmp_bg.set_blending_enabled(true);
+
+                bn::sp_direct_bitmap_bg_painter painter(bmp_bg);
+                bn::size s = bmp_bg_item.value().dimensions();
+                int x = (240 - s.width()) / 2;
+                int y = (160 - s.height()) / 2;
+
+                painter.fill(bn::color(0, 0, 0));
+                painter.blit(x, y, bmp_bg_item.value());
+
+                bmp_bg.set_visible(layer.visible);
+
+                current_bitmap_bgs = bmp_bg;
+                current_bgs_id[i] = layer.background_id;
+
+                BN_LOG("Bitmap BG criado: ", bg_resource->name);
+                return current_bitmap_bgs;
+            }
+        }
+
+        current_bgs_id[i] = bn::string<64>();
+        BN_LOG("Bitmap BG ID: ", i, current_bgs_id[i].data());
+
+    }
+
+    return bn::optional<bn::sp_direct_bitmap_bg_ptr>();
+}
+
+void GraphicsManager::change_layer(const bn::vector<LayerArgs, 4>& changeLayer) {
+    bn::string<64> scene_type = currentScene->scene_type;
+    BN_LOG("[change_layer] Scene type: ", scene_type.data());
+    if(scene_type != "Logo" && scene_type != "Point Click") {
+        BN_LOG("[change_layer] Renderizando cena com REGULAR BG");
+        GraphicsManager::load_next_regular_background_by_id(changeLayer);
+    } else {
+        BN_LOG("[change_layer] Renderizando cena com BITMAP BG");
+        GraphicsManager::load_next_bitmap_background_by_id(changeLayer);
     }
 }
 
@@ -290,8 +539,9 @@ void GraphicsManager::initialize_tilemap(const Scenes* scene)
 
 void GraphicsManager::startup_screen(bn::regular_bg_ptr gba_studio_logo) {
     current_bgs.clear();
+    current_bitmap_bgs.reset();
     bn::core::update();  
-    
+
     current_bgs.push_back(gba_studio_logo);
 }
 
@@ -316,7 +566,7 @@ void GraphicsManager::startup_screen_bitmap(bn::direct_bitmap_item spritesheet) 
     current_bitmap_bgs = bmp_bg;
 }
 
-const Scenes* GraphicsManager::loadNextSceneById(const bn::string<64>& scene_id) {
+const Scenes* GraphicsManager::load_next_scene_by_id(const bn::string<64>& scene_id) {
     // 2. Busca a cena pelo ID na registry
     const Scenes* scene = get_scene_by_id(scene_id);
     if(!scene)
@@ -332,13 +582,13 @@ const Scenes* GraphicsManager::loadNextSceneById(const bn::string<64>& scene_id)
     
     // 3. Valida tipo da cena
     bn::string<64> scene_type = scene->scene_type;
-    BN_LOG("Scene type: ", scene_type.data());
+    BN_LOG("..: Scene type: ", scene_type.data());
     if(scene_type != "Logo" && scene_type != "Point Click") {
         // 4. Renderiza cena
-        BN_LOG("Renderizando cena com REGULAR BG");
+        BN_LOG("[load_next_scene_by_id] Renderizando cena com REGULAR BG");
         GraphicsManager::render_scene_regular_bg(*scene);
     } else {
-        BN_LOG("Renderizando cena com BITMAP BG");
+        BN_LOG("[load_next_scene_by_id] Renderizando cena com BITMAP BG");
         // 5. Renderiza cena
         GraphicsManager::render_scene_bitmap_bg(*scene);
     }

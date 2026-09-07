@@ -9,7 +9,7 @@ import { AntdToken } from '../common/AntDToken';
 import DefaultValueEvents from './DefaultValueEvents';
 import { EEvents, EVENT_INFO } from './interfaces/IEvents';
 
-const CATEGORIES = ["Actor", "Camera", "Audio", "Dialogue & Menus", "Scene", "Screen", "Timer"];
+const CATEGORIES = [/*"Actor", "Camera", "Audio", "Dialogue & Menus",*/ "Scene", "Screen", "Timer"];
 
 const highlightText = (text: string, highlight: string) => {
   const { token } = AntdToken();
@@ -23,43 +23,51 @@ const highlightText = (text: string, highlight: string) => {
 };
 
 const FUNCTIONS_BY_CATEGORY = {
-  Actor: {
-    Movimento: [
-      { id: EEvents.MOVE_ACTOR, name: EVENT_INFO[EEvents.MOVE_ACTOR].name }, 
-      { id: EEvents.JUMP_ACTOR, name: EVENT_INFO[EEvents.JUMP_ACTOR].name }
-    ],
-    Aparência: [
-      { id: EEvents.CHANGE_SPRITE, name: EVENT_INFO[EEvents.CHANGE_SPRITE].name },
-      { id: EEvents.CHANGE_COSTUME, name: EVENT_INFO[EEvents.CHANGE_COSTUME].name }
-    ],
-  },
-  Camera: {
-    Básico: [
-      { id: EEvents.PAN_CAMERA, name: EVENT_INFO[EEvents.PAN_CAMERA].name }, 
-      { id: EEvents.ZOOM, name: EVENT_INFO[EEvents.ZOOM].name }
-    ],
-    Avançado: [
-      { id: EEvents.ROTATE_CAMERA, name: EVENT_INFO[EEvents.ROTATE_CAMERA].name }
-    ],
-  },
-  Audio: {
+  // Actor: {
+  //   Movimento: [
+  //     { id: EEvents.MOVE_ACTOR, name: EVENT_INFO[EEvents.MOVE_ACTOR].name }, 
+  //     { id: EEvents.JUMP_ACTOR, name: EVENT_INFO[EEvents.JUMP_ACTOR].name }
+  //   ],
+  //   Aparência: [
+  //     { id: EEvents.CHANGE_SPRITE, name: EVENT_INFO[EEvents.CHANGE_SPRITE].name },
+  //     { id: EEvents.CHANGE_COSTUME, name: EVENT_INFO[EEvents.CHANGE_COSTUME].name }
+  //   ],
+  // },
+  // Camera: {
+  //   Básico: [
+  //     { id: EEvents.PAN_CAMERA, name: EVENT_INFO[EEvents.PAN_CAMERA].name }, 
+  //     { id: EEvents.ZOOM, name: EVENT_INFO[EEvents.ZOOM].name }
+  //   ],
+  //   Avançado: [
+  //     { id: EEvents.ROTATE_CAMERA, name: EVENT_INFO[EEvents.ROTATE_CAMERA].name }
+  //   ],
+  // },
+  // Audio: {
     
-  },
-  "Dialogue & Menus": {
+  // },
+  // "Dialogue & Menus": {
 
-  },
+  // },
   Scene: {
     Scene: [
       { id: EEvents.CHANGE_SCENE, name: EVENT_INFO[EEvents.CHANGE_SCENE].name },
     ],
-    Tiles: [
+    Layer:[
       {
-        id: EEvents.REPLC_TL_AT_POS, name: EVENT_INFO[EEvents.REPLC_TL_AT_POS].name,
+        id: EEvents.CHANGE_LAYER, name: EVENT_INFO[EEvents.CHANGE_LAYER].name
       },
-      {
-        id: EEvents.REPLC_TL_AT_POS_FROM_SQNCE, name: EVENT_INFO[EEvents.REPLC_TL_AT_POS_FROM_SQNCE].name,
-      }
-    ]
+      // {
+      //   id: EEvents.MOVE_LAYER, name: EVENT_INFO[EEvents.MOVE_LAYER].name
+      // }
+    ],
+    // Tiles: [
+    //   {
+    //     id: EEvents.REPLC_TL_AT_POS, name: EVENT_INFO[EEvents.REPLC_TL_AT_POS].name,
+    //   },
+    //   {
+    //     id: EEvents.REPLC_TL_AT_POS_FROM_SQNCE, name: EVENT_INFO[EEvents.REPLC_TL_AT_POS_FROM_SQNCE].name,
+    //   }
+    // ]
   },
   Screen: {
     "Fade": [
@@ -70,7 +78,7 @@ const FUNCTIONS_BY_CATEGORY = {
   Timer: {
     "Wait": [
       { id: EEvents.WAIT, name: EVENT_INFO[EEvents.WAIT].name },
-      { id: EEvents.IDLE, name: EVENT_INFO[EEvents.IDLE].name }
+      // { id: EEvents.IDLE, name: EVENT_INFO[EEvents.IDLE].name }
     ]
   }
 };

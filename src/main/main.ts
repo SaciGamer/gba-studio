@@ -120,6 +120,7 @@ function createSplashWindow() {
   windows.splash = new BrowserWindow({
     width: 660,
     height: 460,
+    useContentSize: true,
     resizable: false,
     frame: false,
     transparent: true,
@@ -169,6 +170,7 @@ export function createLauncherWindow(selectTab: string | null, isSplash: boolean
   windows.launcher = new BrowserWindow({
     width: 660,
     height: 460,
+    useContentSize: true,
     show: isSplash? false : true, // Não mostrar a janela principal inicialmente
     resizable: false,
     icon: iconPath,
@@ -228,6 +230,7 @@ function createProjectWindow(projectFilePath: string): void {
     y: engineWindowState.y,
     width: engineWindowState.width,
     height: engineWindowState.height,
+    useContentSize: true,
     icon: iconPath,
     webPreferences: {
       preload: preloadPath,
@@ -299,6 +302,7 @@ export function createAboutWindow() {
   windows.about = new BrowserWindow({
     width: 418,
     height: 438,
+    useContentSize: true,
     resizable: false,
     icon: iconPath,
     title: 'About GBA Studio',

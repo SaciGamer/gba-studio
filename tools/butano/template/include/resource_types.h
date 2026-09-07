@@ -3,6 +3,7 @@
 #define RESOURCE_TYPES_H
 
 #include <cstdint>
+#include "event_change_layer.h"
 
 enum class ResourceType : uint8_t
 {

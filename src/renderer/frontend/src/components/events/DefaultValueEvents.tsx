@@ -1,7 +1,7 @@
 import { IArgs, ISceneSettings } from "@/providers/contexts/interfaces/ISceneElement";
 import FadeEvent from "./FadeEvent";
 import { EEvents } from "./interfaces/IEvents";
-import { ChangeSceneEvent } from "./ChangeSceneEvent";
+import { SceneEvent } from "./SceneEvent";
 import WaitEvent from "./WaitEvent";
 
 export default function DefaultValueEvents(command: string | undefined, scenes?: ISceneSettings[]): IArgs | undefined {
@@ -11,7 +11,7 @@ export default function DefaultValueEvents(command: string | undefined, scenes?:
     case EEvents.FADE_IN:
       return FadeEvent.defaultValue();
     case EEvents.CHANGE_SCENE:
-      return scenes ? ChangeSceneEvent.defaultValue(scenes) : undefined;
+      return scenes ? SceneEvent.defaultValue(scenes) : undefined;
     case EEvents.FADE_OUT:
       return FadeEvent.defaultValue();
     case EEvents.WAIT:

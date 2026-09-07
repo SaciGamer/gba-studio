@@ -16,7 +16,7 @@ struct Fade {
     FadeType type;
 };
 
-bool runFade(const int fadeSpeed, FadeType fadeType, bool active);
-bool runFade(const void* args, FadeType fadeType);
+bool run_fade(const int fadeSpeed, FadeType fadeType, bool active);
+bool run_fade(const void* args, FadeType fadeType);
 
 #endif // EVENT_FADE_H

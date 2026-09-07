@@ -1,4 +1,4 @@
-import { App as AntDApp, Flex, Layout, Spin, Splitter, Typography } from 'antd';
+import { App as AntDApp, Flex, FloatButton, Layout, Spin, Splitter, Typography } from 'antd';
 import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 
 import BottomPanel from '../../BottomPanel';
@@ -25,8 +25,16 @@ import { useLocation } from 'react-router-dom';
 import { AntdToken } from '../../common/AntDToken';
 import { IUserSettings } from '@/providers/contexts/interfaces/IUserSettings';
 import Settings from './Settings';
+import { Header } from 'antd/es/layout/layout';
 
 const { Content } = Layout;
+
+const baseLayoutStyle = { 
+  flex: 1,
+  display: 'flex', 
+  height: 'calc(100vh - 42px)',
+  overflow: 'hidden' 
+};
 
 const Engine: React.FC = () => {
   const { token } = AntdToken();
@@ -466,167 +474,162 @@ const Engine: React.FC = () => {
   return (
     <ErrorBoundary>
       <AntDApp>
-        <Layout style={{
-          width: '100vw',
-          height: '100vh',
-          overflow: 'hidden' // Previne scroll indesejado
-        }}>
-          {/* <div> */}
-          {/* <button style={{ width: '150px', display: 'flex', justifyContent: 'space-between' }} onClick={handleCompile}>
-              Compilar Projeto
-            </button> */}
-          {/* <button onClick={handleLaunchEmulator}>Iniciar Emulador</button> */}
-          {/* <button onClick={handleRunProject}>Executar Projeto</button> */}
-          {/* </div> */}
-          <TopBar contenView={contentView} setContentView={setContentView} />
-          {contentView == 1 && (<Layout style={{ display: 'block', flex: 1, overflow: 'hidden' }}>
-            {/* <Content> */}
-            <Splitter
-              // onResizeStart={handleResizeStart}
-              onResizeEnd={handleResizeEnd}
-              onResize={handleResizePanel}
-            >
-              {/* PAINEL ESQUERDO */}
-              <Splitter.Panel
-                defaultSize="25%"
-                min={130}
-                // max="80%"
-                size={panelSizes[0]}
-                style={{
-                  display: panelSizes[0] <= 140 ? 'grid' : 'flex',
-                  overflow: 'hidden',
-                }}
-              >
-                <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                  {panelSizes[0] <= 140 && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                        zIndex: 10,
-                        pointerEvents: 'none', // permite clicar através do overlay
-                      }}
-                    />
-                  )}
-                  <LeftPanel />
-                </div>
-              </Splitter.Panel>
+        <Layout >
+          <Header style={{ height: 42 }}>
+            <TopBar contenView={contentView} setContentView={setContentView} />
+          </Header>
+          <Content>
+            {contentView == 1 && (
+              <Layout style={ baseLayoutStyle }>
+                <Splitter
+                  // onResizeStart={handleResizeStart}
+                  onResizeEnd={handleResizeEnd}
+                  onResize={handleResizePanel}
+                >
+                  {/* PAINEL ESQUERDO */}
+                  <Splitter.Panel
+                    defaultSize="25%"
+                    min={130}
+                    // max="80%"
+                    size={panelSizes[0]}
+                    style={{
+                      display: panelSizes[0] <= 140 ? 'grid' : 'flex',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                      {panelSizes[0] <= 140 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                            zIndex: 10,
+                            pointerEvents: 'none', // permite clicar através do overlay
+                          }}
+                        />
+                      )}
+                      <LeftPanel />
+                    </div>
+                  </Splitter.Panel>
 
-              {/* CENTRO */}
-              <Splitter.Panel /*size={panelSizes[1]}*/>
-                <Splitter layout="vertical">
-                  <Content style={{ backgroundColor: token.colorBgContainer }}>
-                    <GameWorld resetPanelSize={resetPanelSize} setShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton} />
-                  </Content>
-                  <Splitter.Panel defaultSize="25%" min={40} max="90%">
-                    {/* <Footer> */}
-                    <BottomPanel />
-                    {/* </Footer> */}
+                  {/* CENTRO */}
+                  <Splitter.Panel /*size={panelSizes[1]}*/>
+                    <Splitter layout="vertical">
+                      <Content style={{ backgroundColor: token.colorBgContainer }}>
+                        <GameWorld resetPanelSize={resetPanelSize} setShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton} />
+                      </Content>
+                      <Splitter.Panel defaultSize="25%" min={40} max="90%">
+                        {/* <Footer> */}
+                        <BottomPanel />
+                        {/* </Footer> */}
+                      </Splitter.Panel>
+                    </Splitter>
+                  </Splitter.Panel>
+
+                  {/* PAINEL DIREITO */}
+                  <Splitter.Panel defaultSize="35%" min={350} size={panelSizes[2]} >
+                    <RightPanel controllerView={setContentView} />
                   </Splitter.Panel>
                 </Splitter>
-              </Splitter.Panel>
+              </Layout>
+            )}
+            {contentView == 2 && (
+              <Layout style={ baseLayoutStyle }>
+                <Splitter
+                  onResizeEnd={handleResizeEnd}
+                  onResize={handleResizePanel}
+                >
+                  {/* PAINEL ESQUERDO */}
+                  <Splitter.Panel defaultSize="20%" min={200} size={panelSizes[0]}>
+                    <LeftPanel showScriptsAndVariables={false} />
+                  </Splitter.Panel>
 
-              {/* PAINEL DIREITO */}
-              <Splitter.Panel defaultSize="35%" min={350} size={panelSizes[2]} >
-                <RightPanel controllerView={setContentView} />
-              </Splitter.Panel>
-            </Splitter>
-            {/* </Content> */}
-            {/* {showFloatButton && (
-            <FloatButton 
-              shape="square"
-              style={{ position: 'absolute', bottom: 50, right: 900 }}
-              icon={<LayoutOutlined />}
-              onClick={() => { setPanelSize(250); setShowFloatButton(false); }} // Voltar ao tamanho original
-            />
-          )} */}
-          </Layout>
-          )}
-          {contentView == 2 && (
-            <Layout style={{ display: 'block', flex: 1, overflow: 'hidden' }}>
-              <Splitter
-                onResizeEnd={handleResizeEnd}
-                onResize={handleResizePanel}
-              >
-                {/* PAINEL ESQUERDO */}
-                <Splitter.Panel defaultSize="20%" min={200} size={panelSizes[0]}>
-                  <LeftPanel showScriptsAndVariables={false} />
-                </Splitter.Panel>
+                  {/* CENTRO */}
+                  <Splitter.Panel>
+                    <Splitter layout="vertical">
+                      <Content>
+                        {elementSelected && (elementSelected.sceneType === ETypeScene.LOGO || elementSelected.sceneType === ETypeScene.POINTNCLICK) ? (
+                          <TileEditor scene={elementSelected} resetPanelSize={resetPanelSize} setShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton} />
+                        ) : (
+                          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', fontSize: '18px', color: token.colorTextSecondary }}>
+                            Select a scene to edit
+                          </div>
+                        )}
+                      </Content>
+                      <Splitter.Panel defaultSize="25%" min={40} max="90%">
+                        <BottomPanel />
+                      </Splitter.Panel>
+                    </Splitter>
+                  </Splitter.Panel>
 
-                {/* CENTRO */}
-                <Splitter.Panel>
-                  <Splitter layout="vertical">
-                    <Content>
-                      {elementSelected && (elementSelected.sceneType === ETypeScene.LOGO || elementSelected.sceneType === ETypeScene.POINTNCLICK) ? (
-                        <TileEditor scene={elementSelected} resetPanelSize={resetPanelSize} setShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton} />
-                      ) : (
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', fontSize: '18px', color: token.colorTextSecondary }}>
-                          Select a scene to edit
-                        </div>
-                      )}
-                    </Content>
-                    <Splitter.Panel defaultSize="25%" min={40} max="90%">
-                      <BottomPanel />
-                    </Splitter.Panel>
-                  </Splitter>
-                </Splitter.Panel>
-
-                {/* PAINEL DIREITO */}
-                <Splitter.Panel defaultSize="35%" min={350} size={panelSizes[2]}>
-                  <RightPanel controllerView={setContentView} isTileEditor={true} />
-                </Splitter.Panel>
-              </Splitter>
-            </Layout>
-          )}
-        
-          {contentView == 3 && (
-            <Content style={{ margin: 50 }}>
-              <Skeleton.Node active style={{ height: 150, width: 250 }} />
-              <Skeleton active />
-              <Skeleton.Image active style={{ height: 150, width: 250 }} />
-            </Content>
-          )}
-          {contentView == 4 && (
-            <Content style={{ display: 'flex', flex: 'grid', margin: 50 }}>
-              <Skeleton.Image active style={{ height: 150, width: 250 }} />
-              <Skeleton active style={{ paddingInline: 20 }} />
-              <Skeleton.Image active style={{ height: 150, width: 250 }} />
-            </Content>
-          )}
-          {contentView == 5 && (
-            <Content style={{ margin: 50 }}>
-              <Skeleton active />
-              <Skeleton.Node active style={{ height: 150, width: 250 }} />
-            </Content>
-          )}
-          {contentView == 6 && (
-            <Content style={{ margin: 50 }}>
-              <Skeleton active />
-              <Skeleton.Node active style={{ height: 150, width: 250 }} />
-              <Skeleton active />
-            </Content>
-          )}
-          {contentView == 7 && (
-            <Content style={{ margin: 50 }}>
-              <Skeleton active />
-            </Content>
-          )}
-          {contentView == 8 && (
-            <Content style={{ margin: 50 }}>
-              <Skeleton.Node active style={{ height: 150, width: 250 }} />
-              <Skeleton active />
-            </Content>
-          )}
-          {contentView == 9 && (
-            <Content style={{ margin: 25 }}>
-              {/* <Skeleton.Node active style={{ height: 600, width: 350 }} /> */}
-              <Settings />
-            </Content>
-          )}
+                  {/* PAINEL DIREITO */}
+                  <Splitter.Panel defaultSize="35%" min={350} size={panelSizes[2]}>
+                    <RightPanel controllerView={setContentView} isTileEditor={true} />
+                  </Splitter.Panel>
+                </Splitter>
+              </Layout>
+            )}
+          
+            {contentView == 3 && (
+              <Layout style={ baseLayoutStyle }>
+                <Flex vertical style={{ margin: 50 }}>
+                  <Skeleton.Node active style={{ height: 150, width: 250 }} />
+                  <Skeleton active />
+                  <Skeleton.Image active style={{ height: 150, width: 250 }} />
+                </Flex>
+              </Layout>
+            )}
+            {contentView == 4 && (
+              <Layout style={ baseLayoutStyle }>
+                <Flex vertical style={{ margin: 50 }}>
+                  <Skeleton.Image active style={{ height: 150, width: 250 }} />
+                  <Skeleton active  />
+                  <Skeleton.Image active style={{ height: 150, width: 250 }} />
+                </Flex>
+              </Layout>
+            )}
+            {contentView == 5 && (
+              <Layout style={ baseLayoutStyle }>
+                <Flex vertical style={{ margin: 50 }}>
+                  <Skeleton active />
+                  <Skeleton.Node active style={{ height: 150, width: 250 }} />
+                </Flex>
+              </Layout>
+            )}
+            {contentView == 6 && (
+              <Layout style={ baseLayoutStyle }>
+                <Flex vertical style={{ margin: 50 }}>
+                  <Skeleton active />
+                  <Skeleton.Node active style={{ height: 150, width: 250 }} />
+                  <Skeleton active />
+                </Flex>
+              </Layout>
+            )}
+            {contentView == 7 && (
+              <Layout style={ baseLayoutStyle }>
+                <Flex vertical style={{ margin: 50 }}>
+                  <Skeleton active />
+                </Flex>
+              </Layout>
+            )}
+            {contentView == 8 && (
+              <Layout style={ baseLayoutStyle }>
+                <Flex vertical style={{ margin: 50 }}>
+                  <Skeleton.Node active style={{ height: 150, width: 250 }} />
+                  <Skeleton active />
+                </Flex>
+              </Layout>
+            )}
+            {contentView == 9 && (
+              <Layout style={ baseLayoutStyle }>
+                <Settings />
+              </Layout>
+            )}
+          </Content>
         </Layout>
       </AntDApp>
     </ErrorBoundary>

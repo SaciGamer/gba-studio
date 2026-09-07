@@ -300,7 +300,7 @@ void start_screen_anim()
     bn::blending::set_fade_alpha(bn::blending_fade_alpha(1));
     bn::blending::set_white_fade_color();
     // bn::blending::set_fade_color(bn::blending::fade_color_type::WHITE);
-    while (!runFade(1, FadeType::IN, true)) {
+    while (!run_fade(1, FadeType::IN, true)) {
         bn::core::update();
     }
 
@@ -321,7 +321,7 @@ void start_screen_anim()
     bn::blending::set_transparency_alpha(1);
 
     // FADE OUT
-    while (!runFade(1, FadeType::OUT, true)) {
+    while (!run_fade(1, FadeType::OUT, true)) {
         bn::core::update();
     }
 

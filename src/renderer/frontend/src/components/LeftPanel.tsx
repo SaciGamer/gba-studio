@@ -1,7 +1,7 @@
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
 import { BuildOutlined, CaretRightFilled, CaretRightOutlined, FileFilled, PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
-import { Collapse, Input, Layout, Splitter, Tooltip, Tree, TreeDataNode, Typography } from 'antd';
+import { Collapse, Flex, Input, Layout, Splitter, Tooltip, Tree, TreeDataNode, Typography } from 'antd';
 import React, { Key, useEffect, useMemo, useRef, useState } from 'react';
 import { AntdToken } from '../components/common/AntDToken';
 
@@ -138,9 +138,9 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
           break;
       }
 
-      setTreeHeightScenes(newSizes[0] - 40);
-      setTreeHeightScripts(newSizes[1] - 40);
-      setTreeHeightVariables(newSizes[2] - 40);
+      setTreeHeightScenes(newSizes[0] - 60);
+      setTreeHeightScripts(newSizes[1] - 60);
+      setTreeHeightVariables(newSizes[2] - 60);
       return newSizes;
     });
   };
@@ -179,6 +179,17 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
       searchInputRef.current?.focus();
     }
   }, [isSearchVisible]);
+
+  const treeDataScenes: TreeDataNode[] = filteredScenes.map((scene) => ({
+    key: scene.id,
+    title: (
+      <Flex align='center'>
+        <CaretRightFilled />
+        <BuildOutlined />
+        <Text style={{ marginLeft: 5 }}>{scene.name}</Text>
+      </Flex>
+    ),
+  }));
 
   const treeDataVariables: TreeDataNode[] = Array.from({ length: 101 }, (_, index) => ({
     key: index,
@@ -234,7 +245,7 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
     return [parseInt(key)]; // Converte para número pois as keys são numéricas
   };
 
-  const onSelectTree = (selectedKeys: Key[], info: any, source: 'scripts' | 'variables' | 'scenes') => {
+  const onSelectTree = (selectedKeys: Key[], info: any, source: /*'scenes' |*/ 'scripts' | 'variables') => {
     const newKey = selectedKeys[0]?.toString() || null;
     setGlobalSelectedKey(newKey ? `${source}-${newKey}` : null);
   };
@@ -259,8 +270,6 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
 
   const handleResize = (sizes:Array<number>) => {
     const newSizes = [...sizes];
-    const threshold = (HEADER_HEIGHT / window.innerHeight) * 100; // Converter HEADER_HEIGHT para porcentagem
-
 
     // Verifica se o painel 3 atingiu o tamanho 
     if (newSizes[0] <= 50) {
@@ -288,12 +297,14 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
     }
 
     setPanelSizes(newSizes);
-    setTreeHeightScenes(newSizes[0]);
-    setTreeHeightScripts(newSizes[1]);
-    setTreeHeightVariables(newSizes[2] - 50);
+    setTreeHeightScenes(newSizes[0] - 60);
+    setTreeHeightScripts(newSizes[1] - 60);
+    setTreeHeightVariables(newSizes[2] - 60);
   };
 
-  const handleSelectElement = (element: ISceneSettings | null) => {
+  const handleSelectElement = (elementId: Key | undefined) => {
+    const element = filteredScenes.filter(s => s.id === elementId).map(scene => scene).at(0);
+
     setElementSelected((prev: any) => ({
       ...prev,
       ...element,
@@ -306,10 +317,9 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
       onResize={handleResize}
       onResizeStart={handleResizeStart}
       onResizeEnd={handleResizeEnd}
-      style={{}}
     >
       {/* PAINEL 1 */}
-      <Splitter.Panel size={panelSizes[0]} style={{ overflow: 'hidden' }}>
+      <Splitter.Panel size={panelSizes[0]} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Collapse
           defaultActiveKey={['1']}
           activeKey={isScenesOpen ? 1 : 0}
@@ -322,8 +332,8 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
               label: 'SCENES',
               extra: [functionAdd(), functionSearch()],
               style: panelStyle,
-              children: isScenesOpen && (
-                <Content style={{ height: '100vh', backgroundColor: token.colorBgBase }}>
+              children: (
+                <Content style={{ height: '100vh', flex: 1 }}>
                   {isSearchVisible && (
                     <Input
                       ref={searchInputRef}
@@ -334,32 +344,21 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                         marginBottom: 5,
                         height: 25,
                         border: 'none',
-                        backgroundColor:
-                          searchTerm === '' ? token.colorBgBase : token.colorBorder,
+                        backgroundColor: searchTerm === '' ? token.colorBgBase : token.colorBorder,
                       }}
                     />
                   )}
-                  {filteredScenes.map((scene) => (
-                    <Content
-                      key={scene.id}
-                      onClick={() => {
-                        handleSelectElement(scene);
-                      }}
-                      hidden={false}
-                      style={{
-                        backgroundColor:
-                          elementSelected?.id === scene.id
-                            ? token.colorPrimary
-                            : 'transparent',
-                        borderRadius: token.borderRadius,
-                        margin: 2,
-                      }}
-                    >
-                      <CaretRightFilled />
-                      <BuildOutlined />
-                      <Text style={{ marginLeft: 5 }}>{scene.name}</Text>
-                    </Content>
-                  ))}
+                  <Tree
+                    className="custom-tree"
+                    showIcon
+                    height={isSearchVisible ? treeHeightScenes - 25 : treeHeightScenes }
+                    treeData={treeDataScenes}
+                    defaultExpandAll
+                    blockNode
+                    selectedKeys={elementSelected ? [elementSelected.id] : []}
+                    onSelect={(selectedKeys) => handleSelectElement(selectedKeys.at(0))}
+                    style={{ background: token.colorBgBase }}
+                  />
                 </Content>
               ),
             },
@@ -382,6 +381,7 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                   key: '1',
                   label: 'SCRIPTS',
                   extra: genExtra(),
+                  style: panelStyle,
                   children: (
                     <Tree
                       className="custom-tree"
@@ -395,10 +395,9 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                       onSelect={(selectedKeys, info) =>
                         onSelectTree(selectedKeys, info, 'scripts')
                       }
-                      style={{ height: '100vh', background: token.colorBgBase }}
+                      style={{ height: treeHeightScripts, background: token.colorBgBase }}
                     />
-                  ),
-                  style: panelStyle,
+                  )
                 },
               ]}
             />
@@ -417,6 +416,7 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                   key: '1',
                   label: 'VARIABLES',
                   extra: genExtra(),
+                  style: panelStyle,
                   children: (
                     <Tree
                       className="custom-tree"
@@ -430,10 +430,9 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                       onSelect={(selectedKeys, info) =>
                         onSelectTree(selectedKeys, info, 'variables')
                       }
-                      style={{ height: '100vh', backgroundColor: token.colorBgBase }}
+                      style={{ height: treeHeightVariables, backgroundColor: token.colorBgBase }}
                     />
-                  ),
-                  style: panelStyle,
+                  )
                 },
               ]}
             />

@@ -78,17 +78,24 @@ const controlDescriptions: Record<number, string> = {
   29: 'SLOW MOTION'
 };
 
+const contentStyle: React.CSSProperties = {
+  height: 'calc(100vh - 42px)',
+  paddingTop: 20, 
+  paddingInline: 20,
+  overflowY: 'auto',
+  scrollbarWidth: 'thin', 
+  scrollbarGutter: 'stable',  
+};
+
 const siderStyle: React.CSSProperties = {
-//   overflow: 'auto',
-//   height: '100vh',
-//   position: 'sticky',
+  // overflow: 'auto',
+  // height: 'calc(100vh - 70px)',
+  padding: 20,
+  position: 'sticky',
   insetInlineStart: 0,
   top: 0,
-  bottom: 0,
-  border: 0,
   scrollbarWidth: 'thin',
   scrollbarGutter: 'stable',
-  marginLeft: 20,
 };
 
 const Settings: React.FC = () => {
@@ -174,9 +181,12 @@ const Settings: React.FC = () => {
     };
 
     const target = map[key];
-    if (target && target.current) {
-      target.current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    if (target?.current && contentScrollRef.current) {
+      const container = contentScrollRef.current;
+      const targetTop = target.current.offsetTop;
+      container.scrollTo({ top: targetTop, behavior: 'smooth' });
     }
+
     setContentFilter('');
   };
 
@@ -259,18 +269,16 @@ const Settings: React.FC = () => {
 
   return (
     <Layout hasSider >
-      <Sider style={{ height: '100%', boxShadow: token.boxShadow, background: token.colorBgContainer }}>
-        <div>
+      <Sider style={{ ...siderStyle, backgroundColor: token.colorBgLayout }}>
+        <Content style={{ borderRadius: token.borderRadius, overflowY: 'auto', maxHeight: 'calc(100vh - 96px)', boxShadow: token.boxShadow }}>
           <Input.Search
             placeholder="Filter content"
             allowClear
             value={contentFilter}
             onChange={(e) => setContentFilter(e.target.value)}
             onSearch={(value) => setContentFilter(value)}
-            style={{ backgroundColor: token.colorBgBase, width: '100%', padding: 6 }}
+            style={{ backgroundColor: token.colorBgElevated, padding: 6 }}
           />
-        </div>
-        <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 96px)' }}>
           <Menu
             mode="inline"
             selectable={false}
@@ -278,90 +286,88 @@ const Settings: React.FC = () => {
             items={menuItems}
             style={{ background: token.colorBgElevated, border: 0 }}
           />
-        </div>
+        </Content>
       </Sider>
 
-      <Layout style={{ ...siderStyle, boxShadow: token.boxShadow }} >
-        <Content style={{ overflow: 'hidden' }}>
-          <Content ref={contentScrollRef} style={{ height: '100%', overflowY: 'auto' }}>
-            {matchesContent('Fade Options', 'Escolha a direção do fade entre branco→preto ou preto→branco.') && (
-              <Content ref={fadeRef} style={{ padding: 16, borderRadius: token.borderRadius, background: token.colorBgElevated || '#fbfbfb', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.02)', marginBottom: 16 }}>
-                <Title level={4}>Fade Options</Title>
-                <Paragraph>Chose the direction to fade between white and black.</Paragraph>
-                <Space direction="vertical">
-                  <Select
-                    value={(settings && settings.fadeDirection) ?? 0}
-                    onChange={(value) => markUnsaved({ fadeDirection: value })}
-                    style={{ width: 240 }}
-                  >
-                    <Select.Option value={0}>Fade to white</Select.Option>
-                    <Select.Option value={1}>Fade to black</Select.Option>
-                  </Select>
-                </Space>
+      <Content ref={contentScrollRef} style={{ ...contentStyle, scrollbarColor: token.colorBgMask + ' transparent', }}>
+        <Content style={{ position: 'sticky' }}>
+          {matchesContent('Fade Options', 'Escolha a direção do fade entre branco→preto ou preto→branco.') && (
+            <Content ref={fadeRef} style={{ padding: 16, borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadow, marginBottom: 16 }}>
+              <Title level={4}>Fade Options</Title>
+              <Paragraph>Chose the direction to fade between white and black.</Paragraph>
+              <Space direction="vertical">
+                <Select
+                  value={(settings && settings.fadeDirection) ?? 0}
+                  onChange={(value) => markUnsaved({ fadeDirection: value })}
+                  style={{ width: 240 }}
+                >
+                  <Select.Option value={0}>Fade to white</Select.Option>
+                  <Select.Option value={1}>Fade to black</Select.Option>
+                </Select>
+              </Space>
+            </Content>
+          )}
+          {matchesContent('Controls', 'Preencha o formulário abaixo com os valores desejados para cada mapeamento.') && (
+            <Content ref={controlsRef} style={{ padding: 16, borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadow, marginBottom: 16 }}>
+              <Title level={4}>Controls</Title>
+              <Paragraph>Setting of the values buttons to map controller of game.</Paragraph>
+              <Content>
+                  {/* only show configurable indices */}
+                  {([8,0,10,11,2,3,4,5,6,7,27,28,29] as number[]).map((idx) => {
+                    const entry = (controlsObj[0] && controlsObj[0][idx]) || { _values: [] };
+                    const values: string[] = entry._values || [];
+                    return (
+                      <Content key={`control-${idx}`} style={{ padding: 8, borderRadius: token.borderRadius, background: token.colorFillTertiary, marginBottom: 8 }}>
+                      <Row gutter={12} align="middle">
+                        <Col span={3}>
+                          <Space>
+                            {/* <strong>{idx}</strong> */}
+                            <Space style={{ fontSize: 11, color: token.colorTextSecondary }}>{controlDescriptions[idx] || ''}</Space>
+                          </Space>
+                        </Col>
+                        <Col span={14}>
+                          <Input readOnly value={values.join(', ')} placeholder="(click to capture)" onClick={() => setCapturing({ player: 0, idx })} />
+                        </Col>
+                        <Col span={7}>
+                          <Space>
+                            <Button onClick={() => { setControlsAndUnsaved((prev:any) => { const next = {...prev}; if(!next[0]) next[0] = {}; next[0][idx] = { ...(next[0][idx]||{}), _values: [] }; return next; }); message.info('Cleared values'); }}>Clear</Button>
+                          </Space>
+                        </Col>
+                      </Row>
+                      </Content>
+                    );
+                  })}
               </Content>
-            )}
-            {matchesContent('Controls', 'Preencha o formulário abaixo com os valores desejados para cada mapeamento.') && (
-              <Content ref={controlsRef} style={{ padding: 16, borderRadius: token.borderRadius, background: token.colorBgElevated || '#ffffff', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.02)', marginBottom: 16 }}>
-                <Title level={4}>Controls</Title>
-                <Paragraph>Setting of the values buttons to map controller of game.</Paragraph>
-                <Content style={{ /*maxHeight: 420,*/ overflow: 'auto', paddingRight: 8 }}>
-                    {/* only show configurable indices */}
-                    {([8,0,10,11,2,3,4,5,6,7,27,28,29] as number[]).map((idx) => {
-                      const entry = (controlsObj[0] && controlsObj[0][idx]) || { _values: [] };
-                      const values: string[] = entry._values || [];
-                      return (
-                        <Content key={`control-${idx}`} style={{ padding: 8, borderRadius: token.borderRadius, background: token.colorFillTertiary || '#fff', marginBottom: 8 }}>
-                        <Row gutter={12} align="middle">
-                          <Col span={3}>
-                            <Space>
-                              {/* <strong>{idx}</strong> */}
-                              <Space style={{ fontSize: 11, color: token.colorTextSecondary }}>{controlDescriptions[idx] || ''}</Space>
-                            </Space>
-                          </Col>
-                          <Col span={14}>
-                            <Input readOnly value={values.join(', ')} placeholder="(click to capture)" onClick={() => setCapturing({ player: 0, idx })} />
-                          </Col>
-                          <Col span={7}>
-                            <Space>
-                              <Button onClick={() => { setControlsAndUnsaved((prev:any) => { const next = {...prev}; if(!next[0]) next[0] = {}; next[0][idx] = { ...(next[0][idx]||{}), _values: [] }; return next; }); message.info('Cleared values'); }}>Clear</Button>
-                            </Space>
-                          </Col>
-                        </Row>
-                        </Content>
-                      );
-                    })}
-                </Content>
-                <Space style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                    <Button onClick={restoreDefaultControls}>Restore Defaults</Button>
+              <Space style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                  <Button onClick={restoreDefaultControls}>Restore Defaults</Button>
+              </Space>
+            </Content>
+          )}
+          {matchesContent('Demo Filters', 'Demo configuration') && (
+            <Content ref={demoRef} style={{ padding: 16, borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadow, marginBottom: 16 }}>
+              <Title level={4}>Demo configuration</Title>
+              <Paragraph>Configure the settings of display</Paragraph>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Space style={{ width: '100%' }}>
+                  <Content>Select filter: </Content>
+                    <Select
+                      style={{ width: 300 }}
+                      value={(settings && settings.demoFilter) || demoFilterOptions[0].value}
+                      onChange={(v) => markUnsaved({ demoFilter: v })}
+                      options={demoFilterOptions.map(option => ({ value: option.value, label: option.label }))}
+                    />
+                  <Content style={{ paddingLeft: 10 }}>Show FPS: </Content>
+                    <Switch checked={(settings && settings.demoShowFPS) || false} onChange={(v) => markUnsaved({ demoShowFPS: v })} />
+                  <Content style={{ paddingLeft: 10 }}> Show Menu: </Content>
+                    <Switch checked={(settings && settings.demoShowMenu) || false} onChange={(v) => markUnsaved({ demoShowMenu: v })} />
+                  {/* <Content style={{ paddingLeft: 10 }}>Show Right Click to License: </Content>
+                    <Switch checked={(settings && settings.demoShowLicense) || false} onChange={(v) => markUnsaved({ demoShowLicense: v })} /> */}
                 </Space>
-              </Content>
-            )}
-            {matchesContent('Demo Filters', 'Demo configuration') && (
-              <Content ref={demoRef} style={{ padding: 16, borderRadius: token.borderRadius, background: token.colorBgElevated || '#fbfbfb', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.02)', marginBottom: 16 }}>
-                <Title level={4}>Demo configuration</Title>
-                <Paragraph>Configure the settings of display</Paragraph>
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <Space style={{ width: '100%' }}>
-                    <Content>Select filter: </Content>
-                      <Select
-                        style={{ width: 300 }}
-                        value={(settings && settings.demoFilter) || demoFilterOptions[0].value}
-                        onChange={(v) => markUnsaved({ demoFilter: v })}
-                        options={demoFilterOptions.map(option => ({ value: option.value, label: option.label }))}
-                      />
-                    <Content style={{ paddingLeft: 10 }}>Show FPS: </Content>
-                      <Switch checked={(settings && settings.demoShowFPS) || false} onChange={(v) => markUnsaved({ demoShowFPS: v })} />
-                    <Content style={{ paddingLeft: 10 }}> Show Menu: </Content>
-                      <Switch checked={(settings && settings.demoShowMenu) || false} onChange={(v) => markUnsaved({ demoShowMenu: v })} />
-                    {/* <Content style={{ paddingLeft: 10 }}>Show Right Click to License: </Content>
-                      <Switch checked={(settings && settings.demoShowLicense) || false} onChange={(v) => markUnsaved({ demoShowLicense: v })} /> */}
-                  </Space>
-                </Space>
-              </Content>
-            )}
-          </Content>
+              </Space>
+            </Content>
+          )}
         </Content>
-      </Layout>
+      </Content>
     </Layout>
   );
 };

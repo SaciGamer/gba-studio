@@ -111,6 +111,70 @@ export class ResourceBuilder {
     };
   }
 
+  /**
+   * Recursive function to emit C++ code for nested arguments
+   * @param name The name of the argument to emit
+   * @param value The value of the argument to emit
+   * @returns The generated C++ code for the argument
+   */
+  private emitArgs(name: string, value: any): string {
+    let code = "";
+
+    if (typeof value === 'string') {
+      const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      code += `static const char ${name}[] = \"${escaped}\";\n`;
+    } else if (typeof value === 'number') {
+      if (Number.isInteger(value)) {
+        code += `static const int ${name} = ${value};\n`;
+      } else {
+        code += `static const float ${name} = ${value}f;\n`;
+      }
+    } else if (typeof value === 'boolean') {
+      code += `static const bool ${name} = ${value};\n`;
+    } else if (Array.isArray(value)) {
+      // array de objetos -> gera arrays separados por campo
+      const childRefs: string[] = [];
+      let index = 0;
+
+      for (const f of Object.values(value)) {
+        // const fieldValues = value.map(obj => obj[f]);
+        code += this.emitArgs(`${name}_${index}`, f);
+        const memoryRef = typeof f === 'number' || typeof f === 'boolean' ? '&' : '';
+        childRefs.push(`${memoryRef}${name}_${index}`);
+        index++;
+      }
+
+      // criar objeto genérico de ponteiros para os filhos
+      code += `static const void* ${name}[] = {\n`;
+      for (const ref of childRefs) {
+        code += `    ${ref},\n`;
+      }
+      code += `};\n`;
+    } else if (typeof value === "object" && value !== null) {
+      const childRefs: string[] = [];
+      for (const [k, v] of Object.entries(value)) {
+        if (k.startsWith("__")) continue;
+
+        const sufixName = k.toUpperCase();
+        code += this.emitArgs(`${name}_${sufixName}`, v);
+        const memoryRef = typeof v === 'number' || typeof v === 'boolean' ? '&' : '';
+        childRefs.push(`${memoryRef}${name}_${sufixName}`);
+      }
+
+      if (childRefs.length > 0) {
+        code += `static const void* ${name}[] = {\n`;
+        for (const ref of childRefs) {
+          code += `    ${ref},\n`;
+        }
+        code += `};\n`;
+      }
+    } else {
+      code += `static const char* ${name} = nullptr;\n`; 
+    }
+
+    return code;
+  }
+
   private createStructureFromJson(baseName: string, key: string, val: any, resourceType: string): string {
     let response = "";
 
@@ -141,27 +205,8 @@ export class ResourceBuilder {
               return;
 
             let argsName = `${baseName}_ARGS_${index}`;
-            let argsDecl = "";
+            let argsDecl = this.emitArgs(argsName, script.args);
             let argsCount = 0;
-            // let sceneArgsTemplate = `static const char* {{SCENE_NAME}}_ARGS[] = {{{SCRIPT_ARGS_CONTENT}}};\n`;
-            // sceneArgsTemplate = sceneArgsTemplate.replace("{{SCENE_NAME}}", baseName);
-
-            if (script.args && typeof script.args === 'object' /*&& Array.isArray(script.args)*/) {
-              argsDecl += `static const char* ${argsName}[] = { `;
-              Object.entries(script.args).forEach(([key, argValue]) => {
-                if (key.startsWith('__'))
-                  return;
-
-                if (typeof argValue === 'string' || typeof argValue === 'number') {
-                  argsDecl += `"${argValue}", `;
-                  argsCount ++;
-                } else {
-                  argsDecl += `nullptr, `;
-                }
-
-              });
-              argsDecl += `};\n`;
-            }
             
             response += argsDecl;
             sceneScriptsTemplate = sceneScriptsTemplate.replace("{{SCRIPTS_CONTENT}}", `\n    { "${script.id}", "${script.command}", ${argsName}, ${argsCount} },{{SCRIPTS_CONTENT}}`);
