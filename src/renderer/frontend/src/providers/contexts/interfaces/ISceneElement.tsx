@@ -29,7 +29,7 @@ export interface IArgs {
 export interface IScriptsElement {
     id: string;
     command: string;
-    args?: IFade | IChangeScene | IWait | LayerMultiProps;
+    args?: IArgs & (IFade | IChangeScene | IWait | LayerMultiProps);
     children?: Object[];
 }
 interface IPosAndWidth {
