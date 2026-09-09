@@ -1,12 +1,13 @@
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
-import { ArrowRightOutlined, PlusSquareOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
+import { ArrowRightOutlined, BranchesOutlined, PlusSquareOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 import { Button, Divider, Drawer, Empty, Flex, Input, InputRef, Menu, Space, Typography } from "antd";
 import { Content } from 'antd/es/layout/layout';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { AntdToken } from '../common/AntDToken';
 import DefaultValueEvents from './DefaultValueEvents';
+import FlowEditorManager, { ScriptKey } from './FlowEditorManager';
 import { EEvents, EVENT_INFO } from './interfaces/IEvents';
 
 const CATEGORIES = [/*"Actor", "Camera", "Audio", "Dialogue & Menus",*/ "Scene", "Screen", "Timer"];
@@ -107,9 +108,11 @@ const EventMenuItem: React.FC<EventMenuItemProps> = ({ eventId, isFavorite, onTo
 interface ISelectEventProps {
   tabIndex?: string;
   subTabIndex?: string;
+  showFlowButton?: boolean;
+  compact?: boolean;
 }
 
-const SelectNewEvent: React.FC<ISelectEventProps> = ({tabIndex, subTabIndex}) => {
+const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, showFlowButton = true, compact = false }) => {
   // const { scenes, setScenes, ignoredFields } = useSceneContext();
   // const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
   // const { elementSelected, setElementSelected } = useElementContext();
@@ -119,6 +122,7 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({tabIndex, subTabIndex}) =>
   const favoriteEvents = userSettings.favoriteEvents || [];
   
   const [open, setOpen] = useState(false);
+  const [flowOpen, setFlowOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -226,14 +230,33 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({tabIndex, subTabIndex}) =>
   };
 
   return (
-    <Content style={{ margin: 10 }}>
+    <Content style={{ margin: compact ? 0 : 10 }}>
       <Flex vertical gap="middle" align="center" >
-        {shouldShowEmpty && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+        {!compact && shouldShowEmpty && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />}
       
-        <Button type="default" icon={<PlusSquareOutlined style={{fontSize: 20}}/>} style={{ width: '100%'}} onClick={() => setOpen(true)}>
-          Add Event
-        </Button>
+        <Flex gap="small" style={{ width: '100%' }}>
+          <Button type="default" icon={<PlusSquareOutlined style={{fontSize: 20}}/>} style={{ flex: 1 }} onClick={() => setOpen(true)}>
+            Add Event
+          </Button>
+          {showFlowButton && (
+            <Button
+              aria-label="Open Flow Editor"
+              icon={<BranchesOutlined />}
+              title="Open Flow Editor"
+              onClick={() => setFlowOpen(true)}
+            />
+          )}
+        </Flex>
       </Flex>
+
+      {showFlowButton && (
+        <FlowEditorManager
+          open={flowOpen}
+          onClose={() => setFlowOpen(false)}
+          scriptKey={(subTabIndex || 'script') as ScriptKey}
+          addEventControl={<SelectNewEvent tabIndex={tabIndex} subTabIndex={subTabIndex} showFlowButton={false} compact />}
+        />
+      )}
      
       <Drawer
         title="Add Event"

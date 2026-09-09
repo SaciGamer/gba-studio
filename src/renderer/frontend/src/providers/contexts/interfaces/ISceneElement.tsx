@@ -31,6 +31,7 @@ export interface IScriptsElement {
     command: string;
     args?: IArgs & (IFade | IChangeScene | IWait | LayerMultiProps);
     children?: Object[];
+    position?: { x: number; y: number };
 }
 interface IPosAndWidth {
     x: number;
