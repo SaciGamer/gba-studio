@@ -40,7 +40,7 @@ export function setProjectFile(file: string): string | null {
     return settingsController.setProjectFile(file);
 }
 
-export function changesPending<T>(type: 'main' | 'project' | 'settings' | 'scene', newData: Partial<T>) {
+export function changesPending<T>(type: 'main' | 'project' | 'settings' | 'scene' | 'variables', newData: Partial<T>) {
     settingsController.setIsSaved(false);
     settingsController.updateSettings(newData);
 }

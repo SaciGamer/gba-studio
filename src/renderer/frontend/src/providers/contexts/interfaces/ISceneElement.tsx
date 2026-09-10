@@ -3,6 +3,7 @@ import { IFade } from "@/components/events/interfaces/IFade";
 import { IWait } from "@/components/events/interfaces/IWaiting";
 import { IResourceSettings } from "./IBaseSettings";
 import { LayerMultiProps } from "@/components/events/interfaces/ILayer";
+import { EVariableType, VariableValue } from "./IVariablesElement";
 
 export enum ETypeScene {
     TOPDOWN = 'Top Down',
@@ -23,14 +24,63 @@ export interface IBackgroundElement {
     backgroundId?: string | null;
 }
 export interface IArgs {
-  __comment?: boolean;
-  __collapse?: boolean;
+    __comment?: boolean;
+    __collapse?: boolean;
+    __x?: number;
+    __y?: number;
+}
+
+export type IConditionValue =
+    | { kind: 'literal'; value: VariableValue; type: EVariableType }
+    | { kind: 'variable'; variableId: string; symbol: string; type: EVariableType };
+
+export interface IIfArgs extends IArgs {
+    left: IConditionValue;
+    operator: '==' | '!=' | '>' | '>=' | '<' | '<=';
+    right: IConditionValue;
+}
+
+export interface IIfChildren {
+    then: IScriptsElement[];
+    else?: IScriptsElement[];
+    thenCollapsed?: boolean;
+    elseCollapsed?: boolean;
+}
+
+export interface IVariableReference {
+    kind: 'variable';
+    variableId: string;
+    symbol: string;
+    type: EVariableType;
+}
+
+export interface IVariableLiteral {
+    kind: 'literal';
+    type: EVariableType;
+    value: VariableValue;
+}
+
+export type IVariableValue = IVariableReference | IVariableLiteral;
+
+export interface IVariableSetValueArgs extends IArgs {
+    variableId: string;
+    variableSymbol: string;
+    value: IVariableValue;
+}
+
+export interface IVariableBooleanArgs extends IArgs {
+    variableId: string;
+    variableSymbol: string;
+}
+
+export interface IVariableResetAllArgs extends IArgs {
+    scope: 'ALL' | 'GLOBAL' | 'LOCAL' | 'TEMP';
 }
 export interface IScriptsElement {
     id: string;
     command: string;
-    args?: IArgs & (IFade | IChangeScene | IWait | LayerMultiProps);
-    children?: Object[];
+    args?: IArgs & (IFade | IChangeScene | IWait | LayerMultiProps | IIfArgs | IVariableSetValueArgs | IVariableBooleanArgs | IVariableResetAllArgs);
+    children?: IIfChildren;
     position?: { x: number; y: number };
 }
 interface IPosAndWidth {

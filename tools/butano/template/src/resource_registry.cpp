@@ -9,6 +9,7 @@
 #include "bn_string.h"
 #include "resources.h"
 #include "resource_registry.h"
+#include "variable_manager.h"
 
 static const Backgrounds BACKGROUNDS[] = {
 {{BACKGROUNDS_CONSTANTS}}
@@ -19,6 +20,11 @@ static const Scenes SCENES[] = {
 };
 
 static const Settings SETTINGS = {{SETTINGS_CONSTANTS}};
+
+void initialize_variables()
+{
+{{VARIABLES_INITIALIZATION}}
+}
 
 // Função auxiliar genérica para iterar sobre arrays de qualquer tipo
 template <typename T, typename Func>

@@ -26,6 +26,9 @@ const Scenes* get_scene_by_id_and_type(const bn::string<64>& scene_id, ResourceT
 // FUNCOES PARA SETTINGS
 const Settings* get_settings();
 
+// FUNCOES PARA VARIABLES
+void initialize_variables();
+
 // FUNCOES PARA TILEMAP ....
 
 

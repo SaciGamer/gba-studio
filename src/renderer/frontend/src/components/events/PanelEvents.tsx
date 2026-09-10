@@ -4,6 +4,8 @@ import FadeEvent from "./FadeEvent";
 import { EEvents } from "./interfaces/IEvents";
 import WaitEvent from "./WaitEvent";
 import { ChangeLayerEvent, MoveLayerEvent } from "./LayerEvent";
+import IfEvent from "./IfEvent";
+import VariableEvent from "./VariableEvent";
 
 interface PanelEventsProps {
   event: IScriptsElement | null;
@@ -27,6 +29,11 @@ export default function PanelEvents({ event, customTitle, onValueChange }: Panel
       return <ChangeLayerEvent event={event} onValueChange={onValueChange}/>
      case EEvents.MOVE_LAYER:
       return <MoveLayerEvent event={event} onValueChange={onValueChange}/>
+    case EEvents.IF:
+      return <IfEvent event={event} onValueChange={onValueChange} />;
+    case EEvents.VARIABLE:
+    case EEvents.VARIABLE_RESET_ALL:
+      return <VariableEvent event={event} onValueChange={onValueChange} />;
     // case EEvents.IDLE:
     //   return WaitingEvent.idle();
     default:

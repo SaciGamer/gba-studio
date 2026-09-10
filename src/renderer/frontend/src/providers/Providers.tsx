@@ -5,6 +5,7 @@ import { IProjectSettings } from "./contexts/interfaces/IProjectElement";
 import { IMainSettings } from "./contexts/interfaces/ISettingElement";
 import { ISettingUtils } from "./contexts/interfaces/ISettingUtils";
 import { IUserSettings } from "./contexts/interfaces/IUserSettings";
+import { IVariablesSettings } from "./contexts/interfaces/IVariablesElement";
 
 // Criar os providers com nomes personalizados
 export const { Context: SettingsUtilsContext, Provider: SettingsUtilsProvider } = createProvider<ISettingUtils>(
@@ -40,6 +41,17 @@ export const { Context: ElementContext, Provider: ElementProvider } = createProv
 export const { Context: BackgroundContext, Provider: BackgroundProvider } = createProvider<IBackgroundSettings[]>(
     [], 
     { valueName: "backgrounds", setValueName: "setBackgrounds", ignoredFields: ["_saved"/*, "_deleted"*/] }
+);
+
+export const { Context: VariablesContext, Provider: VariablesProvider } = createProvider<IVariablesSettings>(
+    {
+        _resourceType: 'variables',
+        _version: '1.0',
+        _saved: true,
+        _deleted: false,
+        variables: [],
+    },
+    { valueName: "variables", setValueName: "setVariables", ignoredFields: ["_saved"] }
 );
 
 // Função genérica para criar providers com nomes personalizados para value e setValue

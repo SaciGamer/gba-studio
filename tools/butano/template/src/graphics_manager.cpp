@@ -489,7 +489,7 @@ bn::optional<bn::sp_direct_bitmap_bg_ptr> GraphicsManager::load_next_bitmap_back
 void GraphicsManager::change_layer(const bn::vector<LayerArgs, 4>& changeLayer) {
     bn::string<64> scene_type = currentScene->scene_type;
     BN_LOG("[change_layer] Scene type: ", scene_type.data());
-    if(scene_type != "Logo" && scene_type != "Point Click") {
+    if(!(scene_type == "Logo") && !(scene_type == "Point Click")) {
         BN_LOG("[change_layer] Renderizando cena com REGULAR BG");
         GraphicsManager::load_next_regular_background_by_id(changeLayer);
     } else {
@@ -583,7 +583,7 @@ const Scenes* GraphicsManager::load_next_scene_by_id(const bn::string<64>& scene
     // 3. Valida tipo da cena
     bn::string<64> scene_type = scene->scene_type;
     BN_LOG("..: Scene type: ", scene_type.data());
-    if(scene_type != "Logo" && scene_type != "Point Click") {
+    if(!(scene_type == "Logo") && !(scene_type == "Point Click")) {
         // 4. Renderiza cena
         BN_LOG("[load_next_scene_by_id] Renderizando cena com REGULAR BG");
         GraphicsManager::render_scene_regular_bg(*scene);

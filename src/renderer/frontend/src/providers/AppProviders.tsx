@@ -1,6 +1,6 @@
 import { ComponentType, ReactNode } from 'react';
 import { BuildStateProvider } from './BuildStateProvider';
-import { BackgroundProvider, ElementProvider, ProjectProvider, SceneProvider, SettingsProvider, SettingsUtilsProvider, UserSettingsProvider } from "./Providers";
+import { BackgroundProvider, ElementProvider, ProjectProvider, SceneProvider, SettingsProvider, SettingsUtilsProvider, UserSettingsProvider, VariablesProvider } from "./Providers";
 
 const composeProviders = (...providers: ComponentType<{ children: ReactNode }>[]) => {
     return ({ children }: { children: ReactNode }) => 
@@ -14,6 +14,7 @@ const AppProvider = composeProviders(
     ProjectProvider,
     SettingsProvider, 
     BackgroundProvider,
+    VariablesProvider,
     ElementProvider,
     SceneProvider,
 );

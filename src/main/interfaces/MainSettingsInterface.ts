@@ -37,6 +37,18 @@ export interface IFileSettings extends IBaseSettings {
     _release: string;
 }
 
+export type EVariableType = 'number' | 'boolean' | 'string';
+
+export interface IVariableDefinition {
+    id: string;
+    name: string;
+    symbol: string;
+    type: EVariableType;
+    initialValue: number | boolean | string;
+}
+
 export interface IVariablesSettings extends IBaseSettings {
-    variables?: any[];
+    _resourceType: 'variables';
+    _version: string;
+    variables: IVariableDefinition[];
 }

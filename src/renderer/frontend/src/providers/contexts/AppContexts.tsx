@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { BackgroundContext, ElementContext, ProjectContext, SceneContext, SettingsContext, SettingsUtilsContext, UserSettingsContext } from "../Providers";
+import { BackgroundContext, ElementContext, ProjectContext, SceneContext, SettingsContext, SettingsUtilsContext, UserSettingsContext, VariablesContext } from "../Providers";
 
 const useSettingsUtilsContext = () =>  {
     const context = useContext(SettingsUtilsContext);
@@ -57,6 +57,14 @@ const useBackgroundContext = () =>  {
     return context;
 }
 
+const useVariablesContext = () =>  {
+    const context = useContext(VariablesContext);
+    if (!context) {
+        throw new Error('useVariablesContext must be used within a VariablesProvider');
+    }
+    return context;
+}
+
 export const useAppContexts = () => {
   const sceneCtx = useSceneContext();
   const projectCtx = useProjectContext();
@@ -65,6 +73,7 @@ export const useAppContexts = () => {
   const backgroundCtx = useBackgroundContext();
   const settingUtilsCtx = useSettingsUtilsContext();
   const elementCtx = useElementContext();
+    const variablesCtx = useVariablesContext();
 
   return {
     scenes: sceneCtx.scenes,
@@ -91,6 +100,11 @@ export const useAppContexts = () => {
     setBackgrounds: backgroundCtx.setBackgrounds,
     backgroundsRef: backgroundCtx.backgroundsRef,
     ignoredFieldsBackgrounds: backgroundCtx.ignoredFields,
+
+    variables: variablesCtx.variables,
+    setVariables: variablesCtx.setVariables,
+    variablesRef: variablesCtx.variablesRef,
+    ignoredFieldsVariables: variablesCtx.ignoredFields,
 
     settingUtils: settingUtilsCtx.settingUtils,
     setSettingUtils: settingUtilsCtx.setSettingUtils,

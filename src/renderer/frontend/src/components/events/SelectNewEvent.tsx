@@ -1,16 +1,18 @@
 import useAppContexts from '@/providers/contexts/AppContexts';
-import { IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
+import { IConditionValue, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { ArrowRightOutlined, BranchesOutlined, PlusSquareOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 import { Button, Divider, Drawer, Empty, Flex, Input, InputRef, Menu, Space, Typography } from "antd";
 import { Content } from 'antd/es/layout/layout';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { AntdToken } from '../common/AntDToken';
-import DefaultValueEvents from './DefaultValueEvents';
+import DefaultValueEvents, { VariableEventPreset } from './DefaultValueEvents';
 import FlowEditorManager, { ScriptKey } from './FlowEditorManager';
 import { EEvents, EVENT_INFO } from './interfaces/IEvents';
 
-const CATEGORIES = [/*"Actor", "Camera", "Audio", "Dialogue & Menus",*/ "Scene", "Screen", "Timer"];
+const CATEGORIES = [/*"Actor", "Camera", "Audio", "Dialogue & Menus",*/ "Scene", "Screen", "Timer", "Conditions", "Variables"];
+
+type EventOption = { id: EEvents; name: string; preset?: VariableEventPreset };
 
 const highlightText = (text: string, highlight: string) => {
   const { token } = AntdToken();
@@ -81,6 +83,24 @@ const FUNCTIONS_BY_CATEGORY = {
       { id: EEvents.WAIT, name: EVENT_INFO[EEvents.WAIT].name },
       // { id: EEvents.IDLE, name: EVENT_INFO[EEvents.IDLE].name }
     ]
+  },
+  // Conditions: {
+  //   "Logic": []
+  // },
+  Variables: {
+    Assignment: [
+      { id: EEvents.VARIABLE, name: 'Variable Set to Value', preset: 'value' },
+    ],
+    Boolean: [
+      { id: EEvents.VARIABLE, name: 'Variable Set to False', preset: 'false' },
+      { id: EEvents.VARIABLE, name: 'Variable Set to True', preset: 'true' },
+    ],
+    Reset: [
+      { id: EEvents.VARIABLE_RESET_ALL, name: EVENT_INFO[EEvents.VARIABLE_RESET_ALL].name },
+    ],
+    "Control Flow": [
+      { id: EEvents.IF, name: EVENT_INFO[EEvents.IF].name },
+    ],
   }
 };
 
@@ -110,14 +130,15 @@ interface ISelectEventProps {
   subTabIndex?: string;
   showFlowButton?: boolean;
   compact?: boolean;
+  onEventCreated?: (event: IScriptsElement) => void;
 }
 
-const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, showFlowButton = true, compact = false }) => {
+const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, showFlowButton = true, compact = false, onEventCreated }) => {
   // const { scenes, setScenes, ignoredFields } = useSceneContext();
   // const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
   // const { elementSelected, setElementSelected } = useElementContext();
 
-  const { scenes, setScenes, setSettingUtils, elementSelected, setElementSelected, userSettings, setUserSettings } = useAppContexts();
+  const { scenes, variables, setScenes, setSettingUtils, elementSelected, setElementSelected, userSettings, setUserSettings } = useAppContexts();
   
   const favoriteEvents = userSettings.favoriteEvents || [];
   
@@ -154,7 +175,7 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, sh
 
   const filteredEventsList = useMemo(() => {
     if (!searchTerm) return [];
-    const results: { id: EEvents; name: string }[] = [];
+    const results: EventOption[] = [];
     
     Object.values(FUNCTIONS_BY_CATEGORY).forEach(category => {
       Object.values(category).forEach(subCategory => {
@@ -169,13 +190,30 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, sh
     return results.sort((a, b) => a.name.localeCompare(b.name));
   }, [searchTerm]);
 
-  const handleClose = (eventCode: string) => {
+  const handleClose = (eventCode: string, variablePreset: VariableEventPreset = 'value') => {
+    const firstVariableValue = (): IConditionValue => {
+      const variable = variables.variables[0];
+      return variable
+        ? { kind: 'variable', variableId: variable.id, symbol: variable.symbol, type: variable.type }
+        : { kind: 'literal', type: 'number', value: 0 };
+    };
+
     // Criar um elemento de script válido
     const newScript: IScriptsElement = {
       id: uuidv4(),
       command: eventCode,
-      args: DefaultValueEvents(eventCode, scenes),
+      args: eventCode === EEvents.IF
+        ? { left: firstVariableValue(), operator: '==', right: firstVariableValue() }
+        : DefaultValueEvents(eventCode, scenes, variablePreset),
+      ...(eventCode === EEvents.IF ? { children: { then: [] } } : {}),
     };
+
+    if (onEventCreated) {
+      onEventCreated(newScript);
+      setOpen(false);
+      setSubOpen(false);
+      return;
+    }
 
     // Criar novo array sem mutar o original
     let scriptUpdate;
@@ -235,7 +273,12 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, sh
         {!compact && shouldShowEmpty && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />}
       
         <Flex gap="small" style={{ width: '100%' }}>
-          <Button type="default" icon={<PlusSquareOutlined style={{fontSize: 20}}/>} style={{ flex: 1 }} onClick={() => setOpen(true)}>
+          <Button
+            type={compact ? 'text' : 'default'}
+            icon={<PlusSquareOutlined style={{fontSize: 20}}/>}
+            style={{ flex: 1, ...(compact ? { backgroundColor: '#6b6b6b', color: '#fff' } : {}) }}
+            onClick={() => setOpen(true)}
+          >
             Add Event
           </Button>
           {showFlowButton && (
@@ -289,7 +332,7 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, sh
                 eventId={fn.id}
                 isFavorite={favoriteEvents.includes(fn.id)}
                 onToggleFavorite={toggleFavorite}
-                onSelect={() => handleClose(fn.id)}
+                onSelect={() => handleClose(fn.id, fn.preset)}
                 searchTerm={searchTerm}
               />
             ))}
@@ -342,7 +385,7 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, sh
                       eventId={fn.id}
                       isFavorite={favoriteEvents.includes(fn.id)}
                       onToggleFavorite={toggleFavorite}
-                      onSelect={() => handleClose(fn.id)}
+                      onSelect={() => handleClose(fn.id, 'preset' in fn ? fn.preset as VariableEventPreset : undefined)}
                     />
                   ))}
                 </Menu>

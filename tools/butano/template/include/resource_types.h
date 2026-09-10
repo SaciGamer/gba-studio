@@ -15,6 +15,22 @@ enum class ResourceType : uint8_t
     tilemap
 };
 
+enum class VariableType : uint8_t
+{
+    number,
+    boolean,
+    string
+};
+
+struct VariableDefinition
+{
+    const char* id;
+    VariableType type;
+    int number_value;
+    bool boolean_value;
+    const char* string_value;
+};
+
 // struct Resource
 // {
 //     // Identificação básica
@@ -77,13 +93,38 @@ struct SceneLayer
     const char* path;
 };
 
+struct ScriptValueData {
+    VariableType type;
+    bool is_variable;
+    const char* variable_id;
+    int number_value;
+    bool boolean_value;
+    const char* string_value;
+};
+
+struct ScriptConditionData {
+    ScriptValueData left;
+    ScriptValueData right;
+    const char* operation;
+};
+
 struct ScriptCommandData {
     const char* id;
     const char* command;
     // ponteiro genérico para args, pode ser outro struct
     const void* args;
     const int argCount;
-    // const void* child;
+    const int nextIndex;
+    const int falseIndex;
+};
+
+struct VariableSetValueData {
+    const char* variable_id;
+    VariableType type;
+    int number_value;
+    bool boolean_value;
+    const char* string_value;
+    const char* source_variable_id;
 };
 
 struct Scenes

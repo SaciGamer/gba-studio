@@ -1,20 +1,29 @@
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
-import { BuildOutlined, CaretRightFilled, CaretRightOutlined, FileFilled, PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
-import { Collapse, Flex, Input, Layout, Splitter, Tooltip, Tree, TreeDataNode, Typography } from 'antd';
+import { BuildOutlined, CaretRightFilled, CaretRightOutlined, DeleteOutlined, FileFilled, PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
+import { Button, Collapse, Flex, Input, Layout, Popconfirm, Space, Splitter, Tooltip, Tree, TreeDataNode, Typography } from 'antd';
 import React, { Key, useEffect, useMemo, useRef, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { AntdToken } from '../components/common/AntDToken';
+import { IVariableDefinition } from '@/providers/contexts/interfaces/IVariablesElement';
 
 const { Content } = Layout;
 const { Panel } = Collapse;
 const { Text } = Typography;
+
+const getVariableDefaultName = (symbol: string): string => {
+  const readableName = symbol.replace(/^variable_?/i, '').replace(/_/g, ' ').trim();
+  if (!readableName) return symbol;
+
+  return `Variable ${readableName}`;
+};
 
 const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScriptsAndVariables = true }) => {
   // const { scenes } = useSceneContext();
   // const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
   // const { elementSelected, setElementSelected } = useElementContext();
 
-  const { scenes, settingUtils, setSettingUtils, elementSelected, setElementSelected } = useAppContexts();
+  const { scenes, variables, setVariables, settingUtils, setSettingUtils, elementSelected, setElementSelected } = useAppContexts();
 
   const [isScenesOpen, setIsScenesOpen] = useState(true);
   const [isScriptsOpen, setIsScriptsOpen] = useState(true);
@@ -191,9 +200,56 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
     ),
   }));
 
-  const treeDataVariables: TreeDataNode[] = Array.from({ length: 101 }, (_, index) => ({
-    key: index,
-    title: <Text style={{ marginLeft: 5 }}>Variable {index}</Text>,
+  const updateVariables = (nextVariables: IVariableDefinition[]) => {
+    setVariables(prev => ({ ...prev, variables: nextVariables, _saved: false }));
+  };
+
+  const openVariableEditor = (variable: IVariableDefinition) => {
+    setElementSelected({ ...variable, _resourceType: 'variables' });
+    setGlobalSelectedKey(`variables-${variable.id}`);
+  };
+
+  const handleAddVariable = () => {
+    let index = variables.variables.length;
+    while (variables.variables.some(variable => variable.symbol === `variable_${index}`)) index += 1;
+    const variable: IVariableDefinition = {
+      id: uuidv4(),
+      name: `Variable ${index}`,
+      symbol: `variable_${index}`,
+      type: 'number',
+      initialValue: 0,
+    };
+    updateVariables([...variables.variables, variable]);
+    openVariableEditor(variable);
+  };
+
+  const handleDeleteVariable = (id: string) => {
+    updateVariables(variables.variables.filter(variable => variable.id !== id));
+    if (elementSelected?._resourceType === 'variables' && elementSelected.id === id) setElementSelected(null);
+  };
+
+  const treeDataVariables: TreeDataNode[] = variables.variables.map(variable => ({
+    key: variable.id,
+    title: (
+      <Flex align="center" justify="space-between" style={{ paddingRight: 4 }}>
+        <Text style={{ marginLeft: 5 }}>$  {variable.name || getVariableDefaultName(variable.symbol)}</Text>
+        <Space size={0}>
+          <Popconfirm
+            title={`Delete ${variable.name || getVariableDefaultName(variable.symbol)}?`}
+            onConfirm={(event) => { event?.stopPropagation(); handleDeleteVariable(variable.id); }}
+          >
+            <Button
+              aria-label={`Delete ${variable.name || getVariableDefaultName(variable.symbol)}`}
+              icon={<DeleteOutlined />}
+              size="small"
+              type="text"
+              danger
+              onClick={(event) => event.stopPropagation()}
+            />
+          </Popconfirm>
+        </Space>
+      </Flex>
+    ),
   }));
 
   const treeDataScripts: TreeDataNode[] = Array.from({ length: 11 }, (_, index) => ({
@@ -242,12 +298,16 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
   const getSelectedKeyFromGlobal = (prefix: string): Key[] => {
     if (!globalSelectedKey?.startsWith(`${prefix}-`)) return [];
     const key = globalSelectedKey.replace(`${prefix}-`, '');
-    return [parseInt(key)]; // Converte para número pois as keys são numéricas
+    return [key];
   };
 
   const onSelectTree = (selectedKeys: Key[], info: any, source: /*'scenes' |*/ 'scripts' | 'variables') => {
     const newKey = selectedKeys[0]?.toString() || null;
     setGlobalSelectedKey(newKey ? `${source}-${newKey}` : null);
+    if (source === 'variables' && newKey) {
+      const variable = variables.variables.find(item => item.id === newKey);
+      if (variable) setElementSelected({ ...variable, _resourceType: 'variables' });
+    }
   };
 
   const handleResizeStart = (sizes:Array<number>) => {
@@ -415,13 +475,20 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                 {
                   key: '1',
                   label: 'VARIABLES',
-                  extra: genExtra(),
+                  extra: (
+                    <Flex gap={4}>
+                      <Tooltip title="Add variable">
+                        <PlusOutlined style={{ marginRight: 8 }} onClick={(event) => { event.stopPropagation(); handleAddVariable(); }} />
+                      </Tooltip>
+                      {genExtra()}
+                    </Flex>
+                  ),
                   style: panelStyle,
                   children: (
                     <Tree
                       className="custom-tree"
                       showIcon
-                      icon={<div>$</div>}
+                      // icon={<div>$</div>}
                       height={treeHeightVariables}
                       treeData={treeDataVariables}
                       defaultExpandAll

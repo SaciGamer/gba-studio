@@ -56,6 +56,7 @@ const Engine: React.FC = () => {
     settingUtils, setSettingUtils, settingUtilsRef,
     elementSelected,
     userSettings, setUserSettings, userSettingsRef, ignoredFieldsUserSettings
+    , variables, setVariables, variablesRef, ignoredFieldsVariables
   } = useAppContexts();
 
   // Update settings utils initialization
@@ -209,6 +210,7 @@ const Engine: React.FC = () => {
         const projectFromFile: IProjectSettings | null = categorized.project?.[0] || null;          // Assume apenas um projeto
         const settingsFromFile: IMainSettings | null = categorized.settings?.[0] || null;           // Assume apenas uma configuração
         const userSettingsFromFile: IUserSettings | null = categorized.user_settings?.[0] || null;  // Assume apenas uma configuração
+        const variablesFromFile = categorized.variables?.[0] || null;
 
         // Atualize os estados de uma vez só:
         if (scenesFromFile.length > 0) {
@@ -237,6 +239,10 @@ const Engine: React.FC = () => {
 
         if (userSettingsFromFile) {
           setUserSettings(userSettingsFromFile);
+        }
+
+        if (variablesFromFile) {
+          setVariables(variablesFromFile);
         }
 
         setTimeout(() => {
@@ -278,6 +284,8 @@ const Engine: React.FC = () => {
 
         // Settings
         if (settingsRef.current) files.push({ path: `project/settings.gbasres`, content: settingsRef.current });
+
+        if (variablesRef.current) files.push({ path: `project/variables.gbasres`, content: variablesRef.current });
 
         // Collect assets from settingUtils localImagePath (scan assets folder)
         try {
@@ -330,6 +338,7 @@ const Engine: React.FC = () => {
       console.log('..: all data to save backgrounds:', backgroundsRef.current);
       console.log('..: all data to save setting:', settingsRef.current);
       console.log('..: all data to save user setting:', userSettingsRef.current);
+      console.log('..: all data to save variables:', variablesRef.current);
       console.log('..: all data to save settingUtils:', settingUtilsRef.current);
 
       // Preparar os dados para salvar
@@ -339,6 +348,7 @@ const Engine: React.FC = () => {
         settingsRef.current._saved === false ? prepareForBackend(settingsRef.current, ignoredFieldsSettings!) : null,
         userSettingsRef.current._saved === false ? prepareForBackend(userSettingsRef.current, ignoredFieldsUserSettings!) : null,
         prepareForBackend(backgroundsRef.current.filter(s => s._saved === false), ignoredFieldsBackgrounds!),
+        variablesRef.current._saved === false ? prepareForBackend(variablesRef.current, ignoredFieldsVariables!) : null,
         settingUtilsRef.current,
       ].filter(item => item != null && (!(Array.isArray(item)) || item.length > 0));
 
@@ -353,6 +363,7 @@ const Engine: React.FC = () => {
         setSettings(() => ({ ...settingsRef.current, _saved: true }));
         setUserSettings(() => ({ ...userSettingsRef.current, _saved: true }));
         setBackgrounds(() => backgroundsRef.current.map(b => ({ ...b, _saved: true })));
+        setVariables(() => ({ ...variablesRef.current, _saved: true }));
         // setSettingUtils(settingUtils => ({ ...settingUtils, _saved: true }));
 
         console.log('..: Todos os itens agora estão com _saved = true.');
@@ -411,7 +422,8 @@ const Engine: React.FC = () => {
     const unsaved =
       hasUnsaved(scenes) || hasUnsaved(backgrounds) || (project && project._saved === false) 
       || (settings && settings._saved === false) || (settingUtils && settingUtils._saved === false)
-      || (userSettings && userSettings._saved === false);
+      || (userSettings && userSettings._saved === false)
+      || (variables && variables._saved === false);
 
     // Call Electron API to update title - isSaved: true se não tem nada para salvar
     window.electronAPI.updateTitle('GBA Studio', project?.name || '', !unsaved);
@@ -419,7 +431,7 @@ const Engine: React.FC = () => {
     if (unsaved) {
       console.log('..: Engine.tsx tem alguma atualização!');
     }
-  }, [scenes, project, settings, userSettings, backgrounds, settingUtils]);
+  }, [scenes, project, settings, userSettings, backgrounds, settingUtils, variables]);
 
   // useEffect(() => {
   //   const handleResize = () => {

@@ -1,7 +1,7 @@
 import useAppContexts from "@/providers/contexts/AppContexts";
 import { IArgs, ISceneSettings, IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
 import { HolderOutlined, RightOutlined } from "@ant-design/icons";
-import { DndContext, DragEndEvent, DragOverlay, PointerSensor, closestCenter, useDndContext, useSensor, useSensors } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverlay, PointerSensor, closestCenter, useDndContext, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button, Collapse, Flex, Layout } from "antd";
@@ -9,6 +9,8 @@ import { createRef, RefObject, useEffect, useRef, useState } from "react";
 import { EEvents, EVENT_INFO } from "./interfaces/IEvents";
 import MenuEventItem from "./MenuEventItem";
 import PanelEvents from "./PanelEvents";
+import SelectNewEvent from "./SelectNewEvent";
+import { getEventDepthColor } from "./EventColors";
 
 interface CollapseEventProps {
   scripts: IScriptsElement[] | undefined;
@@ -17,6 +19,7 @@ interface CollapseEventProps {
 interface SortableEventHeaderProps {
   event: IScriptsElement;
   title: string;
+  titleColor: string;
   isExpanded: boolean;
   showDragHandle: boolean;
   index: number;
@@ -25,9 +28,94 @@ interface SortableEventHeaderProps {
   onHoverChange: (isHovering: boolean) => void;
 }
 
+function NestedEventDragHandle({ event, title, color, isExpanded, index, scriptIds }: { event: IScriptsElement; title: string; color: string; isExpanded: boolean; index: number; scriptIds: string[] }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: event.id });
+  const { active, over } = useDndContext();
+  const handleRef = useRef<HTMLElement | null>(null);
+  const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    const panel = handleRef.current?.closest<HTMLElement>('.ant-collapse-item');
+    if (!panel) return;
+
+    const activeId = String(active?.id || '');
+    const overId = String(over?.id || '');
+    const activeIndex = scriptIds.indexOf(activeId);
+    const isDropTarget = activeId !== event.id && overId === event.id && activeIndex >= 0;
+    panel.style.visibility = isDragging ? 'hidden' : '';
+    panel.style.borderTop = isDropTarget && activeIndex > index ? '32px solid #000000' : '';
+    panel.style.borderBottom = isDropTarget && activeIndex <= index ? '32px solid #000000' : '';
+
+    return () => {
+      panel.style.visibility = '';
+      panel.style.borderTop = '';
+      panel.style.borderBottom = '';
+    };
+  }, [active, event.id, index, isDragging, over, scriptIds]);
+
+  return (
+    <Flex
+      ref={(node) => {
+        handleRef.current = node;
+        setNodeRef(node);
+      }}
+      {...attributes}
+      {...listeners}
+      align="center"
+      gap={4}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        opacity: isDragging ? 0.45 : 1,
+        cursor: 'grab',
+        width: '100%',
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+    >
+      <Button
+        aria-label={`Reorder ${title}`}
+        icon={<HolderOutlined />}
+        size="small"
+        type="text"
+        onClick={(mouseEvent) => mouseEvent.stopPropagation()}
+        style={{
+          color,
+          opacity: isHovered || isDragging ? 1 : 0,
+          pointerEvents: isHovered || isDragging ? 'auto' : 'none',
+          transition: 'opacity 120ms ease-in-out',
+        }}
+      />
+      <RightOutlined style={{ transform: isExpanded ? 'rotate(90deg)' : undefined, fontSize: 10 }} />
+      <span style={{ color }}>{title}</span>
+    </Flex>
+  );
+}
+
+function BranchDropZone({ id, color }: { id: string; color: string }) {
+  const { active, isOver, setNodeRef } = useDroppable({ id });
+  const isDragging = Boolean(active);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        height: isDragging ? 32 : 0,
+        boxSizing: 'border-box',
+        border: isDragging ? `1px dashed ${color}` : '0 solid transparent',
+        background: isOver ? '#333' : 'transparent',
+        opacity: isDragging && isOver ? 1 : 0,
+        pointerEvents: isDragging ? 'auto' : 'none',
+        transition: 'background 120ms ease-in-out',
+      }}
+    />
+  );
+}
+
 function SortableEventHeader({
   event,
   title,
+  titleColor,
   isExpanded,
   showDragHandle,
   index,
@@ -132,7 +220,7 @@ function SortableEventHeader({
         }}
       />
       <RightOutlined style={{ transform: isExpanded ? "rotate(90deg)" : undefined, fontSize: 10 }} />
-      <span>{title}</span>
+      <span style={{ color: titleColor }}>{title}</span>
     </Flex>
   );
 }
@@ -166,11 +254,31 @@ function ActiveEventDragOverlay({
   headerPanel: Record<string, string>;
 }) {
   const { active } = useDndContext();
-  const activeScript = scripts?.find(script => script.id === active?.id);
+  const findScript = (items: IScriptsElement[] | undefined): IScriptsElement | undefined => {
+    if (!items) return undefined;
+    for (const script of items) {
+      if (script.id === active?.id) return script;
+      const nested = findScript([
+        ...(script.children?.then || []),
+        ...(script.children?.else || []),
+      ]);
+      if (nested) return nested;
+    }
+    return undefined;
+  };
+  const activeScript = findScript(scripts);
   if (!activeScript) return null;
 
   const title = `${activeScript.args?.__comment ? "// " : ""}${headerPanel[activeScript.id] || getEventEnum(activeScript.command)}`;
-  return <EventDragPreview title={title} />;
+  return (
+    <div style={{ border: `1px solid ${getEventDepthColor(1)}`, background: '#303030', padding: '6px 10px', minWidth: 240 }}>
+      <Flex align="center" gap={6}>
+        <HolderOutlined style={{ color: getEventDepthColor(1) }} />
+        <RightOutlined style={{ fontSize: 10, color: getEventDepthColor(1) }} />
+        <span style={{ color: getEventDepthColor(1) }}>{title}</span>
+      </Flex>
+    </div>
+  );
 }
 
 const getEventEnum = (command: string): string => {
@@ -203,11 +311,117 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id || !parameters.scripts) return;
 
-    const oldIndex = parameters.scripts.findIndex(script => script.id === active.id);
-    const newIndex = parameters.scripts.findIndex(script => script.id === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    const rootScripts = parameters.scripts;
+    const containsEvent = (event: IScriptsElement, id: string): boolean =>
+      event.id === id
+      || Boolean(event.children?.then.some(child => containsEvent(child, id)))
+      || Boolean(event.children?.else?.some(child => containsEvent(child, id)));
 
-    const updatedScripts = arrayMove(parameters.scripts, oldIndex, newIndex);
+    const findEvent = (scripts: IScriptsElement[]): IScriptsElement | undefined => {
+      for (const script of scripts) {
+        if (script.id === activeId) return script;
+        const nested = script.children && findEvent([
+          ...script.children.then,
+          ...(script.children.else || []),
+        ]);
+        if (nested) return nested;
+      }
+      return undefined;
+    };
+
+    const findEventById = (scripts: IScriptsElement[], id: string): IScriptsElement | undefined => {
+      for (const script of scripts) {
+        if (script.id === id) return script;
+        const nested = script.children && findEventById([
+          ...script.children.then,
+          ...(script.children.else || []),
+        ], id);
+        if (nested) return nested;
+      }
+      return undefined;
+    };
+
+    const oldIndex = rootScripts.findIndex(script => script.id === activeId);
+    const newIndex = rootScripts.findIndex(script => script.id === overId);
+
+    if (oldIndex >= 0 && newIndex >= 0) {
+      const updatedScripts = arrayMove(rootScripts, oldIndex, newIndex);
+      const updatedElement = { ...elementSelected, script: updatedScripts };
+      setElementSelected(updatedElement);
+      setScenes(prevScenes => prevScenes.map(scene =>
+        scene.id === elementSelected.id ? { ...scene, script: updatedScripts, _saved: false } : scene
+      ));
+      return;
+    }
+
+    const branchDropMatch = overId.match(/^list:([^:]+):(then|else)$/);
+    const targetIsBranch = Boolean(branchDropMatch);
+    const targetEvent = targetIsBranch ? undefined : findEventById(rootScripts, overId);
+    if (!targetIsBranch && !targetEvent) return;
+    const targetIfId = branchDropMatch?.[1] || '';
+    const targetBranch = branchDropMatch?.[2] as 'then' | 'else' | undefined;
+    let movedEvent: IScriptsElement | undefined;
+
+    const sourceEvent = findEvent(rootScripts);
+    if (sourceEvent && ((targetIsBranch && containsEvent(sourceEvent, targetIfId)) || (!targetIsBranch && containsEvent(sourceEvent, overId)))) return;
+
+    const removeEvent = (scripts: IScriptsElement[]): IScriptsElement[] => scripts
+      .filter(script => {
+        if (script.id === activeId) {
+          movedEvent = script;
+          return false;
+        }
+        return true;
+      })
+      .map(script => script.children ? {
+        ...script,
+        children: {
+          ...script.children,
+          then: removeEvent(script.children.then),
+          else: script.children.else ? removeEvent(script.children.else) : undefined,
+        },
+      } : script);
+
+    const insertEvent = (scripts: IScriptsElement[]): IScriptsElement[] => scripts.map(script => {
+      if (targetIsBranch && targetBranch && script.id === targetIfId) {
+        const children = script.children || { then: [] };
+        return { ...script, children: { ...children, [targetBranch]: [...(children[targetBranch] || []), movedEvent!] } };
+      }
+      if (!script.children) return script;
+      return {
+        ...script,
+        children: {
+          ...script.children,
+          then: insertEvent(script.children.then),
+          else: script.children.else ? insertEvent(script.children.else) : undefined,
+        },
+      };
+    });
+
+    const withoutEvent = removeEvent(rootScripts);
+    if (!movedEvent) return;
+    const insertSibling = (scripts: IScriptsElement[]): IScriptsElement[] => {
+      const nextScripts: IScriptsElement[] = [];
+      for (const script of scripts) {
+        if (script.id === overId) {
+          nextScripts.push(movedEvent!);
+          nextScripts.push(script);
+          continue;
+        }
+        nextScripts.push(script.children ? {
+          ...script,
+          children: {
+            ...script.children,
+            then: insertSibling(script.children.then),
+            else: script.children.else ? insertSibling(script.children.else) : undefined,
+          },
+        } : script);
+      }
+      return nextScripts;
+    };
+    const updatedScripts = targetIsBranch ? insertEvent(withoutEvent) : insertSibling(withoutEvent);
     const updatedElement = { ...elementSelected, script: updatedScripts };
 
     setElementSelected(updatedElement);
@@ -304,7 +518,7 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
       ...elementSelected,
       script: elementSelected.script?.map((s: IScriptsElement) =>
         s.id === eventId
-          ? { ...s, args: newArgs }
+          ? { ...s, args: { ...s.args, ...newArgs } }
           : s
       ),
     };
@@ -320,6 +534,111 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
     );
   }
 
+  const updateIfBranch = (ifId: string, branch: 'then' | 'else', update: (events: IScriptsElement[]) => IScriptsElement[]) => {
+    const updateScripts = (scripts: IScriptsElement[] | undefined): IScriptsElement[] | undefined => scripts?.map(script => {
+      if (script.id === ifId) {
+        const children = script.children || { then: [] };
+        return { ...script, children: { ...children, [branch]: update(children[branch] || []) } };
+      }
+
+      if (!script.children) return script;
+      return {
+        ...script,
+        children: {
+          then: updateScripts(script.children.then) || [],
+          else: script.children.else ? updateScripts(script.children.else) : undefined,
+        },
+      };
+    });
+    const updatedElement = { ...elementSelected, script: updateScripts(elementSelected.script) };
+    setElementSelected(updatedElement);
+    setScenes(prevScenes => prevScenes.map(scene =>
+      scene.id === elementSelected.id ? { ...scene, ...updatedElement, _saved: false } : scene
+    ));
+  };
+
+  const updateIfBranchCollapse = (ifId: string, branch: 'then' | 'else', collapsed: boolean) => {
+    const updateScripts = (scripts: IScriptsElement[] | undefined): IScriptsElement[] | undefined => scripts?.map(script => {
+      if (script.id === ifId) {
+        const children = script.children || { then: [] };
+        return { ...script, children: { ...children, [`${branch}Collapsed`]: collapsed } };
+      }
+      if (!script.children) return script;
+      return {
+        ...script,
+        children: {
+          then: updateScripts(script.children.then) || [],
+          else: script.children.else ? updateScripts(script.children.else) : undefined,
+          thenCollapsed: script.children.thenCollapsed,
+          elseCollapsed: script.children.elseCollapsed,
+        },
+      };
+    });
+    const updatedElement = { ...elementSelected, script: updateScripts(elementSelected.script) };
+    setElementSelected(updatedElement);
+    setScenes(prevScenes => prevScenes.map(scene =>
+      scene.id === elementSelected.id ? { ...scene, ...updatedElement, _saved: false } : scene
+    ));
+  };
+
+  const renderIfBranch = (script: IScriptsElement, branch: 'then' | 'else', label: string, depth: number) => {
+    const events = script.children?.[branch] || [];
+    const childColor = getEventDepthColor(depth + 1);
+    const branchKeys = events.filter(item => item.args?.__collapse && !item.args?.__comment).map(item => item.id);
+    const branchKey = `${script.id}-${branch}-content`;
+    const branchCollapsed = script.children?.[`${branch}Collapsed` as 'thenCollapsed' | 'elseCollapsed'] ?? false;
+    return (
+      <Collapse
+        key={branchKey}
+        size="small"
+        activeKey={branchCollapsed ? [] : [branchKey]}
+        onChange={(keys) => updateIfBranchCollapse(script.id, branch, !(Array.isArray(keys) ? keys.includes(branchKey) : keys === branchKey))}
+        style={{ borderRadius: 0 }}
+        items={[{
+          key: branchKey,
+          label: <span style={{ color: childColor }}>{label}</span>,
+          children: (
+            <Flex vertical gap={4}>
+              <SortableContext items={events.map(child => child.id)} strategy={verticalListSortingStrategy}>
+                <Collapse
+                  size="small"
+                  activeKey={branchKeys}
+                  items={events.map((child, index) => ({
+                  key: child.id,
+                  label: <NestedEventDragHandle event={child} color={childColor} index={index} scriptIds={events.map(item => item.id)} isExpanded={branchKeys.includes(child.id)} title={`${child.args?.__comment ? '// ' : ''}${getEventEnum(child.command)}`} />,
+                  collapsible: child.args?.__comment ? 'disabled' : 'header',
+                  showArrow: false,
+                  style: {
+                    border: `1px solid ${childColor}`,
+                    borderRadius: 0,
+                    marginBottom: 4,
+                    background: child.args?.__comment ? '#74b54c' : 'transparent',
+                    color: childColor,
+                  },
+                  extra: <MenuEventItem event={child} onRemove={(id) => updateIfBranch(script.id, branch, current => current.filter(item => item.id !== id))} onToggleDisable={(id) => updateIfBranch(script.id, branch, current => current.map(item => item.id === id ? { ...item, args: { ...item.args, __comment: !item.args?.__comment } } : item))} />,
+                  children: (
+                    <Flex vertical gap={6} style={{ padding: '6px 8px' }}>
+                      <PanelEvents event={child} customTitle={() => undefined} onValueChange={(id, args) => updateIfBranch(script.id, branch, current => current.map(item => item.id === id ? { ...item, args: { ...item.args, ...args } } : item))} />
+                      {child.command === EEvents.IF && renderIfBranch(child, 'then', 'TRUE', depth + 1)}
+                      {child.command === EEvents.IF && renderIfBranch(child, 'else', 'FALSE', depth + 1)}
+                    </Flex>
+                  ),
+                  }))}
+                  onChange={(keys) => updateIfBranch(script.id, branch, current => current.map(item => ({
+                    ...item,
+                    args: { ...item.args, __collapse: Array.isArray(keys) ? keys.includes(item.id) : keys === item.id },
+                  })))}
+                />
+              </SortableContext>
+              <BranchDropZone id={`list:${script.id}:${branch}`} color={childColor} />
+              <SelectNewEvent compact showFlowButton={false} onEventCreated={(event) => updateIfBranch(script.id, branch, current => [...current, event])} />
+            </Flex>
+          ),
+        }]}
+      />
+    );
+  };
+
 	return (
     <Layout>
       <DndContext
@@ -332,7 +651,7 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
           strategy={verticalListSortingStrategy}
         >
           <Collapse 
-            activeKey={parameters.scripts?.filter(s => s.args?.__collapse).map(s => s.id)} 
+            activeKey={parameters.scripts?.filter(s => s.args?.__collapse && !s.args?.__comment).map(s => s.id)} 
             onChange={onCollapseChange} 
             style={{ borderRadius: 0 }}
             size="small"
@@ -358,6 +677,7 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
                   <SortableEventHeader
                     event={script}
                     title={title}
+                    titleColor={getEventDepthColor(0)}
                     isExpanded={Boolean(script.args?.__collapse)}
                     showDragHandle={hoveredEventId === script.id}
                     index={index}
@@ -373,7 +693,13 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
                   borderRadius: 0,
                   backgroundColor: isDisabled ? "#74b54c" : "transparent",
                 },
-                children: <PanelEvents event={script} customTitle={handleValueTitle} onValueChange={handleValueChange}/>,
+                children: (
+                  <Flex vertical gap={6} style={{ color: getEventDepthColor(0) }}>
+                    <PanelEvents event={script} customTitle={handleValueTitle} onValueChange={handleValueChange}/>
+                    {script.command === EEvents.IF && renderIfBranch(script, 'then', 'TRUE', 0)}
+                    {script.command === EEvents.IF && renderIfBranch(script, 'else', 'FALSE', 0)}
+                  </Flex>
+                ),
               };
             })}
           />

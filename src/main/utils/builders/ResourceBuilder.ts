@@ -47,6 +47,9 @@ export class ResourceBuilder {
             resourceFiles.push(resourceFile);
           } catch (err) {
             console.warn('..: Failed to process resource:', fullPath, err);
+            if (fullPath.endsWith('variables.gbasres')) {
+              throw err;
+            }
           }
         }
       }
@@ -82,6 +85,9 @@ export class ResourceBuilder {
         headerContent: Buffer.from('', 'utf8'),
       };
     } else {
+      if (jsonObj._resourceType === 'variables') {
+        this.validateVariablesResource(jsonObj, resourcePath);
+      }
       const idPart = jsonObj?.id ? `_${jsonObj.id}` : "";
       headerFilename = `${jsonObj._resourceType}${idPart}`.replaceAll('-', '_');
       newFilename = `${headerFilename}${extension}`;
@@ -109,6 +115,43 @@ export class ResourceBuilder {
       headerContent: Buffer.from(headerContent, 'utf8'),
       jsonContent: jsonObj,
     };
+  }
+
+  private validateVariablesResource(resource: any, resourcePath: string): void {
+    if (!Array.isArray(resource.variables)) {
+      throw new Error(`Invalid variables resource ${resourcePath}: variables must be an array`);
+    }
+
+    const ids = new Set<string>();
+    const symbols = new Set<string>();
+    const supportedTypes = new Set(['number', 'boolean', 'string']);
+
+    for (const variable of resource.variables) {
+      if (!variable || typeof variable.id !== 'string' || !variable.id) {
+        throw new Error(`Invalid variables resource ${resourcePath}: every variable needs an id`);
+      }
+      if (ids.has(variable.id)) {
+        throw new Error(`Invalid variables resource ${resourcePath}: duplicate variable id ${variable.id}`);
+      }
+      ids.add(variable.id);
+
+      if (typeof variable.symbol !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(variable.symbol)) {
+        throw new Error(`Invalid variables resource ${resourcePath}: invalid C++ symbol ${variable.symbol}`);
+      }
+      if (symbols.has(variable.symbol)) {
+        throw new Error(`Invalid variables resource ${resourcePath}: duplicate variable symbol ${variable.symbol}`);
+      }
+      symbols.add(variable.symbol);
+
+      if (!supportedTypes.has(variable.type)) {
+        throw new Error(`Invalid variables resource ${resourcePath}: unsupported type ${variable.type}`);
+      }
+      if ((variable.type === 'number' && typeof variable.initialValue !== 'number') ||
+          (variable.type === 'boolean' && typeof variable.initialValue !== 'boolean') ||
+          (variable.type === 'string' && typeof variable.initialValue !== 'string')) {
+        throw new Error(`Invalid variables resource ${resourcePath}: initial value type mismatch for ${variable.id}`);
+      }
+    }
   }
 
   /**
@@ -175,6 +218,143 @@ export class ResourceBuilder {
     return code;
   }
 
+  private emitVariableEventArgs(name: string, script: any): string {
+    const args = script.args || {};
+    const value = args.value;
+    const command = script.command;
+    const variableId = typeof args.variableId === 'string' ? args.variableId : '';
+
+    if (!variableId || command === 'EVENT_VARIABLE_RESET_ALL') {
+      return `static const void* ${name} = nullptr;\n`;
+    }
+
+    const type = value?.type;
+    if (type !== 'number' && type !== 'boolean' && type !== 'string') {
+      throw new Error(`Invalid variable event ${script.id}: unsupported value type`);
+    }
+
+    const sourceVariableId = value?.kind === 'variable' && typeof value.variableId === 'string'
+      ? value.variableId
+      : '';
+    const numberValue = type === 'number' ? Number(value?.value ?? 0) : 0;
+    const booleanValue = Boolean(value?.value ?? false);
+    const stringValue = type === 'string' && value?.kind !== 'variable' ? String(value?.value ?? '') : '';
+    const escapedString = stringValue.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+    return `static const VariableSetValueData ${name}_VALUE = { "${variableId}", VariableType::${type}, ${numberValue}, ${booleanValue}, "${escapedString}", ${sourceVariableId ? `"${sourceVariableId}"` : 'nullptr'} };\n` +
+      `static const void* ${name} = &${name}_VALUE;\n`;
+  }
+
+  private getRuntimeArgs(args: any): any {
+    if (!args || typeof args !== 'object' || Array.isArray(args)) return args;
+    return Object.fromEntries(Object.entries(args).filter(([key]) => !key.startsWith('__')));
+  }
+
+  private emitConditionValue(name: string, value: any): string {
+    const type = value?.type === 'boolean' || value?.type === 'string' ? value.type : 'number';
+    const isVariable = value?.kind === 'variable' && typeof value.variableId === 'string';
+    const variableId = isVariable ? JSON.stringify(value.variableId) : 'nullptr';
+    const numberValue = type === 'number' && !isVariable ? Number(value?.value ?? 0) : 0;
+    const booleanValue = type === 'boolean' && !isVariable ? Boolean(value?.value ?? false) : false;
+    const stringValue = type === 'string' && !isVariable ? JSON.stringify(String(value?.value ?? '')) : 'nullptr';
+
+    return `static const ScriptValueData ${name} = { VariableType::${type}, ${isVariable}, ${variableId}, ${numberValue}, ${booleanValue}, ${stringValue} };\n`;
+  }
+
+  private emitScriptCondition(name: string, args: any): string {
+    const leftName = `${name}_LEFT`;
+    const rightName = `${name}_RIGHT`;
+    const operator = ['==', '!=', '>', '>=', '<', '<='].includes(args?.operator) ? args.operator : '==';
+
+    return this.emitConditionValue(leftName, args?.left) +
+      this.emitConditionValue(rightName, args?.right) +
+      `static const ScriptConditionData ${name}_VALUE = { ${leftName}, ${rightName}, ${JSON.stringify(operator)} };\n` +
+      `static const void* ${name} = &${name}_VALUE;\n`;
+  }
+
+  private emitSceneScripts(baseName: string, scripts: any[]): string {
+    type FlatScript = {
+      script: any;
+      argsName: string;
+      nextIndex: number;
+      falseIndex: number;
+    };
+
+    const flatScripts: FlatScript[] = [];
+    const compileSequence = (events: any[], continuation: number): number => {
+      let nextIndex = continuation;
+
+      for (let eventIndex = events.length - 1; eventIndex >= 0; eventIndex--) {
+        const script = events[eventIndex];
+        if (script?.args?.__comment) continue;
+
+        if (script.command === 'EVENT_IF') {
+          const thenStart = compileSequence(script.children?.then || [], nextIndex);
+          const elseStart = compileSequence(script.children?.else || [], nextIndex);
+          const commandIndex = flatScripts.length;
+          flatScripts.push({
+            script,
+            argsName: `${baseName}_ARGS_${commandIndex}`,
+            nextIndex: thenStart,
+            falseIndex: elseStart,
+          });
+          nextIndex = commandIndex;
+        } else {
+          const commandIndex = flatScripts.length;
+          flatScripts.push({
+            script,
+            argsName: `${baseName}_ARGS_${commandIndex}`,
+            nextIndex,
+            falseIndex: -1,
+          });
+          nextIndex = commandIndex;
+        }
+      }
+
+      return nextIndex;
+    };
+
+    const compiledStartIndex = compileSequence(scripts, -1);
+    const orderedScripts: FlatScript[] = [];
+    const indexMap = new Map<number, number>();
+    const visit = (index: number): void => {
+      if (index < 0 || indexMap.has(index)) return;
+      indexMap.set(index, orderedScripts.length);
+      orderedScripts.push(flatScripts[index]);
+      visit(flatScripts[index].nextIndex);
+      visit(flatScripts[index].falseIndex);
+    };
+    visit(compiledStartIndex);
+
+    for (const flatScript of orderedScripts) {
+      const nextIndex = flatScript.nextIndex;
+      const falseIndex = flatScript.falseIndex;
+      flatScript.nextIndex = nextIndex < 0 ? -1 : indexMap.get(nextIndex)!;
+      flatScript.falseIndex = falseIndex < 0 ? -1 : indexMap.get(falseIndex)!;
+    }
+
+    let response = '';
+
+    for (const flatScript of orderedScripts) {
+      const args = flatScript.script.args;
+      response += flatScript.script.command === 'EVENT_IF'
+        ? this.emitScriptCondition(flatScript.argsName, args)
+        : ['EVENT_VARIABLE', 'EVENT_VARIABLE_RESET_ALL'].includes(flatScript.script.command)
+          ? this.emitVariableEventArgs(flatScript.argsName, flatScript.script)
+          : this.emitArgs(flatScript.argsName, this.getRuntimeArgs(args));
+    }
+
+    response += `static const ScriptCommandData ${baseName}_SCRIPTS[] = {\n`;
+    for (const flatScript of orderedScripts) {
+      const falseIndex = flatScript.script.command === 'EVENT_IF' ? flatScript.falseIndex : -1;
+      const nextIndex = flatScript.nextIndex < 0 ? orderedScripts.length : flatScript.nextIndex;
+      const safeFalseIndex = falseIndex < 0 ? orderedScripts.length : falseIndex;
+      response += `    { ${JSON.stringify(flatScript.script.id)}, ${JSON.stringify(flatScript.script.command)}, ${flatScript.argsName}, 0, ${nextIndex}, ${safeFalseIndex} },\n`;
+    }
+    response += `};\nstatic const int ${baseName}_SCRIPTS_COUNT = ${orderedScripts.length};\n`;
+    return response;
+  }
+
   private createStructureFromJson(baseName: string, key: string, val: any, resourceType: string): string {
     let response = "";
 
@@ -196,23 +376,8 @@ export class ResourceBuilder {
         }
         // Scripts
         if (key === 'script' && val && Array.isArray(val)) {
-          // Script format: { id, command, args }
-          let sceneScriptsTemplate = `static const ScriptCommandData {{SCENE_NAME}}S[] = {{{SCRIPTS_CONTENT}}};\n`;
-          sceneScriptsTemplate = sceneScriptsTemplate.replace("{{SCENE_NAME}}", baseName);
-
-          val.forEach((script: any, index: number) => {
-            if (script.args?.__comment)
-              return;
-
-            let argsName = `${baseName}_ARGS_${index}`;
-            let argsDecl = this.emitArgs(argsName, script.args);
-            let argsCount = 0;
-            
-            response += argsDecl;
-            sceneScriptsTemplate = sceneScriptsTemplate.replace("{{SCRIPTS_CONTENT}}", `\n    { "${script.id}", "${script.command}", ${argsName}, ${argsCount} },{{SCRIPTS_CONTENT}}`);
-          });
-          
-          response += sceneScriptsTemplate.replaceAll("{{SCRIPTS_CONTENT}}", '\n');
+          const sceneBaseName = baseName.replace(/_SCRIPT$/, '');
+          response += this.emitSceneScripts(sceneBaseName, val);
         }
 
         break;
@@ -236,6 +401,12 @@ export class ResourceBuilder {
     let header = `#ifndef ${guardName}\n#define ${guardName}\n\n`;
     header += `#include "resource_types.h"\n\n`;
     header += `/* Auto-generated resource header for: ${baseName} */\n\n`;
+
+    if (jsonObj?._resourceType === 'variables') {
+      header += this.generateVariablesHeader(jsonObj);
+      header += `\n#endif // ${guardName}\n`;
+      return header;
+    }
 
     if (jsonObj && typeof jsonObj === 'object') {
       // Emit primitive keys as defines or constants
@@ -290,6 +461,36 @@ export class ResourceBuilder {
     }
 
     header += `\n#endif // ${guardName}\n`;
+    return header;
+  }
+
+  private generateVariablesHeader(resource: any): string {
+    let header = '';
+
+    for (const variable of resource.variables) {
+      const symbol = variable.symbol;
+      if (variable.type === 'number') {
+        header += `static const int ${symbol}_INITIAL = ${variable.initialValue};\n`;
+      } else if (variable.type === 'boolean') {
+        header += `static const bool ${symbol}_INITIAL = ${variable.initialValue ? 'true' : 'false'};\n`;
+      } else {
+        const escaped = variable.initialValue.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        header += `static const char ${symbol}_INITIAL[] = "${escaped}";\n`;
+      }
+    }
+
+    header += '\nstatic const VariableDefinition VARIABLES_DEFINITIONS[] = {\n';
+    for (const variable of resource.variables) {
+      const symbol = variable.symbol;
+      const value = variable.type === 'number'
+        ? `{ "${variable.id}", VariableType::number, ${symbol}_INITIAL, false, nullptr }`
+        : variable.type === 'boolean'
+          ? `{ "${variable.id}", VariableType::boolean, 0, ${symbol}_INITIAL, nullptr }`
+          : `{ "${variable.id}", VariableType::string, 0, false, ${symbol}_INITIAL }`;
+      header += `    ${value},\n`;
+    }
+    header += '};\n';
+    header += `static const int VARIABLES_DEFINITIONS_COUNT = ${resource.variables.length};\n`;
     return header;
   }
 
@@ -378,6 +579,7 @@ export class ResourceBuilder {
       let backgrounds = "";
       let scenes = "";
       let settings = "";
+      let variablesInitialization = '    VariableManager::instance().initialize(nullptr, 0);';
 
       for (const file of resourceFiles) {
         switch(file.jsonContent?._resourceType) {
@@ -389,6 +591,9 @@ export class ResourceBuilder {
             break;
           case "settings":
             settings += parseResourceFile(file) + "\n";
+            break;
+          case "variables":
+            variablesInitialization = '    VariableManager::instance().initialize(VARIABLES_DEFINITIONS, VARIABLES_DEFINITIONS_COUNT);';
             break;
         }
 
@@ -402,6 +607,7 @@ export class ResourceBuilder {
       registry_template = registry_template.replace("{{BACKGROUNDS_CONSTANTS}}", backgrounds);
       registry_template = registry_template.replace("{{SCENES_CONSTANTS}}", scenes);
       registry_template = registry_template.replace("{{SETTINGS_CONSTANTS}}", settings);
+      registry_template = registry_template.replace("{{VARIABLES_INITIALIZATION}}", variablesInitialization);
 
       const registryPath = path.join(this.srcDir, 'resource_registry.cpp');
       fs.writeFileSync(registryPath, registry_template, 'utf8');
@@ -470,7 +676,7 @@ function parseResourceFile(file: ResourceFile): string {
       const imageType = file.jsonContent?.imageType !== undefined ? `${baseNameUpper}_IMAGETYPE` : '0';
       const backgroundLayerCount = file.jsonContent?.backgrounds ? file.jsonContent.backgrounds.length : 0;
       const script = file.jsonContent?.script && file.jsonContent.script.length > 0 ? `${baseNameUpper}_SCRIPTS` : `nullptr`;
-      const scriptCount = file.jsonContent?.script ? file.jsonContent.script.length : 0;
+      const scriptCount = file.jsonContent?.script && file.jsonContent.script.length > 0 ? `${baseNameUpper}_SCRIPTS_COUNT` : '0';
 
       return `    { ResourceType::${type}, ${baseNameUpper}_ID, ${baseNameUpper}_NAME, ${script}, ${scriptCount}, ${baseNameUpper}_BACKGROUNDS_LAYERS, ${backgroundLayerCount}, ${tileSetId}, ${baseNameUpper}_WIDTH, ${baseNameUpper}_HEIGHT, ${baseNameUpper}_SCENETYPE, ${imageType}, ${tilemap} },`;
     } else {

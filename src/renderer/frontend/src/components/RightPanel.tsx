@@ -1,5 +1,6 @@
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { EImageType, ETypeScene, IBackgroundElement, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
+import { EVariableType, IVariableDefinition, VariableValue } from '@/providers/contexts/interfaces/IVariablesElement';
 import { BgColorsOutlined, PictureOutlined } from '@ant-design/icons';
 import { Button, Checkbox, Divider, Input, InputNumber, Layout, Select, Space, Tabs, theme, Typography } from 'antd';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -10,6 +11,106 @@ import RightPanelGWSettings from './RightPanelGWSettings';
 
 const { useToken } = theme;
 const { Content } = Layout;
+
+const getVariableDefaultName = (symbol: string): string => {
+  const readableName = symbol.replace(/^variable_?/i, '').replace(/_/g, ' ').trim();
+  if (!readableName) return symbol;
+
+  return `Variable ${readableName}`;
+};
+
+const VariableSettingsForm: React.FC<{ variable: IVariableDefinition }> = ({ variable }) => {
+  const { variables, setVariables, setElementSelected } = useAppContexts();
+  const [isEditingName, setIsEditingName] = useState(false);
+  const defaultName = getVariableDefaultName(variable.symbol);
+  const displayedName = variable.name || defaultName;
+
+  const updateVariable = (patch: Partial<IVariableDefinition>) => {
+    const updatedVariable = { ...variable, ...patch };
+    setVariables(prev => ({
+      ...prev,
+      variables: prev.variables.map(item => item.id === variable.id ? updatedVariable : item),
+      _saved: false,
+    }));
+    setElementSelected({ ...updatedVariable, _resourceType: 'variables' });
+  };
+
+  const changeType = (type: EVariableType) => {
+    const initialValue: VariableValue = type === 'number' ? 0 : type === 'boolean' ? false : '';
+    updateVariable({ type, initialValue });
+  };
+
+  return (
+    <Space direction="vertical" style={{ width: '100%' }}>
+      {isEditingName ? (
+        <Input
+          autoFocus
+          aria-label="Variable name"
+          placeholder={defaultName}
+          value={variable.name}
+          onChange={(event) => updateVariable({ name: event.target.value })}
+          onBlur={() => {
+            if (!variable.name.trim()) updateVariable({ name: defaultName });
+            setIsEditingName(false);
+          }}
+          onPressEnter={() => {
+            if (!variable.name.trim()) updateVariable({ name: defaultName });
+            setIsEditingName(false);
+          }}
+        />
+      ) : (
+        <Typography.Title
+          level={5}
+          onClick={() => setIsEditingName(true)}
+          style={{ margin: 0, cursor: 'pointer', padding: 10 }}
+        >
+          {displayedName}
+        </Typography.Title>
+      )}
+      <Divider style={{ margin: 0 }} />
+      <Space direction="vertical" style={{ width: '100%', padding: 10 }}>
+        <Typography.Text strong>Variable settings</Typography.Text>
+      <Select<EVariableType>
+        aria-label="Variable type"
+        style={{ width: '100%' }}
+        value={variable.type}
+        options={[
+          { value: 'number', label: 'Number' },
+          { value: 'boolean', label: 'Boolean' },
+          { value: 'string', label: 'String' },
+        ]}
+        onChange={changeType}
+      />
+      {variable.type === 'number' && (
+        <InputNumber
+          aria-label="Variable initial value"
+          addonBefore="Initial value"
+          style={{ width: '100%' }}
+          value={variable.initialValue as number}
+          onChange={(value) => updateVariable({ initialValue: value ?? 0 })}
+        />
+      )}
+      {variable.type === 'boolean' && (
+        <Select<boolean>
+          aria-label="Variable initial value"
+          style={{ width: '100%' }}
+          value={variable.initialValue as boolean}
+          options={[{ value: true, label: 'True' }, { value: false, label: 'False' }]}
+          onChange={(value) => updateVariable({ initialValue: value })}
+        />
+      )}
+      {variable.type === 'string' && (
+        <Input
+          aria-label="Variable initial value"
+          addonBefore="Initial value"
+          value={variable.initialValue as string}
+          onChange={(event) => updateVariable({ initialValue: event.target.value })}
+        />
+      )}
+      </Space>
+    </Space>
+  );
+};
 
 interface IRightPanelProps {
   controllerView: any;
@@ -579,6 +680,15 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView, isTileEditor =
     return (
       <Content style={{ padding: token.padding }}>
         <RightPanelGWSettings controllerView={controllerView}/>
+      </Content>
+    );
+  }
+
+  if (elementSelected._resourceType === 'variables') {
+    const variable = elementSelected as IVariableDefinition;
+    return (
+      <Content>
+        <VariableSettingsForm variable={variable} />
       </Content>
     );
   }

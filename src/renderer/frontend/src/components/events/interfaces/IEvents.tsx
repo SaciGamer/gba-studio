@@ -17,6 +17,9 @@ export enum EEvents {
     FADE_IN = 'EVENT_FADE_IN',
     FADE_OUT = 'EVENT_FADE_OUT',
     WAIT = 'EVENT_WAIT',
+    IF = 'EVENT_IF',
+    VARIABLE = 'EVENT_VARIABLE',
+    VARIABLE_RESET_ALL = 'EVENT_VARIABLE_RESET_ALL',
     IDLE = 'EVENT_IDLE',
 
 }
@@ -40,6 +43,9 @@ export const EVENT_INFO: Record<EEvents, { name: string }> = {
   [EEvents.FADE_IN]: { name: 'Fade In' },
   [EEvents.FADE_OUT]: { name: 'Fade Out' },
   [EEvents.WAIT]: { name: 'Wait' },
+  [EEvents.IF]: { name: 'If / Else' },
+  [EEvents.VARIABLE]: { name: 'Variable Set to Value' },
+  [EEvents.VARIABLE_RESET_ALL]: { name: 'Reset All Variables to Default' },
   [EEvents.IDLE]: { name: 'Idle' },
 
 }

@@ -14,6 +14,7 @@
 #include "bn_bg_palettes.h"
 // #include "bn_scene.h"
 #include "startup.h"
+#include "resource_registry.h"
 
 /**
  * Game constructor - Initialize game systems
@@ -57,6 +58,7 @@ void Game::initialize() {
     
     // Inicializa gráficos e carrega o background inicial
     GraphicsManager::instance().initialize();
+    initialize_variables();
 }
 
 /**
@@ -71,7 +73,14 @@ void Game::update() {
 
     // - Scripts OnInit
     const Scenes* scene = GraphicsManager::instance().getScene();
-    int count = scene->onInitCount;
+    if(!scene)
+    {
+        BN_LOG("..: No current scene; skipping scripts");
+        return;
+    }
+
+    const int count = scene->onInitCount;
+    BN_LOG("..: Scene scripts: ", count, " ptr: ", scene->onInitScripts);
 
     if(scene && scene->onInitScripts && count > 0) {
         // scripts.execute(*scene->onInitScripts[currentScriptIndex], count); // processar por index

@@ -19,13 +19,16 @@ import { Button, Drawer, Flex, Tag, Typography, theme } from "antd";
 import { ReactNode, useCallback, useEffect, useMemo } from "react";
 import PanelEvents from "./PanelEvents";
 import { EEvents, EVENT_INFO } from "./interfaces/IEvents";
+import { getEventDepthColor } from "./EventColors";
 
 export type ScriptKey = "script" | "playerHit1Script" | "playerHit2Script" | "playerHit3Script";
 
 interface EventNodeData extends Record<string, unknown> {
   event: IScriptsElement;
-  onArgsChange: (id: string, args: IArgs) => void;
-  onDelete: (id: string) => void;
+  path: string;
+  onArgsChange: (path: string, args: IArgs) => void;
+  onDelete: (path: string) => void;
+  branch?: "then" | "else";
 }
 
 type EventNode = Node<EventNodeData, "event">;
@@ -44,13 +47,14 @@ function EventFlowNode({ data }: NodeProps<EventNode>) {
   const { token } = theme.useToken();
   const { event, onArgsChange, onDelete } = data;
   const isDisabled = event.args?.__comment === true;
+  const eventColor = getEventDepthColor(0);
 
   return (
     <div
-      className="nodrag"
+      className="flow-event-node"
       style={{
         width: 280,
-        border: `1px solid ${token.colorBorder}`,
+        border: `1px solid ${eventColor}`,
         borderRadius: token.borderRadiusLG,
         background: isDisabled ? token.colorSuccessBg : token.colorBgContainer,
         boxShadow: token.boxShadowSecondary,
@@ -58,27 +62,33 @@ function EventFlowNode({ data }: NodeProps<EventNode>) {
       }}
     >
       <Handle type="target" position={Position.Left} isConnectable={false} />
-      <Flex align="center" justify="space-between" style={{ padding: "8px 10px", borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
-        <Typography.Text strong>{eventTitle(event)}</Typography.Text>
+      <Flex align="center" justify="space-between" style={{ padding: "8px 10px", borderBottom: `1px solid ${eventColor}` }}>
+        <Typography.Text strong style={{ color: eventColor }}>{eventTitle(event)}</Typography.Text>
         <Flex align="center" gap={4}>
           {isDisabled && <Tag color="success">Disabled</Tag>}
           <Button
             aria-label={`Delete ${eventTitle(event)}`}
+            className="nodrag"
             icon={<DeleteOutlined />}
             size="small"
             type="text"
-            onClick={() => onDelete(event.id)}
+            onClick={() => onDelete(data.path)}
           />
         </Flex>
       </Flex>
-      <div className="nodrag nopan" style={{ padding: 10 }}>
+      <div className="nodrag nopan" style={{ padding: 10, color: eventColor }}>
         <PanelEvents
           event={event}
           customTitle={() => undefined}
-          onValueChange={(id, args) => onArgsChange(id, args)}
+          onValueChange={(_, args) => onArgsChange(data.path, args)}
         />
       </div>
-      <Handle type="source" position={Position.Right} isConnectable={false} />
+      {event.command === EEvents.IF ? (
+        <>
+          <Handle id="then" type="source" position={Position.Right} style={{ top: "35%" }} isConnectable={false} />
+          <Handle id="else" type="source" position={Position.Right} style={{ top: "65%" }} isConnectable={false} />
+        </>
+      ) : <Handle id="next" type="source" position={Position.Right} isConnectable={false} />}
     </div>
   );
 }
@@ -103,27 +113,75 @@ function FlowCanvas({ scriptKey, addEventControl }: Pick<FlowEditorManagerProps,
   }, [elementSelected, scriptKey, setElementSelected, setScenes]);
 
   const updateArgs = useCallback((id: string, args: IArgs) => {
-    updateScripts(scripts.map(script => script.id === id ? { ...script, args } : script));
+    const updateNested = (items: IScriptsElement[], parts: string[]): IScriptsElement[] => {
+      const index = Number(parts[0]);
+      if (parts.length === 1) return items.map((item, itemIndex) => itemIndex === index
+        ? { ...item, args: { ...item.args, ...args, __x: item.args?.__x, __y: item.args?.__y } }
+        : item);
+      const branch = parts[1] as "then" | "else";
+      return items.map((item, itemIndex) => itemIndex === index && item.children ? {
+        ...item,
+        children: { ...item.children, [branch]: updateNested(item.children[branch] || [], parts.slice(2)) },
+      } : item);
+    };
+    updateScripts(updateNested(scripts, id.split("/")));
   }, [scripts, updateScripts]);
 
-  const deleteEvent = useCallback((id: string) => {
-    updateScripts(scripts.filter(script => script.id !== id));
+  const deleteEvent = useCallback((path: string) => {
+    const removeNested = (items: IScriptsElement[], parts: string[]): IScriptsElement[] => {
+      const index = Number(parts[0]);
+      if (parts.length === 1) return items.filter((_, itemIndex) => itemIndex !== index);
+      const branch = parts[1] as "then" | "else";
+      return items.map((item, itemIndex) => itemIndex === index && item.children ? {
+        ...item,
+        children: { ...item.children, [branch]: removeNested(item.children[branch] || [], parts.slice(2)) },
+      } : item);
+    };
+    updateScripts(removeNested(scripts, path.split("/")));
   }, [scripts, updateScripts]);
 
-  const initialNodes = useMemo<EventNode[]>(() => scripts.map((event, index) => ({
-    id: event.id,
-    type: "event",
-    position: event.position || { x: 80 + index * 340, y: 140 },
-    data: { event, onArgsChange: updateArgs, onDelete: deleteEvent },
-  })), [deleteEvent, scripts, updateArgs]);
-
-  const edges = useMemo<Edge[]>(() => scripts.slice(0, -1).map((script, index) => ({
-    id: `${script.id}-${scripts[index + 1].id}`,
-    source: script.id,
-    target: scripts[index + 1].id,
-    type: "smoothstep",
-    animated: false,
-  })), [scripts]);
+  const { initialNodes, edges } = useMemo(() => {
+    const nextNodes: EventNode[] = [];
+    const nextEdges: Edge[] = [];
+    const addNodes = (items: IScriptsElement[], prefix = "", depth = 0) => items.forEach((event, index) => {
+      const path = prefix ? `${prefix}/${index}` : String(index);
+      nextNodes.push({
+        id: path,
+        type: "event",
+        position: typeof event.args?.__x === "number" && typeof event.args?.__y === "number"
+          ? { x: event.args.__x, y: event.args.__y }
+          : event.position || { x: 80 + depth * 380, y: 120 + index * 180 },
+        data: { event, path, onArgsChange: updateArgs, onDelete: deleteEvent },
+      });
+      if (event.children) {
+        addNodes(event.children.then, `${path}/then`, depth + 1);
+        addNodes(event.children.else || [], `${path}/else`, depth + 1);
+      }
+    });
+    const buildSequence = (items: IScriptsElement[], prefix: string, continuation?: string): string | undefined => {
+      if (!items.length) return continuation;
+      items.forEach((current, index) => {
+        const currentPath = prefix ? `${prefix}/${index}` : String(index);
+        const next = index < items.length - 1
+          ? (prefix ? `${prefix}/${index + 1}` : String(index + 1))
+          : continuation;
+        if (current.command === EEvents.IF) {
+          const thenEntry = buildSequence(current.children?.then || [], `${currentPath}/then`, next);
+          const elseEntry = buildSequence(current.children?.else || [], `${currentPath}/else`, next);
+          if (thenEntry) nextEdges.push({ id: `${currentPath}-then-${thenEntry}`, source: currentPath, sourceHandle: "then", target: thenEntry, type: "smoothstep" });
+          if (elseEntry) nextEdges.push({ id: `${currentPath}-else-${elseEntry}`, source: currentPath, sourceHandle: "else", target: elseEntry, type: "smoothstep" });
+          if (!thenEntry && next) nextEdges.push({ id: `${currentPath}-then-${next}`, source: currentPath, sourceHandle: "then", target: next, type: "smoothstep" });
+          if (!elseEntry && next) nextEdges.push({ id: `${currentPath}-else-${next}`, source: currentPath, sourceHandle: "else", target: next, type: "smoothstep" });
+        } else if (next) {
+          nextEdges.push({ id: `${currentPath}-next-${next}`, source: currentPath, sourceHandle: "next", target: next, type: "smoothstep" });
+        }
+      });
+      return prefix ? `${prefix}/0` : "0";
+    };
+    addNodes(scripts);
+    buildSequence(scripts, "", undefined);
+    return { initialNodes: nextNodes, edges: nextEdges };
+  }, [deleteEvent, scripts, updateArgs]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<EventNode>(initialNodes);
 
@@ -132,10 +190,19 @@ function FlowCanvas({ scriptKey, addEventControl }: Pick<FlowEditorManagerProps,
   }, [initialNodes, setNodes]);
 
   const onNodeDragStop = useCallback((_: MouseEvent | TouchEvent, node: EventNode) => {
-    updateScripts(scripts.map(script => script.id === node.id
-      ? { ...script, position: node.position }
-      : script
-    ));
+    const updatePosition = (items: IScriptsElement[], parts: string[]): IScriptsElement[] => {
+      const index = Number(parts[0]);
+      if (parts.length === 1) return items.map((item, itemIndex) => itemIndex === index ? {
+        ...item,
+        args: { ...item.args, __x: node.position.x, __y: node.position.y },
+      } : item);
+      const branch = parts[1] as "then" | "else";
+      return items.map((item, itemIndex) => itemIndex === index && item.children ? {
+        ...item,
+        children: { ...item.children, [branch]: updatePosition(item.children[branch] || [], parts.slice(2)) },
+      } : item);
+    };
+    updateScripts(updatePosition(scripts, node.id.split("/")));
   }, [scripts, updateScripts]);
 
   return (
@@ -159,9 +226,9 @@ function FlowCanvas({ scriptKey, addEventControl }: Pick<FlowEditorManagerProps,
       >
         <Background color={token.colorBorderSecondary} gap={20} />
         <Controls style={{ background: token.colorBgContainer, border: `1px solid ${token.colorBorder}` }} />
-        <MiniMap
+          <MiniMap
           maskColor={token.colorFillSecondary}
-          nodeColor={token.colorPrimaryBg}
+          nodeColor={getEventDepthColor(0)}
           style={{ background: token.colorBgContainer, border: `1px solid ${token.colorBorder}` }}
         />
       </ReactFlow>
