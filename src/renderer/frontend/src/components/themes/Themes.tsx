@@ -1,5 +1,28 @@
 import { Layout, theme } from 'antd'
 
+const legacySliderTokens = {
+  controlSize: 12,
+  railSize: 4,
+  handleSize: 12,
+  handleSizeHover: 12,
+  handleLineWidth: 2,
+  handleLineWidthHover: 2,
+};
+
+const modernSliderTokens = {
+  controlSize: 10,
+  railSize: 4,
+  handleSize: 10,
+  handleSizeHover: 12,
+  handleLineWidth: 2,
+  handleLineWidthHover: 2.5,
+};
+
+const floatingMenuTokens = {
+  floatButtonSize: 50,
+  floatButtonIconSize: 30,
+};
+
 const Themes: Record<string, any> = {
   light: {
     token: {
@@ -13,6 +36,7 @@ const Themes: Record<string, any> = {
       // colorBgContainer: '#f0f0f0',
       // colorBgContainerDisabled: '#d9d9d9',
       colorBgSolidActive: '#ffa500',
+      colorPrimaryBg: '#ffa500',
       controlItemBgActive: '#ffa500',
       // colorBgElevated: '#ffffff',
       // colorTextPlaceholder: '#000000', // Placeholder cinza
@@ -21,6 +45,7 @@ const Themes: Record<string, any> = {
       
     },
     algorithm: [theme.defaultAlgorithm],
+    components: { Slider: legacySliderTokens },
   },
   dark: {
     token: {
@@ -36,6 +61,7 @@ const Themes: Record<string, any> = {
       // colorBgContainerDisabled: '#505050',
      
       colorBgSolidActive: '#ffa500',
+      colorPrimaryBg: '#ffa500',
       controlItemBgActive: '#ffa500',
       colorBgElevated: '#353535',
       // colorTextPlaceholder: '#ffffff', // Placeholder cinza
@@ -56,6 +82,8 @@ const Themes: Record<string, any> = {
     }, 
     // algorithm: [theme.darkAlgorithm, theme.compactAlgorithm],
     components: {
+      Slider: legacySliderTokens,
+      FloatButton: floatingMenuTokens,
       Tree: {
         nodeSelectedBg: '#ffa500',
         nodeHoverBg: '#353535',
@@ -95,6 +123,7 @@ const Themes: Record<string, any> = {
       // colorBgContainer: '#088A08',
       colorBgContainerDisabled: '#2c2c2c',
       colorBgSolidActive: '#6A5ACD',
+      colorPrimaryBg: '#6A5ACD',
       controlItemBgActive: '#6A5ACD',
       colorBgElevated: '#088A08',
       colorFill: '#e60012',
@@ -107,6 +136,7 @@ const Themes: Record<string, any> = {
       // controlHeight: '50px', // Aumenta a altura dos botões padrão
     },
     components: {
+      Slider: legacySliderTokens,
       Collapse: {
         contentBg:'#483D8B', // caso precise trocar a cor do fundo do colapse
         padding: 10,
@@ -133,13 +163,14 @@ const Themes: Record<string, any> = {
       colorBgContainer: '#505050', // Cor de fundo dos botões e inputs
       colorBgContainerDisabled: '#D8D8D8', // Cor de fundo desabilitada dos botões e inputs
       colorBgSolidActive: '#e60012',
+      colorPrimaryBg: '#e60012',
       controlItemBgActive: '#e60012',
       colorBgElevated: '#000000', // Cor de fundo dos menus suspensos
       colorTextPlaceholder: '#979797', // Placeholder cinza
       colorFill: '#e60012',
       fontSize: 15,
       colorBorder: '#000000',
-      controlHeightLG: '45px',
+      controlHeightLG: '50px',
       borderRadius: '0px', // Mais quadrado
       "borderRadiusXS": 0,
       "borderRadiusSM": 0,
@@ -155,6 +186,7 @@ const Themes: Record<string, any> = {
       
     },
     components: {
+      Slider: legacySliderTokens,
       Collapse: {
         contentBg:'#979797', // caso precise trocar a cor do fundo do colapse
         padding: 10,
@@ -178,6 +210,7 @@ const Themes: Record<string, any> = {
       colorBgContainer: '#0489B1',
       colorBgContainerDisabled: '#003f7f',
       colorBgSolidActive: '#007BFF',
+      colorPrimaryBg: '#007BFF',
       controlItemBgActive: '#007BFF',
       colorBgElevated: '#045FB4',
       // colorTextPlaceholder: '#ffffff',
@@ -185,6 +218,7 @@ const Themes: Record<string, any> = {
       controlHeightLG: '50px',
     },
     components: {
+      Slider: legacySliderTokens,
       Collapse: {
         // headerBg: '#6E6E6E', // Caso não use a config no painel
         contentBg:'#0026ff', // caso precise trocar a cor do fundo do colapse
@@ -204,10 +238,92 @@ const Themes: Record<string, any> = {
       colorBgContainer: '#E0E0E0',
       colorBgContainerDisabled: '#B0B0B0',
       colorBgElevated: '#6E6E6E',
+      colorPrimaryBg: '#93a5bb',
       colorBorder: '#808080',
       // colorTextPlaceholder: '#000000',
 
-      controlHeightLG: '45px',
+      controlHeightLG: '50px',
+    },
+    components: { Slider: legacySliderTokens },
+  },
+  glass: {
+    algorithm: [theme.defaultAlgorithm],
+    token: {
+      colorPrimary: '#1677ff',
+      colorBgBase: '#dce7f0',
+      colorBgContainer: 'rgba(255, 255, 255, 0.42)',
+      colorBgElevated: 'rgba(255, 255, 255, 0.72)',
+      colorPrimaryBg: 'rgba(255, 255, 255, 0.42)',
+      colorBorder: 'rgba(255, 255, 255, 0.52)',
+      colorBorderSecondary: 'rgba(85, 85, 85, 0.16)',
+      borderRadius: 12,
+      borderRadiusSM: 10,
+      borderRadiusLG: 12,
+      controlHeightLG: 50,
+      boxShadow: '0 8px 24px rgba(85, 85, 85, 0.1)',
+      boxShadowSecondary: '0 8px 24px rgba(85, 85, 85, 0.1)',
+    },
+    components: {
+      Slider: modernSliderTokens,
+      FloatButton: floatingMenuTokens,
+      Button: { primaryShadow: 'none', dangerShadow: 'none', defaultShadow: 'none' },
+      Layout: { bodyBg: 'rgba(255, 255, 255, 0.16)', headerBg: 'rgba(255, 255, 255, 0.32)', siderBg: 'rgba(255, 255, 255, 0.18)' },
+      Menu: { itemBg: 'transparent', subMenuItemBg: 'transparent', itemHoverBg: 'rgba(255, 255, 255, 0.28)', itemSelectedBg: 'rgba(255, 255, 255, 0.38)' },
+      Progress: { remainingColor: 'rgba(255, 255, 255, 0.3)' },
+    },
+  },
+  bootstrap: {
+    algorithm: [theme.defaultAlgorithm],
+    token: {
+      colorPrimary: '#337ab7',
+      colorInfo: '#3a87ad',
+      colorBgBase: '#f8f9fa',
+      colorBgContainer: '#ffffff',
+      colorPrimaryBg: '#337ab7',
+      colorBorder: '#b8bec5',
+      borderRadius: 4,
+      borderRadiusSM: 3,
+      borderRadiusLG: 6,
+      controlHeightLG: 50,
+    },
+    components: {
+      Slider: modernSliderTokens,
+      FloatButton: floatingMenuTokens,
+      Layout: { bodyBg: '#f8f9fa', headerBg: '#ffffff', siderBg: '#ffffff', triggerBg: '#e9ecef', triggerColor: '#212529' },
+      Menu: { itemBg: 'transparent', subMenuItemBg: 'transparent' },
+      Tooltip: { fontSize: 12 },
+      Progress: { defaultColor: '#337ab7', remainingColor: '#f5f5f5' },
+    },
+  },
+  cartoon: {
+    algorithm: [theme.defaultAlgorithm],
+    token: {
+      colorText: '#51463B',
+      colorPrimary: '#225555',
+      colorError: '#DA8787',
+      colorInfo: '#9CD3D3',
+      colorBorder: '#225555',
+      colorBorderSecondary: '#88BBBB',
+      colorBgBase: '#FAFAEE',
+      colorBgContainer: '#fffdf3',
+      colorPrimaryBg: '#9CD3D3',
+      lineWidth: 2,
+      lineWidthBold: 2,
+      borderRadius: 18,
+      borderRadiusSM: 14,
+      borderRadiusLG: 18,
+      controlHeightSM: 28,
+      controlHeight: 36,
+      controlHeightLG: 50,
+    },
+    components: {
+      Slider: modernSliderTokens,
+      FloatButton: floatingMenuTokens,
+      Button: { primaryShadow: 'none', dangerShadow: 'none', defaultShadow: 'none' },
+      Layout: { bodyBg: '#FAFAEE', headerBg: '#F6D878', siderBg: '#F5E8C0', triggerBg: '#E8D29A', triggerColor: '#51463B' },
+      Menu: { itemBg: 'transparent', subMenuItemBg: 'transparent' },
+      Select: { optionSelectedBg: '#CBC4AF' },
+      Progress: { defaultColor: '#225555', remainingColor: '#CBC4AF' },
     },
   },
 };

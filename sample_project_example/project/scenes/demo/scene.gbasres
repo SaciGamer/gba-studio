@@ -1,0 +1,281 @@
+{
+  "id": "d8191841-adf3-46ed-917d-4d5d74c38ad2",
+  "_resourceType": "scene",
+  "_index": 3,
+  "_deleted": false,
+  "name": "Demo",
+  "backgroundId": "c00c9c5b-af66-4fb8-bfbb-e63ca7ab66f4",
+  "background": "local://E:/VisualStudio/GBAStudioProject/gba-studio/sample_project_example/assets/backgrounds\\background.png",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": "cbadfea7-bdcf-41c5-8d3b-113471be8897",
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 1,
+      "backgroundId": "ee10f14b-7604-4235-99c3-a5d862264666",
+      "name": "",
+      "path": "",
+      "y": 0
+    },
+    {
+      "layerId": 2,
+      "backgroundId": "c383b905-1c1f-47f1-9478-883b7b4202dc",
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 3,
+      "backgroundId": "0e5bf5a3-ab18-40e6-aed4-d727c05749c0",
+      "name": "",
+      "path": ""
+    }
+  ],
+  "x": 1328,
+  "y": 96,
+  "width": 256,
+  "height": 256,
+  "sceneType": "Top Down",
+  "editorPosition": {
+    "x": 1328,
+    "y": 96
+  },
+  "script": [
+    {
+      "id": "7115544a-dc12-4fe6-b09d-ebc5425c321f",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 2,
+        "__automatic": true,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "93fe2fe2-c2f2-4eaa-99a4-e5bb6b860046",
+      "version": 1,
+      "command": "EVENT_DISPLAY_VARIABLE_TEXT",
+      "args": {
+        "__collapse": false,
+        "variableId": "b8123607-c770-4ebb-b40c-2e3ce96c43de",
+        "x": 18,
+        "font": "variable8x16",
+        "y": 54,
+        "__comment": true
+      }
+    },
+    {
+      "id": "72df20fa-33ba-4ef1-8228-c317a530a6c2",
+      "version": 1,
+      "command": "EVENT_DISPLAY_DIALOGUE",
+      "args": {
+        "text": "Teste sem nenhum tipo de quebra de linha mas mesmo assim o texto deve aparecer. Caso fique grande vou quebrar aqui!\nTeste de acentos. á Á é É í Í ó Ó ú Ú. \nSímbolos: ~`!@#$%^&*()_+-=[]{};:'\",<.>/?. Fim! Só precisa saber quanto posso escrever a",
+        "horizontalAlign": "left",
+        "verticalAlign": "bottom",
+        "__collapse": false,
+        "animate": true,
+        "animationSpeed": "medium",
+        "__comment": false,
+        "dialogueFont": "fixed8x8",
+        "showFrame": true
+      }
+    },
+    {
+      "id": "1e7cb0d3-f785-4229-a9df-7c37c779e93a",
+      "version": 1,
+      "command": "EVENT_DIALOGUE_CHOICE",
+      "args": {
+        "prompt": "O que voce é?",
+        "optionA": "Sim",
+        "optionB": "Não",
+        "resultVariable": "b6f31d73-5839-4bd3-87c8-cb1f5507d66d",
+        "__collapse": false,
+        "__comment": true
+      }
+    },
+    {
+      "id": "475cc91b-98f8-4bfe-ada3-52b8acf5b726",
+      "version": 1,
+      "command": "EVENT_PAN_CAMERA",
+      "args": {
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "showCamera": false,
+        "__collapse": false,
+        "__comment": true
+      }
+    }
+  ],
+  "showCamera": true,
+  "actors": [
+    {
+      "id": "bc6692db-96ec-4ff2-a9b5-cbb1674e26ff",
+      "actorId": "bc6692db-96ec-4ff2-a9b5-cbb1674e26ff",
+      "name": "Actor 1",
+      "x": 104,
+      "y": 92,
+      "width": 16,
+      "height": 8,
+      "anchor": "center",
+      "direction": "right",
+      "spriteId": "stage_1_monsters_1",
+      "onInteractScript": [
+        {
+          "id": "af9590d2-8d63-4bb0-9b08-1855ecbb6248",
+          "version": 1,
+          "command": "EVENT_DISPLAY_DIALOGUE",
+          "args": {
+            "text": "Hi, i'm a monster!",
+            "horizontalAlign": "left",
+            "verticalAlign": "bottom",
+            "animationSpeed": "medium",
+            "__collapse": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "e2c825e0-64d1-42ed-a465-e23be228c1ca",
+      "actorId": "e2c825e0-64d1-42ed-a465-e23be228c1ca",
+      "name": "Actor 2",
+      "x": 56,
+      "y": 92,
+      "width": 16,
+      "height": 8,
+      "anchor": "center",
+      "direction": "down",
+      "spriteId": "stage_1_monsters_2",
+      "onInteractScript": [
+        {
+          "id": "d56c3335-b2cb-4ef1-b633-0e725b040499",
+          "version": 1,
+          "command": "EVENT_FADE_OUT",
+          "args": {
+            "speed": 2,
+            "__collapse": false
+          }
+        },
+        {
+          "id": "d1839e40-9060-4693-a1dd-392c29421d0d",
+          "version": 1,
+          "command": "EVENT_WAIT",
+          "args": {
+            "units": "time",
+            "time": 2,
+            "frames": 0,
+            "__collapse": true
+          }
+        },
+        {
+          "id": "74e42212-1323-48a4-9116-63ca946a76e6",
+          "version": 1,
+          "command": "EVENT_FADE_IN",
+          "args": {
+            "speed": 2,
+            "__collapse": true
+          }
+        }
+      ]
+    }
+  ],
+  "collisions": [
+    {
+      "id": "7959075d-895e-48e6-8dfe-a209ab2ba53f",
+      "name": "Collision 1",
+      "collisionSide": "solid",
+      "x": 96,
+      "y": 112,
+      "width": 16,
+      "height": 16
+    },
+    {
+      "id": "7b59df0a-572e-404d-9e1e-2655ca8f2235",
+      "name": "Collision 2",
+      "collisionSide": "solid",
+      "x": 144,
+      "y": 112,
+      "width": 16,
+      "height": 16
+    },
+    {
+      "id": "2c58358f-c199-49db-a567-97fd06325b5e",
+      "name": "Collision 4",
+      "collisionSide": "solid",
+      "x": 80,
+      "y": 128,
+      "width": 96,
+      "height": 32
+    }
+  ],
+  "triggers": [
+    {
+      "id": "e59d6cb1-b2c7-4220-ace6-af58f2268c5d",
+      "sceneId": "d8191841-adf3-46ed-917d-4d5d74c38ad2",
+      "name": "Grass",
+      "x": 0,
+      "y": 144,
+      "width": 48,
+      "height": 32,
+      "activation": "enter",
+      "enabled": true,
+      "once": false,
+      "cooldownFrames": 0,
+      "script": [],
+      "onEnterScript": [
+        {
+          "id": "433bfa76-68f8-49b3-ac37-be39191ac301",
+          "version": 1,
+          "command": "EVENT_FADE_OUT",
+          "args": {
+            "speed": 2,
+            "__collapse": false,
+            "__comment": false
+          }
+        },
+        {
+          "id": "483a09d1-802d-45b3-bd39-2bfc0dff11dd",
+          "version": 1,
+          "command": "EVENT_HIDE_ACTOR",
+          "args": {
+            "actorId": "",
+            "__comment": true,
+            "__collapse": false
+          }
+        },
+        {
+          "id": "01304930-7bc2-4309-9fa1-a08cda82093c",
+          "version": 1,
+          "command": "EVENT_WAIT",
+          "args": {
+            "units": "time",
+            "time": 2,
+            "frames": 0,
+            "__collapse": false,
+            "__comment": false
+          }
+        },
+        {
+          "id": "5510d271-5696-41ce-a46e-00de551c8785",
+          "version": 1,
+          "command": "EVENT_FADE_IN",
+          "args": {
+            "speed": 2,
+            "__collapse": true
+          }
+        }
+      ],
+      "onLeaveScript": []
+    }
+  ],
+  "cameraPosition": {
+    "x": 8,
+    "y": 48
+  }
+}

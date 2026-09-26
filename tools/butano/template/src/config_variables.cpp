@@ -14,7 +14,6 @@ bool ConfigVariables::configure(const void* args)
     const auto* variable = static_cast<const VariableSetValueData*>(args);
     if(!variable)
     {
-        BN_LOG("[EVENT_VARIABLE] missing arguments");
         return false;
     }
 
@@ -25,13 +24,8 @@ bool ConfigVariables::configure(const void* args)
         variable->string_value
     };
 
-    BN_LOG("[EVENT_VARIABLE] id: ", variable->variable_id);
-    BN_LOG("[EVENT_VARIABLE] type: ", variable->type == VariableType::number ? "number" :
-           variable->type == VariableType::boolean ? "boolean" : "string");
-
     if(variable->source_variable_id)
     {
-        BN_LOG("[EVENT_VARIABLE] source: ", variable->source_variable_id);
         if(variable->type == VariableType::number)
         {
             value.number_value = VariableManager::instance().get_number(variable->source_variable_id);
@@ -46,21 +40,11 @@ bool ConfigVariables::configure(const void* args)
         }
     }
 
-    if(value.type == VariableType::number)
-    {
-        BN_LOG("[EVENT_VARIABLE] value: ", value.number_value);
-    }
-    else if(value.type == VariableType::boolean)
-    {
-        BN_LOG("[EVENT_VARIABLE] value: ", value.boolean_value);
-    }
-    else
-    {
-        BN_LOG("[EVENT_VARIABLE] value: ", value.string_value);
-    }
-
     const bool result = VariableManager::instance().set_value(variable->variable_id, value);
-    BN_LOG("[EVENT_VARIABLE] set result: ", result);
+    if(result)
+    {
+        BN_LOG("[EVENT_VARIABLE] set: ", variable->variable_id);
+    }
     return result;
 }
 

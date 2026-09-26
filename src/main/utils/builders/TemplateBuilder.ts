@@ -43,6 +43,7 @@ export class TemplateBuilder {
       path.join(this.buildDir, 'graphics'),
       path.join(this.buildDir, 'dmg_audio'),
       path.join(this.buildDir, 'audio'),
+      path.join(this.buildDir, 'common'),
     ];
 
     for (const dir of dirs) {
@@ -50,6 +51,12 @@ export class TemplateBuilder {
         fs.mkdirSync(dir, { recursive: true });
       }
     }
+
+    // Bundle Butano common font assets with generated projects; this keeps the
+    // dialogue renderer self-contained when builds run from a temp directory.
+    const commonSrc = path.resolve(this.templateDir, '..', 'common');
+    const commonDst = path.join(this.buildDir, 'common');
+    if (fs.existsSync(commonSrc)) this.copyRecursive(commonSrc, commonDst);
   }
 
   /**

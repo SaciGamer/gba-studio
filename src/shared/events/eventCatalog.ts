@@ -1,0 +1,99 @@
+/** Declarative event contract shared by editor, compiler and documentation. */
+export type EventExecution = 'instant' | 'blocking';
+
+export type EventPayloadField = {
+  type: 'integer' | 'string' | 'boolean' | 'enum';
+  required?: boolean;
+  min?: number;
+  max?: number;
+  options?: string[];
+};
+
+export type EventDefinition = {
+  code: string;
+  version: 1;
+  category: 'Screen' | 'Timer' | 'Scene' | 'Camera' | 'Variables' | 'Scripts';
+  label: string;
+  execution: EventExecution;
+  payload: Record<string, EventPayloadField>;
+};
+
+export const EVENT_CATALOG = [
+  { code: 'EVENT_WAIT', version: 1, category: 'Timer', label: 'Wait', execution: 'blocking', payload: { units: { type: 'enum', required: true }, frames: { type: 'integer', min: 0 }, time: { type: 'integer', min: 0 } } },
+  { code: 'EVENT_FADE_IN', version: 1, category: 'Screen', label: 'Fade In', execution: 'blocking', payload: { speed: { type: 'integer', min: 1, max: 6 } } },
+  { code: 'EVENT_FADE_OUT', version: 1, category: 'Screen', label: 'Fade Out', execution: 'blocking', payload: { speed: { type: 'integer', min: 1, max: 6 } } },
+  { code: 'EVENT_FADE_OPTIONS', version: 1, category: 'Screen', label: 'Fade Options', execution: 'instant', payload: { color: { type: 'enum', required: true } } },
+  { code: 'EVENT_CHANGE_SCENE', version: 1, category: 'Scene', label: 'Change Scene', execution: 'blocking', payload: { sceneId: { type: 'string', required: true }, x: { type: 'integer', min: 0 }, y: { type: 'integer', min: 0 }, direction: { type: 'enum' }, fadeSpeed: { type: 'integer', min: 1, max: 6 } } },
+  { code: 'EVENT_PAN_CAMERA', version: 1, category: 'Camera', label: 'Pan Camera', execution: 'instant', payload: { x: { type: 'integer', required: true }, y: { type: 'integer', required: true } } },
+  { code: 'EVENT_MOVE_ACTOR', version: 1, category: 'Scene', label: 'Move Actor', execution: 'instant', payload: { actorId: { type: 'string', required: true }, x: { type: 'integer', required: true }, y: { type: 'integer', required: true } } },
+  { code: 'EVENT_SPAWN_ACTOR', version: 1, category: 'Scene', label: 'Spawn Actor', execution: 'instant', payload: { actorId: { type: 'string', required: true }, x: { type: 'integer', required: true }, y: { type: 'integer', required: true } } },
+  { code: 'EVENT_REMOVE_ACTOR', version: 1, category: 'Scene', label: 'Remove Actor', execution: 'instant', payload: { actorId: { type: 'string', required: true } } },
+  { code: 'EVENT_VISIBLE_ACTOR', version: 1, category: 'Scene', label: 'Visible Actor', execution: 'instant', payload: { actorId: { type: 'string', required: true }, visible: { type: 'boolean', required: true } } },
+  { code: 'EVENT_HIDE_ACTOR', version: 1, category: 'Scene', label: 'Hide Actor', execution: 'instant', payload: { actorId: { type: 'string', required: true } } },
+  { code: 'EVENT_SHOW_ACTOR', version: 1, category: 'Scene', label: 'Show Actor', execution: 'instant', payload: { actorId: { type: 'string', required: true } } },
+  { code: 'EVENT_HIDE_ALL_SPRITES', version: 1, category: 'Scene', label: 'Hide All Sprites', execution: 'instant', payload: {} },
+  { code: 'EVENT_SHOW_ALL_SPRITES', version: 1, category: 'Scene', label: 'Show All Sprites', execution: 'instant', payload: {} },
+  { code: 'EVENT_SET_ANIMATION_SPEED', version: 1, category: 'Scene', label: 'Set Animation Speed', execution: 'instant', payload: { actorId: { type: 'string', required: true }, speed: { type: 'integer', required: true, min: 0, max: 60 } } },
+  { code: 'EVENT_SET_ACTOR_PRIORITY', version: 1, category: 'Scene', label: 'Set Actor Priority', execution: 'instant', payload: { actorId: { type: 'string', required: true }, priority: { type: 'integer', required: true, min: 0, max: 3 } } },
+  { code: 'EVENT_PLAY_MUSIC', version: 1, category: 'Screen', label: 'Play Music', execution: 'instant', payload: { musicId: { type: 'string', required: true }, volume: { type: 'integer', min: 0, max: 100 } } },
+  { code: 'EVENT_PLAY_SOUND', version: 1, category: 'Screen', label: 'Play Sound', execution: 'instant', payload: { soundId: { type: 'string', required: true }, volume: { type: 'integer', min: 0, max: 100 } } },
+  { code: 'EVENT_STOP_MUSIC', version: 1, category: 'Screen', label: 'Stop Music', execution: 'instant', payload: {} },
+  { code: 'EVENT_SET_MUSIC_VOLUME', version: 1, category: 'Screen', label: 'Set Music Volume', execution: 'instant', payload: { volume: { type: 'integer', required: true, min: 0, max: 100 } } },
+  { code: 'EVENT_DISPLAY_DIALOGUE', version: 1, category: 'Scripts', label: 'Display Dialogue', execution: 'blocking', payload: { text: { type: 'string', required: true }, dialogueFont: { type: 'enum', options: ['fixed8x8', 'fixed8x16'] }, showFrame: { type: 'boolean' }, horizontalAlign: { type: 'enum', options: ['left', 'center', 'right'] }, verticalAlign: { type: 'enum', options: ['top', 'center', 'bottom'] }, animate: { type: 'boolean' }, animationSpeed: { type: 'enum', options: ['slow', 'medium', 'fast'] } } },
+  { code: 'EVENT_DISPLAY_VARIABLE_TEXT', version: 1, category: 'Variables', label: 'Display Variable Text', execution: 'instant', payload: { variableId: { type: 'string', required: true }, x: { type: 'integer', required: true, min: 0 }, y: { type: 'integer', required: true, min: 0 }, font: { type: 'enum', options: ['variable8x8', 'variable8x16', 'variable16x16'] } } },
+  { code: 'EVENT_HIDE_DIALOGUE', version: 1, category: 'Scripts', label: 'Hide Dialogue', execution: 'instant', payload: {} },
+  { code: 'EVENT_DIALOGUE_CHOICE', version: 1, category: 'Scripts', label: 'Dialogue Choice', execution: 'blocking', payload: { prompt: { type: 'string', required: true }, optionA: { type: 'string', required: true }, optionB: { type: 'string', required: true }, resultVariable: { type: 'string', required: true } } },
+  { code: 'EVENT_CHANGE_LAYER', version: 1, category: 'Scene', label: 'Change Background', execution: 'instant', payload: { layerId: { type: 'integer', required: true, min: 0, max: 3 }, backgroundId: { type: 'string' } } },
+  { code: 'EVENT_VISIBLE_BACKGROUND', version: 1, category: 'Scene', label: 'Visible Background', execution: 'instant', payload: { layerId: { type: 'integer', required: true, min: 0, max: 3 }, visible: { type: 'boolean', required: true } } },
+  { code: 'EVENT_CHANGE_PALETTE_BACKGROUND', version: 1, category: 'Scene', label: 'Change Palette Background', execution: 'instant', payload: { layerId: { type: 'integer', required: true, min: 0, max: 3 }, restorePaletteLayerDefault: { type: 'boolean' } } },
+  { code: 'EVENT_VARIABLE', version: 1, category: 'Variables', label: 'Variable Set to Value', execution: 'instant', payload: { variableId: { type: 'string', required: true } } },
+  { code: 'EVENT_VARIABLE_RESET_ALL', version: 1, category: 'Variables', label: 'Reset All Variables', execution: 'instant', payload: {} },
+  { code: 'EVENT_IF', version: 1, category: 'Variables', label: 'If / Else', execution: 'instant', payload: { operator: { type: 'enum', required: true } } },
+  { code: 'EVENT_WHILE', version: 1, category: 'Variables', label: 'While', execution: 'instant', payload: { operator: { type: 'enum', required: true } } },
+  { code: 'EVENT_CALL_SCRIPT', version: 1, category: 'Scripts', label: 'Call Script', execution: 'blocking', payload: { scriptId: { type: 'string', required: true } } },
+  { code: 'EVENT_FOR', version: 2, category: 'Scripts', label: 'For', execution: 'instant', payload: { variableId: { type: 'string', required: true }, start: { type: 'integer', required: true }, end: { type: 'integer', required: true }, step: { type: 'integer', required: true } } },
+  { code: 'EVENT_BREAK', version: 1, category: 'Scripts', label: 'Script: Break', execution: 'instant', payload: {} },
+  { code: 'EVENT_CONTINUE', version: 1, category: 'Scripts', label: 'Script: Continue', execution: 'instant', payload: {} },
+  { code: 'EVENT_WAIT_FOR_BUTTON', version: 1, category: 'Scripts', label: 'Attach Script to Button', execution: 'instant', payload: { button: { type: 'enum' }, buttons: { type: 'array' }, overrideButton: { type: 'boolean' } } },
+  { code: 'EVENT_IF_BUTTON_HELD', version: 1, category: 'Variables', label: 'If Button Held', execution: 'instant', payload: { button: { type: 'enum', required: true }, buttons: { type: 'array' } } },
+] as const satisfies readonly EventDefinition[];
+
+export const EVENT_CATALOG_BY_CODE: Readonly<Record<string, EventDefinition>> = Object.fromEntries(
+  EVENT_CATALOG.map((event) => [event.code, event]),
+);
+
+export const EVENT_DEFAULTS: Readonly<Record<string, unknown>> = {
+  EVENT_WAIT: { units: 'time', time: 0, frames: 0 },
+  EVENT_FADE_IN: { speed: 2 },
+  EVENT_FADE_OUT: { speed: 2 },
+  EVENT_FADE_OPTIONS: { color: 'black' },
+  EVENT_PAN_CAMERA: { x: { type: 'number', value: 0 }, y: { type: 'number', value: 0 }, showCamera: false },
+  EVENT_CHANGE_LAYER: { layerId: 0, backgroundId: null },
+  EVENT_VISIBLE_BACKGROUND: { layerId: 0, visible: true },
+  EVENT_CHANGE_PALETTE_BACKGROUND: { layerId: 0, paletteIds: Array(16).fill(null) },
+  EVENT_VARIABLE_RESET_ALL: { scope: 'ALL' },
+  EVENT_CALL_SCRIPT: { scriptId: '' },
+  EVENT_SPAWN_ACTOR: { actorId: '', x: 0, y: 0 },
+  EVENT_MOVE_ACTOR: { actorId: '', x: 0, y: 0 },
+  EVENT_REMOVE_ACTOR: { actorId: '' },
+  EVENT_VISIBLE_ACTOR: { actorId: '', visible: true },
+  EVENT_SET_ANIMATION_SPEED: { actorId: '', speed: 6 },
+  EVENT_SET_ACTOR_PRIORITY: { actorId: '', priority: 2 },
+  EVENT_PLAY_MUSIC: { musicId: '', volume: 100 },
+  EVENT_PLAY_SOUND: { soundId: '', volume: 100 },
+  EVENT_STOP_MUSIC: {},
+  EVENT_SET_MUSIC_VOLUME: { volume: 100 },
+  EVENT_DISPLAY_DIALOGUE: { text: '', dialogueFont: 'fixed8x16', showFrame: true, horizontalAlign: 'center', verticalAlign: 'bottom', animationSpeed: 'medium' },
+  EVENT_DISPLAY_VARIABLE_TEXT: { variableId: '', x: 0, y: 0, font: 'variable8x16' },
+  EVENT_HIDE_DIALOGUE: {},
+  EVENT_DIALOGUE_CHOICE: { prompt: '', optionA: '', optionB: '', resultVariable: '' },
+  EVENT_FOR: { variableId: '', start: 0, end: 0, step: 1 },
+  EVENT_BREAK: {},
+  EVENT_CONTINUE: {},
+  EVENT_WAIT_FOR_BUTTON: { button: 'A', buttons: ['A'], overrideButton: false },
+  EVENT_IF_BUTTON_HELD: { button: 'A', buttons: ['A'] },
+  EVENT_HIDE_ACTOR: { actorId: '' },
+  EVENT_SHOW_ACTOR: { actorId: '' },
+  EVENT_HIDE_ALL_SPRITES: {},
+  EVENT_SHOW_ALL_SPRITES: {},
+};

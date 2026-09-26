@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { BackgroundContext, ElementContext, ProjectContext, SceneContext, SettingsContext, SettingsUtilsContext, UserSettingsContext, VariablesContext } from "../Providers";
+import { BackgroundContext, ElementContext, PalettesContext, ProjectContext, SceneContext, ScriptsContext, SettingsContext, SettingsUtilsContext, SpriteContext, UserSettingsContext, VariablesContext } from "../Providers";
 
 const useSettingsUtilsContext = () =>  {
     const context = useContext(SettingsUtilsContext);
@@ -65,6 +65,16 @@ const useVariablesContext = () =>  {
     return context;
 }
 
+const useSpriteContext = () => {
+    const context = useContext(SpriteContext);
+    if (!context) {
+        throw new Error('useSpriteContext must be used within a SpriteProvider');
+    }
+    return context;
+}
+const useScriptsContext = () => { const context = useContext(ScriptsContext); if (!context) throw new Error('useScriptsContext must be used within a ScriptsProvider'); return context; };
+const usePalettesContext = () => { const context = useContext(PalettesContext); if (!context) throw new Error('usePalettesContext must be used within a PalettesProvider'); return context; };
+
 export const useAppContexts = () => {
   const sceneCtx = useSceneContext();
   const projectCtx = useProjectContext();
@@ -74,6 +84,9 @@ export const useAppContexts = () => {
   const settingUtilsCtx = useSettingsUtilsContext();
   const elementCtx = useElementContext();
     const variablesCtx = useVariablesContext();
+    const spriteCtx = useSpriteContext();
+    const scriptsCtx = useScriptsContext();
+    const palettesCtx = usePalettesContext();
 
   return {
     scenes: sceneCtx.scenes,
@@ -105,6 +118,20 @@ export const useAppContexts = () => {
     setVariables: variablesCtx.setVariables,
     variablesRef: variablesCtx.variablesRef,
     ignoredFieldsVariables: variablesCtx.ignoredFields,
+
+    spriteResources: spriteCtx.spriteResources,
+    setSpriteResources: spriteCtx.setSpriteResources,
+    spriteResourcesRef: spriteCtx.spriteResourcesRef,
+    ignoredFieldsSpriteResources: spriteCtx.ignoredFields,
+
+    scripts: scriptsCtx.scripts,
+    setScripts: scriptsCtx.setScripts,
+    scriptsRef: scriptsCtx.scriptsRef,
+    ignoredFieldsScripts: scriptsCtx.ignoredFields,
+    palettes: palettesCtx.palettes,
+    setPalettes: palettesCtx.setPalettes,
+    palettesRef: palettesCtx.palettesRef,
+    ignoredFieldsPalettes: palettesCtx.ignoredFields,
 
     settingUtils: settingUtilsCtx.settingUtils,
     setSettingUtils: settingUtilsCtx.setSettingUtils,

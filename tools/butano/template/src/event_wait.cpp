@@ -1,66 +1,54 @@
-/**
- * {{PROJECT_NAME}} - GBA Game
- * Author: {{AUTHOR}}
- * Version: {{VERSION}}
- * 
- * Built with GBA Studio engine for Butano
- */
-
 #include "event_wait.h"
 
-#include "bn_log.h"
 #include "bn_core.h"
 #include "bn_string.h"
-#include "bn_fixed.h"
-
-#include "utils.h"
 
 Wait wait;
 
-bool run_wait(const void* args) {
-    if (wait.active) {
-        if (wait.type == WaitType::TIME) {
-            // decrementa tempo
-            wait.countFixed += bn::fixed(1) / 60; // supondo 60 fps
-            // BN_LOG("runWait Secounds: ", wait.countFixed);
-            BN_LOG("runWait Time: ", wait.countFixed);
-
-            if(wait.countFixed >= wait.time) {
-                wait.countFixed = 0;
-                wait.active = false;
-                return true;
-            }
-        } else if (wait.type == WaitType::FRAMES) {
-            wait.countInt++;
-            BN_LOG("runWait Frames: ", wait.countInt);
-             
-            if(wait.countInt >= wait.frames) { 
-                wait.countInt = 0;
-                wait.active = false;
-                return true;
-            }
+EventStatus run_wait_status(const WaitEventData& data, Wait& state)
+{
+    if(state.active)
+    {
+        ++state.countInt;
+        if(state.countInt >= state.frames)
+        {
+            state.countInt = 0;
+            state.active = false;
+            return EventStatus::completed;
         }
-    } else {
-        const void* const* strArgs = static_cast<const void* const*>(args);
-
-        const float* time = static_cast<const float*>(strArgs[0]);
-        const int* frames = static_cast<const int*>(strArgs[1]);
-
-        wait.time = bn::fixed(*time);
-        wait.frames = *frames;
-        bn::string<64> units = static_cast<const char*>(strArgs[2]);
-        
-        wait.active = true;
-
-        if (units == "time") {
-            wait.countInt = 0;
-            wait.type = WaitType::TIME;
-        } else if (units == "frames") {
-            wait.countFixed = bn::fixed(0);
-            wait.type = WaitType::FRAMES;
-        }
+        return EventStatus::running;
     }
 
-     return false;
-    
+    state.seconds = data.seconds;
+    state.frames = data.frames;
+    state.countInt = 0;
+    state.type = data.units && bn::string<8>(data.units) == "frames"
+        ? WaitType::FRAMES : WaitType::TIME;
+    if(state.type == WaitType::TIME)
+    {
+        state.frames = state.seconds > 0 ? state.seconds * 60 : 0;
+    }
+    if(state.frames <= 0)
+    {
+        state.active = false;
+        return EventStatus::completed;
+    }
+    state.active = true;
+    return EventStatus::running;
+}
+
+bool run_wait(const WaitEventData& data, Wait& state)
+{
+    return run_wait_status(data, state) == EventStatus::completed;
+}
+
+bool run_wait(const void* args, Wait& state)
+{
+    if(!args) return true;
+    return run_wait(*static_cast<const WaitEventData*>(args), state);
+}
+
+bool run_wait(const void* args)
+{
+    return run_wait(args, wait);
 }

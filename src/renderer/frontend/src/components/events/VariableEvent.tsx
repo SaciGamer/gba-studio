@@ -1,7 +1,8 @@
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { IVariableBooleanArgs, IVariableLiteral, IVariableSetValueArgs, IVariableValue, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { EVariableType, IVariableDefinition, VariableValue } from '@/providers/contexts/interfaces/IVariablesElement';
-import { Button, Cascader, Flex, Input, InputNumber, Select, Space, Typography } from 'antd';
+import { Button, Cascader, Flex, Input, Select, Space, Typography } from 'antd';
+import StepInputNumber, { InputNumber } from '../StepInputNumber';
 import { useEffect, useState } from 'react';
 import { EEvents } from './interfaces/IEvents';
 
@@ -54,7 +55,7 @@ function LiteralEditor({
   onChange: (value: VariableValue) => void;
 }) {
   if (type === 'number') return <InputNumber aria-label="Value" value={value as number} onChange={(next) => onChange(next ?? 0)} />;
-  if (type === 'boolean') return <Select<boolean> aria-label="Value" value={value as boolean} options={[{ value: true, label: 'True' }, { value: false, label: 'False' }]} onChange={onChange} />;
+  if (type === 'boolean') return <Select<string> aria-label="Value" value={String(value as boolean)} options={[{ value: 'true', label: 'True' }, { value: 'false', label: 'False' }]} onChange={(next) => onChange(next === 'true')} />;
   return <Input aria-label="Value" value={value as string} onChange={(event) => onChange(event.target.value)} />;
 }
 
@@ -111,11 +112,11 @@ function ValueEditor({
           }}
         />
       ) : type === 'boolean' ? (
-        <Select<boolean>
+        <Select<string>
           aria-label="Boolean value"
-          value={value.value as boolean}
-          options={[{ value: true, label: 'True' }, { value: false, label: 'False' }]}
-          onChange={(next) => onChange({ kind: 'literal', type: 'boolean', value: next })}
+          value={String(value.value as boolean)}
+          options={[{ value: 'true', label: 'True' }, { value: 'false', label: 'False' }]}
+          onChange={(next) => onChange({ kind: 'literal', type: 'boolean', value: next === 'true' })}
         />
       ) : (
         <LiteralEditor
@@ -156,7 +157,7 @@ export default function VariableEvent({ event, onValueChange }: VariableEventPro
     const nextValue = value.kind === 'literal' ? { kind: 'literal' as const, type: variable.type, value: valueForType(variable.type) } : value;
     setVariableId(variable.id);
     setValue(nextValue);
-    update({ variableId: variable.id, variableSymbol: variable.symbol, ...(event?.command === EEvents.VARIABLE_SET_VALUE ? { value: nextValue } : {}) });
+    update({ variableId: variable.id, variableSymbol: variable.symbol, ...(event?.command === EEvents.VARIABLE ? { value: nextValue } : {}) });
   };
 
   return (

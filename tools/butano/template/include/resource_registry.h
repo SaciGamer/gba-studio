@@ -17,11 +17,17 @@
 const Backgrounds* get_background_by_name(const char* name);
 const Backgrounds* get_background_by_id(const bn::string<64>& background_id);
 const Backgrounds* get_background_by_id_and_type(const bn::string<64>& background_id, ResourceType type);
+const BackgroundPalette* get_background_palette_by_id(const bn::string<64>& palette_id);
 
 // FUNCOES PARA SCENE
 const Scenes* get_scene_by_name(const char* name);
 const Scenes* get_scene_by_id(const bn::string<64>& scene_id);
+const Scenes* get_first_scene();
 const Scenes* get_scene_by_id_and_type(const bn::string<64>& scene_id, ResourceType type);
+
+// FUNCOES PARA SPRITE
+const Sprites* get_sprite_by_name(const char* name);
+const Sprites* get_sprite_by_id(const bn::string<64>& sprite_id);
 
 // FUNCOES PARA SETTINGS
 const Settings* get_settings();

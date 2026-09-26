@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
 import FloatButttons from './FloatButtons';
 import { AntdToken } from './common/AntDToken';
+import { InputNumber } from './StepInputNumber';
 
 const { Content } = Layout;
 

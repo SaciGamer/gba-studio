@@ -17,6 +17,57 @@ export interface IMainSettings extends IBaseSettings {
     startAnimSpeed: number;
     startDirection: 'up' | 'down' | 'left' | 'right';
     colorMode: string;
+    fadeDirection: 0 | 1;
+    demoAudioVolume?: number;
+    demoAudioMuted?: boolean;
+    playerSpriteId?: string | null;
+    uiCursorImage?: string | null;
+    uiFrameImage?: string | null;
+    font8x8Image?: string | null;
+    font8x16Image?: string | null;
+    font8x8VariablesImage?: string | null;
+    font8x16VariablesImage?: string | null;
+    font16x16VariablesImage?: string | null;
+    playerFrameWidth?: number;
+    playerFrameHeight?: number;
+    playerFramesPerDirection?: number;
+    playerAnimSpeed?: number;
+    playerIdleFrame?: number;
+    playerCanvasOriginX?: number;
+    playerCanvasOriginY?: number;
+    playerCollisionX?: number;
+    playerCollisionY?: number;
+    playerCollisionWidth?: number;
+    playerCollisionHeight?: number;
+    playerAnimations?: Array<{ id: string; name: string; frames: number[]; canvasFrames?: SpriteCanvasFrame[] }>;
+    playerAnimationStates?: Array<{
+        id: string;
+        name: string;
+        type: string;
+        flipRightToCreateLeftFacingFrames?: boolean;
+        animations: Array<{ id: string; name: string; frames: number[]; type?: string; canvasFrames?: SpriteCanvasFrame[] }>;
+    }>;
+    palettes?: Array<{
+        id: string;
+        name: string;
+        colors: string[];
+        custom?: boolean;
+    }>;
+}
+
+interface SpriteCanvasFrame {
+    id: string;
+    width: number;
+    height: number;
+    pieces: Array<{
+        id: string;
+        sourceX: number;
+        sourceY: number;
+        width: number;
+        height: number;
+        x: number;
+        y: number;
+    }>;
 }
 
 export interface IUserSettings extends IBaseSettings {

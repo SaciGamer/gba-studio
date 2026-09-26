@@ -1,5 +1,6 @@
 import { IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
-import { Button, Dropdown, InputNumber, Space, Typography } from "antd";
+import { Button, Dropdown, Space, Typography } from "antd";
+import StepInputNumber, { InputNumber } from '../StepInputNumber';
 import { useEffect, useMemo, useState } from "react";
 import { AntdToken } from "../common/AntDToken";
 import { IWait } from './interfaces/IWaiting';
@@ -14,7 +15,7 @@ export function WaitEvent({ event, customTitle, onValueChange }: WaitEventsProps
   const { token } = AntdToken();
 
   const [units, setUnits] = useState<string>("time");
-  const [timeValue, setTimeValue] = useState<number>(0.5);
+  const [timeValue, setTimeValue] = useState<number>(1);
   const [framesValue, setFramesValue] = useState<number>(30);
 
   const args = event?.args as IWait;
@@ -22,7 +23,7 @@ export function WaitEvent({ event, customTitle, onValueChange }: WaitEventsProps
   useEffect(() => {
     const initValue = WaitEvent.defaultValue();
     setUnits(args?.units ?? initValue.units);
-    setTimeValue(args?.time ?? initValue.time);
+    setTimeValue(Math.max(0, Math.round(args?.time ?? initValue.time)));
     setFramesValue(args?.frames ?? initValue.frames);
 
     if ((args?.units ?? initValue.units) === "time") {
@@ -67,8 +68,8 @@ export function WaitEvent({ event, customTitle, onValueChange }: WaitEventsProps
         </Dropdown>
         <InputNumber 
           min={0}
-          step={units === "time" ? 0.1 : 1}
-          precision={units === "time" ? 1 : 0}
+          step={1}
+          precision={0}
           value={units === "time" ? timeValue : framesValue} 
           style={{ width: "100%" }}
           onChange={(e) => setTimeOrFramesValue(Number(e))}
@@ -79,7 +80,7 @@ export function WaitEvent({ event, customTitle, onValueChange }: WaitEventsProps
 }
 
 WaitEvent.defaultValue = (): IWait => ({
-  time: 0.5,
+  time: 1,
   frames: 30,
   units: "time", // seconds
 });

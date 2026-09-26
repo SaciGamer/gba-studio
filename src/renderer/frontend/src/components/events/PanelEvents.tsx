@@ -1,11 +1,18 @@
 import { IArgs, IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
 import SceneEvent from "./SceneEvent";
 import FadeEvent from "./FadeEvent";
+import FadeOptionsEvent from './FadeOptionsEvent';
 import { EEvents } from "./interfaces/IEvents";
 import WaitEvent from "./WaitEvent";
 import { ChangeLayerEvent, MoveLayerEvent } from "./LayerEvent";
+import { ChangePaletteBackgroundEvent, VisibleBackgroundEvent } from "./BackgroundEvents";
 import IfEvent from "./IfEvent";
 import VariableEvent from "./VariableEvent";
+import AnimationSpeedEvent from "./AnimationSpeedEvent";
+import CallScriptEvent from './CallScriptEvent';
+import CameraEvent from './CameraEvent';
+import RuntimeEventPanel from './RuntimeEventPanel';
+import VariableTextEvent from './VariableTextEvent';
 
 interface PanelEventsProps {
   event: IScriptsElement | null;
@@ -23,21 +30,38 @@ export default function PanelEvents({ event, customTitle, onValueChange }: Panel
       return <SceneEvent event={event} customTitle={customTitle} onValueChange={onValueChange}/>;
     case EEvents.FADE_OUT:
       return <FadeEvent event={event} onValueChange={onValueChange} />;
+    case EEvents.FADE_OPTIONS:
+      return <FadeOptionsEvent event={event} onValueChange={onValueChange} />;
     case EEvents.WAIT:
       return <WaitEvent event={event} customTitle={customTitle} onValueChange={onValueChange} />;
     case EEvents.CHANGE_LAYER:
       return <ChangeLayerEvent event={event} onValueChange={onValueChange}/>
+    case EEvents.VISIBLE_BACKGROUND:
+      return <VisibleBackgroundEvent event={event} onValueChange={onValueChange}/>
+    case EEvents.CHANGE_PALETTE_BACKGROUND:
+      return <ChangePaletteBackgroundEvent event={event} onValueChange={onValueChange}/>
      case EEvents.MOVE_LAYER:
       return <MoveLayerEvent event={event} onValueChange={onValueChange}/>
     case EEvents.IF:
+    case EEvents.WHILE:
       return <IfEvent event={event} onValueChange={onValueChange} />;
     case EEvents.VARIABLE:
     case EEvents.VARIABLE_RESET_ALL:
       return <VariableEvent event={event} onValueChange={onValueChange} />;
+    case EEvents.DISPLAY_VARIABLE_TEXT:
+      return <VariableTextEvent event={event} onValueChange={onValueChange} />;
+    case EEvents.SET_ANIMATION_SPEED:
+      return <AnimationSpeedEvent event={event} onValueChange={onValueChange} />;
+    case EEvents.SET_ACTOR_PRIORITY:
+      return <RuntimeEventPanel event={event} onValueChange={onValueChange} />;
+    case EEvents.CALL_SCRIPT:
+      return <CallScriptEvent event={event} onValueChange={onValueChange} />;
+    case EEvents.PAN_CAMERA:
+      return <CameraEvent event={event} onValueChange={onValueChange} />;
     // case EEvents.IDLE:
     //   return WaitingEvent.idle();
     default:
-      return null;
+      return <RuntimeEventPanel event={event} customTitle={customTitle} onValueChange={onValueChange} />;
   }
 
 }

@@ -11,21 +11,23 @@
       "layerId": 2,
       "backgroundId": "a525e43c-eb61-4858-8b94-9bcebf88fbc7",
       "name": "",
-      "path": ""
+      "path": "",
+      "x": 24,
+      "y": 24
     }
   ],
-  "x": 722.6400146484375,
-  "y": 354,
+  "x": 720,
+  "y": 352,
   "width": 240,
   "height": 160,
   "sceneType": "Point Click",
   "script": [
     {
-      "id": "c8d66189-0dd5-43e3-93ab-1bcb00443655",
+      "id": "56910abf-486e-4016-a7da-f02f7940304c",
       "command": "EVENT_FADE_IN",
       "args": {
         "speed": 2,
-        "__collapse": false
+        "__automatic": true
       }
     },
     {
@@ -46,5 +48,10 @@
         "__collapse": true
       }
     }
-  ]
+  ],
+  "showCamera": false,
+  "editorPosition": {
+    "x": 720,
+    "y": 352
+  }
 }

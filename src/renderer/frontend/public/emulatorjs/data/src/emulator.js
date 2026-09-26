@@ -246,7 +246,7 @@ class EmulatorJS {
         }
         this.defaultAutoFireInterval = 100;
         this.autofireIntervals = {};
-        this.muted = false;
+        this.muted = this.config.muted === true;
         this.paused = true;
         this.missingLang = [];
         this.setElements(element);
@@ -1164,7 +1164,7 @@ class EmulatorJS {
             this.loadSettings();
             this.updateCheatUI();
             this.updateGamepadLabels();
-            if (!this.muted) this.setVolume(this.volume);
+            this.setVolume(this.muted ? 0 : this.volume);
             if (this.config.noAutoFocus !== true) this.elements.parent.focus();
             this.textElem.remove();
             this.textElem = null;

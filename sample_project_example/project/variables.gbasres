@@ -1,0 +1,30 @@
+{
+  "_resourceType": "variables",
+  "_version": "1.0",
+  "_deleted": false,
+  "variables": [
+    {
+      "id": "b8123607-c770-4ebb-b40c-2e3ce96c43de",
+      "name": "game_started",
+      "symbol": "variable_0",
+      "type": "boolean",
+      "initialValue": false,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "d5fa2b54-ca0d-45b0-bfce-64d3e314a1ab",
+      "name": "choice_result2",
+      "symbol": "variable_1",
+      "type": "number",
+      "initialValue": 0,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "b6f31d73-5839-4bd3-87c8-cb1f5507d66d",
+      "name": "Variable 2",
+      "symbol": "variable_2",
+      "type": "number",
+      "initialValue": 0
+    }
+  ]
+}

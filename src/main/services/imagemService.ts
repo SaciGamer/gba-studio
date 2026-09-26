@@ -30,17 +30,24 @@ const preparePathForFrontend = (filePath: string) => {
 
 
 // Função para sincronizar arquivos incrementalmente
+// AssetLibraryEditor uses the same IPC endpoint for images, music and sound
+// effects.  The old image-only filter made the audio screens always empty even
+// when assets existed in assets/musics or assets/sounds.
+const isAssetFile = (filename: string) => [
+  '.png', '.jpg', '.jpeg', '.gif', '.bmp',
+  '.wav', '.mp3', '.ogg', '.mod', '.xm', '.s3m', '.it',
+].includes(path.extname(filename).toLowerCase());
+
 const syncImagesIncrementally = (monitoredDir: string, targetUserDir: string | null) => {
-  // Obtem os arquivos da pasta monitorada e da pasta destino
-  const sourceFiles = fs.readdirSync(monitoredDir);
-  const targetFiles = targetUserDir ? fs.readdirSync(targetUserDir) : null;
+  const sourceFiles = fs.readdirSync(monitoredDir).filter(isAssetFile);
+  const shouldSyncTarget = targetUserDir && path.resolve(monitoredDir) !== path.resolve(targetUserDir);
+  const targetFiles = shouldSyncTarget && targetUserDir
+    ? (fs.mkdirSync(targetUserDir, { recursive: true }), fs.readdirSync(targetUserDir).filter(isAssetFile))
+    : null;
 
   if (targetFiles && targetUserDir) {
     // Filtra os arquivos a adicionar
-    const filesToAdd = sourceFiles.filter((file) => {
-      const ext = path.extname(file).toLowerCase();
-      return ['.png', '.jpg', '.jpeg', '.gif', '.bmp'].includes(ext) && !targetFiles.includes(file);
-    });
+    const filesToAdd = sourceFiles.filter(file => !targetFiles.includes(file));
 
     // Adiciona novos arquivos
     filesToAdd.forEach((file) => {
@@ -75,13 +82,7 @@ const syncImagesIncrementally = (monitoredDir: string, targetUserDir: string | n
       }
     });
 
-    return targetFiles;
   }
-
-  sourceFiles.filter((file) => {
-    const ext = path.extname(file).toLowerCase();
-    return ['.png', '.jpg', '.jpeg', '.gif', '.bmp'].includes(ext);
-  });
 
   return sourceFiles;
 };
@@ -108,6 +109,9 @@ export async function clearWatchers() {
 
 // Monitorar alterações na pasta
 const watchImages = (win: any, monitoredDir: string, targetUserDir: string | null) => {
+  const sandboxAssetsDir = targetUserDir ?? (directoryPathProject
+    ? path.join(directoryPathProject, 'assets', path.basename(monitoredDir))
+    : null);
   console.log(`..: Monitorando o diretório: ${monitoredDir}`);
 
   const watch = fs.watch(monitoredDir, (eventType, filename) => {
@@ -123,7 +127,7 @@ const watchImages = (win: any, monitoredDir: string, targetUserDir: string | nul
       //   }, debounceInterval);
 
       console.log(`..: Alteração detectada: ${eventType} no arquivo ${filename}`);
-      const imagesNames = syncImagesIncrementally(monitoredDir, null); // Atualiza lista de arquivos
+      const imagesNames = syncImagesIncrementally(monitoredDir, sandboxAssetsDir); // Atualiza sandbox e lista de arquivos
       console.log('..: watchImages enviar para o FE:', monitoredDir, imagesNames);
       win.webContents.send('update-images', preparePathForFrontend(monitoredDir), imagesNames); // Notifica o frontend
     }
@@ -137,16 +141,23 @@ export function startWatch(win: BrowserWindow | null, originalProjectDirectory: 
   const projectPath = path.join(originalProjectDirectory || '', 'assets', monitoringFolderPath);
 
   if (!fs.existsSync(projectPath)) {
-    return { status: 'error', message: '>> Directory not found.' };
+    if (monitoringFolderPath === 'fonts') {
+      fs.mkdirSync(projectPath, { recursive: true });
+    } else {
+      return { status: 'error', message: '>> Directory not found.' };
+    }
   }
 
   if (!win) {
     return { status: 'error', message: '>> Nenhuma janela ativa encontrada' };
   }
+  const targetUserDir = directoryPathProject
+    ? path.join(directoryPathProject, 'assets', monitoringFolderPath)
+    : null;
   targetDir = directoryPathProject;
   watchImages(win, projectPath, null/*, targetUserDir*/); // Chama a função passando a janela e o caminho do projeto
 
-  return { status: 'success', localPath: `${preparePathForFrontend(projectPath)}`, fileImages: syncImagesIncrementally(projectPath, null) };
+  return { status: 'success', localPath: `${preparePathForFrontend(projectPath)}`, fileImages: syncImagesIncrementally(projectPath, targetUserDir) };
 };
 
 // export function cleanAllTargetDir () {

@@ -1,12 +1,36 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { spawnSync } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import { fileURLToPath } from 'url';
 import { GameConfig, TranscodeOptions, TranscodeResult } from '../types/BuildTypes';
 import TemplateBuilder from '../builders/TemplateBuilder';
 import ResourceBuilder from '../builders/ResourceBuilder';
 import AssetBuilder from '../builders/AssetBuilder';
+
+let activeAssetProcess: ChildProcess | null = null;
+let activeAssetDone: Promise<void> | null = null;
+let resolveActiveAssetDone: (() => void) | null = null;
+
+/** Stops the asynchronous Butano asset-generation process, if one is running. */
+export async function cancelActiveAssetGeneration(): Promise<boolean> {
+  const proc = activeAssetProcess;
+  const done = activeAssetDone;
+  if (!proc || !proc.pid) return false;
+
+  if (process.platform === 'win32') {
+    await new Promise<void>((resolve) => {
+      const taskkill = spawn('taskkill', ['/pid', String(proc.pid), '/t', '/f'], { windowsHide: true });
+      taskkill.once('close', () => resolve());
+      taskkill.once('error', () => resolve());
+    });
+  } else {
+    proc.kill('SIGTERM');
+  }
+
+  await done;
+  return true;
+}
 import { CppBuilder } from '../builders/CppBuilder';
 import { packageJson } from '@/main';
 import isDev from 'electron-is-dev';
@@ -59,7 +83,7 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
     console.log('..: Using template from:', templateDir);
     
     // Valid path and clean if same project
-    prepareBuildDir(projectDir, outputDir);
+    prepareBuildDir(options.markerProjectDir || projectDir, outputDir);
 
     // Initialize template builder
     const templateBuilder = new TemplateBuilder({
@@ -97,11 +121,6 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
       resourceFiles = await resourceBuilder.processResourceFiles(projectResourceDir);
       console.log('..: Processed', resourceFiles.length, 'resource files');
 
-      // Generate resource header and registry
-      if (resourceFiles.length > 0) {
-        await resourceBuilder.writeResourceHeader(resourceFiles);
-        await resourceBuilder.generateResourceRegistryClass(resourceFiles, gameConfig);
-      }
     }
 
     // Copy assets if enabled
@@ -109,6 +128,22 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
     if (includeAssets) {
       const assetBuilder = new AssetBuilder(path.resolve(__dirname, '..', '..', '..'), outputDir);
       const projectAssetsDir = path.join(projectDir, 'assets');
+
+      // UI defaults are available to the template even when the project has
+      // no custom assets/ui folder yet. Never overwrite user-provided files.
+      const uiDir = path.join(projectAssetsDir, 'ui');
+      fs.mkdirSync(uiDir, { recursive: true });
+      const projectRoot = path.resolve(__dirname, '..', '..', '..');
+      const defaultUiDir = path.join(projectRoot, 'src', 'renderer', 'frontend', 'src', 'img');
+      const sampleUiDir = path.join(projectRoot, 'sample_project_example', 'assets', 'ui');
+      for (const filename of ['cursor.png', 'frame.png']) {
+        const destination = path.join(uiDir, filename);
+        if (fs.existsSync(destination)) continue;
+        const source = fs.existsSync(path.join(defaultUiDir, filename))
+          ? path.join(defaultUiDir, filename)
+          : path.join(sampleUiDir, filename);
+        if (fs.existsSync(source)) fs.copyFileSync(source, destination);
+      }
 
       if (fs.existsSync(projectAssetsDir)) {
         assetStats = await assetBuilder.copyAssets(projectAssetsDir, resourceFiles,
@@ -120,7 +155,24 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
         );
 
         console.log('..: Copied', assetStats.copiedCount, 'assets');
+        const projectSettings = resourceFiles.find(file => file.jsonContent?._resourceType === 'settings')?.jsonContent;
+        await assetBuilder.applyFontOverrides(projectAssetsDir, projectSettings);
+        await assetBuilder.materializeDialogueFrame('frame.png');
+        const derivedResources = await assetBuilder.materializeTileLayerEdits(resourceFiles);
+        if (derivedResources.length) {
+          resourceFiles = [
+            ...resourceFiles.map(file => file.jsonContent ? resourceBuilder.processResourceObject(file.jsonContent) : file),
+            ...derivedResources.map(resource => resourceBuilder.processResourceObject(resource)),
+          ];
+          console.log('..: Materialized', derivedResources.length, 'edited background layer(s)');
+        }
       }
+    }
+
+    // The registry must be emitted after derived layer resources have been added.
+    if (resourceFiles.length > 0) {
+      await resourceBuilder.writeResourceHeader(resourceFiles);
+      await resourceBuilder.generateResourceRegistryClass(resourceFiles, gameConfig);
     }
 
     // Generate Butano assets before reading generated graphic headers.
@@ -130,6 +182,8 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
     if (fs.existsSync(buildDir)) {
       await generateButanoAssetHeaders(buildDir, outputBuildDir, toolsRoot);
     }
+
+    resourceBuilder.validateMusicReferences(resourceFiles, outputBuildDir);
 
     let graphicHeaderGeneratedByButano: string[] = [];
     if (fs.existsSync(outputBuildDir)) {
@@ -252,6 +306,11 @@ async function generateButanoAssetHeaders(buildDir: string, outputBuildDir: stri
     return;
   }
 
+  // The output directory contains both project artifacts and Butano library
+  // objects. Clean only artifacts owned by the project so unchanged library
+  // objects remain incremental between builds.
+  cleanProjectBuildArtifacts(outputBuildDir);
+
   for (const dir of [outputBuildDir, buildDir, graphicsDir, audioDir, dmgAudioDir]) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -262,37 +321,57 @@ async function generateButanoAssetHeaders(buildDir: string, outputBuildDir: stri
   const audioToolExecutable = resolveToolExecutable('mmutil');
   const pythonExecutable = process.env.PYTHON || 'python';
 
-  const result = spawnSync(
-    pythonExecutable,
-    [
-      '-B',
-      assetToolPath,
-      '--grit', gritExecutable,
-      '--audio', audioDir,
-      '--audio_backend', 'maxmod',
-      '--audio_tool', audioToolExecutable,
-      '--dmg_audio', dmgAudioDir,
-      '--dmg_audio_backend', 'default',
-      '--graphics', graphicsDir,
-      '--build', outputBuildDir,
-    ],
-    {
+  const args = [
+    '-B', assetToolPath,
+    '--grit', gritExecutable,
+    '--audio', audioDir,
+    '--audio_backend', 'maxmod',
+    '--audio_tool', audioToolExecutable,
+    '--dmg_audio', dmgAudioDir,
+    '--dmg_audio_backend', 'default',
+    '--graphics', graphicsDir,
+    '--build', outputBuildDir,
+  ];
+
+  const exitCode = await new Promise<number>((resolve, reject) => {
+    const proc = spawn(pythonExecutable, args, {
       cwd: buildDir,
       env: process.env,
       windowsHide: true,
       stdio: 'pipe',
-    }
-  );
+    });
+    activeAssetProcess = proc;
+    activeAssetDone = new Promise<void>((done) => { resolveActiveAssetDone = done; });
+    proc.stdout?.on('data', (data) => console.log(data.toString()));
+    proc.stderr?.on('data', (data) => console.warn(data.toString()));
+    proc.once('error', reject);
+    proc.once('close', (code) => {
+      activeAssetProcess = null;
+      resolveActiveAssetDone?.();
+      resolveActiveAssetDone = null;
+      activeAssetDone = null;
+      resolve(code ?? 1);
+    });
+  });
 
-  if (result.error) {
-    throw result.error;
-  }
-
-  if (result.status !== 0) {
-    throw new Error(`Butano asset generation failed with exit code ${result.status}.`);
+  if (exitCode !== 0) {
+    throw new Error(`Butano asset generation failed with exit code ${exitCode}.`);
   }
 
   console.log('..: Butano asset generation completed for:', buildDir);
+}
+
+function cleanProjectBuildArtifacts(outputBuildDir: string): void {
+  if (!fs.existsSync(outputBuildDir)) return;
+
+  const projectArtifact = /(?:_bn_gfx\.(?:s|o|d)|_bn_[^/]+_graphics_file_info\.txt$|^bn_ofiles\.txt$|bn_(?:regular_bg_items|direct_bitmap_items|sprite_items|palette_bitmap_items)_[^/]+\.h$|^(?:event_[^/]+|game|graphics_manager|main|resource_registry|script_[^/]+|startup)\.(?:o|d|cpp|h|txt)$)/i;
+  const projectAudioArtifact = /^bn_(?:audio_soundbank|sound_items|music_items)(?:\.|_|$)/i;
+
+  for (const entry of fs.readdirSync(outputBuildDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    if (!projectArtifact.test(entry.name) && !projectAudioArtifact.test(entry.name)) continue;
+    fs.rmSync(path.join(outputBuildDir, entry.name), { force: true });
+  }
 }
 
 /**

@@ -18,6 +18,9 @@ import PreferencesModal from './components/PreferencesModal';
 import './components/themes/globalStyles.css'; // Importe o arquivo CSS global
 import Themes from './components/themes/Themes';
 import AppProvider from './providers/AppProviders';
+import { AppLanguage, I18nProvider, resolveLanguage } from './i18n/I18n';
+import { clearImageCache } from './utils/imageCache';
+import { clearPaletteTransparentImageCache } from './utils/paletteTransparency';
 
 interface Preferences {
   theme: string;
@@ -33,7 +36,9 @@ interface RecentProject {
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<any>();
+  const [themeName, setThemeName] = useState('light');
   const [locale, setLocale] = useState<Locale>(en_US);
+  const [language, setLanguage] = useState<AppLanguage>('en_US');
 
   const [isLoading, setIsLoading] = useState(true);
   const [prefsOpen, setPrefsOpen] = useState(false);
@@ -42,8 +47,9 @@ const App: React.FC = () => {
   // Função auxiliar para carregar o locale
   const loadLocale = async (language: string) => {
     try {
+      const resolvedLanguage = resolveLanguage(language);
       let localeModule;
-      switch (language) {
+      switch (resolvedLanguage) {
         case 'pt_BR':
           localeModule = pt_BR;
           break;
@@ -57,7 +63,8 @@ const App: React.FC = () => {
         default:
           localeModule = en_US;
       }
-      console.log('..: Carregando idioma: ', language);
+      console.log('..: Carregando idioma: ', resolvedLanguage);
+      setLanguage(resolvedLanguage);
       setLocale(localeModule);
     } catch (error) {
       console.error('Erro ao carregar idioma:', error);
@@ -79,9 +86,11 @@ const App: React.FC = () => {
         console.log('..: Carregando Tema: ', preferencias.theme);
         if (Themes[preferencias.theme]) {
           setTheme(Themes[preferencias.theme]);
+          setThemeName(preferencias.theme);
         } else {
           console.error(`Theme ${preferencias.theme} not found, falling back to default.`);
           setTheme(Themes.light);
+          setThemeName('light');
         }
 
         // Carrega idioma
@@ -100,13 +109,29 @@ const App: React.FC = () => {
     if (!window.electronAPI) return;
 
     const themeChangeHandler = (event: any, newTheme: string) => {
-      setTheme(Themes[newTheme]);
+      if (Themes[newTheme]) {
+        setTheme(Themes[newTheme]);
+        setThemeName(newTheme);
+      }
     };
 
     window.electronAPI.on('change-theme', themeChangeHandler);
     return () => window.electronAPI.removeListener('change-theme', themeChangeHandler);
   }, []);
   // Evento para CHANGE THEME END ----------------------------------
+
+  // Assets are cached across navigation so returning to Game World is instant.
+  // Reload Assets is the explicit escape hatch that invalidates those caches.
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    const reloadAssets = () => {
+      clearImageCache();
+      clearPaletteTransparentImageCache();
+      window.dispatchEvent(new Event('gba-studio:assets-reloaded'));
+    };
+    window.electronAPI.on('reload-assets', reloadAssets);
+    return () => window.electronAPI.removeListener('reload-assets', reloadAssets);
+  }, []);
 
   // Evento para CHANGE LANGUAGE 
   useEffect(() => {
@@ -228,20 +253,22 @@ const App: React.FC = () => {
     // }}
     // floatButtonGroup={{ size: 'large' }}
     >
-      <AppProvider>
-        <HashRouter>
-          <Content style={{ height: '100vh', filter: isWindowActive ? 'none' : 'grayscale(100%)' }}>
-            <Routes>
-              <Route path="/launcher" element={<Launcher />} />
-              <Route path="/engine" element={<Engine />} />
-              <Route path="/splash" element={<SplashScreen />} />
-              <Route path="/emulator" element={<Emulator />} />
-              <Route path="/about" element={<About />} />
-              <Route path="*" element={<Navigate to="/launcher" replace />} />
-            </Routes>
-          </Content>
-        </HashRouter>
-      </AppProvider>
+      <I18nProvider language={language}>
+        <AppProvider>
+          <HashRouter>
+            <Content className={`gba-theme gba-theme-${themeName}`} data-theme={themeName} style={{ height: '100vh', filter: isWindowActive ? 'none' : 'grayscale(100%)' }}>
+              <Routes>
+                <Route path="/launcher" element={<Launcher />} />
+                <Route path="/engine" element={<Engine />} />
+                <Route path="/splash" element={<SplashScreen />} />
+                <Route path="/emulator" element={<Emulator />} />
+                <Route path="/about" element={<About />} />
+                <Route path="*" element={<Navigate to="/launcher" replace />} />
+              </Routes>
+            </Content>
+          </HashRouter>
+        </AppProvider>
+      </I18nProvider>
       <PreferencesModal open={prefsOpen} onClose={() => setPrefsOpen(false)} />
     </ConfigProvider>
   );

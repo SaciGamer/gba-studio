@@ -10,6 +10,7 @@ let sceneDefault: ISceneSettings = {
     tileseId: '',
     width: 240,
     height: 160,
+    cameraPosition: { x: 0, y: 0 },
     type: ETypeScene.TOPDOWN,
     paletteIds: [],
     spritePaletteIds: [],

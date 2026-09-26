@@ -1,7 +1,11 @@
-import React, { useRef, useState } from 'react';
-import { Layout, Menu, Switch, Radio, Select, Typography, Button, Space, Input, message, Divider, Row, Col } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Dropdown, Layout, Menu, Switch, Radio, Select, Typography, Button, Space, Input, message, Divider, Row, Col, Slider, Tooltip, Flex } from 'antd';
+import { PictureOutlined } from '@ant-design/icons';
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { AntdToken } from '../../common/AntDToken';
+import { loadPaletteLibrary } from '../../resourceEditors/paletteLibrary';
+import { getPaletteIndexZeroColor, loadPaletteTransparentImage } from '@/utils/paletteTransparency';
+import { fontCharacterWidth, fontGlyphIndex, PREVIEW_FONTS, type PreviewFontId } from '@/utils/fontMetrics';
 
 const { Sider, Content } = Layout;
 const { Title, Paragraph } = Typography;
@@ -99,17 +103,81 @@ const siderStyle: React.CSSProperties = {
 };
 
 const Settings: React.FC = () => {
-  const { settings, setSettings } = useAppContexts() as any;
+  const { settings, setSettings, palettes } = useAppContexts() as any;
 
   const fadeRef = useRef<HTMLDivElement | null>(null);
+  const colorOptionsRef = useRef<HTMLDivElement | null>(null);
   const controlsRef = useRef<HTMLDivElement | null>(null);
   const demoRef = useRef<HTMLDivElement | null>(null);
+  const uiElementsRef = useRef<HTMLDivElement | null>(null);
+  const fontsRef = useRef<HTMLDivElement | null>(null);
   const contentScrollRef = useRef<HTMLDivElement | null>(null);
 
   const [contentFilter, setContentFilter] = useState<string>('');
+  const [uiImages, setUiImages] = useState<{ name: string; path: string }[]>([]);
+  const [uiImagesPath, setUiImagesPath] = useState('');
+  const [fontImages, setFontImages] = useState<{ name: string; path: string }[]>([]);
+  const [fontImagesPath, setFontImagesPath] = useState('');
+  const [commonFontImages, setCommonFontImages] = useState<Record<string, string>>({});
+  const [fontPreviewImages, setFontPreviewImages] = useState<Record<string, string>>({});
+  const [fontPaletteColors, setFontPaletteColors] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let mounted = true;
+    void window.electronAPI.fetchImages('ui').then((response: any) => {
+      if (!mounted || response?.status !== 'success') return;
+      const images = (response.fileImages ?? []).map((name: string) => ({ name, path: `${response.localPath}/${name}` }));
+      setUiImages(images);
+      setUiImagesPath(response.localPath ?? '');
+    }).catch(() => { if (mounted) setUiImages([]); });
+    void window.electronAPI.fetchImages('fonts').then((response: any) => {
+      if (!mounted || response?.status !== 'success') return;
+      const images = (response.fileImages ?? []).map((name: string) => ({ name, path: `${response.localPath}/${name}` }));
+      setFontImages(images);
+      setFontImagesPath(response.localPath ?? '');
+    }).catch(() => { if (mounted) setFontImages([]); });
+    void window.electronAPI.getCommonFontImages().then((response: Record<string, string>) => {
+      if (mounted && response) setCommonFontImages(response);
+    }).catch(() => undefined);
+    return () => { mounted = false; };
+  }, []);
+  useEffect(() => {
+    let mounted = true;
+    const sources = [
+      ...Object.entries(commonFontImages).map(([name, source]) => [name, source] as const),
+      ...fontImages.map(image => [`custom:${image.name}`, `${fontImagesPath}/${image.name}`] as const),
+    ];
+    if (!sources.length) return () => { mounted = false; };
+
+    void Promise.all(sources.map(async ([key, source]) => {
+      const canvas = await loadPaletteTransparentImage(source);
+      return [key, canvas?.toDataURL('image/png')] as const;
+    })).then(results => {
+      if (!mounted) return;
+      setFontPreviewImages(previous => ({
+        ...previous,
+        ...Object.fromEntries(results.filter(([, image]) => Boolean(image))),
+      }));
+    });
+
+    return () => { mounted = false; };
+  }, [commonFontImages, fontImages, fontImagesPath]);
+  useEffect(() => {
+    let mounted = true;
+    const sources = [
+      ...Object.entries(commonFontImages).map(([name, source]) => [name, source] as const),
+      ...fontImages.map(image => [`custom:${image.name}`, `${fontImagesPath}/${image.name}`] as const),
+    ];
+    void Promise.all(sources.map(async ([key, source]) => [key, await getPaletteIndexZeroColor(source)] as const)).then(results => {
+      if (mounted) setFontPaletteColors(Object.fromEntries(results.filter(([, color]) => Boolean(color)) as Array<[string, string]>));
+    });
+    return () => { mounted = false; };
+  }, [commonFontImages, fontImages, fontImagesPath]);
   const menuItems = [
     { key: 'fade', label: 'Fade Options' },
+    { key: 'color-options', label: 'Color Options' },
     { key: 'controls', label: 'Controls' },
+    { key: 'ui-elements', label: 'UI Elements' },
+    { key: 'fonts', label: 'Fonts' },
     { key: 'demo', label: 'Demo Filters' },
   ];
 
@@ -117,6 +185,70 @@ const Settings: React.FC = () => {
     const normalized = contentFilter.trim().toLowerCase();
     if (!normalized) return true;
     return label.toLowerCase().includes(normalized) || description.toLowerCase().includes(normalized);
+  };
+
+  const uiImageOptions = uiImages.map(image => ({
+    value: image.name,
+    title: image.name,
+    label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><img src={`${uiImagesPath}/${image.name}`} alt="" style={{ width: 48, height: 48, objectFit: 'contain', imageRendering: 'pixelated' }} />{image.name}</span>,
+  }));
+  const renderUiImageValue = (value: string | undefined) => {
+    if (!value) return <PictureOutlined style={{ fontSize: 28, color: token.colorTextQuaternary }} />;
+    return <img src={`${uiImagesPath}/${value}`} alt={value} style={{ display: 'block', width: 64, height: 64, objectFit: 'contain', imageRendering: 'pixelated' }} />;
+  };
+
+  const renderUiImagePicker = (value: string | null | undefined, onChange: (nextValue: string | null) => void, label: string) => (
+    <Dropdown
+      trigger={['click']}
+      menu={{
+        items: [
+          { key: '__default', label: 'Use default image', icon: <PictureOutlined /> },
+          ...uiImageOptions.map(option => ({ key: String(option.value), label: option.label })),
+        ],
+        onClick: ({ key }) => onChange(key === '__default' ? null : key),
+      }}
+    >
+      <Button aria-label={`Select ${label}`} style={{ width: 64, height: 64, minWidth: 64, padding: 0, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        {renderUiImageValue(value ?? undefined)}
+      </Button>
+    </Dropdown>
+  );
+
+  const renderMappedFont = (image: string, font: PreviewFontId, text: string, availableWidth = 104, availableHeight = 48) => {
+    const metrics = PREVIEW_FONTS[font];
+    const textWidth = Array.from(text).reduce((total, character) => total + fontCharacterWidth(font, character), 0);
+    const scale = Math.max(1, Math.min(4, availableWidth / Math.max(1, textWidth), availableHeight / metrics.glyphHeight));
+    const scaledHeight = metrics.glyphHeight * scale;
+    return <span aria-label={text} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', overflow: 'hidden', lineHeight: 0 }}>
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'nowrap', width: 'max-content', maxWidth: '100%', marginInline: 'auto' }}>
+      {Array.from(text).map((character, index) => {
+        // Butano's mapped font sheets are vertical strips: the first glyph
+        // is "!", followed by ASCII and the optional mapped accents.
+        const glyph = Math.max(0, fontGlyphIndex(character));
+        const scaledGlyphWidth = fontCharacterWidth(font, character) * scale;
+        const scaledCellWidth = metrics.glyphWidth * scale;
+        return <span key={`${character}-${index}`} style={{ width: scaledGlyphWidth, height: scaledHeight, flex: `0 0 ${scaledGlyphWidth}px`, backgroundImage: `url(${image})`, backgroundRepeat: 'no-repeat', backgroundSize: `${scaledCellWidth}px auto`, backgroundPosition: `0 ${-glyph * scaledHeight}px`, imageRendering: 'pixelated' }} />;
+      })}
+      </span>
+    </span>;
+  };
+  const fontImageOptions = (font: PreviewFontId) => fontImages.map(image => ({
+    value: image.name,
+    label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 32 }}><span style={{ width: 64, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: fontPaletteColors[`custom:${image.name}`] ?? 'transparent', borderRadius: 4, overflow: 'hidden' }}>{renderMappedFont(`${fontImagesPath}/${image.name}`, font, 'abc', 56, 24)}</span>{image.name}</span>,
+  }));
+  const renderFontPicker = (value: string | null | undefined, onChange: (nextValue: string | null) => void, label: string, font: PreviewFontId, previewText: string) => {
+    const defaultImage = PREVIEW_FONTS[font].image;
+    const image = value
+      ? fontPreviewImages[`custom:${value}`] ?? `${fontImagesPath}/${value}`
+      : fontPreviewImages[defaultImage] ?? commonFontImages[defaultImage] ?? '/common_variable_8x16_font.png';
+    return <Dropdown
+      trigger={['click']}
+      menu={{ items: [{ key: '__default', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 32 }}><span style={{ width: 64, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: fontPaletteColors[defaultImage] ?? 'transparent', borderRadius: 4, overflow: 'hidden', opacity: 0.45 }}>{renderMappedFont(commonFontImages[defaultImage] ?? '/common_variable_8x16_font.png', font, 'abc', 56, 24)}</span>Use common default</span> }, ...fontImageOptions(font).map(option => ({ key: String(option.value), label: option.label }))], onClick: ({ key }) => onChange(key === '__default' ? null : key) }}
+    >
+      <Button aria-label={`Select ${label}`} style={{ width: 118, height: 72, minWidth: 118, minHeight: 72, maxHeight: 72, boxSizing: 'border-box', padding: 2, borderRadius: 6, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        <span style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', opacity: value ? 1 : 0.45 }}>{renderMappedFont(image, font, previewText)}</span>
+      </Button>
+    </Dropdown>;
   };
 
   const { token } = AntdToken();
@@ -176,8 +308,11 @@ const Settings: React.FC = () => {
     const key = e.key as string;
     const map: Record<string, React.RefObject<HTMLDivElement | null>> = {
       fade: fadeRef,
+      'color-options': colorOptionsRef,
       controls: controlsRef,
       demo: demoRef,
+      'ui-elements': uiElementsRef,
+      fonts: fontsRef,
     };
 
     const target = map[key];
@@ -271,6 +406,7 @@ const Settings: React.FC = () => {
     <Layout hasSider >
       <Sider style={{ ...siderStyle, backgroundColor: token.colorBgLayout }}>
         <Content style={{ borderRadius: token.borderRadius, overflowY: 'auto', maxHeight: 'calc(100vh - 96px)', boxShadow: token.boxShadow }}>
+          <Tooltip title="Filter settings by section name or description.">
           <Input.Search
             placeholder="Filter content"
             allowClear
@@ -279,6 +415,7 @@ const Settings: React.FC = () => {
             onSearch={(value) => setContentFilter(value)}
             style={{ backgroundColor: token.colorBgElevated, padding: 6 }}
           />
+          </Tooltip>
           <Menu
             mode="inline"
             selectable={false}
@@ -296,17 +433,28 @@ const Settings: React.FC = () => {
               <Title level={4}>Fade Options</Title>
               <Paragraph>Chose the direction to fade between white and black.</Paragraph>
               <Space direction="vertical">
-                <Select
+                <Tooltip title="Choose the color used by the fade transition."><Select
                   value={(settings && settings.fadeDirection) ?? 0}
                   onChange={(value) => markUnsaved({ fadeDirection: value })}
                   style={{ width: 240 }}
                 >
                   <Select.Option value={0}>Fade to white</Select.Option>
                   <Select.Option value={1}>Fade to black</Select.Option>
-                </Select>
+                </Select></Tooltip>
               </Space>
             </Content>
           )}
+          {matchesContent('Color Options', 'Select one of the available palettes for each color slot.') && <Content ref={colorOptionsRef} style={{ padding: 16, borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadow, marginBottom: 16 }}>
+            <Title level={4}>Color Options</Title>
+            <Paragraph>Choose an available palette for each of the 16 color slots.</Paragraph>
+            <Row gutter={[8, 8]}>
+              {Array.from({ length: 16 }, (_, index) => {
+                const paletteIds = Array.isArray((settings as any)?.colorPaletteIds) ? (settings as any).colorPaletteIds : Array(16).fill(undefined);
+                const availablePalettes = palettes?.palettes?.length ? palettes.palettes : loadPaletteLibrary();
+                return <Col key={index} span={6}><Space direction="vertical" size={2} style={{ width: '100%' }}><Typography.Text type="secondary">Slot {index}</Typography.Text><Tooltip title="Assign a project palette to this hardware palette slot."><Select allowClear placeholder="Select palette" value={paletteIds[index]} onChange={value => { const next = [...paletteIds]; next[index] = value; markUnsaved({ colorPaletteIds: next }); }} style={{ width: '100%' }} popupMatchSelectWidth={320} options={availablePalettes.map((palette: any) => ({ value: palette.id, label: <Space size={4}><span style={{ display: 'inline-flex', gap: 1 }}>{palette.colors.slice(0, 8).map((color: string, position: number) => <span key={position} style={{ width: 7, height: 14, background: color, border: '1px solid rgba(127,127,127,.35)' }} />)}</span>{palette.name}</Space> }))} /></Tooltip></Space></Col>;
+              })}
+            </Row>
+          </Content>}
           {matchesContent('Controls', 'Preencha o formulário abaixo com os valores desejados para cada mapeamento.') && (
             <Content ref={controlsRef} style={{ padding: 16, borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadow, marginBottom: 16 }}>
               <Title level={4}>Controls</Title>
@@ -326,11 +474,11 @@ const Settings: React.FC = () => {
                           </Space>
                         </Col>
                         <Col span={14}>
-                          <Input readOnly value={values.join(', ')} placeholder="(click to capture)" onClick={() => setCapturing({ player: 0, idx })} />
+                          <Tooltip title="Click, then press a key or controller button to assign it."><Input readOnly value={values.join(', ')} placeholder="(click to capture)" onClick={() => setCapturing({ player: 0, idx })} /></Tooltip>
                         </Col>
                         <Col span={7}>
                           <Space>
-                            <Button onClick={() => { setControlsAndUnsaved((prev:any) => { const next = {...prev}; if(!next[0]) next[0] = {}; next[0][idx] = { ...(next[0][idx]||{}), _values: [] }; return next; }); message.info('Cleared values'); }}>Clear</Button>
+                            <Tooltip title="Remove all assignments for this control."><Button onClick={() => { setControlsAndUnsaved((prev:any) => { const next = {...prev}; if(!next[0]) next[0] = {}; next[0][idx] = { ...(next[0][idx]||{}), _values: [] }; return next; }); message.info('Cleared values'); }}>Clear</Button></Tooltip>
                           </Space>
                         </Col>
                       </Row>
@@ -339,30 +487,87 @@ const Settings: React.FC = () => {
                   })}
               </Content>
               <Space style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                  <Button onClick={restoreDefaultControls}>Restore Defaults</Button>
+                  <Tooltip title="Restore the default keyboard and controller mappings."><Button onClick={restoreDefaultControls}>Restore Defaults</Button></Tooltip>
               </Space>
+            </Content>
+          )}
+          {matchesContent('UI Elements', 'Select the cursor and dialogue frame images from the ui folder.') && (
+            <Content ref={uiElementsRef} style={{ padding: 16, borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadow, marginBottom: 16 }}>
+              <Title level={4}>UI Elements</Title>
+              <Paragraph>Select the images used by dialogue boxes and choice cursors.</Paragraph>
+              <Flex align="flex-start" gap={16} wrap="wrap">
+                <Space direction="vertical">
+                  <Typography.Text>Cursor Image</Typography.Text>
+                  {renderUiImagePicker(settings?.uiCursorImage, value => markUnsaved({ uiCursorImage: value }), 'cursor image')}
+                </Space>
+                <Space direction="vertical">
+                  <Typography.Text>Frame Image</Typography.Text>
+                  {renderUiImagePicker(settings?.uiFrameImage, value => markUnsaved({ uiFrameImage: value }), 'dialogue frame image')}
+                </Space>
+                {uiImages.length === 0 && <Alert type="info" showIcon message="Nenhuma imagem foi encontrada em assets/ui. O build usará cursor.png e frame.png padrão." />}
+              </Flex>
+            </Content>
+          )}
+          {matchesContent('Fonts', 'Customize the mapped fonts used by the project.') && (
+            <Content ref={fontsRef} style={{ padding: 16, borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadow, marginBottom: 16 }}>
+              <Title level={4}>Fonts</Title>
+              <Paragraph>Select mapped font images from the project assets/fonts folder. The common Butano fonts are used when no image is selected.</Paragraph>
+              <Flex align="flex-start" gap={16} wrap="wrap">
+                <Space direction="vertical" align="center"><Typography.Text>Font S</Typography.Text>{renderFontPicker(settings?.font8x8Image, value => markUnsaved({ font8x8Image: value }), 'Font S', 'fixed8x8', '8x8')}</Space>
+                <Space direction="vertical" align="center"><Typography.Text>Font M</Typography.Text>{renderFontPicker(settings?.font8x16Image, value => markUnsaved({ font8x16Image: value }), 'Font M', 'fixed8x16', '8x16')}</Space>
+                <Space direction="vertical" align="center"><Typography.Text>Font S Variables</Typography.Text>{renderFontPicker(settings?.font8x8VariablesImage, value => markUnsaved({ font8x8VariablesImage: value }), 'Font S Variables', 'variable8x8', '8x8v')}</Space>
+                <Space direction="vertical" align="center"><Typography.Text>Font M Variables</Typography.Text>{renderFontPicker(settings?.font8x16VariablesImage, value => markUnsaved({ font8x16VariablesImage: value }), 'Font M Variables', 'variable8x16', '8x16v')}</Space>
+                <Space direction="vertical" align="center"><Typography.Text>Font L Variables</Typography.Text>{renderFontPicker(settings?.font16x16VariablesImage, value => markUnsaved({ font16x16VariablesImage: value }), 'Font L Variables', 'variable16x16', '16x16v')}</Space>
+                {fontImages.length === 0 && <Alert type="info" showIcon message="Nenhuma imagem foi encontrada em assets/fonts. Os fonts common serão usados por padrão." />}
+              </Flex>
             </Content>
           )}
           {matchesContent('Demo Filters', 'Demo configuration') && (
             <Content ref={demoRef} style={{ padding: 16, borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadow, marginBottom: 16 }}>
               <Title level={4}>Demo configuration</Title>
-              <Paragraph>Configure the settings of display</Paragraph>
+              <Paragraph>Configure display and audio defaults for the EmulatorJS demo.</Paragraph>
               <Space direction="vertical" style={{ width: '100%' }}>
-                <Space style={{ width: '100%' }}>
+                <Flex align="center" gap={12} wrap="wrap">
                   <Content>Select filter: </Content>
+                  <Tooltip title="Choose the display filter used by the demo emulator.">
                     <Select
                       style={{ width: 300 }}
                       value={(settings && settings.demoFilter) || demoFilterOptions[0].value}
                       onChange={(v) => markUnsaved({ demoFilter: v })}
                       options={demoFilterOptions.map(option => ({ value: option.value, label: option.label }))}
                     />
+                  </Tooltip>
                   <Content style={{ paddingLeft: 10 }}>Show FPS: </Content>
-                    <Switch checked={(settings && settings.demoShowFPS) || false} onChange={(v) => markUnsaved({ demoShowFPS: v })} />
+                  <Tooltip title="Show the current frame rate in the emulator."><Switch checked={(settings && settings.demoShowFPS) || false} onChange={(v) => markUnsaved({ demoShowFPS: v })} /></Tooltip>
                   <Content style={{ paddingLeft: 10 }}> Show Menu: </Content>
-                    <Switch checked={(settings && settings.demoShowMenu) || false} onChange={(v) => markUnsaved({ demoShowMenu: v })} />
+                  <Tooltip title="Show EmulatorJS controls in the demo."><Switch checked={(settings && settings.demoShowMenu) || false} onChange={(v) => markUnsaved({ demoShowMenu: v })} /></Tooltip>
                   {/* <Content style={{ paddingLeft: 10 }}>Show Right Click to License: </Content>
                     <Switch checked={(settings && settings.demoShowLicense) || false} onChange={(v) => markUnsaved({ demoShowLicense: v })} /> */}
-                </Space>
+                </Flex>
+                <Divider style={{ margin: '8px 0' }} />
+                <Flex vertical gap={8} style={{ width: '100%', maxWidth: 520 }}>
+                  <Flex align="center" justify="space-between" gap={12}>
+                    <Typography.Text>Default volume</Typography.Text>
+                    <Typography.Text type="secondary">{Math.round((typeof settings?.demoAudioVolume === 'number' ? settings.demoAudioVolume : 1) * 100)}%</Typography.Text>
+                  </Flex>
+                  <Tooltip title="Set the initial emulator volume. Drag the handle or use the arrow keys for precise changes.">
+                    <Slider
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={typeof settings?.demoAudioVolume === 'number' ? settings.demoAudioVolume : 1}
+                      onChange={(value) => markUnsaved({ demoAudioVolume: value })}
+                      tooltip={{ formatter: (value) => `${Math.round((value ?? 1) * 100)}%` }}
+                      style={{ width: '100%', margin: 0 }}
+                    />
+                  </Tooltip>
+                  <Flex align="center" justify="space-between" gap={12}>
+                    <Typography.Text>Start muted</Typography.Text>
+                    <Tooltip title="Start the emulator with audio muted, regardless of the default volume.">
+                      <Switch checked={settings?.demoAudioMuted ?? false} onChange={(value) => markUnsaved({ demoAudioMuted: value })} />
+                    </Tooltip>
+                  </Flex>
+                </Flex>
               </Space>
             </Content>
           )}

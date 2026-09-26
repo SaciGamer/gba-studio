@@ -1,8 +1,9 @@
-import { exec } from 'child_process';
-import { ipcMain, MenuItem, MenuItemConstructorOptions, BrowserWindow } from 'electron';
+import { app, ipcMain, Menu, MenuItem, MenuItemConstructorOptions, shell } from 'electron';
 import { updatePreferences, getPreferences } from './handlers/preferenceHandlers';
-import { changeTheme, createAboutWindow, createLauncherWindow, windows } from './main'
+import { changeTheme, createAboutWindow, createLauncherWindow, packageJson, windows } from './main'
 import { requestSaveChanges } from './services/saveSettingsService';
+import { createMainTranslator } from './mainI18n';
+import { checkForUpdates } from './services/updateService';
 
 let isShowCollisionsChecked = true;
 let isShowNavigatorChecked = true;
@@ -13,13 +14,14 @@ function menuTemplate(): MenuItemConstructorOptions[] {
     const preferences = getPreferences();
     const currentTheme = preferences.theme || 'systemDefault';
     const currentLanguage = preferences.language || 'systemDefault';
+    const t = createMainTranslator(currentLanguage);
 
     return [
         {
-            label: 'File',
+            label: t('file'),
             submenu: [
                 {
-                    label: 'New Project',
+                    label: t('newProject'),
                     accelerator: 'CmdOrCtrl+N', 
                     click: () => {
                         console.log('..: New Project clicado'); 
@@ -28,7 +30,7 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                     }
                 },
                 {
-                    label: 'Open...',
+                    label: t('open'),
                     accelerator: 'CmdOrCtrl+O', 
                     click: () => {
                         console.log('..: Open clicado');
@@ -36,7 +38,7 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                     },
                 },
                 {
-                    label: 'Switch Project',
+                    label: t('switchProject'),
                     accelerator: 'CmdOrCtrl+P', 
                     click: () => {
                         console.log('..: Switch Project clicado'); 
@@ -45,42 +47,44 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                     }
                 },
                 { 
-                    label: 'Save', 
+                    label: t('save'), 
                     accelerator: 'CmdOrCtrl+S', 
                     click: () => { 
                         console.log('..: Chamada para save pelo menu'); 
                         requestSaveChanges({ source: 'save', persistToOriginal: true });
                     } },
                 { 
-                    label: 'Save As...', 
+                    label: t('saveAs'), 
                     click: () => { console.log('..: Save As clicado'); ipcMain.emit('save-project-as', null); } 
                 },
                 { type: 'separator' },
-                { label: 'Reload Assets', click: () => { console.log('..: Recarregar Assets clicado'); } },
+                { label: t('reloadAssets'), click: () => { windows.main?.webContents.send('reload-assets'); } },
                 { type: 'separator' },
-                { label: 'Close', role: 'quit' }
+                { label: t('close'), click: () => {
+                    if (windows.main && !windows.main.isDestroyed()) windows.main.close();
+                    else app.quit();
+                } }
             ]
         },
         {
-            label: 'Edit',
+            label: t('edit'),
             submenu: [
-                // { label: 'Undo', role: 'undo' },
-                // { label: 'Redo', role: 'redo' },
-                // { type: 'separator' },
-                // { label: 'Cut', role: 'cut' },
-                // { label: 'Copy', role: 'copy' },
-                // { label: 'Past', role: 'paste' },
-                // { label: 'Past in Place', role: 'pasteAndMatchStyle', click: () => { console.log('..: Past in Place clicado'); } },
-                // { label: 'Delete', role: 'delete' },
-                // { label: 'Select All', role: 'selectAll', click: () => { console.log('..: Selecionar Tudo clicado'); } },
-                // { type: 'separator' },
+                { label: 'Undo', accelerator: 'CmdOrCtrl+Z', click: () => windows.main?.webContents.send('history-undo') },
+                { label: 'Redo', accelerator: 'CmdOrCtrl+Shift+Z', click: () => windows.main?.webContents.send('history-redo') },
+                { type: 'separator' },
+                { label: 'Cut', accelerator: 'CmdOrCtrl+X', click: () => windows.main?.webContents.send('scene-cut') },
+                { label: 'Copy', accelerator: 'CmdOrCtrl+C', click: () => windows.main?.webContents.send('scene-copy') },
+                { label: 'Paste', accelerator: 'CmdOrCtrl+V', click: () => windows.main?.webContents.send('scene-paste') },
+                { label: 'Delete', accelerator: 'Delete', click: () => windows.main?.webContents.send('scene-delete') },
+                { label: 'Select All', accelerator: 'CmdOrCtrl+A', click: () => windows.main?.webContents.send('scene-select-all') },
+                { type: 'separator' },
                 // {
                 //     label: 'Spelling and Grammar', submenu: [
                 //         { label: 'Checke Spelling While Typing', click: () => { console.log('..: Spelling While Typing clicado'); } },
                 //     ]
                 // },
                 // { type: 'separator' },
-                { label: 'Preferences...', click: () => { 
+                { label: t('preferences'), click: () => { 
                     console.log('..: Preferences clicado'); 
                     if (windows.main) {
                         windows.main.webContents.send('open-preferences');
@@ -117,38 +121,55 @@ function menuTemplate(): MenuItemConstructorOptions[] {
         //     ]
         // },
         {
-            label: 'View',
+            label: 'Game',
             submenu: [
-                { label: 'Game World', accelerator: 'CmdOrCtrl+1', click: () => { console.log('..: Game World clicado'); try { if (windows.main && !windows.main.isDestroyed()) windows.main.webContents.send('change-content-view', 1); } catch (e) { console.warn('Failed to send change-content-view', e); } } },
-                { label: 'Tiles Editor', accelerator: 'CmdOrCtrl+2', click: () => { console.log('..: Tiles Editor clicado'); try { if (windows.main && !windows.main.isDestroyed()) windows.main.webContents.send('change-content-view', 2); } catch (e) { console.warn('Failed to send change-content-view', e); } } },
-                { label: 'Sprites', accelerator: 'CmdOrCtrl+3', click: () => { console.log('..: Sprites clicado'); try { if (windows.main && !windows.main.isDestroyed()) windows.main.webContents.send('change-content-view', 3); } catch (e) { console.warn('Failed to send change-content-view', e); } } },
-                { label: 'Images', accelerator: 'CmdOrCtrl+4', click: () => { console.log('..: Images clicado'); try { if (windows.main && !windows.main.isDestroyed()) windows.main.webContents.send('change-content-view', 4); } catch (e) { console.warn('Failed to send change-content-view', e); } } },
-                { label: 'Music', accelerator: 'CmdOrCtrl+5', click: () => { console.log('..: Music clicado'); try { if (windows.main && !windows.main.isDestroyed()) windows.main.webContents.send('change-content-view', 5); } catch (e) { console.warn('Failed to send change-content-view', e); } } },
-                { label: 'Sound Effects', accelerator: 'CmdOrCtrl+6', click: () => { console.log('..: Sound Effects clicado'); try { if (windows.main && !windows.main.isDestroyed()) windows.main.webContents.send('change-content-view', 6); } catch (e) { console.warn('Failed to send change-content-view', e); } } },
-                { label: 'Palettes', accelerator: 'CmdOrCtrl+7', click: () => { console.log('..: Palettes clicado'); try { if (windows.main && !windows.main.isDestroyed()) windows.main.webContents.send('change-content-view', 7); } catch (e) { console.warn('Failed to send change-content-view', e); } } },
-                { label: 'Dialogue Review', accelerator: 'CmdOrCtrl+8', click: () => { console.log('..: Dialogue Review clicado'); try { if (windows.main && !windows.main.isDestroyed()) windows.main.webContents.send('change-content-view', 8); } catch (e) { console.warn('Failed to send change-content-view', e); } } },
-                { label: 'Settings', accelerator: 'CmdOrCtrl+9', click: () => { console.log('..: Settings clicado'); try { if (windows.main && !windows.main.isDestroyed()) windows.main.webContents.send('change-content-view', 9); } catch (e) { console.warn('Failed to send change-content-view', e); } } },
+                { label: 'Play Preview Game', accelerator: 'CmdOrCtrl+P', click: () => windows.main?.webContents.send('game-play-preview') },
+                { label: 'Build Game', accelerator: 'CmdOrCtrl+B', click: () => windows.main?.webContents.send('game-build') },
+                {
+                    label: 'Export As',
+                    submenu: [
+                        { label: 'Export Butano Project', accelerator: 'CmdOrCtrl+Shift+B', click: () => windows.main?.webContents.send('game-export-butano') },
+                        { label: 'Export Executable', accelerator: 'CmdOrCtrl+Shift+E', click: () => windows.main?.webContents.send('game-export-executable') },
+                    ],
+                },
+            ],
+        },
+        {
+            label: t('view'),
+            submenu: [
+                { label: t('world'), accelerator: 'CmdOrCtrl+1', click: () => windows.main?.webContents.send('change-content-view', 1) },
+                { label: t('sprites'), accelerator: 'CmdOrCtrl+2', click: () => windows.main?.webContents.send('change-content-view', 3) },
+                { label: t('images'), accelerator: 'CmdOrCtrl+3', click: () => windows.main?.webContents.send('change-content-view', 4) },
+                { label: t('music'), accelerator: 'CmdOrCtrl+4', click: () => windows.main?.webContents.send('change-content-view', 5) },
+                { label: t('sounds'), accelerator: 'CmdOrCtrl+5', click: () => windows.main?.webContents.send('change-content-view', 6) },
+                { label: t('palettes'), accelerator: 'CmdOrCtrl+6', click: () => windows.main?.webContents.send('change-content-view', 7) },
+                { label: t('dialogues'), accelerator: 'CmdOrCtrl+7', click: () => windows.main?.webContents.send('change-content-view', 8) },
+                { label: t('settings'), accelerator: 'CmdOrCtrl+8', click: () => windows.main?.webContents.send('change-content-view', 9) },
                 { type: 'separator' },
                 {
-                    label: 'Theme', submenu: [
-                        { label: 'System Default', type: 'checkbox', checked: currentTheme === 'systemDefault', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'systemDefault'); } },
+                    label: t('theme'), submenu: [
+                        { label: t('systemDefault'), type: 'checkbox', checked: currentTheme === 'systemDefault', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'systemDefault'); } },
                         { type: 'separator' },
-                        { label: 'Light', type: 'checkbox', checked: currentTheme === 'light', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'light'); } },
-                        { label: 'Dark', type: 'checkbox', checked: currentTheme === 'dark', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'dark'); } },
+                        { label: t('light'), type: 'checkbox', checked: currentTheme === 'light', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'light'); } },
+                        { label: t('dark'), type: 'checkbox', checked: currentTheme === 'dark', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'dark'); } },
                         { label: 'GameCubix', type: 'checkbox',  checked: currentTheme === 'gamecube', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'gamecube'); } },
                         { label: 'S-Nintenbu', type: 'checkbox', checked: currentTheme === 'nintendo', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'nintendo'); } },
                         { label: 'Blue', type: 'checkbox', checked: currentTheme === 'blue', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'blue'); } },
                         { label: 'Silver', type: 'checkbox', checked: currentTheme === 'silver', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'silver'); } },
+                        { type: 'separator' },
+                        { label: t('glass'), type: 'checkbox', checked: currentTheme === 'glass', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'glass'); } },
+                        { label: t('bootstrap'), type: 'checkbox', checked: currentTheme === 'bootstrap', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'bootstrap'); } },
+                        { label: t('cartoon'), type: 'checkbox', checked: currentTheme === 'cartoon', click: (menuItem: MenuItem) => { updateTheme(menuItem, 'cartoon'); } },
                     ]
                 },
                 {
-                    label: 'Language', submenu: [
-                        { label: 'System Default', type: 'checkbox', checked: currentLanguage === 'systemDefault', click: (menuItem: MenuItem) => updateLanguage(menuItem, 'systemDefault') },
+                    label: t('language'), submenu: [
+                        { label: t('systemDefault'), type: 'checkbox', checked: currentLanguage === 'systemDefault', click: (menuItem: MenuItem) => updateLanguage(menuItem, 'systemDefault') },
                         { type: 'separator' },
-                        { label: 'en_US', type: 'checkbox', checked: currentLanguage === 'en_US', click: (menuItem: MenuItem) => { updateLanguage(menuItem, 'en_US'); } },
-                        { label: 'es_ES', type: 'checkbox', checked: currentLanguage === 'es_ES', click: (menuItem: MenuItem) => { updateLanguage(menuItem, 'es_ES'); } },
-                        { label: 'fr_FR', type: 'checkbox', checked: currentLanguage === 'fr_FR', click: (menuItem: MenuItem) => { updateLanguage(menuItem, 'fr_FR'); } },
-                        { label: 'pt_BR', type: 'checkbox', checked: currentLanguage === 'pt_BR', click: (menuItem: MenuItem) => { updateLanguage(menuItem, 'pt_BR'); } },
+                        { label: 'English (United States)', type: 'checkbox', checked: currentLanguage === 'en_US', click: (menuItem: MenuItem) => { updateLanguage(menuItem, 'en_US'); } },
+                        { label: 'Español (España)', type: 'checkbox', checked: currentLanguage === 'es_ES', click: (menuItem: MenuItem) => { updateLanguage(menuItem, 'es_ES'); } },
+                        { label: 'Français (France)', type: 'checkbox', checked: currentLanguage === 'fr_FR', click: (menuItem: MenuItem) => { updateLanguage(menuItem, 'fr_FR'); } },
+                        { label: 'Português (Brasil)', type: 'checkbox', checked: currentLanguage === 'pt_BR', click: (menuItem: MenuItem) => { updateLanguage(menuItem, 'pt_BR'); } },
                     ]
                 },
                 // { type: 'separator' },
@@ -181,41 +202,50 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                 //     }
                 // },
                 { type: 'separator' },
-                { label: 'Actual Size', role: 'resetZoom', click: () => { console.log('..: Actual Size clicado'); } },
-                { label: 'Zoom In', role: 'zoomIn', click: () => { console.log('..: Zoon In clicado'); } },
-                { label: 'Zoom Out', role: 'zoomOut', click: () => { console.log('..: Zoon Out clicado'); } }
+                { label: t('actualSize'), role: 'resetZoom' },
+                { label: t('zoomIn'), role: 'zoomIn' },
+                { label: t('zoomOut'), role: 'zoomOut' }
             ]
         },
         {
-            label: 'Window',
+            label: t('window'),
             submenu: [
-                { label: 'Minimise', role: 'minimize', click: () => { console.log('..: Minimise clicado'); } }
+                { label: t('minimize'), role: 'minimize' }
             ]
         },
         {
-            label: 'Help',
+            label: t('help'),
             submenu: [
                 {
-                    label: 'Documentation',
+                    label: t('documentation'),
                     click: () => {
                         console.log('..: Documentation clicado');
                         openBrowser('https://sacigamer.github.io/gba-studio-site/docs/intro');
                     }
                 },
                 {
-                    label: 'Learn More', click: () => {
+                    label: t('learnMore'), click: () => {
                         console.log('..: Learn More clicado');
                         openBrowser('https://gbadev.net/getting-started.html/');
                     }
                 },
                 { type: 'separator' },
                 {
-                    label: 'About GBA Studio', click: () => {
+                    label: t('about'), click: () => {
                         createAboutWindow();
                         console.log('..: About GBA Studio clicado');
                     }
                 },
-                // { label: 'Check for Updates...', click: () => { console.log('..: Check for Updates clicado'); } }
+                {
+                    label: 'Check for Updates...',
+                    click: () => {
+                        void checkForUpdates({
+                            currentVersion: packageJson.version,
+                            parentWindow: windows.main ?? windows.launcher,
+                            showUpToDate: true,
+                        });
+                    },
+                }
             ]
         }
     ]
@@ -223,10 +253,7 @@ function menuTemplate(): MenuItemConstructorOptions[] {
 
 // Função para abrir o navegador
 function openBrowser(url: string): void {
-    const start = process.platform === 'darwin' ? 'open' :
-        process.platform === 'win32' ? 'start' :
-            'xdg-open';
-    exec(`${start} ${url}`);
+    void shell.openExternal(url);
 }
 
 function updateTheme(menuItem: MenuItem, theme: string): void {
@@ -236,14 +263,6 @@ function updateTheme(menuItem: MenuItem, theme: string): void {
     // Marcar o item selecionado e aplicar o tema
     menuItem.checked = true;
     console.log('..: Mudando tema para: ', theme);
-    
-    // Enviar evento para todas as janelas abertas
-    if (windows.main) {
-        windows.main.webContents.send('change-theme', theme);
-    }
-    if (windows.launcher) {
-        windows.launcher.webContents.send('change-theme', theme);
-    }
     
     changeTheme(theme);
 }
@@ -264,6 +283,8 @@ function updateLanguage(menuItem: MenuItem, language: string): void {
     if (windows.launcher) {
         windows.launcher.webContents.send('change-language', language);
     }
+
+    Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate()));
 
 }
 

@@ -9,7 +9,16 @@ const defaultMainSettings: IMainSettings = {
     startMoveSpeed: 1,
     startAnimSpeed: 4,
     startDirection: 'right',
-    colorMode: 'mono'
+    colorMode: 'mono',
+    fadeDirection: 0,
+    demoAudioVolume: 1,
+    demoAudioMuted: false,
+    playerSpriteId: null,
+    playerFrameWidth: 16,
+    playerFrameHeight: 16,
+    playerFramesPerDirection: 4,
+    playerAnimSpeed: 4,
+    playerIdleFrame: 0
 };
 
 export class MainSettingsManager extends BaseManager<IMainSettings> {

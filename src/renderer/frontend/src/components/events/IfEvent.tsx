@@ -1,6 +1,7 @@
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { IConditionValue, IIfArgs, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
-import { Cascader, Input, InputNumber, Select, Space, Typography } from 'antd';
+import { Cascader, Input, Select, Space, Typography } from 'antd';
+import StepInputNumber, { InputNumber } from '../StepInputNumber';
 import { useEffect, useState } from 'react';
 
 interface IfEventProps {
@@ -29,6 +30,7 @@ const firstVariableValue = (variables: ReturnType<typeof useAppContexts>['variab
 
 const prefixForValue = (value: IConditionValue): string => {
   if (value.kind === 'variable') return '$';
+  if (value.kind === 'button') return `B:${value.button}`;
   if (value.type === 'boolean') return value.value ? 'T' : 'F';
   if (value.type === 'number') return '#';
   return '""';
@@ -49,6 +51,9 @@ function Operand({
   const type = selectedVariable?.type || value.type;
 
   const renderLiteral = () => {
+    if (value.kind === 'button') {
+      return <Select value={value.button} options={['A', 'B', 'L', 'R', 'START', 'SELECT', 'UP', 'DOWN', 'LEFT', 'RIGHT'].map(button => ({ value: button, label: button }))} onChange={button => onChange({ kind: 'button', type: 'boolean', button })} />;
+    }
     if (type === 'number') {
       return <InputNumber value={value.kind === 'literal' ? value.value as number : 0} onChange={(next) => onChange({ kind: 'literal', type, value: next ?? 0 })} />;
     }
@@ -69,12 +74,13 @@ function Operand({
     <Space.Compact block>
       <Cascader
         allowClear={false}
-        value={value.kind === 'variable' ? ['Variables', value.variableId] : value.type === 'boolean' ? ['Boolean', String(value.value)] : [value.type === 'number' ? 'Number' : 'Text']}
+        value={value.kind === 'variable' ? ['Variables', value.variableId] : value.kind === 'button' ? ['Button', value.button] : value.type === 'boolean' ? ['Boolean', String(value.value)] : [value.type === 'number' ? 'Number' : 'Text']}
         options={[
           { value: 'Number', label: 'Number' },
           { value: 'Text', label: 'Text' },
           { value: 'Variables', label: 'Variables', children: variables.map(variable => ({ value: variable.id, label: variable.name || variable.symbol })) },
           { value: 'Boolean', label: 'Boolean', children: [{ value: 'true', label: 'True' }, { value: 'false', label: 'False' }] },
+          { value: 'Button', label: 'Button', children: ['A', 'B', 'L', 'R', 'START', 'SELECT', 'UP', 'DOWN', 'LEFT', 'RIGHT'].map(button => ({ value: button, label: button })) },
         ]}
         displayRender={() => prefixForValue(value)}
         style={{ width: 42 }}
@@ -85,6 +91,8 @@ function Operand({
             if (variable) onChange({ kind: 'variable', variableId: variable.id, symbol: variable.symbol, type: variable.type });
           } else if (category === 'Boolean' && selected) {
             onChange({ kind: 'literal', type: 'boolean', value: selected === 'true' });
+          } else if (category === 'Button' && selected) {
+            onChange({ kind: 'button', type: 'boolean', button: selected });
           } else if (category === 'Number') {
             onChange({ kind: 'literal', type: 'number', value: 0 });
           } else if (category === 'Text') {

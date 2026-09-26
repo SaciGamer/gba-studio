@@ -62,6 +62,14 @@ export function prepareProjectSandbox(projectFilePath: string): { sandboxDirecto
 export function requestSaveChanges(options: SaveOptions = {}) {
     const mergedOptions: SaveOptions = { source: 'save', ...options };
     console.log('..: requestSaveChanges processingToSaved:', processingToSaved, 'source:', mergedOptions.source);
+    if (windows.main && processingToSaved) {
+        // A close request can arrive while another save is being prepared.
+        // Upgrade that pending save so it also persists to the original
+        // project instead of letting the close race with a sandbox-only save.
+        pendingSaveOptions = { ...(pendingSaveOptions || {}), ...mergedOptions };
+        return;
+    }
+
     if (windows.main && !processingToSaved) {
         processingToSaved = true;
         pendingSaveOptions = mergedOptions;
@@ -76,8 +84,12 @@ export function waitForSaveComplete(timeoutMs = 10000): Promise<void> {
             reject(new Error('Save timeout'));
         }, timeoutMs);
 
-        const onSaved = () => {
+        const onSaved = (result?: { success?: boolean }) => {
             clearTimeout(timeout);
+            if (result?.success === false) {
+                reject(new Error('Save failed'));
+                return;
+            }
             resolve();
         };
 
@@ -91,7 +103,7 @@ export function responseSaveChanges(dataToSave: any) {
     stopAllWatchers();
     processingToSaved = saveChanges(dataToSave, pendingSaveOptions || {});
 
-    var foldersToWatch = ["backgrounds", "backgrounds-hd", "tilesets"];
+    var foldersToWatch = ["backgrounds", "backgrounds-hd", "tilesets", "sprites"];
     foldersToWatch.forEach((folder) => startWatch(windows.main, originalProjectDirectory, folder));
     pendingSaveOptions = null;
 }
@@ -102,7 +114,7 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
     try {
         if (!Array.isArray(dataToSave)) {
             console.warn('..: Dados de save inválidos, ignorando');
-            emitSaveComplete(options);
+            emitSaveComplete(options, false);
             return false;
         }
 
@@ -119,7 +131,7 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
 
         if (options.persistToOriginal === false && !activeProjectDirectory) {
             console.warn('..: Skip project write for implicit build/run-live save because no sandbox directory is active');
-            emitSaveComplete(options);
+            emitSaveComplete(options, false);
             return false;
         }
 
@@ -141,6 +153,9 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
 
             if (fileData && fileData._resourceType === 'project') {
                 saveSettingsToStore(activeProjectDirectory, '', path.basename(settingsUtils.projectPathFile || 'project.gbaproj'), fileData);
+            } else if (fileData && fileData._resourceType === 'palettes') {
+                const palettePath = path.join(activeProjectDirectory, 'project', 'palettes');
+                fileData.palettes.forEach((palette: any) => saveWithFolders(palettePath, palette.name, { ...palette, _resourceType: 'palette' }));
             } else {
                 saveSettingsToStore(activeProjectDirectory, 'project', fileData._resourceType, fileData);
             }
@@ -163,9 +178,9 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
     }
 }
 
-function emitSaveComplete(options: SaveOptions) {
+function emitSaveComplete(options: SaveOptions, success = true) {
     try {
-        saveEvents.emit('saved', { success: true, options });
+        saveEvents.emit('saved', { success, options });
     } catch (e) {
         console.warn('saveEvents emit failed', e);
     }
@@ -206,7 +221,7 @@ function createProjectSandboxDirectory(originalDirectory: string): string {
 }
 
 function copySandboxToOriginalProject(activeProjectDirectory: string) {
-    console.log('..: Copying sandbox project back to original project directory');
+    console.log('..: Synchronizing changed sandbox files with original project directory');
     if (!originalProjectDirectory || !activeProjectDirectory) {
         return;
     }
@@ -218,11 +233,69 @@ function copySandboxToOriginalProject(activeProjectDirectory: string) {
         return;
     }
 
-    if (fs.existsSync(normalizedOriginalDir)) {
-        fs.rmSync(normalizedOriginalDir, { recursive: true, force: true });
+    syncDirectoryChanges(normalizedActiveDir, normalizedOriginalDir);
+}
+
+/**
+ * Synchronizes a sandbox without replacing the whole project directory.
+ * Files are copied only when their contents changed. Asset files are always
+ * preserved in the original project when they are missing from the sandbox;
+ * a save must never turn a temporary/incomplete asset view into data loss.
+ */
+function syncDirectoryChanges(sourceDir: string, targetDir: string, preserveAssets = false): void {
+    if (!fs.existsSync(sourceDir)) {
+        return;
     }
-    fs.mkdirSync(normalizedOriginalDir, { recursive: true });
-    copyDirectoryContents(normalizedActiveDir, normalizedOriginalDir);
+
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const sourceEntries = fs.readdirSync(sourceDir, { withFileTypes: true });
+    const sourceNames = new Set(sourceEntries.map((entry) => entry.name));
+    const preserveAssetEntries = preserveAssets || path.basename(sourceDir).toLowerCase() === 'assets';
+
+    for (const entry of sourceEntries) {
+        const sourcePath = path.join(sourceDir, entry.name);
+        const targetPath = path.join(targetDir, entry.name);
+
+        if (entry.isDirectory()) {
+            if (fs.existsSync(targetPath) && !fs.statSync(targetPath).isDirectory()) {
+                fs.rmSync(targetPath, { force: true });
+            }
+            syncDirectoryChanges(sourcePath, targetPath, preserveAssetEntries);
+            continue;
+        }
+
+        if (fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory()) {
+            fs.rmSync(targetPath, { recursive: true, force: true });
+        }
+
+        if (!filesHaveSameContents(sourcePath, targetPath)) {
+            fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+            fs.copyFileSync(sourcePath, targetPath);
+        }
+    }
+
+    if (!fs.existsSync(targetDir)) {
+        return;
+    }
+
+    if (!preserveAssetEntries) {
+        for (const entry of fs.readdirSync(targetDir, { withFileTypes: true })) {
+            if (!sourceNames.has(entry.name)) {
+                fs.rmSync(path.join(targetDir, entry.name), { recursive: true, force: true });
+            }
+        }
+    }
+}
+
+function filesHaveSameContents(sourcePath: string, targetPath: string): boolean {
+    if (!fs.existsSync(targetPath) || !fs.statSync(targetPath).isFile()) {
+        return false;
+    }
+
+    const source = fs.readFileSync(sourcePath);
+    const target = fs.readFileSync(targetPath);
+    return source.equals(target);
 }
 
 export function copyDirectoryContents(sourceDir: string, targetDir: string) {

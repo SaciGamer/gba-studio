@@ -5,6 +5,8 @@ import os from 'os';
 import isDev from 'electron-is-dev';
 import { dirname } from 'path'
 import { fileURLToPath } from 'url';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 
 import windowStateKeeper from 'electron-window-state';
 import { getPreferences, updatePreferences, initializeDefaultPaths, getBuildConfig } from './handlers/preferenceHandlers';
@@ -12,18 +14,21 @@ import { prepareProjectSandbox, requestSaveChanges, setProjectDirectory, setProj
 import { saveEvents } from './services/saveSettingsService';
 import { createProjectStruct } from './structs/mainProjectStruct';
 import menuTemplate from './menuTemplate';
-import compileGBA from './utils/gbaCompiler/compile-gba';
-import transcodeProject from './utils/projectTranscoder/transcode-project';
+import compileGBA, { cancelActiveCompile } from './utils/gbaCompiler/compile-gba';
+import transcodeProject, { cancelActiveAssetGeneration } from './utils/projectTranscoder/transcode-project';
 import initializeIpcHandlers from './controllers/HandlerController';
 import { clearWatchers, startWatch } from './services/imagemService';
 import { SettingsController } from './controllers/SettingsController';
 import { setCurrentActiveSandboxDirectory } from './states/tempProjectState';
+import { loadLauncherCredits, refreshLauncherCredits } from './services/creditsService';
+import { checkForUpdates } from './services/updateService';
 
 import express from 'express';
 import { CompileResult } from './utils/types/BuildTypes';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const execFileAsync = promisify(execFile);
 
 const preloadPath = path.join(__dirname, 'preload', 'preload.js');
 const iconPath = path.join(app.getAppPath(), 'icon', 'defaultImgIcon.png');
@@ -54,6 +59,7 @@ protocol.registerSchemesAsPrivileged([
     privileges: {
       secure: true, // Marca o esquema como seguro
       standard: true, // Habilita APIs padrão, como carregamento de arquivos
+      corsEnabled: true,
     },
   },
 ]);
@@ -160,6 +166,7 @@ function createSplashWindow() {
     } else {
       windows.launcher.show();
       windows.launcher.focus();
+      void checkForUpdates({ currentVersion: packageJson.version, parentWindow: windows.launcher });
     }
     windows.launcher?.setAlwaysOnTop(false); // Desabilitar a configuração após trazer a janela para o topo
   }, 3000); // 3 segundos
@@ -199,6 +206,12 @@ export function createLauncherWindow(selectTab: string | null, isSplash: boolean
       ? `http://localhost:5173#/launcher?tab=${encodeURI(selectTab || '')}`
       : `file://${path.join(__dirname, '../renderer', 'index.html')}#/launcher?tab=${encodeURI(selectTab || '')}`
   );
+
+  if (!isSplash) {
+    windows.launcher.once('ready-to-show', () => {
+      void checkForUpdates({ currentVersion: packageJson.version, parentWindow: windows.launcher });
+    });
+  }
   
   // Detecta quando a janela perde o foco
   windows.launcher?.on('blur', () => {
@@ -230,7 +243,10 @@ function createProjectWindow(projectFilePath: string): void {
     y: engineWindowState.y,
     width: engineWindowState.width,
     height: engineWindowState.height,
-    useContentSize: true,
+    // electron-window-state persists native bounds (which include the title
+    // bar). Keep BrowserWindow in that same coordinate system: with content
+    // size enabled Electron would add the frame height every time it reopens.
+    useContentSize: false,
     icon: iconPath,
     webPreferences: {
       preload: preloadPath,
@@ -408,7 +424,9 @@ export function changeTheme(theme: string) {
 
   // Envia o evento para todas as janelas ativas
   Object.values(windows).forEach((window) => {
-    window.webContents.send('change-theme', theme);
+    if (window && !window.isDestroyed()) {
+      window.webContents.send('change-theme', theme);
+    }
   });
 
   updatePreferences('theme', currentTheme)
@@ -433,10 +451,18 @@ app.whenReady().then(() => {
       // Ensure the file exists before returning it
       if (fs.existsSync(filePath)) {
         const fileBuffer = fs.readFileSync(filePath);
+        const extension = path.extname(filePath).toLowerCase();
+        const contentType = extension === '.bmp' ? 'image/bmp'
+          : extension === '.jpg' || extension === '.jpeg' ? 'image/jpeg'
+            : extension === '.gif' ? 'image/gif'
+              : extension === '.wav' ? 'audio/wav'
+                : extension === '.mp3' ? 'audio/mpeg'
+                  : extension === '.ogg' ? 'audio/ogg'
+                    : 'image/png';
 
         return new Response(new Uint8Array(fileBuffer), {
           status: 200, // Success
-          headers: { 'Content-Type': 'image/png' },
+          headers: { 'Content-Type': contentType },
         });
       } else {
         return new Response('File not found', {
@@ -487,8 +513,17 @@ async function handleWindowClose(window: BrowserWindow) {
     });
 
     if (response.response === 0) { // Botão "Save"
-      requestSaveChanges();
-      return true; // Permitir o fechamento
+      requestSaveChanges({ source: 'close', persistToOriginal: true });
+
+      try {
+        // The renderer must answer and the original project must be updated
+        // before watchers/build processes are stopped and the window closes.
+        await waitForSaveComplete();
+        return true;
+      } catch (error) {
+        console.error('..: Save did not finish before closing; keeping the window open.', error);
+        return false;
+      }
     } else if (response.response === 1) { // Botão "Don't Save"
       settingsController.setIsSaved(true);
       return true; // Permitir o fechamento
@@ -708,6 +743,9 @@ ipcMain.handle("get-emulator-rom-buffer", async (event, filePath) => {
 // ## RUN-LIVE #########################################################
 // This is used for "Run Live" feature, which runs the project without saving changes to disk
 ipcMain.on('run-live', async (event) => {
+  if (buildInProgress) return;
+  buildInProgress = true;
+  buildStopRequested = false;
   console.log('..: run-live requested');
   try {
     const compileRes = await transcodeAndCompile();
@@ -735,35 +773,189 @@ ipcMain.on('run-live', async (event) => {
   } catch (error) {
     console.error('run-live error', error);
     windows.main?.webContents.send('compile-error', error);
+  } finally {
+    buildInProgress = false;
   }
 });
 // ## RUN-LIVE END #####################################################
 
 // ## COMPILE PROJECT  #################################################
+function getTemporaryBuildDirectory(): string {
+  return path.resolve(os.tmpdir(), 'gba-studio-temp', 'gba-studio-build');
+}
+
+function clearTemporaryBuildDirectory(): void {
+  const temporaryRoot = path.resolve(os.tmpdir(), 'gba-studio-temp');
+  const buildDirectory = getTemporaryBuildDirectory();
+  if (path.dirname(buildDirectory) !== temporaryRoot) {
+    throw new Error(`Refusing to clean an unexpected build directory: ${buildDirectory}`);
+  }
+  fs.rmSync(buildDirectory, { recursive: true, force: true });
+}
+
+async function archiveBuildDirectory(sourceDirectory: string, destinationFile: string): Promise<void> {
+  if (process.platform !== 'win32') {
+    throw new Error('Exportação de build em ZIP está disponível apenas no Windows no momento.');
+  }
+
+  // Keep paths out of the PowerShell command. `-Command` doesn't bind trailing
+  // process arguments to a top-level `param`, while environment variables are
+  // passed reliably even when a path contains spaces.
+  await execFileAsync('powershell.exe', [
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    '$source = $env:GBA_STUDIO_EXPORT_SOURCE; $destination = $env:GBA_STUDIO_EXPORT_DESTINATION; $stage = Join-Path ([System.IO.Path]::GetTempPath()) ("gba-studio-export-" + [guid]::NewGuid()); New-Item -ItemType Directory -Path $stage -Force | Out-Null; Copy-Item -Path (Join-Path $source "*") -Destination $stage -Recurse -Force; Get-ChildItem -LiteralPath $stage -Recurse -Force -File | Where-Object { $_.Name -eq ".project.json" -or $_.Extension -in @(".gba", ".elf") } | Remove-Item -Force; Get-ChildItem -LiteralPath $stage -Force | Compress-Archive -DestinationPath $destination -Force; Remove-Item -LiteralPath $stage -Recurse -Force',
+  ], {
+    windowsHide: true,
+    env: {
+      ...process.env,
+      GBA_STUDIO_EXPORT_SOURCE: sourceDirectory,
+      GBA_STUDIO_EXPORT_DESTINATION: destinationFile,
+    },
+  });
+}
+
+let buildInProgress = false;
+let buildStopRequested = false;
+let exportInProgress = false;
+
+const runExclusiveExport = async (operation: () => Promise<unknown>) => {
+  if (exportInProgress) {
+    return { success: false, message: 'Uma exportação já está aberta. Feche a janela atual antes de tentar novamente.' };
+  }
+  exportInProgress = true;
+  try {
+    return await operation();
+  } finally {
+    exportInProgress = false;
+  }
+};
+
+ipcMain.handle('export-build-as', () => runExclusiveExport(async () => {
+  if (buildInProgress) {
+    return { success: false, message: 'Aguarde o build atual terminar antes de exportar.' };
+  }
+
+  const buildDirectory = getTemporaryBuildDirectory();
+  const markerFile = path.join(buildDirectory, '.project.json');
+  if (!fs.existsSync(markerFile)) return { success: false, message: 'Nenhum build válido foi encontrado. Faça um build primeiro.' };
+  try {
+    const marker = JSON.parse(fs.readFileSync(markerFile, 'utf8'));
+    if (marker.projectDir !== (originalProjectDirectory || '')) return { success: false, message: 'O build pertence a outro projeto. Faça um build primeiro.' };
+  } catch { return { success: false, message: 'O build está inválido. Faça um build primeiro.' }; }
+  if (!fs.existsSync(buildDirectory) || !fs.statSync(buildDirectory).isDirectory()) {
+    return { success: false, message: 'Nenhum build temporário foi encontrado. Compile o projeto antes de exportar.' };
+  }
+
+  const projectFile = SettingsController.getInstance().getProjectFile() || 'gba-studio';
+  const archiveName = `${path.basename(projectFile, path.extname(projectFile))}-build.zip`;
+  const dialogOptions = {
+    title: 'Export Build As',
+    defaultPath: path.join(originalProjectDirectory || app.getPath('documents'), archiveName),
+    filters: [{ name: 'ZIP archive', extensions: ['zip'] }],
+  };
+  const result = windows.main
+    ? await dialog.showSaveDialog(windows.main, dialogOptions)
+    : await dialog.showSaveDialog(dialogOptions);
+
+  if (result.canceled || !result.filePath) {
+    return { success: false, cancelled: true };
+  }
+
+  try {
+    await archiveBuildDirectory(buildDirectory, result.filePath);
+    return { success: true, filePath: result.filePath };
+  } catch (error) {
+    console.error('Failed to export build archive', error);
+    return { success: false, message: `Não foi possível exportar o build: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}));
+
+ipcMain.handle('export-executable', () => runExclusiveExport(async () => {
+  if (buildInProgress) return { success: false, message: 'Aguarde o build atual terminar antes de exportar.' };
+  const buildDirectory = getTemporaryBuildDirectory();
+  const markerFile = path.join(buildDirectory, '.project.json');
+  if (!fs.existsSync(markerFile)) return { success: false, message: 'Nenhum build válido foi encontrado. Faça um build primeiro.' };
+  try {
+    const marker = JSON.parse(fs.readFileSync(markerFile, 'utf8'));
+    if (marker.projectDir !== (originalProjectDirectory || '')) return { success: false, message: 'O build pertence a outro projeto. Faça um build primeiro.' };
+  } catch { return { success: false, message: 'O build está inválido. Faça um build primeiro.' }; }
+  const findGba = (directory: string): string | null => {
+    if (!fs.existsSync(directory)) return null;
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const candidate = path.join(directory, entry.name);
+      if (entry.isDirectory()) { const nested = findGba(candidate); if (nested) return nested; }
+      else if (/\.gba$/i.test(entry.name)) return candidate;
+    }
+    return null;
+  };
+  const sourceGba = findGba(buildDirectory);
+  if (!sourceGba) return { success: false, message: 'Nenhum executável encontrado. Compile o projeto antes de exportar.' };
+  const projectFile = SettingsController.getInstance().getProjectFile() || 'gba-studio';
+  const result = windows.main
+    ? await dialog.showOpenDialog(windows.main, { title: 'Export Executable', defaultPath: originalProjectDirectory || app.getPath('documents'), properties: ['openDirectory', 'createDirectory'] })
+    : await dialog.showOpenDialog({ title: 'Export Executable', defaultPath: originalProjectDirectory || app.getPath('documents'), properties: ['openDirectory', 'createDirectory'] });
+  if (result.canceled || !result.filePaths[0]) return { success: false, cancelled: true };
+  try {
+    const name = path.basename(projectFile, path.extname(projectFile));
+    const destinationDir = path.join(result.filePaths[0], 'Build');
+    fs.mkdirSync(destinationDir, { recursive: true });
+    fs.copyFileSync(sourceGba, path.join(destinationDir, `${name}.gba`));
+    const sourceElf = sourceGba.replace(/\.gba$/i, '.elf');
+    if (fs.existsSync(sourceElf)) fs.copyFileSync(sourceElf, path.join(destinationDir, `${name}.elf`));
+    return { success: true, filePath: destinationDir };
+  }
+  catch (error) { return { success: false, message: `Não foi possível exportar o executável: ${error instanceof Error ? error.message : String(error)}` }; }
+}));
+
+ipcMain.on('stop-build', async () => {
+  try {
+    if (!buildInProgress) {
+      windows.main?.webContents.send('compile-error', { message: 'Não há compilação Butano em execução.' });
+      return;
+    }
+
+    buildStopRequested = true;
+    const [stoppedCompile, stoppedAssets] = await Promise.all([
+      cancelActiveCompile(),
+      cancelActiveAssetGeneration(),
+    ]);
+    if (!stoppedCompile && !stoppedAssets) {
+      // The current transcode operation has not started make yet. It will
+      // observe this flag before compiling and clean the temporary directory.
+      windows.main?.webContents.send('compile-progress', {
+        status: 'running',
+        message: '>> Cancelamento solicitado; aguardando a etapa atual.',
+      });
+      return;
+    }
+
+    clearTemporaryBuildDirectory();
+    windows.main?.webContents.send('compile-error', {
+      message: 'Compilação cancelada e diretório temporário limpo.',
+      cancelled: true,
+    });
+  } catch (error) {
+    console.error('Unable to stop build', error);
+    windows.main?.webContents.send('compile-error', { message: String(error) });
+  }
+});
+
 ipcMain.on('compile-project', async (event)  => {
+  if (buildInProgress) return;
+  buildInProgress = true;
+  buildStopRequested = false;
   console.log('..: Compiling project...');
   try {
     const compileRes = await transcodeAndCompile();
-
-    // On successful compile, copy outputs (.gba, .elf, .map) into project's build folder
-    if (compileRes && compileRes.gbaPath) {
-      const outDir = path.join(originalProjectDirectory!, 'build');
-      if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
-
-      // Copy .gba
-      try { fs.copyFileSync(compileRes.gbaPath, path.join(outDir, path.basename(compileRes.gbaPath))); } catch (e) { console.warn('Could not copy .gba to project build', e); }
-
-      // Try to copy .elf and .map if present in same folder
-      const possibleElf = compileRes.gbaPath.replace(/\.gba$/i, '.elf');
-      const possibleMap = compileRes.gbaPath.replace(/\.gba$/i, '.map');
-      try { if (fs.existsSync(possibleElf)) fs.copyFileSync(possibleElf, path.join(outDir, path.basename(possibleElf))); } catch (e) { console.warn('Could not copy .elf to project build', e); }
-      try { if (fs.existsSync(possibleMap)) fs.copyFileSync(possibleMap, path.join(outDir, path.basename(possibleMap))); } catch (e) { console.warn('Could not copy .map to project build', e); }
-    }
 
     return { success: true, message: compileRes };
   } catch (error) {
     console.error('Transcode/compile error ', error);
     windows.main?.webContents.send('compile-error', error);
+  } finally {
+    buildInProgress = false;
   }
 });
 
@@ -790,11 +982,17 @@ async function transcodeAndCompile(): Promise<CompileResult> {
   // Transcode project using the sandbox workspace directly
   const transRes: any = await transcodeProject({
     projectDir: activeProjectDir,
+    markerProjectDir: originalProjectDirectory || activeProjectDir,
     includeAssets: true,
   });
 
   if (!transRes.success || !transRes.outputDir) {
     throw new Error(`Transcode failed: ${transRes.message}`);
+  }
+
+  if (buildStopRequested) {
+    clearTemporaryBuildDirectory();
+    throw new Error('Compilação cancelada pelo usuário');
   }
 
   // Compile using path build
@@ -939,6 +1137,106 @@ ipcMain.handle('get-versions', () => ({
   projectVersion: packageJson.version,
 }));
 
+ipcMain.handle('load-credits', async () => {
+  const localCredits = await loadLauncherCredits();
+  void refreshLauncherCredits().then((remoteCredits) => {
+    if (remoteCredits) windows.launcher?.webContents.send('credits-updated', remoteCredits);
+  });
+  return localCredits;
+});
+
+interface ProjectResourceUsage {
+  /** Last exported ROM, kept only as a confirmation/calibration reference. */
+  binary: number;
+  /** Engine code and static runtime estimate. */
+  engine: number;
+  graphics: number;
+  audio: number;
+  scripts: number;
+  /** Calculated from intermediate build resources, not from the .gba file. */
+  total: number;
+  source: 'build' | 'assets';
+  measuredAt: number;
+}
+
+const sumDirectoryBytes = (directory: string): number => {
+  if (!fs.existsSync(directory)) return 0;
+  let total = 0;
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const fullPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) total += sumDirectoryBytes(fullPath);
+    else if (entry.isFile()) total += fs.statSync(fullPath).size;
+  }
+  return total;
+};
+
+const newestGbaSize = (directory: string): number => {
+  if (!fs.existsSync(directory)) return 0;
+  const files: Array<{ path: string; modified: number }> = [];
+  const visit = (current: string) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) visit(fullPath);
+      else if (entry.isFile() && entry.name.toLowerCase().endsWith('.gba')) files.push({ path: fullPath, modified: fs.statSync(fullPath).mtimeMs });
+    }
+  };
+  visit(directory);
+  files.sort((left, right) => right.modified - left.modified);
+  return files[0] ? fs.statSync(files[0].path).size : 0;
+};
+
+const sumMatchingFiles = (directory: string, predicate: (name: string) => boolean): number => {
+  if (!fs.existsSync(directory)) return 0;
+  let total = 0;
+  const visit = (current: string) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) visit(fullPath);
+      else if (entry.isFile() && predicate(entry.name)) total += fs.statSync(fullPath).size;
+    }
+  };
+  visit(directory);
+  return total;
+};
+
+const ENGINE_ROM_BASE_ESTIMATE = 256 * 1024;
+
+// The displayed value is deliberately an estimate. It uses Butano's generated
+// resource objects whenever a temporary build exists, rather than adding raw
+// source files to a finished .gba (which double-counts ROM). The exported GBA
+// remains a separate confirmation and calibrates the engine baseline.
+ipcMain.handle('get-project-resource-usage', (): { status: 'success' | 'error'; usage?: ProjectResourceUsage; message?: string } => {
+  try {
+    const root = originalProjectDirectory ?? directoryPathProject;
+    if (!root) return { status: 'error', message: 'No project is currently open.' };
+    const assets = path.join(root, 'assets');
+    const sourceGraphics = ['backgrounds', 'backgrounds-hd', 'sprites', 'tilesets', 'avatars', 'emotes', 'fonts', 'ui']
+      .reduce((total, folder) => total + sumDirectoryBytes(path.join(assets, folder)), 0);
+    const sourceAudio = ['musics', 'sounds'].reduce((total, folder) => total + sumDirectoryBytes(path.join(assets, folder)), 0);
+    const scripts = sumDirectoryBytes(path.join(root, 'scripts')) + sumDirectoryBytes(path.join(root, 'data', 'scripts'));
+    const binary = newestGbaSize(path.join(root, 'build'));
+    const temporaryBuild = getTemporaryBuildDirectory();
+    const buildObjects = path.join(temporaryBuild, 'build');
+    const generatedGraphics = sumMatchingFiles(buildObjects, name => /_bn_gfx\.o$/i.test(name));
+    const generatedAudio = fs.existsSync(path.join(buildObjects, 'bn_audio_soundbank.bin'))
+      ? fs.statSync(path.join(buildObjects, 'bn_audio_soundbank.bin')).size
+      : 0;
+    const hasBuildEstimate = generatedGraphics > 0 || generatedAudio > 0;
+    const graphics = hasBuildEstimate ? generatedGraphics : sourceGraphics;
+    const audio = hasBuildEstimate ? generatedAudio : sourceAudio;
+    const estimatedContent = graphics + audio + scripts;
+    // A confirmed ROM improves the static engine term, but never becomes the
+    // displayed estimate itself. This keeps the bar useful before Build.
+    const engine = binary > estimatedContent
+      ? Math.max(ENGINE_ROM_BASE_ESTIMATE, binary - estimatedContent)
+      : ENGINE_ROM_BASE_ESTIMATE;
+    const usage = { binary, engine, graphics, audio, scripts, total: engine + estimatedContent, source: hasBuildEstimate ? 'build' as const : 'assets' as const, measuredAt: Date.now() };
+    return { status: 'success', usage };
+  } catch (error) {
+    return { status: 'error', message: error instanceof Error ? error.message : String(error) };
+  }
+});
+
 // Handle get project path - files from Frontend
 ipcMain.handle('save-image', async (event, { filePath, filename, data }) => {
   try {
@@ -966,6 +1264,145 @@ ipcMain.handle('save-image', async (event, { filePath, filename, data }) => {
 // Handle fetch images from assets folder
 ipcMain.handle('fetch-images', async (event, folderName) => {
   return startWatch(windows.main, originalProjectDirectory, folderName);
+});
+
+ipcMain.handle('get-common-font-images', async () => {
+  const filenames = [
+    'common_fixed_8x8_font.bmp',
+    'common_fixed_8x16_font.bmp',
+    'common_variable_8x8_font.bmp',
+    'common_variable_8x16_font.bmp',
+    'common_variable_16x16_font.bmp',
+  ];
+  const roots = [
+    path.resolve(__dirname, '..', '..', 'tools', 'butano', 'common', 'graphics'),
+    path.join(process.resourcesPath, 'bin', 'tools', 'butano', 'common', 'graphics'),
+  ];
+  const result: Record<string, string> = {};
+  for (const filename of filenames) {
+    const source = roots.map(root => path.join(root, filename)).find(candidate => fs.existsSync(candidate));
+    if (!source) continue;
+    result[filename] = `data:image/bmp;base64,${fs.readFileSync(source).toString('base64')}`;
+  }
+  return result;
+});
+
+ipcMain.handle('read-image-bytes', async (_event, source: string) => {
+  if (!originalProjectDirectory) throw new Error('Project directory is unavailable.');
+  const decodedSource = source.startsWith('local://')
+    ? decodeURIComponent(source.replace('local://', ''))
+    : source;
+  const normalizedSource = /^[a-zA-Z](\\|\/)/.test(decodedSource)
+    ? decodedSource.replace(/^([a-zA-Z])(\\|\/)/, '$1:\\')
+    : decodedSource;
+  const assetRoot = path.resolve(originalProjectDirectory, 'assets') + path.sep;
+  const assetPath = path.resolve(normalizedSource);
+  if (!assetPath.startsWith(assetRoot)) throw new Error('Image source is outside project assets.');
+
+  const image = await fs.promises.readFile(assetPath);
+  return image.buffer.slice(image.byteOffset, image.byteOffset + image.byteLength);
+});
+
+ipcMain.handle('rename-asset', async (_event, folderName: string, filename: string, nextFilename: string) => {
+  const allowedFolders = new Set(['backgrounds', 'backgrounds-hd', 'avatars', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui']);
+  if (!allowedFolders.has(folderName) || path.basename(filename) !== filename || path.basename(nextFilename) !== nextFilename) {
+    return { status: 'error', message: 'Invalid asset name.' };
+  }
+
+  const sourceExtension = path.extname(filename).toLowerCase();
+  if (!sourceExtension || path.extname(nextFilename).toLowerCase() !== sourceExtension) {
+    return { status: 'error', message: 'The asset extension cannot be changed.' };
+  }
+
+  const roots = [originalProjectDirectory, directoryPathProject]
+    .filter((root): root is string => Boolean(root))
+    .filter((root, index, all) => all.indexOf(root) === index);
+  const locations = roots.map(root => ({
+    source: path.join(root, 'assets', folderName, filename),
+    destination: path.join(root, 'assets', folderName, nextFilename),
+  }));
+
+  if (locations.length === 0 || !locations.some(location => fs.existsSync(location.source))) {
+    return { status: 'error', message: 'Asset not found.' };
+  }
+  if (locations.some(location => fs.existsSync(location.destination) && path.resolve(location.source) !== path.resolve(location.destination))) {
+    return { status: 'error', message: 'An asset with this name already exists.' };
+  }
+
+  try {
+    locations.forEach(location => {
+      if (fs.existsSync(location.source) && path.resolve(location.source) !== path.resolve(location.destination)) {
+        fs.renameSync(location.source, location.destination);
+      }
+    });
+    return { status: 'success', filename: nextFilename };
+  } catch (error) {
+    console.error('rename-asset error:', error);
+    return { status: 'error', message: 'Unable to rename asset.' };
+  }
+});
+
+const copyAssetsToProject = (folderName: string, sources: string[]) => {
+  const sourceRoot = originalProjectDirectory;
+  const activeRoot = directoryPathProject;
+  if (!sourceRoot && !activeRoot) {
+    return { status: 'error', message: 'No project is currently open.' };
+  }
+
+  const destinations = [sourceRoot, activeRoot]
+    .filter((root): root is string => Boolean(root))
+    .filter((root, index, roots) => roots.indexOf(root) === index)
+    .map(root => path.join(root, 'assets', folderName));
+  destinations.forEach(destination => fs.mkdirSync(destination, { recursive: true }));
+
+  const imported: string[] = [];
+  for (const source of sources) {
+    if (!fs.existsSync(source) || !fs.statSync(source).isFile()) continue;
+    const parsed = path.parse(source);
+    let candidate = parsed.base;
+    let suffix = 1;
+    while (destinations.some(destination => fs.existsSync(path.join(destination, candidate)))) {
+      candidate = `${parsed.name}-${suffix}${parsed.ext}`;
+      suffix += 1;
+    }
+    destinations.forEach(destination => fs.copyFileSync(source, path.join(destination, candidate)));
+    imported.push(candidate);
+  }
+
+  return { status: 'success', files: imported };
+};
+
+ipcMain.handle('import-assets', async (_event, folderName: string) => {
+  const allowedFolders = new Set(['backgrounds', 'backgrounds-hd', 'avatars', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui']);
+  if (!allowedFolders.has(folderName)) {
+    return { status: 'error', message: `Unsupported asset folder: ${folderName}` };
+  }
+
+  const importDialogOptions: Electron.OpenDialogOptions = {
+    title: `Import assets into ${folderName}`,
+    properties: ['openFile', 'multiSelections'],
+  };
+  const result = windows.main
+    ? await dialog.showOpenDialog(windows.main, importDialogOptions)
+    : await dialog.showOpenDialog(importDialogOptions);
+  if (result.canceled || result.filePaths.length === 0) {
+    return { status: 'cancelled', files: [] };
+  }
+
+  return copyAssetsToProject(folderName, result.filePaths);
+});
+
+ipcMain.handle('import-dropped-assets', async (_event, folderName: string, filePaths: string[]) => {
+  const allowedFolders = new Set(['backgrounds', 'backgrounds-hd', 'avatars', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui']);
+  if (!allowedFolders.has(folderName) || !Array.isArray(filePaths)) {
+    return { status: 'error', message: `Unsupported asset import: ${folderName}` };
+  }
+  try {
+    return copyAssetsToProject(folderName, filePaths);
+  } catch (error) {
+    console.error('import-dropped-assets error:', error);
+    return { status: 'error', message: 'Unable to copy dropped assets.' };
+  }
 });
 
 // Initialize IPC handlers for preferences and other functionalities

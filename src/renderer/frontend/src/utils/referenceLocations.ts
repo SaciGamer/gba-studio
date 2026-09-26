@@ -1,0 +1,74 @@
+import { ISceneSettings, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
+import { IScriptDefinition } from '@/providers/contexts/interfaces/IScriptElement';
+
+export interface ReferenceLocation {
+  scene?: string;
+  script?: string;
+  variable?: string;
+  event?: string;
+}
+
+const eventLabel = (event: IScriptsElement) => event.args?.__name || event.command;
+
+const containsVariableReference = (value: unknown, variableId: string): boolean => {
+  if (!value || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return value.some(item => containsVariableReference(item, variableId));
+  return Object.entries(value).some(([key, item]) =>
+    (key === 'variableId' && item === variableId) || containsVariableReference(item, variableId),
+  );
+};
+
+const walkEvents = (
+  events: IScriptsElement[] | undefined,
+  location: Omit<ReferenceLocation, 'event'>,
+  targetId: string,
+  kind: 'script' | 'variable',
+  result: ReferenceLocation[],
+) => {
+  for (const event of events ?? []) {
+    const matches = kind === 'script'
+      ? event.command === 'EVENT_CALL_SCRIPT' && (event.args as { scriptId?: string } | undefined)?.scriptId === targetId
+      : containsVariableReference(event, targetId);
+    if (matches) result.push({ ...location, event: eventLabel(event) });
+    walkEvents(event.children?.then, location, targetId, kind, result);
+    walkEvents(event.children?.else, location, targetId, kind, result);
+  }
+};
+
+export const collectReferenceLocations = (
+  scenes: ISceneSettings[],
+  scripts: IScriptDefinition[],
+  targetId: string,
+  kind: 'script' | 'variable',
+): ReferenceLocation[] => {
+  const result: ReferenceLocation[] = [];
+
+  scripts.filter(script => !(script as IScriptDefinition & { _deleted?: boolean })._deleted).forEach(script => {
+    walkEvents(script.events, { script: script.name }, targetId, kind, result);
+  });
+
+  scenes.filter(scene => !scene._deleted).forEach(scene => {
+    const sceneName = scene.name || scene.id;
+    walkEvents(scene.script, { scene: sceneName, script: 'On Init' }, targetId, kind, result);
+    walkEvents(scene.playerHit1Script, { scene: sceneName, script: 'Player Hit 1' }, targetId, kind, result);
+    walkEvents(scene.playerHit2Script, { scene: sceneName, script: 'Player Hit 2' }, targetId, kind, result);
+    walkEvents(scene.playerHit3Script, { scene: sceneName, script: 'Player Hit 3' }, targetId, kind, result);
+    scene.actors?.forEach(actor => {
+      const actorName = actor.name || actor.id;
+      const actorScripts = actor as typeof actor & Record<string, IScriptsElement[] | undefined>;
+      walkEvents(actorScripts.onInteractScript, { scene: sceneName, script: `${actorName} / On Interact` }, targetId, kind, result);
+      walkEvents(actorScripts.onInitScript, { scene: sceneName, script: `${actorName} / On Init` }, targetId, kind, result);
+      walkEvents(actorScripts.onUpdateScript, { scene: sceneName, script: `${actorName} / On Update` }, targetId, kind, result);
+    });
+    scene.triggers?.forEach(trigger => {
+      const triggerName = trigger.name || trigger.id;
+      const triggerScripts = trigger as typeof trigger & Record<string, IScriptsElement[] | undefined>;
+      walkEvents(triggerScripts.script, { scene: sceneName, script: triggerName }, targetId, kind, result);
+      walkEvents(triggerScripts.onEnterScript, { scene: sceneName, script: `${triggerName} / On Enter` }, targetId, kind, result);
+      walkEvents(triggerScripts.onLeaveScript, { scene: sceneName, script: `${triggerName} / On Leave` }, targetId, kind, result);
+    });
+    Object.values(scene.eventGraphs ?? {}).forEach(graph => walkEvents(graph.nodes, { scene: sceneName, script: 'Event Graph' }, targetId, kind, result));
+  });
+
+  return result;
+};

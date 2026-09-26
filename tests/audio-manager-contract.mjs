@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const root = path.resolve(import.meta.dirname, '..');
+const header = fs.readFileSync(path.join(root, 'tools', 'butano', 'template', 'include', 'audio_manager.h'), 'utf8');
+const source = fs.readFileSync(path.join(root, 'tools', 'butano', 'template', 'src', 'audio_manager.cpp'), 'utf8');
+const cppBuilder = fs.readFileSync(path.join(root, 'src', 'main', 'utils', 'builders', 'CppBuilder.ts'), 'utf8');
+const resourceBuilder = fs.readFileSync(path.join(root, 'src', 'main', 'utils', 'builders', 'ResourceBuilder.ts'), 'utf8');
+const transcoder = fs.readFileSync(path.join(root, 'src', 'main', 'utils', 'projectTranscoder', 'transcode-project.ts'), 'utf8');
+for (const method of ['play_music', 'stop_music', 'set_volume']) assert.match(header, new RegExp(`${method}\\(`));
+assert.match(source, /volume < 0 \|\| volume > 100/);
+assert.match(source, /playing = false/);
+assert.match(source, /resolve_music_item/);
+assert.match(source, /bn::music::stop/);
+assert.match(cppBuilder, /Copied template audio_manager\.h from template dir/);
+assert.match(resourceBuilder, /validateMusicReferences/);
+assert.match(resourceBuilder, /Music assets not found for EVENT_PLAY_MUSIC/);
+assert.match(transcoder, /resourceBuilder\.validateMusicReferences/);
+console.log('Audio manager contract guard passed.');

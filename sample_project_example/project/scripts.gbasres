@@ -1,0 +1,41 @@
+{
+  "_resourceType": "scripts",
+  "_version": "1.0",
+  "_deleted": false,
+  "scripts": [
+    {
+      "id": "84140ff4-8ba1-4a77-825a-c0cea256d1ad",
+      "name": "feature-tour",
+      "events": [
+        {
+          "id": "0cb83b83-a77c-4c70-b95f-d757aa430a92",
+          "version": 1,
+          "command": "EVENT_DIALOGUE_CHOICE",
+          "args": {
+            "prompt": "Deseja voltar para o início?",
+            "optionA": "Sim",
+            "optionB": "Não",
+            "resultVariable": "b8123607-c770-4ebb-b40c-2e3ce96c43de",
+            "__collapse": true
+          }
+        }
+      ],
+      "_resourceType": "script",
+      "script": [
+        {
+          "id": "0cb83b83-a77c-4c70-b95f-d757aa430a92",
+          "version": 1,
+          "command": "EVENT_DIALOGUE_CHOICE",
+          "args": {
+            "prompt": "Deseja voltar para o início?",
+            "optionA": "Sim",
+            "optionB": "Não",
+            "resultVariable": "b8123607-c770-4ebb-b40c-2e3ce96c43de",
+            "__collapse": true
+          }
+        }
+      ],
+      "_saved": false
+    }
+  ]
+}

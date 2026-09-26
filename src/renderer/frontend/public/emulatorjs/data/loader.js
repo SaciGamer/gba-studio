@@ -159,6 +159,7 @@ const config = {
     VirtualGamepadSettings: window.EJS_VirtualGamepadSettings,
     buttonOpts: window.EJS_Buttons,
     volume: window.EJS_volume,
+    muted: window.EJS_muted,
     defaultControllers: window.EJS_defaultControls,
     startOnLoad: window.EJS_startOnLoaded,
     fullscreenOnLoad: window.EJS_fullscreenOnLoaded,

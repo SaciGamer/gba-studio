@@ -1,5 +1,5 @@
-import { App as AntDApp, Flex, FloatButton, Layout, Spin, Splitter, Typography } from 'antd';
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { App as AntDApp, Flex, FloatButton, Layout, Spin, Splitter, Typography, notification } from 'antd';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import BottomPanel from '../../BottomPanel';
 import LeftPanel from '../../LeftPanel';
@@ -10,22 +10,30 @@ import TopBar from '../../TopBar';
 // import '.././styles.css';
 
 import GameWorld from '../../gameWorld/GameWorld';
-import TileEditor from '../../TileEditor';
+import SpriteEditor from '../../SpriteEditor';
 
 import useAppContexts from '@/providers/contexts/AppContexts';
+import { useBuildState } from '@/providers/BuildStateProvider';
 import { IBackgroundSettings } from '@/providers/contexts/interfaces/IBackgroundElement';
 import { IProjectSettings } from '@/providers/contexts/interfaces/IProjectElement';
-import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
+import { ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
 import { IMainSettings } from '@/providers/contexts/interfaces/ISettingElement';
+import { ISpriteSettings } from '@/providers/contexts/interfaces/ISpriteElement';
 import { ISettingUtils } from '@/providers/contexts/interfaces/ISettingUtils';
 import { LayoutOutlined } from '@ant-design/icons';
 import ErrorBoundary from 'antd/es/alert/ErrorBoundary';
-import { Skeleton } from 'antd/lib';
 import { useLocation } from 'react-router-dom';
 import { AntdToken } from '../../common/AntDToken';
 import { IUserSettings } from '@/providers/contexts/interfaces/IUserSettings';
 import Settings from './Settings';
 import { Header } from 'antd/es/layout/layout';
+import AssetLibraryEditor from '../../resourceEditors/AssetLibraryEditor';
+import DialogueReviewEditor from '../../resourceEditors/DialogueReviewEditor';
+
+// The menu event can be delivered to more than one mounted Engine listener.
+// Keep this lock at module scope so all listeners share the same export state.
+let exportDialogInProgress = false;
+import { useI18n } from '@/i18n/I18n';
 
 const { Content } = Layout;
 
@@ -38,9 +46,12 @@ const baseLayoutStyle = {
 
 const Engine: React.FC = () => {
   const { token } = AntdToken();
+  const { t } = useI18n();
+  const { setBuilding } = useBuildState();
   const location = useLocation();
   const [contentView, setContentView] = useState<number>(1);
   const [loading, setLoading] = useState(true);
+
 
   // const { scenes, setScenes, scenesRef, ignoredFields: ignoredFieldsScenes} = useSceneContext();
   // const { project, setProject, projectRef, ignoredFields: ignoredFieldsProject } = useProjectContext();
@@ -53,11 +64,20 @@ const Engine: React.FC = () => {
     project, setProject, projectRef, ignoredFieldsProject,
     settings, setSettings, settingsRef, ignoredFieldsSettings,
     backgrounds, setBackgrounds, backgroundsRef, ignoredFieldsBackgrounds,
+    spriteResources, setSpriteResources, spriteResourcesRef, ignoredFieldsSpriteResources,
     settingUtils, setSettingUtils, settingUtilsRef,
-    elementSelected,
+    elementSelected, setElementSelected,
     userSettings, setUserSettings, userSettingsRef, ignoredFieldsUserSettings
-    , variables, setVariables, variablesRef, ignoredFieldsVariables
+    , variables, setVariables, variablesRef, ignoredFieldsVariables, scripts, setScripts, scriptsRef, ignoredFieldsScripts, palettes, setPalettes, palettesRef, ignoredFieldsPalettes
   } = useAppContexts();
+
+  const openDialogueScene = useCallback((sceneId: string) => {
+    const scene = scenes.find(item => item.id === sceneId && !item._deleted);
+    if (!scene) return;
+    setContentView(1);
+    setElementSelected({ ...scene, _recenter: true });
+    setSettingUtils(previous => ({ ...previous, selectedSceneIds: [scene.id], tileEditSceneId: null, tileEditLayerId: null, activeSceneObject: null, activeTriggerId: null }));
+  }, [scenes, setElementSelected, setSettingUtils]);
 
   // Update settings utils initialization
   const initializeSettingUtils = useCallback((projectFilePath: string) => {
@@ -68,8 +88,10 @@ const Engine: React.FC = () => {
       projectPathFile: projectFilePath,
       projectDirectory: projectFilePath ? projectFilePath.substring(0, projectFilePath.lastIndexOf('\\')) : '',
       baseTitle: 'GBA Studio',
-      activeButton: 'select',
-      activeSubButton: '',
+activeButton: 'select',
+activeSubButton: '',
+collisionBrushSize: '8px',
+collisionSide: 'solid',
       localImagePath: '',
       localImagePathHD: '',
       images: null,
@@ -102,7 +124,7 @@ const Engine: React.FC = () => {
 
   const handleResizeEnd = (sizes: number[]) => {
     // setIsResizing(false);
-    const newSizes = sizes;
+    const newSizes = [...sizes];
 
     // console.log('Tamanhos 1 janela:', sizes[0])
     // console.log('Tamanhos 2 janela:', sizes[1])
@@ -111,7 +133,7 @@ const Engine: React.FC = () => {
     // setPanelSize(size);
     if (newSizes[0] > 140 && newSizes[0] < 250) {
       setShowFloatButton(false);
-      newSizes[0] = 250
+      newSizes[0] = 250;
       setPanelSizes(newSizes);
     } else if (newSizes[0] <= 140) {
       setShowFloatButton(true);
@@ -120,7 +142,6 @@ const Engine: React.FC = () => {
     } else {
       setShowFloatButton(false);
     }
-
     // Arredondar os numeros
     let newSizesRound = newSizes.map(Math.round);
 
@@ -207,10 +228,13 @@ const Engine: React.FC = () => {
 
         const scenesFromFile: ISceneSettings[] = categorized.scene || [];
         const backgroundsFromFile: IBackgroundSettings[] = categorized.background || [];
+        const spritesFromFile: ISpriteSettings[] = categorized.sprite || [];
         const projectFromFile: IProjectSettings | null = categorized.project?.[0] || null;          // Assume apenas um projeto
         const settingsFromFile: IMainSettings | null = categorized.settings?.[0] || null;           // Assume apenas uma configuração
         const userSettingsFromFile: IUserSettings | null = categorized.user_settings?.[0] || null;  // Assume apenas uma configuração
         const variablesFromFile = categorized.variables?.[0] || null;
+        const scriptsFromFile = categorized.scripts?.[0] || null;
+        const palettesFromFile = categorized.palette || [];
 
         // Atualize os estados de uma vez só:
         if (scenesFromFile.length > 0) {
@@ -229,6 +253,14 @@ const Engine: React.FC = () => {
           });
         }
 
+        if (spritesFromFile.length > 0) {
+          setSpriteResources(prev => {
+            const previousIds = prev.map(sprite => sprite.id);
+            const newSprites = spritesFromFile.filter(sprite => !previousIds.includes(sprite.id));
+            return [...prev, ...newSprites];
+          });
+        }
+
         if (projectFromFile) {
           setProject(projectFromFile);
         }
@@ -244,6 +276,8 @@ const Engine: React.FC = () => {
         if (variablesFromFile) {
           setVariables(variablesFromFile);
         }
+        if (scriptsFromFile) setScripts(scriptsFromFile);
+        if (palettesFromFile.length) setPalettes(previous => ({ ...previous, palettes: palettesFromFile }));
 
         setTimeout(() => {
           setLoading(false); // Finaliza o estado de carregamento
@@ -275,6 +309,9 @@ const Engine: React.FC = () => {
         const bgs = backgroundsRef.current || [];
         bgs.forEach((b: any) => files.push({ path: `project/backgrounds/${b.name.toLowerCase().replace(/ /g,'_')}.gbasres`, content: b }));
 
+        const sprites = spriteResourcesRef.current || [];
+        sprites.forEach((sprite: any) => files.push({ path: `project/sprites/${sprite.name.toLowerCase().replace(/ /g,'_')}.gbasres`, content: sprite }));
+
         // Project
         if (projectRef.current) {
           const projPathFile = settingUtilsRef.current && (settingUtilsRef.current as any).projectPathFile ? (settingUtilsRef.current as any).projectPathFile : null;
@@ -286,6 +323,8 @@ const Engine: React.FC = () => {
         if (settingsRef.current) files.push({ path: `project/settings.gbasres`, content: settingsRef.current });
 
         if (variablesRef.current) files.push({ path: `project/variables.gbasres`, content: variablesRef.current });
+        if (scriptsRef.current) files.push({ path: `project/scripts.gbasres`, content: scriptsRef.current });
+        (palettesRef.current?.palettes ?? []).forEach((palette: any) => files.push({ path: `project/palettes/${palette.name.toLowerCase().replace(/ /g, '_')}/palette.gbasres`, content: { ...palette, _resourceType: 'palette' } }));
 
         // Collect assets from settingUtils localImagePath (scan assets folder)
         try {
@@ -301,6 +340,59 @@ const Engine: React.FC = () => {
 
     return () => { try { delete (window as any).__getSerializedProject; } catch (e) {} };
   }, []);
+
+  useEffect(() => {
+    if (!window.electronAPI?.on) return;
+    const playPreview = () => window.electronAPI.send('run-live', null);
+    const buildGame = () => {
+      setBuilding(true);
+      window.electronAPI.send('compile-project', null);
+    };
+    const exportButano = async () => {
+      if (exportDialogInProgress) return;
+      exportDialogInProgress = true;
+      try {
+        const result = await window.electronAPI.exportBuildAs();
+        if (!result?.success && !result?.cancelled) {
+          const description = result?.message || 'Não foi possível exportar o projeto Butano. Faça um Build antes de exportar.';
+          notification.error({
+            message: 'Exportação não realizada',
+            description,
+            placement: 'topRight',
+          });
+        }
+      } finally {
+        exportDialogInProgress = false;
+      }
+    };
+    const exportExecutable = async () => {
+      if (exportDialogInProgress) return;
+      exportDialogInProgress = true;
+      try {
+        const result = await window.electronAPI.exportExecutable();
+        if (!result?.success && !result?.cancelled) {
+          const description = result?.message || 'Não foi possível exportar o executável. Faça um Build antes de exportar.';
+          notification.error({
+            message: 'Exportação não realizada',
+            description,
+            placement: 'topRight',
+          });
+        }
+      } finally {
+        exportDialogInProgress = false;
+      }
+    };
+    window.electronAPI.on('game-play-preview', playPreview);
+    window.electronAPI.on('game-build', buildGame);
+    window.electronAPI.on('game-export-butano', exportButano);
+    window.electronAPI.on('game-export-executable', exportExecutable);
+    return () => {
+      window.electronAPI.removeListener('game-play-preview', playPreview);
+      window.electronAPI.removeListener('game-build', buildGame);
+      window.electronAPI.removeListener('game-export-butano', exportButano);
+      window.electronAPI.removeListener('game-export-executable', exportExecutable);
+    };
+  }, [setBuilding]);
 
   // Pega informações do projeto aberto para salvar
   useEffect(() => {
@@ -336,6 +428,7 @@ const Engine: React.FC = () => {
       console.log('..: all data to save scenes:', scenesRef.current);
       console.log('..: all data to save project:', projectRef.current);
       console.log('..: all data to save backgrounds:', backgroundsRef.current);
+      console.log('..: all data to save sprites:', spriteResourcesRef.current);
       console.log('..: all data to save setting:', settingsRef.current);
       console.log('..: all data to save user setting:', userSettingsRef.current);
       console.log('..: all data to save variables:', variablesRef.current);
@@ -348,7 +441,10 @@ const Engine: React.FC = () => {
         settingsRef.current._saved === false ? prepareForBackend(settingsRef.current, ignoredFieldsSettings!) : null,
         userSettingsRef.current._saved === false ? prepareForBackend(userSettingsRef.current, ignoredFieldsUserSettings!) : null,
         prepareForBackend(backgroundsRef.current.filter(s => s._saved === false), ignoredFieldsBackgrounds!),
+        prepareForBackend(spriteResourcesRef.current.filter(sprite => sprite._saved === false), ignoredFieldsSpriteResources!),
         variablesRef.current._saved === false ? prepareForBackend(variablesRef.current, ignoredFieldsVariables!) : null,
+        scriptsRef.current._saved === false ? prepareForBackend(scriptsRef.current, ignoredFieldsScripts!) : null,
+        palettesRef.current._saved === false ? prepareForBackend(palettesRef.current, ignoredFieldsPalettes!) : null,
         settingUtilsRef.current,
       ].filter(item => item != null && (!(Array.isArray(item)) || item.length > 0));
 
@@ -363,7 +459,10 @@ const Engine: React.FC = () => {
         setSettings(() => ({ ...settingsRef.current, _saved: true }));
         setUserSettings(() => ({ ...userSettingsRef.current, _saved: true }));
         setBackgrounds(() => backgroundsRef.current.map(b => ({ ...b, _saved: true })));
+        setSpriteResources(() => spriteResourcesRef.current.map(sprite => ({ ...sprite, _saved: true })));
         setVariables(() => ({ ...variablesRef.current, _saved: true }));
+        setScripts(() => ({ ...scriptsRef.current, _saved: true }));
+        setPalettes(() => ({ ...palettesRef.current, _saved: true }));
         // setSettingUtils(settingUtils => ({ ...settingUtils, _saved: true }));
 
         console.log('..: Todos os itens agora estão com _saved = true.');
@@ -420,10 +519,12 @@ const Engine: React.FC = () => {
 
     // Check todos para ver se tem algum com alteração para salvar
     const unsaved =
-      hasUnsaved(scenes) || hasUnsaved(backgrounds) || (project && project._saved === false) 
+      hasUnsaved(scenes) || hasUnsaved(backgrounds) || hasUnsaved(spriteResources) || (project && project._saved === false) 
       || (settings && settings._saved === false) || (settingUtils && settingUtils._saved === false)
       || (userSettings && userSettings._saved === false)
-      || (variables && variables._saved === false);
+      || (variables && variables._saved === false)
+      || (scripts && scripts._saved === false)
+      || (palettes && palettes._saved === false);
 
     // Call Electron API to update title - isSaved: true se não tem nada para salvar
     window.electronAPI.updateTitle('GBA Studio', project?.name || '', !unsaved);
@@ -431,7 +532,7 @@ const Engine: React.FC = () => {
     if (unsaved) {
       console.log('..: Engine.tsx tem alguma atualização!');
     }
-  }, [scenes, project, settings, userSettings, backgrounds, settingUtils, variables]);
+  }, [scenes, project, settings, userSettings, backgrounds, spriteResources, settingUtils, variables, scripts, palettes]);
 
   // useEffect(() => {
   //   const handleResize = () => {
@@ -478,7 +579,7 @@ const Engine: React.FC = () => {
         width: '100vw',
         height: '100vh',
       }}>
-        <Spin fullscreen size="large" percent={50} indicator={<LayoutOutlined spin />} />
+        <Spin fullscreen size="large" percent={50} tip="Carregando projeto..." indicator={<LayoutOutlined spin />} />
       </Layout>
     )
   }
@@ -487,14 +588,14 @@ const Engine: React.FC = () => {
     <ErrorBoundary>
       <AntDApp>
         <Layout >
-          <Header style={{ height: 42 }}>
+          <Header style={{ height: 42, padding: 0, background: token.colorBgContainer }}>
             <TopBar contenView={contentView} setContentView={setContentView} />
           </Header>
           <Content>
             {contentView == 1 && (
               <Layout style={ baseLayoutStyle }>
                 <Splitter
-                  // onResizeStart={handleResizeStart}
+                  data-testid="engine-layout-splitter"
                   onResizeEnd={handleResizeEnd}
                   onResize={handleResizePanel}
                 >
@@ -520,7 +621,7 @@ const Engine: React.FC = () => {
                             bottom: 0,
                             backgroundColor: 'rgba(0, 0, 0, 0.5)',
                             zIndex: 10,
-                            pointerEvents: 'none', // permite clicar através do overlay
+                            pointerEvents: 'none',
                           }}
                         />
                       )}
@@ -532,7 +633,11 @@ const Engine: React.FC = () => {
                   <Splitter.Panel /*size={panelSizes[1]}*/>
                     <Splitter layout="vertical">
                       <Content style={{ backgroundColor: token.colorBgContainer }}>
-                        <GameWorld resetPanelSize={resetPanelSize} setShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton} />
+                        <GameWorld
+                          resetPanelSize={resetPanelSize}
+                          setShowFloatButton={setShowFloatButton}
+                          showFloatButton={showFloatButton}
+                        />
                       </Content>
                       <Splitter.Panel defaultSize="25%" min={40} max="90%">
                         {/* <Footer> */}
@@ -543,97 +648,40 @@ const Engine: React.FC = () => {
                   </Splitter.Panel>
 
                   {/* PAINEL DIREITO */}
-                  <Splitter.Panel defaultSize="35%" min={350} size={panelSizes[2]} >
+                  <Splitter.Panel defaultSize="35%" min={360} size={panelSizes[2]} style={{ minWidth: 360, flexShrink: 0 }} >
                     <RightPanel controllerView={setContentView} />
                   </Splitter.Panel>
                 </Splitter>
               </Layout>
             )}
-            {contentView == 2 && (
-              <Layout style={ baseLayoutStyle }>
-                <Splitter
-                  onResizeEnd={handleResizeEnd}
-                  onResize={handleResizePanel}
-                >
-                  {/* PAINEL ESQUERDO */}
-                  <Splitter.Panel defaultSize="20%" min={200} size={panelSizes[0]}>
-                    <LeftPanel showScriptsAndVariables={false} />
-                  </Splitter.Panel>
-
-                  {/* CENTRO */}
-                  <Splitter.Panel>
-                    <Splitter layout="vertical">
-                      <Content>
-                        {elementSelected && (elementSelected.sceneType === ETypeScene.LOGO || elementSelected.sceneType === ETypeScene.POINTNCLICK) ? (
-                          <TileEditor scene={elementSelected} resetPanelSize={resetPanelSize} setShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton} />
-                        ) : (
-                          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', fontSize: '18px', color: token.colorTextSecondary }}>
-                            Select a scene to edit
-                          </div>
-                        )}
-                      </Content>
-                      <Splitter.Panel defaultSize="25%" min={40} max="90%">
-                        <BottomPanel />
-                      </Splitter.Panel>
-                    </Splitter>
-                  </Splitter.Panel>
-
-                  {/* PAINEL DIREITO */}
-                  <Splitter.Panel defaultSize="35%" min={350} size={panelSizes[2]}>
-                    <RightPanel controllerView={setContentView} isTileEditor={true} />
-                  </Splitter.Panel>
-                </Splitter>
-              </Layout>
-            )}
-          
             {contentView == 3 && (
               <Layout style={ baseLayoutStyle }>
-                <Flex vertical style={{ margin: 50 }}>
-                  <Skeleton.Node active style={{ height: 150, width: 250 }} />
-                  <Skeleton active />
-                  <Skeleton.Image active style={{ height: 150, width: 250 }} />
-                </Flex>
+                <SpriteEditor />
               </Layout>
             )}
             {contentView == 4 && (
               <Layout style={ baseLayoutStyle }>
-                <Flex vertical style={{ margin: 50 }}>
-                  <Skeleton.Image active style={{ height: 150, width: 250 }} />
-                  <Skeleton active  />
-                  <Skeleton.Image active style={{ height: 150, width: 250 }} />
-                </Flex>
+                <AssetLibraryEditor kind="images" />
               </Layout>
             )}
             {contentView == 5 && (
               <Layout style={ baseLayoutStyle }>
-                <Flex vertical style={{ margin: 50 }}>
-                  <Skeleton active />
-                  <Skeleton.Node active style={{ height: 150, width: 250 }} />
-                </Flex>
+                <AssetLibraryEditor kind="music" />
               </Layout>
             )}
             {contentView == 6 && (
               <Layout style={ baseLayoutStyle }>
-                <Flex vertical style={{ margin: 50 }}>
-                  <Skeleton active />
-                  <Skeleton.Node active style={{ height: 150, width: 250 }} />
-                  <Skeleton active />
-                </Flex>
+                <AssetLibraryEditor kind="sounds" />
               </Layout>
             )}
             {contentView == 7 && (
               <Layout style={ baseLayoutStyle }>
-                <Flex vertical style={{ margin: 50 }}>
-                  <Skeleton active />
-                </Flex>
+                <AssetLibraryEditor kind="palettes" />
               </Layout>
             )}
             {contentView == 8 && (
               <Layout style={ baseLayoutStyle }>
-                <Flex vertical style={{ margin: 50 }}>
-                  <Skeleton.Node active style={{ height: 150, width: 250 }} />
-                  <Skeleton active />
-                </Flex>
+                <DialogueReviewEditor onOpenScene={openDialogueScene} />
               </Layout>
             )}
             {contentView == 9 && (

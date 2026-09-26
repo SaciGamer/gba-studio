@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -6,6 +6,32 @@ import os from 'os';
 import isDev from 'electron-is-dev';
 import { CompileOptions, CompileResult } from '../types/BuildTypes';
 import { windows } from '@/main';
+
+let activeCompileProcess: ChildProcess | null = null;
+let activeCompileDone: Promise<void> | null = null;
+let resolveActiveCompileDone: (() => void) | null = null;
+let activeCompileCancelled = false;
+
+/** Stops the active make process tree and waits for it to exit. */
+export async function cancelActiveCompile(): Promise<boolean> {
+  const proc = activeCompileProcess;
+  if (!proc || !proc.pid) return false;
+  const compileDone = activeCompileDone;
+
+  activeCompileCancelled = true;
+  if (process.platform === 'win32') {
+    await new Promise<void>((resolve) => {
+      const taskkill = spawn('taskkill', ['/pid', String(proc.pid), '/t', '/f'], { windowsHide: true });
+      taskkill.once('close', () => resolve());
+      taskkill.once('error', () => resolve());
+    });
+  } else {
+    proc.kill('SIGTERM');
+  }
+
+  await compileDone;
+  return true;
+}
 
 // Obter o caminho do diretório atual
 const __filename = fileURLToPath(import.meta.url);
@@ -81,6 +107,11 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
         env: envForMake,
         shell: true,
       });
+      activeCompileProcess = proc;
+      activeCompileCancelled = false;
+      activeCompileDone = new Promise<void>((resolve) => {
+        resolveActiveCompileDone = resolve;
+      });
 
       let stdout = '';
       let stderr = '';
@@ -106,6 +137,19 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
       });
 
       proc.on('close', (code) => {
+        const wasCancelled = activeCompileCancelled;
+        activeCompileProcess = null;
+        resolveActiveCompileDone?.();
+        resolveActiveCompileDone = null;
+        activeCompileDone = null;
+
+        if (wasCancelled) {
+          const message = 'Compilação cancelada pelo usuário';
+          broadcast('compile-error', { message, cancelled: true });
+          reject(new Error(message));
+          return;
+        }
+
         if (code !== 0) {
           const errMsg = `make exited with code ${code}`;
           console.error('..: ' + errMsg);
@@ -176,10 +220,10 @@ function setupEnvironmentWithDevkitPro(): Record<string, string> {
  */
 function buildMakeArgs(options: CompileOptions): string[] {
   const args: string[] = [];
-  // Determine parallel jobs: use provided value if valid, otherwise half of CPU cores
+  // Builds are single-threaded unless parallelism was explicitly enabled in Preferences.
   const parallelJobs: number = (typeof options.parallel === 'number' && options.parallel > 0)
     ? options.parallel
-    : Math.max(1, Math.floor(os.cpus().length / 2));
+    : 1;
 
   args.push(`-j${parallelJobs}`);
 

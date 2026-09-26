@@ -1,11 +1,12 @@
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
-import { BuildOutlined, CaretRightFilled, CaretRightOutlined, DeleteOutlined, FileFilled, PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
-import { Button, Collapse, Flex, Input, Layout, Popconfirm, Space, Splitter, Tooltip, Tree, TreeDataNode, Typography } from 'antd';
+import { BuildOutlined, CaretRightFilled, CaretRightOutlined, FileFilled, GatewayOutlined, PlusOutlined, SearchOutlined, SettingOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { Button, Collapse, Flex, Input, Layout, Space, Splitter, Tooltip, Tree, TreeDataNode, Typography } from 'antd';
 import React, { Key, useEffect, useMemo, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { AntdToken } from '../components/common/AntDToken';
 import { IVariableDefinition } from '@/providers/contexts/interfaces/IVariablesElement';
+import { IScriptDefinition } from '@/providers/contexts/interfaces/IScriptElement';
 
 const { Content } = Layout;
 const { Panel } = Collapse;
@@ -23,13 +24,13 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
   // const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
   // const { elementSelected, setElementSelected } = useElementContext();
 
-  const { scenes, variables, setVariables, settingUtils, setSettingUtils, elementSelected, setElementSelected } = useAppContexts();
+  const { scenes, variables, setVariables, scripts, setScripts, settingUtils, setSettingUtils, elementSelected, setElementSelected } = useAppContexts();
 
   const [isScenesOpen, setIsScenesOpen] = useState(true);
   const [isScriptsOpen, setIsScriptsOpen] = useState(true);
   const [isVariablesOpen, setIsVariablesOpen] = useState(true);
 
-  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [searchOpen, setSearchOpen] = useState({ scenes: false, scripts: false, variables: false });
   const searchInputRef = useRef<any>(null);
   const { token } = AntdToken();
 
@@ -42,6 +43,24 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
 
   // Adicione esse novo estado no início do componente
   const [globalSelectedKey, setGlobalSelectedKey] = useState<string | null>(null);
+
+  // Keep the three trees mutually exclusive even when selection is cleared
+  // from another component (for example, by clicking the empty game world).
+  useEffect(() => {
+    if (!elementSelected) {
+      setGlobalSelectedKey(null);
+      return;
+    }
+    if (elementSelected._resourceType === 'script') setGlobalSelectedKey(`scripts-${elementSelected.id}`);
+    else if (elementSelected._resourceType === 'variables') setGlobalSelectedKey(`variables-${elementSelected.id}`);
+    else setGlobalSelectedKey(null);
+  }, [elementSelected]);
+
+  useEffect(() => {
+    if (!elementSelected || (elementSelected._resourceType !== 'script' && elementSelected._resourceType !== 'variables')) {
+      setGlobalSelectedKey(null);
+    }
+  }, [elementSelected]);
 
   const toggleSection = (section: string) => {
     if (!showScriptsAndVariables) {
@@ -154,7 +173,8 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
     });
   };
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerms, setSearchTerms] = useState({ scenes: '', scripts: '', variables: '' });
+  const searchTerm = searchTerms.scenes;
   const filteredScenes = useMemo(() => {
     const term = searchTerm.toLowerCase();
 
@@ -176,28 +196,30 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
     });
   }, [scenes, searchTerm, showScriptsAndVariables]);
 
-  const handleSearchClick = () => {
-    setIsSearchVisible(!isSearchVisible);
-    if (isSearchVisible) {
-      setSearchTerm('');
-    }
+  const handleSearchClick = (section: 'scenes' | 'scripts' | 'variables') => {
+    setSearchOpen(previous => ({ ...previous, [section]: !previous[section] }));
+    if (searchOpen[section]) setSearchTerms(previous => ({ ...previous, [section]: '' }));
   };
 
   useEffect(() => {
-    if (isSearchVisible && searchInputRef.current) {
+    if (Object.values(searchOpen).some(Boolean) && searchInputRef.current) {
       searchInputRef.current?.focus();
     }
-  }, [isSearchVisible]);
+  }, [searchOpen]);
 
   const treeDataScenes: TreeDataNode[] = filteredScenes.map((scene) => ({
     key: scene.id,
     title: (
       <Flex align='center'>
-        <CaretRightFilled />
         <BuildOutlined />
         <Text style={{ marginLeft: 5 }}>{scene.name}</Text>
       </Flex>
     ),
+    isLeaf: false,
+    children: [
+      ...(scene.actors ?? []).map(actor => ({ key: `actor:${scene.id}:${actor.id}`, title: <Flex align="center"><GatewayOutlined /><Text style={{ marginLeft: 5 }}>{actor.name || 'Actor'}</Text></Flex> })),
+      ...(scene.triggers ?? []).map(trigger => ({ key: `trigger:${scene.id}:${trigger.id}`, title: <Flex align="center"><ThunderboltOutlined /><Text style={{ marginLeft: 5 }}>{trigger.name || 'Trigger'}</Text></Flex> })),
+    ],
   }));
 
   const updateVariables = (nextVariables: IVariableDefinition[]) => {
@@ -205,6 +227,7 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
   };
 
   const openVariableEditor = (variable: IVariableDefinition) => {
+    setSettingUtils(previous => ({ ...previous, selectedSceneIds: [], tileEditSceneId: null, tileEditLayerId: null, activeSceneObject: null, activeTriggerId: null }));
     setElementSelected({ ...variable, _resourceType: 'variables' });
     setGlobalSelectedKey(`variables-${variable.id}`);
   };
@@ -223,38 +246,26 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
     openVariableEditor(variable);
   };
 
-  const handleDeleteVariable = (id: string) => {
-    updateVariables(variables.variables.filter(variable => variable.id !== id));
-    if (elementSelected?._resourceType === 'variables' && elementSelected.id === id) setElementSelected(null);
-  };
-
-  const treeDataVariables: TreeDataNode[] = variables.variables.map(variable => ({
+  const treeDataVariables: TreeDataNode[] = variables.variables.filter(variable => !(variable as any)._deleted && (!searchTerms.variables || (variable.name || getVariableDefaultName(variable.symbol)).toLowerCase().includes(searchTerms.variables.toLowerCase()))).map(variable => ({
     key: variable.id,
     title: (
-      <Flex align="center" justify="space-between" style={{ paddingRight: 4 }}>
+      <Flex align="center" style={{ paddingRight: 4 }}>
         <Text style={{ marginLeft: 5 }}>$  {variable.name || getVariableDefaultName(variable.symbol)}</Text>
-        <Space size={0}>
-          <Popconfirm
-            title={`Delete ${variable.name || getVariableDefaultName(variable.symbol)}?`}
-            onConfirm={(event) => { event?.stopPropagation(); handleDeleteVariable(variable.id); }}
-          >
-            <Button
-              aria-label={`Delete ${variable.name || getVariableDefaultName(variable.symbol)}`}
-              icon={<DeleteOutlined />}
-              size="small"
-              type="text"
-              danger
-              onClick={(event) => event.stopPropagation()}
-            />
-          </Popconfirm>
-        </Space>
       </Flex>
     ),
   }));
 
-  const treeDataScripts: TreeDataNode[] = Array.from({ length: 11 }, (_, index) => ({
-    key: index + 1,
-    title: <Text style={{ marginLeft: 5 }}>Script {index}</Text>,
+  const updateScripts = (nextScripts: IScriptDefinition[]) => setScripts(prev => ({ ...prev, scripts: nextScripts, _saved: false }));
+  const handleAddScript = () => {
+    const script: IScriptDefinition = { id: uuidv4(), name: `Script ${scripts.scripts.length}`, events: [] };
+    updateScripts([...scripts.scripts, script]);
+    setSettingUtils(previous => ({ ...previous, selectedSceneIds: [], tileEditSceneId: null, tileEditLayerId: null, activeSceneObject: null, activeTriggerId: null }));
+    setElementSelected({ ...script, _resourceType: 'script' });
+    setGlobalSelectedKey(`scripts-${script.id}`);
+  };
+  const treeDataScripts: TreeDataNode[] = scripts.scripts.filter(script => !(script as any)._deleted && (!searchTerms.scripts || (script.name || '').toLowerCase().includes(searchTerms.scripts.toLowerCase()))).map(script => ({
+    key: script.id,
+    title: <Flex align="center" style={{ paddingRight: 4 }}><Text style={{ marginLeft: 5 }}><FileFilled /> {script.name}</Text></Flex>,
   }));
 
   const genExtra = () => (
@@ -269,23 +280,30 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
     />
   );
 
-  const functionSearch = () => (
+  const functionSearch = (section: 'scenes' | 'scripts' | 'variables') => (
     <Tooltip placement="right" title={"Search"} color={token.colorBorder}>
-      <SearchOutlined style={{ marginLeft: 8, padding: 4, borderRadius: token.borderRadius, backgroundColor: isSearchVisible ? token.colorPrimary : 'transparent', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); handleSearchClick(); }} />
+      <SearchOutlined style={{ marginLeft: 8, padding: 4, borderRadius: token.borderRadius, backgroundColor: searchOpen[section] ? token.colorPrimary : 'transparent', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); handleSearchClick(section); }} />
     </Tooltip>
   );
 
   const handleCallNewScene = () => {
+    setElementSelected(null);
     setSettingUtils(prev => ({
       ...prev,
       activeButton: 'add',
-      activeSubButton: 'Scene'
+      activeSubButton: 'Scene',
+      tileEditSceneId: null,
+      tileEditLayerId: null,
+      activeSceneObject: null,
+      activeTriggerId: null,
     }))
   }
 
   const functionAdd = () => (
     <Tooltip placement="bottom" title={"Add Scene"} color={token.colorBorder} >
-      <PlusOutlined style={{ marginLeft: 8, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); handleCallNewScene() }} />
+      <span role="button" aria-label="Add Scene" style={{ display: 'inline-flex' }}>
+        <PlusOutlined style={{ marginLeft: 8, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); handleCallNewScene() }} />
+      </span>
     </Tooltip>
   );
 
@@ -306,7 +324,17 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
     setGlobalSelectedKey(newKey ? `${source}-${newKey}` : null);
     if (source === 'variables' && newKey) {
       const variable = variables.variables.find(item => item.id === newKey);
-      if (variable) setElementSelected({ ...variable, _resourceType: 'variables' });
+      if (variable) {
+        setSettingUtils(previous => ({ ...previous, selectedSceneIds: [], tileEditSceneId: null, tileEditLayerId: null, activeSceneObject: null, activeTriggerId: null }));
+        setElementSelected({ ...variable, _resourceType: 'variables' });
+      }
+    }
+    if (source === 'scripts' && newKey) {
+      const script = scripts.scripts.find(item => item.id === newKey);
+      if (script) {
+        setSettingUtils(previous => ({ ...previous, selectedSceneIds: [], tileEditSceneId: null, tileEditLayerId: null, activeSceneObject: null, activeTriggerId: null }));
+        setElementSelected({ ...script, _resourceType: 'script' });
+      }
     }
   };
 
@@ -362,18 +390,38 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
     setTreeHeightVariables(newSizes[2] - 60);
   };
 
-  const handleSelectElement = (elementId: Key | undefined) => {
-    const element = filteredScenes.filter(s => s.id === elementId).map(scene => scene).at(0);
+  const handleSelectElement = (elementId: Key | undefined, selectedKeys: Key[] = []) => {
+    const key = elementId?.toString();
+    if (!key) return;
+    const objectMatch = /^(actor|trigger):([^:]+):(.+)$/.exec(key);
+    if (objectMatch) {
+      const [, type, sceneId, id] = objectMatch;
+      const scene = scenes.find(item => item.id === sceneId);
+      if (!scene) return;
+      setElementSelected({ ...scene, _recenter: true });
+      setSettingUtils(previous => ({ ...previous, tileEditSceneId: sceneId, tileEditLayerId: 4, activeSceneObject: { sceneId, type: type as 'actor' | 'trigger', id }, activeTriggerId: type === 'trigger' ? id : null }));
+      return;
+    }
+    const element = filteredScenes.filter(s => s.id === key).map(scene => scene).at(0);
+    if (!element) return;
 
-    setElementSelected((prev: any) => ({
-      ...prev,
-      ...element,
-      _recenter: true
+    const sceneIds = selectedKeys.map(item => String(item)).filter(id => scenes.some(scene => scene.id === id));
+    const activeId = sceneIds.at(-1) ?? element.id;
+    const activeScene = scenes.find(scene => scene.id === activeId) ?? element;
+
+    setGlobalSelectedKey(null);
+    setSettingUtils(previous => ({
+      ...previous,
+      tileEditSceneId: previous.activeButton === 'add' && (previous.activeSubButton === 'Actor' || previous.activeSubButton === 'Trigger') ? element.id : previous.tileEditSceneId,
+      activeSceneObject: null,
+      activeTriggerId: null,
+      selectedSceneIds: sceneIds.length ? sceneIds : [element.id],
     }));
+    setElementSelected({ ...activeScene, _recenter: true });
   }
 
   return (
-    <Splitter layout="vertical"
+    <Splitter data-testid="left-panel" layout="vertical"
       onResize={handleResize}
       onResizeStart={handleResizeStart}
       onResizeEnd={handleResizeEnd}
@@ -390,33 +438,36 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
             {
               key: '1',
               label: 'SCENES',
-              extra: [functionAdd(), functionSearch()],
+              extra: [functionAdd(), functionSearch('scenes')],
               style: panelStyle,
               children: (
                 <Content style={{ height: '100vh', flex: 1 }}>
-                  {isSearchVisible && (
+                  {searchOpen.scenes && (
                     <Input
                       ref={searchInputRef}
                       placeholder="Search..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      value={searchTerms.scenes}
+                      onChange={(e) => setSearchTerms(previous => ({ ...previous, scenes: e.target.value }))}
                       style={{
                         marginBottom: 5,
                         height: 25,
                         border: 'none',
-                        backgroundColor: searchTerm === '' ? token.colorBgBase : token.colorBorder,
+                        backgroundColor: searchTerms.scenes === '' ? token.colorBgBase : token.colorBorder,
                       }}
                     />
                   )}
                   <Tree
                     className="custom-tree"
                     showIcon
-                    height={isSearchVisible ? treeHeightScenes - 25 : treeHeightScenes }
+                    multiple
+                    height={searchOpen.scenes ? treeHeightScenes - 25 : treeHeightScenes }
                     treeData={treeDataScenes}
                     defaultExpandAll
                     blockNode
-                    selectedKeys={elementSelected ? [elementSelected.id] : []}
-                    onSelect={(selectedKeys) => handleSelectElement(selectedKeys.at(0))}
+                    selectedKeys={settingUtils.activeSceneObject
+                      ? [settingUtils.activeSceneObject.sceneId, `${settingUtils.activeSceneObject.type}:${settingUtils.activeSceneObject.sceneId}:${settingUtils.activeSceneObject.id}`]
+                      : settingUtils.selectedSceneIds ?? (elementSelected ? [elementSelected.id] : [])}
+                    onSelect={(keys, info) => handleSelectElement(info.node.key, keys)}
                     style={{ background: token.colorBgBase }}
                   />
                 </Content>
@@ -440,14 +491,16 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                 {
                   key: '1',
                   label: 'SCRIPTS',
-                  extra: genExtra(),
+                  extra: <Flex gap={4}><Tooltip title="Add script"><PlusOutlined onClick={event => { event.stopPropagation(); handleAddScript(); }} /></Tooltip>{functionSearch('scripts')}</Flex>,
                   style: panelStyle,
                   children: (
+                    <Content style={{ height: '100vh', flex: 1 }}>
+                    {searchOpen.scripts && <Input ref={searchInputRef} placeholder="Search..." value={searchTerms.scripts} onChange={event => setSearchTerms(previous => ({ ...previous, scripts: event.target.value }))} style={{ marginBottom: 5, height: 25, border: 'none', backgroundColor: searchTerms.scripts === '' ? token.colorBgBase : token.colorBorder }} />}
                     <Tree
                       className="custom-tree"
                       showIcon
-                      icon={<FileFilled />}
-                      height={treeHeightScripts}
+                      // icon={<FileFilled />}
+                      height={searchOpen.scripts ? treeHeightScripts - 25 : treeHeightScripts}
                       treeData={treeDataScripts}
                       defaultExpandAll
                       blockNode
@@ -456,7 +509,7 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                         onSelectTree(selectedKeys, info, 'scripts')
                       }
                       style={{ height: treeHeightScripts, background: token.colorBgBase }}
-                    />
+                    /></Content>
                   )
                 },
               ]}
@@ -480,16 +533,18 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                       <Tooltip title="Add variable">
                         <PlusOutlined style={{ marginRight: 8 }} onClick={(event) => { event.stopPropagation(); handleAddVariable(); }} />
                       </Tooltip>
-                      {genExtra()}
+                      {functionSearch('variables')}
                     </Flex>
                   ),
                   style: panelStyle,
                   children: (
+                    <Content style={{ height: '100vh', flex: 1 }}>
+                    {searchOpen.variables && <Input ref={searchInputRef} placeholder="Search..." value={searchTerms.variables} onChange={event => setSearchTerms(previous => ({ ...previous, variables: event.target.value }))} style={{ marginBottom: 5, height: 25, border: 'none', backgroundColor: searchTerms.variables === '' ? token.colorBgBase : token.colorBorder }} />}
                     <Tree
                       className="custom-tree"
                       showIcon
                       // icon={<div>$</div>}
-                      height={treeHeightVariables}
+                      height={searchOpen.variables ? treeHeightVariables - 25 : treeHeightVariables}
                       treeData={treeDataVariables}
                       defaultExpandAll
                       blockNode
@@ -498,7 +553,7 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                         onSelectTree(selectedKeys, info, 'variables')
                       }
                       style={{ height: treeHeightVariables, backgroundColor: token.colorBgBase }}
-                    />
+                    /></Content>
                   )
                 },
               ]}

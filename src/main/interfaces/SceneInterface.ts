@@ -18,6 +18,7 @@ export interface ISceneSettings extends IBaseSettings {
     tileseId: string;
     width: number;
     height: number;
+    cameraPosition?: { x: number; y: number };
     type: ETypeScene;
     paletteIds: string[];
     spritePaletteIds: string[];

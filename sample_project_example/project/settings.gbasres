@@ -1,11 +1,20 @@
 {
   "_resourceType": "settings",
-  "startSceneId": "738ec3e3-374f-44a8-8bda-8a027cce1d08",
-  "startX": 0,
-  "startY": 0,
+  "startSceneId": "d8191841-adf3-46ed-917d-4d5d74c38ad2",
+  "startX": 11,
+  "startY": 5,
   "startMoveSpeed": 1,
   "startAnimSpeed": 4,
-  "startDirection": "right",
+  "startDirection": "down",
   "colorMode": false,
-  "demoFilter": "crt-easymode.glslp"
+  "demoFilter": "crt-easymode.glslp",
+  "playerSpriteId": "player",
+  "demoAudioMuted": true,
+  "demoAudioVolume": 0.25,
+  "demoShowMenu": true,
+  "uiCursorImage": "cursor.png",
+  "uiFrameImage": "frame.png",
+  "font8x16Image": "customized_8x16_font.bmp",
+  "font8x16VariablesImage": "customized_variable_8x16_font.bmp",
+  "font16x16VariablesImage": null
 }

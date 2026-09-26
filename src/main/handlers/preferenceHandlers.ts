@@ -14,6 +14,7 @@ const defaultPreferences: IPreferences = {
   language: 'pt_BR',
   recentProjects: [],
   tempProjectBackupLimit: 5,
+  historyLimit: 50,
 };
 
 // THEME --------------------------------------------------------
@@ -155,6 +156,15 @@ const setTempProjectBackupLimit = (tempProjectBackupLimit: number): void => {
   updatePreferences('tempProjectBackupLimit', safeLimit);
 };
 
+const getHistoryLimit = (): number => {
+  const limit = Number(getPreferences().historyLimit ?? 50);
+  return Number.isFinite(limit) ? Math.max(1, Math.min(500, Math.floor(limit))) : 50;
+};
+
+const setHistoryLimit = (historyLimit: number): void => {
+  updatePreferences('historyLimit', Math.max(1, Math.min(500, Math.floor(Number(historyLimit) || 50))));
+};
+
 const clearTempProjectData = (): void => {
   const tempRoot = path.join(os.tmpdir(), 'gba-studio-temp');
   if (!fs.existsSync(tempRoot)) {
@@ -197,7 +207,7 @@ const clearTempProjectData = (): void => {
 
 // BUILD CONFIG -----------------------------------------------------------
 export const getBuildConfig = () => {
-  return __store.get('buildConfig', { parallel: 0, optimizationLevel: 'O2', verbose: false });
+  return __store.get('buildConfig', { parallel: 1, optimizationLevel: 'O2', verbose: false });
 };
 
 export const setBuildConfig = (cfg: any): void => {
@@ -242,8 +252,11 @@ export const configurarPreferenceHandlers = () => {
   ipcMain.handle('set-temp-build-path', (_event: IpcMainInvokeEvent, tempBuildPath: string) => setTempBuildPath(tempBuildPath));
   ipcMain.handle('get-temp-project-backup-limit', () => getTempProjectBackupLimit());
   ipcMain.handle('set-temp-project-backup-limit', (_event: IpcMainInvokeEvent, tempProjectBackupLimit: number) => setTempProjectBackupLimit(tempProjectBackupLimit));
+  ipcMain.handle('get-history-limit', () => getHistoryLimit());
+  ipcMain.handle('set-history-limit', (_event: IpcMainInvokeEvent, historyLimit: number) => setHistoryLimit(historyLimit));
   ipcMain.handle('clear-temp-project-data', () => clearTempProjectData());
   // Build config handlers
   ipcMain.handle('get-build-config', () => getBuildConfig());
   ipcMain.handle('set-build-config', (_event: IpcMainInvokeEvent, cfg: any) => setBuildConfig(cfg));
+  ipcMain.handle('get-cpu-count', () => Math.max(1, os.cpus().length));
 }

@@ -4,8 +4,9 @@ import { HolderOutlined, RightOutlined } from "@ant-design/icons";
 import { DndContext, DragEndEvent, DragOverlay, PointerSensor, closestCenter, useDndContext, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, Collapse, Flex, Layout } from "antd";
+import { Button, Collapse, Empty, Flex, Input, Layout } from "antd";
 import { createRef, RefObject, useEffect, useRef, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { EEvents, EVENT_INFO } from "./interfaces/IEvents";
 import MenuEventItem from "./MenuEventItem";
 import PanelEvents from "./PanelEvents";
@@ -14,6 +15,12 @@ import { getEventDepthColor } from "./EventColors";
 
 interface CollapseEventProps {
   scripts: IScriptsElement[] | undefined;
+  showEmptyState?: boolean;
+  /**
+   * Lets the event UI edit scripts owned by another resource (for example a
+   * trigger) without pretending that resource is the currently selected scene.
+   */
+  onScriptsChange?: (scripts: IScriptsElement[]) => void;
 }
 
 interface SortableEventHeaderProps {
@@ -26,9 +33,13 @@ interface SortableEventHeaderProps {
   scriptIds: string[];
   panelRef: RefObject<HTMLDivElement>;
   onHoverChange: (isHovering: boolean) => void;
+  isRenaming: boolean;
+  renameValue: string;
+  onRenameChange: (value: string) => void;
+  onRenameCommit: () => void;
 }
 
-function NestedEventDragHandle({ event, title, color, isExpanded, index, scriptIds }: { event: IScriptsElement; title: string; color: string; isExpanded: boolean; index: number; scriptIds: string[] }) {
+function NestedEventDragHandle({ event, title, color, isExpanded, index, scriptIds, isRenaming, renameValue, onRenameChange, onRenameCommit }: { event: IScriptsElement; title: string; color: string; isExpanded: boolean; index: number; scriptIds: string[]; isRenaming: boolean; renameValue: string; onRenameChange: (value: string) => void; onRenameCommit: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: event.id });
   const { active, over } = useDndContext();
   const handleRef = useRef<HTMLElement | null>(null);
@@ -87,7 +98,7 @@ function NestedEventDragHandle({ event, title, color, isExpanded, index, scriptI
         }}
       />
       <RightOutlined style={{ transform: isExpanded ? 'rotate(90deg)' : undefined, fontSize: 10 }} />
-      <span style={{ color }}>{title}</span>
+      {isRenaming ? <Input size="small" autoFocus value={renameValue} placeholder={getEventEnum(event.command)} onChange={e => onRenameChange(e.target.value)} onBlur={onRenameCommit} onPressEnter={onRenameCommit} onClick={e => e.stopPropagation()} /> : <span style={{ color }}>{title}</span>}
     </Flex>
   );
 }
@@ -122,6 +133,10 @@ function SortableEventHeader({
   scriptIds,
   panelRef,
   onHoverChange,
+  isRenaming,
+  renameValue,
+  onRenameChange,
+  onRenameCommit,
 }: SortableEventHeaderProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: event.id });
   const { active, over } = useDndContext();
@@ -220,7 +235,7 @@ function SortableEventHeader({
         }}
       />
       <RightOutlined style={{ transform: isExpanded ? "rotate(90deg)" : undefined, fontSize: 10 }} />
-      <span style={{ color: titleColor }}>{title}</span>
+      {isRenaming ? <Input size="small" autoFocus value={renameValue} placeholder={getEventEnum(event.command)} onChange={e => onRenameChange(e.target.value)} onBlur={onRenameCommit} onPressEnter={onRenameCommit} onClick={e => e.stopPropagation()} /> : <span style={{ color: titleColor }}>{title}</span>}
     </Flex>
   );
 }
@@ -269,7 +284,8 @@ function ActiveEventDragOverlay({
   const activeScript = findScript(scripts);
   if (!activeScript) return null;
 
-  const title = `${activeScript.args?.__comment ? "// " : ""}${headerPanel[activeScript.id] || getEventEnum(activeScript.command)}`;
+  const automaticSuffix = activeScript.command === EEvents.FADE_IN && activeScript.args?.__automatic ? ' (Automatic)' : '';
+  const title = `${activeScript.args?.__comment ? "// " : ""}${activeScript.args?.__name || headerPanel[activeScript.id] || getEventEnum(activeScript.command)}${automaticSuffix}`;
   return (
     <div style={{ border: `1px solid ${getEventDepthColor(1)}`, background: '#303030', padding: '6px 10px', minWidth: 240 }}>
       <Flex align="center" gap={6}>
@@ -294,10 +310,49 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
   const { setScenes, elementSelected, setElementSelected } = useAppContexts();
   const [headerPanel, setHeaderPanel] = useState<Record<string, string>>({});
   const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
+  const [renamingEventId, setRenamingEventId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
   const panelRefs = useRef(new Map<string, RefObject<HTMLDivElement>>());
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
+  const rootScripts = parameters.scripts ?? [];
+  const persistScripts = (updatedScripts: IScriptsElement[]) => {
+    if (parameters.onScriptsChange) {
+      parameters.onScriptsChange(updatedScripts);
+      return;
+    }
+
+    const updatedElement = { ...elementSelected, script: updatedScripts };
+    setElementSelected(updatedElement);
+    setScenes(prevScenes => prevScenes.map(scene =>
+      scene.id === elementSelected.id ? { ...scene, ...updatedElement, _saved: false } : scene
+    ));
+  };
+
+  // Duplicate an event as a new tree, assigning fresh IDs to the event and
+  // every nested event so no drag/drop or collapse state references collide.
+  const cloneEventWithNewIds = (event: IScriptsElement): IScriptsElement => ({
+    ...event,
+    id: uuidv4(),
+    args: event.args ? { ...event.args } : event.args,
+    children: event.children ? {
+      ...event.children,
+      then: event.children.then.map(cloneEventWithNewIds),
+      else: event.children.else?.map(cloneEventWithNewIds),
+    } : undefined,
+  });
+
+  const duplicateInList = (events: IScriptsElement[], id: string): IScriptsElement[] => {
+    const result: IScriptsElement[] = [];
+    for (const event of events) {
+      result.push(event);
+      if (event.id === id) {
+        result.push(cloneEventWithNewIds(event));
+      }
+    }
+    return result;
+  };
 
   const getPanelRef = (id: string) => {
     const existingRef = panelRefs.current.get(id);
@@ -313,7 +368,6 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
 
     const activeId = String(active.id);
     const overId = String(over.id);
-    const rootScripts = parameters.scripts;
     const containsEvent = (event: IScriptsElement, id: string): boolean =>
       event.id === id
       || Boolean(event.children?.then.some(child => containsEvent(child, id)))
@@ -348,11 +402,7 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
 
     if (oldIndex >= 0 && newIndex >= 0) {
       const updatedScripts = arrayMove(rootScripts, oldIndex, newIndex);
-      const updatedElement = { ...elementSelected, script: updatedScripts };
-      setElementSelected(updatedElement);
-      setScenes(prevScenes => prevScenes.map(scene =>
-        scene.id === elementSelected.id ? { ...scene, script: updatedScripts, _saved: false } : scene
-      ));
+      persistScripts(updatedScripts);
       return;
     }
 
@@ -422,116 +472,73 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
       return nextScripts;
     };
     const updatedScripts = targetIsBranch ? insertEvent(withoutEvent) : insertSibling(withoutEvent);
-    const updatedElement = { ...elementSelected, script: updatedScripts };
-
-    setElementSelected(updatedElement);
-    setScenes(prevScenes =>
-      prevScenes.map(scene =>
-        scene.id === elementSelected.id
-          ? { ...scene, script: updatedScripts, _saved: false }
-          : scene
-      )
-    );
+    persistScripts(updatedScripts);
   };
 
   const onRemoveScriptEvent = (id: string) => {
     // Atualiza estado removendo o id
-    const updatedElement = { 
-      ...elementSelected,  
-      script: elementSelected.script?.filter((s: any) => s.id !== id) || [],
-      playerHit1Script: elementSelected.playerHit1Script?.filter((s: any) => s.id !== id) || [],
-      playerHit2Script: elementSelected.playerHit2Script?.filter((s: any) => s.id !== id) || [],
-      playerHit3Script: elementSelected.playerHit3Script?.filter((s: any) => s.id !== id) || [],
+    persistScripts(rootScripts.filter(script => script.id !== id));
+  };
+
+  const onDuplicateScriptEvent = (id: string) => {
+    persistScripts(duplicateInList(rootScripts, id));
+  };
+
+  const renameInList = (events: IScriptsElement[], id: string, name: string): IScriptsElement[] => events.map(event => {
+    if (event.id === id) return { ...event, args: { ...event.args, __name: name } };
+    if (!event.children) return event;
+    return {
+      ...event,
+      children: {
+        ...event.children,
+        then: renameInList(event.children.then, id, name),
+        else: event.children.else ? renameInList(event.children.else, id, name) : undefined,
+      },
     };
+  });
 
-    setElementSelected(updatedElement);
+  const onRenameScriptEvent = (id: string, name: string) => {
+    persistScripts(renameInList(rootScripts, id, name));
+  };
 
-    setScenes(prevScenes =>
-      prevScenes.map(scene =>
-        scene.id === elementSelected.id
-          ? { ...scene, ...updatedElement, _saved: false }
-          : scene
-      )
-    );
+  const startRename = (id: string) => {
+    const find = (events: IScriptsElement[]): IScriptsElement | undefined => {
+      for (const event of events) {
+        if (event.id === id) return event;
+        const nested = event.children && find([...event.children.then, ...(event.children.else || [])]);
+        if (nested) return nested;
+      }
+      return undefined;
+    };
+    setRenameDraft(find(rootScripts)?.args?.__name || '');
+    setRenamingEventId(id);
+  };
+
+  const commitRename = () => {
+    if (!renamingEventId) return;
+    onRenameScriptEvent(renamingEventId, renameDraft.trim());
+    setRenamingEventId(null);
   };
 
   const toggleDisableScript = (id: string) => {
-    setElementSelected((prev: ISceneSettings) => ({
-      ...prev,
-      script: prev.script?.map((s: IScriptsElement) =>
-        s.id === id
-          ? { ...s, args: { ...s.args, __comment: !(s.args?.__comment), __collapse: false } }
-          : s
-      ),
-    }));
-
-    setScenes((prevScenes: any) =>
-      prevScenes.map((scene: ISceneSettings) => {
-        if (scene.id !== elementSelected.id) return scene;
-
-        const updatedScripts = scene.script?.map(s =>
-          s.id === id
-            ? {
-                ...s,
-                args: { ...s.args, __comment: !(s.args?.__comment), __collapse: false },
-              }
-            : s
-        );
-
-        return { ...scene, script: updatedScripts, _saved: false };
-      })
-    );
-    
+    persistScripts(rootScripts.map(script => script.id === id
+      ? { ...script, args: { ...script.args, __comment: !script.args?.__comment, __collapse: false } }
+      : script));
   };
 
   const onCollapseChange = (keys: string[] | string) => {
-    setElementSelected((prev: ISceneSettings) => ({
-      ...prev,
-      script: prev.script?.map(s => ({
-        ...s,
-        args: { 
-          ...s.args, 
-          __collapse: Array.isArray(keys) ? keys.includes(s.id) : keys === s.id 
-        }
-      })),
-    }));
-
-    setScenes(prevScenes =>
-      prevScenes.map(scene => {
-        if (scene.id !== elementSelected.id) return scene;
-
-        const updatedScripts = scene.script?.map(s => ({
-          ...s,
-          args: { 
-            ...s.args, 
-            __collapse: Array.isArray(keys) ? keys.includes(s.id) : keys === s.id 
-          }
-        }));
-
-        return { ...scene, script: updatedScripts, _saved: false };
-      })
-    );
+    persistScripts(rootScripts.map(script => ({
+      ...script,
+      args: { ...script.args, __collapse: Array.isArray(keys) ? keys.includes(script.id) : keys === script.id },
+    })));
   };
 
   const handleValueChange = (eventId: string, newArgs: IArgs) => {
-    const updateElement = {
-      ...elementSelected,
-      script: elementSelected.script?.map((s: IScriptsElement) =>
+    persistScripts(rootScripts.map((s: IScriptsElement) =>
         s.id === eventId
           ? { ...s, args: { ...s.args, ...newArgs } }
           : s
-      ),
-    };
-
-    setElementSelected(updateElement);
-
-    setScenes(prevScenes =>
-      prevScenes.map(scene =>
-        scene.id === elementSelected.id
-          ? { ...scene, ...updateElement, _saved: false }
-          : scene
-        )
-    );
+      ));
   }
 
   const updateIfBranch = (ifId: string, branch: 'then' | 'else', update: (events: IScriptsElement[]) => IScriptsElement[]) => {
@@ -550,11 +557,7 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
         },
       };
     });
-    const updatedElement = { ...elementSelected, script: updateScripts(elementSelected.script) };
-    setElementSelected(updatedElement);
-    setScenes(prevScenes => prevScenes.map(scene =>
-      scene.id === elementSelected.id ? { ...scene, ...updatedElement, _saved: false } : scene
-    ));
+    persistScripts(updateScripts(rootScripts) ?? []);
   };
 
   const updateIfBranchCollapse = (ifId: string, branch: 'then' | 'else', collapsed: boolean) => {
@@ -574,11 +577,7 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
         },
       };
     });
-    const updatedElement = { ...elementSelected, script: updateScripts(elementSelected.script) };
-    setElementSelected(updatedElement);
-    setScenes(prevScenes => prevScenes.map(scene =>
-      scene.id === elementSelected.id ? { ...scene, ...updatedElement, _saved: false } : scene
-    ));
+    persistScripts(updateScripts(rootScripts) ?? []);
   };
 
   const renderIfBranch = (script: IScriptsElement, branch: 'then' | 'else', label: string, depth: number) => {
@@ -605,7 +604,7 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
                   activeKey={branchKeys}
                   items={events.map((child, index) => ({
                   key: child.id,
-                  label: <NestedEventDragHandle event={child} color={childColor} index={index} scriptIds={events.map(item => item.id)} isExpanded={branchKeys.includes(child.id)} title={`${child.args?.__comment ? '// ' : ''}${getEventEnum(child.command)}`} />,
+                  label: <NestedEventDragHandle event={child} color={childColor} index={index} scriptIds={events.map(item => item.id)} isExpanded={branchKeys.includes(child.id)} title={`${child.args?.__comment ? '// ' : ''}${child.args?.__name || getEventEnum(child.command)}`} isRenaming={renamingEventId === child.id} renameValue={renameDraft} onRenameChange={setRenameDraft} onRenameCommit={commitRename} />,
                   collapsible: child.args?.__comment ? 'disabled' : 'header',
                   showArrow: false,
                   style: {
@@ -615,12 +614,12 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
                     background: child.args?.__comment ? '#74b54c' : 'transparent',
                     color: childColor,
                   },
-                  extra: <MenuEventItem event={child} onRemove={(id) => updateIfBranch(script.id, branch, current => current.filter(item => item.id !== id))} onToggleDisable={(id) => updateIfBranch(script.id, branch, current => current.map(item => item.id === id ? { ...item, args: { ...item.args, __comment: !item.args?.__comment } } : item))} />,
+                  extra: <MenuEventItem event={child} onRemove={(id) => updateIfBranch(script.id, branch, current => current.filter(item => item.id !== id))} onDuplicate={(id) => updateIfBranch(script.id, branch, current => duplicateInList(current, id))} onRename={startRename} onToggleDisable={(id) => updateIfBranch(script.id, branch, current => current.map(item => item.id === id ? { ...item, args: { ...item.args, __comment: !item.args?.__comment } } : item))} />,
                   children: (
                     <Flex vertical gap={6} style={{ padding: '6px 8px' }}>
                       <PanelEvents event={child} customTitle={() => undefined} onValueChange={(id, args) => updateIfBranch(script.id, branch, current => current.map(item => item.id === id ? { ...item, args: { ...item.args, ...args } } : item))} />
-                      {child.command === EEvents.IF && renderIfBranch(child, 'then', 'TRUE', depth + 1)}
-                      {child.command === EEvents.IF && renderIfBranch(child, 'else', 'FALSE', depth + 1)}
+                      {(child.command === EEvents.IF || child.command === EEvents.WHILE || child.command === EEvents.FOR || child.command === EEvents.WAIT_FOR_BUTTON || child.command === EEvents.IF_BUTTON_HELD) && renderIfBranch(child, 'then', child.command === EEvents.IF || child.command === EEvents.WHILE || child.command === EEvents.FOR ? 'BODY' : child.command === EEvents.WAIT_FOR_BUTTON ? 'ON PRESS' : 'TRUE', depth + 1)}
+                      {(child.command === EEvents.IF || child.command === EEvents.IF_BUTTON_HELD) && renderIfBranch(child, 'else', 'FALSE', depth + 1)}
                     </Flex>
                   ),
                   }))}
@@ -646,7 +645,9 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
         onDragEnd={onDragEnd}
         sensors={sensors}
       >
-        <SortableContext
+        {(parameters.showEmptyState || parameters.onScriptsChange) && rootScripts.length === 0 ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        ) : <SortableContext
           items={parameters.scripts?.map(script => script.id) ?? []}
           strategy={verticalListSortingStrategy}
         >
@@ -655,20 +656,20 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
             onChange={onCollapseChange} 
             style={{ borderRadius: 0 }}
             size="small"
-            items={parameters.scripts?.map((script, index, scripts) => {
+          items={rootScripts.map((script, index, scripts) => {
               const isDisabled = script.args?.__comment === true;
-              const baseHeader = getEventEnum(script.command);
+              const baseHeader = `${getEventEnum(script.command)}${script.command === EEvents.FADE_IN && script.args?.__automatic ? ' (Automatic)' : ''}`;
 
           const handleValueTitle = (newTitle: string) => {
             setHeaderPanel(prev => ({
               ...prev,
-              [script.id]: baseHeader + newTitle
+              [script.id]: script.command === EEvents.WAIT_FOR_BUTTON ? newTitle : baseHeader + newTitle
             }));
           };
 
               const title = isDisabled
-                ? `// ${headerPanel[script.id] || baseHeader}`
-                : headerPanel[script.id] || baseHeader;
+                ? `// ${script.args?.__name || headerPanel[script.id] || baseHeader}`
+                : script.args?.__name || headerPanel[script.id] || baseHeader;
 
               return {
                 key: script.id,
@@ -684,9 +685,13 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
                     scriptIds={scripts.map(item => item.id)}
                     panelRef={getPanelRef(script.id)}
                     onHoverChange={(isHovering) => setHoveredEventId(isHovering ? script.id : null)}
+                    isRenaming={renamingEventId === script.id}
+                    renameValue={renameDraft}
+                    onRenameChange={setRenameDraft}
+                    onRenameCommit={commitRename}
                   />
                 ),
-                extra: <MenuEventItem event={script} onRemove={onRemoveScriptEvent} onToggleDisable={toggleDisableScript}/>,
+                extra: <MenuEventItem event={script} onRemove={onRemoveScriptEvent} onDuplicate={onDuplicateScriptEvent} onRename={startRename} onToggleDisable={toggleDisableScript}/>,
                 collapsible: isDisabled ? "disabled" : "header",
                 showArrow: false,
                 style: {
@@ -696,14 +701,14 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
                 children: (
                   <Flex vertical gap={6} style={{ color: getEventDepthColor(0) }}>
                     <PanelEvents event={script} customTitle={handleValueTitle} onValueChange={handleValueChange}/>
-                    {script.command === EEvents.IF && renderIfBranch(script, 'then', 'TRUE', 0)}
-                    {script.command === EEvents.IF && renderIfBranch(script, 'else', 'FALSE', 0)}
+                    {(script.command === EEvents.IF || script.command === EEvents.WHILE || script.command === EEvents.FOR || script.command === EEvents.WAIT_FOR_BUTTON || script.command === EEvents.IF_BUTTON_HELD) && renderIfBranch(script, 'then', script.command === EEvents.IF || script.command === EEvents.WHILE || script.command === EEvents.FOR ? 'BODY' : script.command === EEvents.WAIT_FOR_BUTTON ? 'ON PRESS' : 'TRUE', 0)}
+                    {(script.command === EEvents.IF || script.command === EEvents.IF_BUTTON_HELD) && renderIfBranch(script, 'else', 'FALSE', 0)}
                   </Flex>
                 ),
               };
             })}
           />
-        </SortableContext>
+        </SortableContext>}
         <DragOverlay dropAnimation={null}>
           <ActiveEventDragOverlay scripts={parameters.scripts} headerPanel={headerPanel} />
         </DragOverlay>

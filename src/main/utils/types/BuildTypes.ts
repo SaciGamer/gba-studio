@@ -31,6 +31,7 @@ export interface BuildConfig {
 
 export interface TranscodeOptions {
   projectDir: string;
+  markerProjectDir?: string;
   outputDir?: string;
   projectName?: string;
   includeAssets?: boolean;
@@ -89,12 +90,59 @@ export interface JsonResourceDefault {
   filename?: string;
   imageWidth?: number;
   imageHeight?: number;
+  width?: number;
+  height?: number;
+  cameraPosition?: { x?: number; y?: number };
   tileMap?: number[][];
   selectedTilesetId?: string;
   imageType?: string;
   backgrounds?: any[];
   script?: any[];
   colorMode?: 'mono' | 'mixed' | undefined;
+  fadeDirection?: 0 | 1;
+  startAnimSpeed?: number;
+  playerSpriteId?: string | null;
+  uiCursorImage?: string | null;
+  uiFrameImage?: string | null;
+  font8x8Image?: string | null;
+  font8x16Image?: string | null;
+  font8x8VariablesImage?: string | null;
+  font8x16VariablesImage?: string | null;
+  font16x16VariablesImage?: string | null;
+  playerFrameWidth?: number;
+  playerFrameHeight?: number;
+  playerFramesPerDirection?: number;
+  playerAnimSpeed?: number;
+  playerIdleFrame?: number;
+  playerCanvasOriginX?: number;
+  playerCanvasOriginY?: number;
+  playerCollisionX?: number;
+  playerCollisionY?: number;
+  playerCollisionWidth?: number;
+  playerCollisionHeight?: number;
+  playerAnimations?: Array<{ id: string; name: string; frames: number[]; canvasFrames?: SpriteCanvasFrame[] }>;
+  playerAnimationStates?: Array<{
+    id: string;
+    name: string;
+    type: string;
+    flipRightToCreateLeftFacingFrames?: boolean;
+    animations: Array<{ id: string; name: string; frames: number[]; type?: string; canvasFrames?: SpriteCanvasFrame[] }>;
+  }>;
+}
+
+interface SpriteCanvasFrame {
+  id: string;
+  width: number;
+  height: number;
+  pieces: Array<{
+    id: string;
+    sourceX: number;
+    sourceY: number;
+    width: number;
+    height: number;
+    x: number;
+    y: number;
+  }>;
 }
 
 export interface ResourceFile {

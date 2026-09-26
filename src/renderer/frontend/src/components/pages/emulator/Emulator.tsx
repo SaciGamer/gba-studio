@@ -194,8 +194,15 @@ const Emulator: React.FC = () => {
     };
     emulatorJs.EJS_askBeforeExit = false;
     emulatorJs.EJS_gameID = gameId;        // evita conflito de saves e netplay
+    const configuredVolume = Number(localSettings?.demoAudioVolume);
+    emulatorJs.EJS_volume = Number.isFinite(configuredVolume)
+      ? Math.min(1, Math.max(0, configuredVolume))
+      : 1;
+    emulatorJs.EJS_muted = localSettings?.demoAudioMuted === true;
     // emulatorJs.EJS_language = "pt";        // força idioma correto
     emulatorJs.EJS_DEBUG_XX = true;        // força usar emulator.js em vez de minificado
+    // Project settings own the demo audio defaults. EmulatorJS local storage is
+    // disabled so old per-game values cannot override the configured defaults.
     emulatorJs.EJS_disableLocalStorage = true;
 		// emulatorJs.EJS_cacheConfig = {
 		// 	enabled: false,
@@ -212,6 +219,9 @@ const Emulator: React.FC = () => {
     emulatorJs.EJS_defaultOptions = {
       'shader': localSettings?.demoFilter ? localSettings?.demoFilter : '',
       'fps': localSettings?.demoShowFPS ? "show" : "hide",
+      // The custom EmulatorJS build only creates the F2 rewind control when
+      // this RetroArch option is enabled before the core starts.
+      'rewindEnabled': 'enabled',
     };
 
     emulatorJs.EJS_defaultControls = controlsConfig;

@@ -1,5 +1,5 @@
 import useAppContexts from '@/providers/contexts/AppContexts';
-import { IConditionValue, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
+import { ETypeScene, IConditionValue, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { ArrowRightOutlined, BranchesOutlined, PlusSquareOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 import { Button, Divider, Drawer, Empty, Flex, Input, InputRef, Menu, Space, Typography } from "antd";
 import { Content } from 'antd/es/layout/layout';
@@ -10,7 +10,7 @@ import DefaultValueEvents, { VariableEventPreset } from './DefaultValueEvents';
 import FlowEditorManager, { ScriptKey } from './FlowEditorManager';
 import { EEvents, EVENT_INFO } from './interfaces/IEvents';
 
-const CATEGORIES = [/*"Actor", "Camera", "Audio", "Dialogue & Menus",*/ "Scene", "Screen", "Timer", "Conditions", "Variables"];
+const CATEGORIES = ["Player", "Actor", "Camera", "Scene", "Screen", "Timer", "Audio", "Dialogue", "Scripts", "Variables"];
 
 type EventOption = { id: EEvents; name: string; preset?: VariableEventPreset };
 
@@ -51,6 +51,26 @@ const FUNCTIONS_BY_CATEGORY = {
   // "Dialogue & Menus": {
 
   // },
+  Camera: {
+    Position: [
+      { id: EEvents.PAN_CAMERA, name: EVENT_INFO[EEvents.PAN_CAMERA].name },
+    ],
+  },
+  Audio: {
+    Music: [
+      { id: EEvents.PLAY_MUSIC, name: EVENT_INFO[EEvents.PLAY_MUSIC].name },
+      { id: EEvents.PLAY_SOUND, name: EVENT_INFO[EEvents.PLAY_SOUND].name },
+      { id: EEvents.STOP_MUSIC, name: EVENT_INFO[EEvents.STOP_MUSIC].name },
+      { id: EEvents.SET_MUSIC_VOLUME, name: EVENT_INFO[EEvents.SET_MUSIC_VOLUME].name },
+    ],
+  },
+  Dialogue: {
+    Text: [
+      { id: EEvents.DISPLAY_DIALOGUE, name: EVENT_INFO[EEvents.DISPLAY_DIALOGUE].name },
+      { id: EEvents.HIDE_DIALOGUE, name: EVENT_INFO[EEvents.HIDE_DIALOGUE].name },
+      { id: EEvents.DIALOGUE_CHOICE, name: EVENT_INFO[EEvents.DIALOGUE_CHOICE].name },
+    ],
+  },
   Scene: {
     Scene: [
       { id: EEvents.CHANGE_SCENE, name: EVENT_INFO[EEvents.CHANGE_SCENE].name },
@@ -58,6 +78,12 @@ const FUNCTIONS_BY_CATEGORY = {
     Layer:[
       {
         id: EEvents.CHANGE_LAYER, name: EVENT_INFO[EEvents.CHANGE_LAYER].name
+      },
+      {
+        id: EEvents.VISIBLE_BACKGROUND, name: EVENT_INFO[EEvents.VISIBLE_BACKGROUND].name
+      },
+      {
+        id: EEvents.CHANGE_PALETTE_BACKGROUND, name: EVENT_INFO[EEvents.CHANGE_PALETTE_BACKGROUND].name
       },
       // {
       //   id: EEvents.MOVE_LAYER, name: EVENT_INFO[EEvents.MOVE_LAYER].name
@@ -72,10 +98,34 @@ const FUNCTIONS_BY_CATEGORY = {
     //   }
     // ]
   },
+  Actor: {
+    "Actor Functions": [
+      { id: EEvents.SPAWN_ACTOR, name: EVENT_INFO[EEvents.SPAWN_ACTOR].name },
+      { id: EEvents.MOVE_ACTOR, name: EVENT_INFO[EEvents.MOVE_ACTOR].name },
+      { id: EEvents.REMOVE_ACTOR, name: EVENT_INFO[EEvents.REMOVE_ACTOR].name },
+    ],
+    Visibility: [
+      { id: EEvents.HIDE_ACTOR, name: EVENT_INFO[EEvents.HIDE_ACTOR].name },
+      { id: EEvents.HIDE_ALL_SPRITES, name: EVENT_INFO[EEvents.HIDE_ALL_SPRITES].name },
+      { id: EEvents.SHOW_ACTOR, name: EVENT_INFO[EEvents.SHOW_ACTOR].name },
+      { id: EEvents.SHOW_ALL_SPRITES, name: EVENT_INFO[EEvents.SHOW_ALL_SPRITES].name },
+    ],
+    Animation: [
+      { id: EEvents.SET_ANIMATION_SPEED, name: EVENT_INFO[EEvents.SET_ANIMATION_SPEED].name },
+      { id: EEvents.SET_ACTOR_PRIORITY, name: EVENT_INFO[EEvents.SET_ACTOR_PRIORITY].name },
+    ],
+  },
+  "Joypad Input": {
+    Buttons: [
+      { id: EEvents.WAIT_FOR_BUTTON, name: EVENT_INFO[EEvents.WAIT_FOR_BUTTON].name },
+      { id: EEvents.IF_BUTTON_HELD, name: EVENT_INFO[EEvents.IF_BUTTON_HELD].name },
+    ],
+  },
   Screen: {
     "Fade": [
       { id: EEvents.FADE_IN, name: EVENT_INFO[EEvents.FADE_IN].name },
-      { id: EEvents.FADE_OUT, name: EVENT_INFO[EEvents.FADE_OUT].name }
+      { id: EEvents.FADE_OUT, name: EVENT_INFO[EEvents.FADE_OUT].name },
+      { id: EEvents.FADE_OPTIONS, name: EVENT_INFO[EEvents.FADE_OPTIONS].name },
     ],
   },
   Timer: {
@@ -84,12 +134,22 @@ const FUNCTIONS_BY_CATEGORY = {
       // { id: EEvents.IDLE, name: EVENT_INFO[EEvents.IDLE].name }
     ]
   },
-  // Conditions: {
-  //   "Logic": []
-  // },
+  Scripts: {
+    Script: [
+      { id: EEvents.CALL_SCRIPT, name: EVENT_INFO[EEvents.CALL_SCRIPT].name },
+      { id: EEvents.FOR, name: EVENT_INFO[EEvents.FOR].name },
+      { id: EEvents.BREAK, name: EVENT_INFO[EEvents.BREAK].name },
+      { id: EEvents.CONTINUE, name: EVENT_INFO[EEvents.CONTINUE].name },
+    ],
+    "Control Flow": [
+      { id: EEvents.IF, name: EVENT_INFO[EEvents.IF].name },
+      { id: EEvents.WHILE, name: EVENT_INFO[EEvents.WHILE].name },
+    ],
+  },
   Variables: {
     Assignment: [
       { id: EEvents.VARIABLE, name: 'Variable Set to Value', preset: 'value' },
+      { id: EEvents.DISPLAY_VARIABLE_TEXT, name: EVENT_INFO[EEvents.DISPLAY_VARIABLE_TEXT].name },
     ],
     Boolean: [
       { id: EEvents.VARIABLE, name: 'Variable Set to False', preset: 'false' },
@@ -97,9 +157,6 @@ const FUNCTIONS_BY_CATEGORY = {
     ],
     Reset: [
       { id: EEvents.VARIABLE_RESET_ALL, name: EVENT_INFO[EEvents.VARIABLE_RESET_ALL].name },
-    ],
-    "Control Flow": [
-      { id: EEvents.IF, name: EVENT_INFO[EEvents.IF].name },
     ],
   }
 };
@@ -199,13 +256,20 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, sh
     };
 
     // Criar um elemento de script válido
+    const defaultArgs = [EEvents.IF, EEvents.WHILE].includes(eventCode as EEvents)
+      ? { left: firstVariableValue(), operator: '==', right: firstVariableValue() }
+      : DefaultValueEvents(eventCode, scenes, variablePreset);
+    const isSingleLayerScene = elementSelected?.sceneType === ETypeScene.LOGO || elementSelected?.sceneType === ETypeScene.POINTNCLICK;
+    if (isSingleLayerScene && [EEvents.CHANGE_LAYER, EEvents.VISIBLE_BACKGROUND, EEvents.CHANGE_PALETTE_BACKGROUND].includes(eventCode as EEvents) && defaultArgs) {
+      (defaultArgs as { layerId?: number }).layerId = 2;
+    }
     const newScript: IScriptsElement = {
       id: uuidv4(),
+      version: 1,
       command: eventCode,
-      args: eventCode === EEvents.IF
-        ? { left: firstVariableValue(), operator: '==', right: firstVariableValue() }
-        : DefaultValueEvents(eventCode, scenes, variablePreset),
-      ...(eventCode === EEvents.IF ? { children: { then: [] } } : {}),
+      args: defaultArgs,
+      ...([EEvents.IF, EEvents.WHILE, EEvents.FOR, EEvents.WAIT_FOR_BUTTON].includes(eventCode as EEvents) ? { children: { then: [] } } : {}),
+      ...(eventCode === EEvents.IF_BUTTON_HELD ? { children: { then: [], else: [] } } : {}),
     };
 
     if (onEventCreated) {
@@ -233,7 +297,11 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, sh
         updatedElement = { ...elementSelected, playerHit3Script: scriptUpdate };
         break;
       default:
-        scriptUpdate = [...(elementSelected?.script || []), newScript];
+        // A manually inserted Fade In replaces the placeholder created with
+        // the scene. There must be only one initial fade in the script.
+        scriptUpdate = eventCode === EEvents.FADE_IN && elementSelected?.script?.[0]?.command === EEvents.FADE_IN && elementSelected.script[0].args?.__automatic
+          ? [newScript, ...elementSelected.script.slice(1)]
+          : [...(elementSelected?.script || []), newScript];
         updatedElement = { ...elementSelected, script: scriptUpdate };
         break;
     }

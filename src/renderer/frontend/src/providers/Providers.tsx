@@ -6,6 +6,9 @@ import { IMainSettings } from "./contexts/interfaces/ISettingElement";
 import { ISettingUtils } from "./contexts/interfaces/ISettingUtils";
 import { IUserSettings } from "./contexts/interfaces/IUserSettings";
 import { IVariablesSettings } from "./contexts/interfaces/IVariablesElement";
+import { ISpriteSettings } from './contexts/interfaces/ISpriteElement';
+import { IScriptsSettings } from './contexts/interfaces/IScriptElement';
+import { IPalettesSettings } from './contexts/interfaces/IPalettesElement';
 
 // Criar os providers com nomes personalizados
 export const { Context: SettingsUtilsContext, Provider: SettingsUtilsProvider } = createProvider<ISettingUtils>(
@@ -43,6 +46,11 @@ export const { Context: BackgroundContext, Provider: BackgroundProvider } = crea
     { valueName: "backgrounds", setValueName: "setBackgrounds", ignoredFields: ["_saved"/*, "_deleted"*/] }
 );
 
+export const { Context: SpriteContext, Provider: SpriteProvider } = createProvider<ISpriteSettings[]>(
+    [],
+    { valueName: "spriteResources", setValueName: "setSpriteResources", ignoredFields: ["_saved"] }
+);
+
 export const { Context: VariablesContext, Provider: VariablesProvider } = createProvider<IVariablesSettings>(
     {
         _resourceType: 'variables',
@@ -52,6 +60,15 @@ export const { Context: VariablesContext, Provider: VariablesProvider } = create
         variables: [],
     },
     { valueName: "variables", setValueName: "setVariables", ignoredFields: ["_saved"] }
+);
+
+export const { Context: ScriptsContext, Provider: ScriptsProvider } = createProvider<IScriptsSettings>(
+    { _resourceType: 'scripts', _version: '1.0', _saved: true, _deleted: false, scripts: [] },
+    { valueName: 'scripts', setValueName: 'setScripts', ignoredFields: ['_saved'] }
+);
+export const { Context: PalettesContext, Provider: PalettesProvider } = createProvider<IPalettesSettings>(
+    { _resourceType: 'palettes', _version: '1.0', _saved: true, _deleted: false, palettes: [] },
+    { valueName: 'palettes', setValueName: 'setPalettes', ignoredFields: ['_saved'] }
 );
 
 // Função genérica para criar providers com nomes personalizados para value e setValue

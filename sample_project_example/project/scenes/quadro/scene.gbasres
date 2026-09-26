@@ -11,7 +11,9 @@
       "layerId": 2,
       "backgroundId": "bd4f4380-c0a8-4f67-81e2-33e8ee800110",
       "name": "",
-      "path": ""
+      "path": "",
+      "x": 80,
+      "y": 32
     }
   ],
   "x": 719.6400146484375,
@@ -21,10 +23,20 @@
   "sceneType": "Logo",
   "script": [
     {
-      "id": "49f0f09f-1338-41d0-aa4c-5bfc1a452e2c",
+      "id": "29d150a1-c92c-458a-acbe-07845866535a",
+      "version": 1,
+      "command": "EVENT_HIDE_ACTOR",
+      "args": {
+        "actorId": "__PLAYER__",
+        "__collapse": true
+      }
+    },
+    {
+      "id": "5eb02535-6d26-4dac-9618-e73ac64655a9",
       "command": "EVENT_FADE_IN",
       "args": {
         "speed": 2,
+        "__automatic": true,
         "__collapse": true
       }
     },
@@ -46,5 +58,6 @@
         "__collapse": true
       }
     }
-  ]
+  ],
+  "showCamera": false
 }

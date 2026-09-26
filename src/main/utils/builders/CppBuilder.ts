@@ -221,6 +221,17 @@ public:
    * Generate audio support headers
    */
   private async generateAudioSupport(config: GameConfig): Promise<void> {
+    // The event-enabled Butano template owns the runtime audio contract used
+    // by ScriptCommand. Preserve that header instead of replacing it with
+    // the historical bn::music_item API below.
+    if (this.templateDir) {
+      const templateAudioPath = path.join(this.templateDir, 'include', 'audio_manager.h');
+      if (fs.existsSync(templateAudioPath)) {
+        fs.copyFileSync(templateAudioPath, path.join(this.includeDir, 'audio_manager.h'));
+        console.log('..: Copied template audio_manager.h from template dir');
+        return;
+      }
+    }
     const content = `#ifndef AUDIO_MANAGER_H
 #define AUDIO_MANAGER_H
 
@@ -353,6 +364,16 @@ public:
         }).join(' else ');
   }
 
+  private conditionalToShowSpritesIfElse(graphicNames: string[]) {
+    return graphicNames.filter(file => file.startsWith('bn_sprite_items_'))
+      .map(file => {
+        const suffix = file.replace(/\.h$/, '').replace(/^bn_sprite_items_/, '');
+        return `if (name == bn::string<64>("${suffix}")) {
+\treturn bn::sprite_items::${suffix};
+    }`;
+      }).join(' else ');
+  }
+
   /**
    * Generate graphics manager state support headers
    */
@@ -370,6 +391,7 @@ public:
           content = content.replace(/\{\{VERSION\}\}/g, config.version || '1.0.0');
           content = content.replace(/\{\{BACKGROUND_CONDITIONALS_FROM_NAME\}\}/g, this.conditionalToShowBackgroundsIfElse(this.graphicHeadersGeneratedByButano || []));
           content = content.replace(/\{\{BITMAP_BACKGROUND_CONDITIONALS_FROM_NAME\}\}/g, this.conditionalToShowBitmapBackgroundsIfElse(this.graphicHeadersGeneratedByButano || []));
+          content = content.replace(/\{\{SPRITE_CONDITIONALS_FROM_NAME\}\}/g, this.conditionalToShowSpritesIfElse(this.graphicHeadersGeneratedByButano || []));
           fs.writeFileSync(graphicSrcPath, content, 'utf8');
           console.log('..: Copied template graphics_manager.cpp from template dir');
           return;

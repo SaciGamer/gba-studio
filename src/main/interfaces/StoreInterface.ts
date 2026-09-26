@@ -4,6 +4,7 @@ export interface IPreferences {
     recentProjects: IRecentProject[];
     tempBuildPath?: string;
     tempProjectBackupLimit?: number;
+    historyLimit?: number;
 }
 export interface IRecentProject {
     path: string;

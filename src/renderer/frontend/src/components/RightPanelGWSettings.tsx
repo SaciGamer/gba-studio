@@ -1,14 +1,97 @@
 import imgPlaceholder from '@/img/placeholder.png';
+import { joinLocalAssetPath } from '@/utils/localAssetUrl';
+import { loadPaletteTransparentImage } from '@/utils/paletteTransparency';
 import useAppContexts from "@/providers/contexts/AppContexts";
 import { IProjectSettings } from "@/providers/contexts/interfaces/IProjectElement";
 import { ISceneSettings } from "@/providers/contexts/interfaces/ISceneElement";
 import { EColorMode, IMainSettings } from "@/providers/contexts/interfaces/ISettingElement";
 import { CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled } from "@ant-design/icons";
-import { Button, Checkbox, Divider, Flex, Form, Image, Input, InputNumber, Radio, Select, Space, theme, Typography } from "antd";
+import { Button, Checkbox, Divider, Flex, Form, Input, Radio, Select, Space, theme, Typography } from "antd";
+import StepInputNumber, { InputNumber } from './StepInputNumber';
 import { Content } from "antd/es/layout/layout";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const { useToken } = theme;
+
+interface SceneBackgroundLayer {
+  key: string;
+  path: string;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+}
+
+const SceneLayersThumbnail: React.FC<{
+  layers: SceneBackgroundLayer[];
+  alt: string;
+  canvasWidth: number;
+  canvasHeight: number;
+}> = ({ layers, alt, canvasWidth, canvasHeight }) => {
+  const [transparentSources, setTransparentSources] = useState<Record<string, string>>({});
+  const layerSignature = useMemo(() => layers.map(layer => `${layer.key}:${layer.path}`).join('|'), [layers]);
+  const cropX = 0;
+  const cropY = 0;
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(layers.map(async layer => {
+      const image = await loadPaletteTransparentImage(layer.path);
+      return [layer.key, image?.toDataURL() ?? layer.path] as const;
+    })).then(entries => {
+      if (!cancelled) setTransparentSources(Object.fromEntries(entries));
+    });
+    return () => { cancelled = true; };
+  }, [layerSignature]);
+
+  return (
+    <span
+      role="img"
+      aria-label={alt}
+      style={{
+        position: 'relative',
+        display: 'block',
+        boxSizing: 'border-box',
+        width: 36,
+        height: 24,
+        flex: '0 0 36px',
+        overflow: 'hidden',
+        verticalAlign: 'middle',
+        background: '#111',
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: 240,
+          height: 160,
+          overflow: 'hidden',
+          transform: 'scale(0.15)',
+          transformOrigin: 'top left',
+        }}
+      >
+        {layers.length > 0 ? layers.map(layer => (
+          <img
+            key={layer.key}
+            src={transparentSources[layer.key] ?? layer.path}
+            alt=""
+            style={{
+              position: 'absolute',
+              top: layer.y - cropY,
+              left: layer.x - cropX,
+              display: 'block',
+              imageRendering: 'pixelated',
+            }}
+          />
+        )) : (
+          <img src={imgPlaceholder} alt="" style={{ display: 'block', width: 240, height: 160, objectFit: 'cover' }} />
+        )}
+      </span>
+    </span>
+  );
+};
 
 const UserSettingsForm: React.FC = () => {
   const [form] = Form.useForm();
@@ -103,7 +186,6 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
     settings, setSettings,
     scenes, backgrounds, settingUtils,
   } = useAppContexts();
-
   const optionsMoveSpeed = [
     { value: 0.25, label: "Speed ¼ (Slower)", ppf: "0.25 PPF" },
     { value: 0.5, label: "Speed ½", ppf: "0.5 PPF" },
@@ -184,9 +266,13 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
 
         setCustomSpeed(!optionsMoveSpeed.map((values) => values.value).includes(transformedSettings?.startMoveSpeed as number));
 
-        console.log('..: GameSettingsForm customSpeed %s, convertendo colorModo após loading: ', customSpeed, transformedSettings);
+        const normalizedSettings = {
+          ...transformedSettings,
+        };
 
-        form.setFieldsValue(transformedSettings);
+        console.log('..: GameSettingsForm customSpeed %s, convertendo colorModo após loading: ', customSpeed, normalizedSettings);
+
+        form.setFieldsValue(normalizedSettings);
         // setLoading(settings ? false : true);
       } catch (error) {
         console.error('..: Erro loading UserSettingsForm:', error);
@@ -195,27 +281,32 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
     };
 
     loadLocalSettings();
-  }, []);
+  }, [form, settings]);
 
   // if (loading) {
   //   return <Spin />;
   // }
 
-  const getImagePath = (scene: ISceneSettings): string => {
-    const getFileNameByBackgroundId = (scene: ISceneSettings): string | undefined => {
-      const sceneBackgroundId = scene.backgrounds?.find(b => b.backgroundId)?.backgroundId;
-      return backgrounds.find(b => !b._deleted && b.id === sceneBackgroundId)?.filename;
-    }
+  const getSceneBackgroundLayers = (scene: ISceneSettings) => (
+    [...(scene.backgrounds ?? [])]
+      .sort((left, right) => left.layerId - right.layerId)
+      .flatMap(layer => {
+        const background = backgrounds.find(item => !item._deleted && item.id === layer.backgroundId);
+        if (!background) return [];
 
-    if (!scene.backgrounds) return imgPlaceholder;
-
-    const response = getFileNameByBackgroundId(scene);
-    if (scene.sceneType != "Logo" && scene.sceneType != "Point Click" && scene.backgrounds?.length > 1) {
-      return response ? settingUtils.localImagePath + '/' + response : imgPlaceholder;
-    }
-
-    return response ? settingUtils.localImagePathHD + '/' + response : imgPlaceholder;
-  };
+        return [{
+          key: `${layer.layerId}-${background.id}`,
+          path: joinLocalAssetPath(
+            background.hd ? settingUtils.localImagePathHD : settingUtils.localImagePath,
+            background.filename,
+          ),
+          width: background.imageWidth,
+          height: background.imageHeight,
+          x: Number(layer.x) || 0,
+          y: Number(layer.y) || 0,
+        }];
+      })
+  );
 
   function getSceneMax(startSceneId: string, maxDefault: number) {
     const scene = scenes.find(s => s.id === startSceneId);
@@ -233,22 +324,23 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
         <Select
           showSearch
           optionFilterProp="label"
+          placeholder="Select Starting Scene"
           // value={scenes.filter(sf => !sf._deleted && sf.id === settings.startSceneId) ?? null }
           options={scenes.filter(sf => !sf._deleted).map(scene => ({
             value: scene.id, // ID único da cena
             label: (
-              <Content style={{ display: 'flex', alignItems: 'center' }}>
-                  <Image 
-                    preview={false}
-                    src={getImagePath(scene)} // Caminho da imagem da miniatura
-                    alt={scene.name} 
-                    style={{ display: 'flex', alignItems: 'center', width: 24, height: 24, marginRight: 8 }}
-                  />
-                  {scene.name} {/* Nome da cena */}
-              </Content>
+              <span style={{ display: 'inline-flex', width: '100%', minHeight: 36, alignItems: 'center', justifyContent: 'flex-start', gap: 8, lineHeight: 1 }}>
+                <SceneLayersThumbnail
+                  layers={getSceneBackgroundLayers(scene)}
+                  alt={scene.name}
+                  canvasWidth={Math.max(240, scene.width || 0)}
+                  canvasHeight={Math.max(160, scene.height || 0)}
+                />
+                <span>{scene.name}</span>
+              </span>
             ),
           }))}
-          style={{ width: '100%' }}
+          style={{ width: '100%', height: 40 }}
         >
         </Select>
       </Form.Item>
@@ -308,7 +400,7 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
       <Space.Compact block>
         {/* Movement Speed - Dynamic */}
         {customSpeed ? (
-          <Form.Item name="startMoveSpeed" label="Movement Speed" style={{ flex: 1, textAlign: 'center' }}>
+          <Form.Item label="Movement Speed" style={{ flex: 1, textAlign: 'center' }}>
             <InputNumber
               style={{ width: '100%' }}
               min={0.00}

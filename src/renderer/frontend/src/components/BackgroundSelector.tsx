@@ -1,7 +1,11 @@
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { ETypeScene } from '@/providers/contexts/interfaces/ISceneElement';
-import { Select, theme } from 'antd';
+import { EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons';
+import { Button, message, Select, Space, theme, Typography } from 'antd';
+import StepInputNumber from './StepInputNumber';
 import React, { useState } from 'react';
+import { joinLocalAssetPath } from '@/utils/localAssetUrl';
+import { countDistinctImageTiles } from '@/utils/tileCount';
 
 const { useToken } = theme;
 
@@ -10,22 +14,24 @@ interface BackgroundSelectorProps {
   layerKey: number;
   backgroundId?: string | null | undefined;
   onUpdateBackground?: (layerId: number, backgroundId: string | null) => void;
+  showPreviewVisibilityToggle?: boolean;
 }
 
 export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
   selectedElementId,
   layerKey,
   backgroundId,
-  onUpdateBackground
+  onUpdateBackground,
+  showPreviewVisibilityToggle = false,
 }) => {
   const { token } = useToken();
-  const { scenes, setScenes, backgroundsRef, settingUtils, setElementSelected } = useAppContexts();
+  const { scenes, setScenes, backgroundsRef, settingUtils, setElementSelected, userSettings, setUserSettings } = useAppContexts();
   const elementSelected = scenes.find(s => s.id === selectedElementId);
   const isHDScene = elementSelected?.sceneType === ETypeScene.LOGO || elementSelected?.sceneType === ETypeScene.POINTNCLICK;
   const backgroundsAvaible = backgroundsRef.current.filter(b => !b._deleted && b.hd === isHDScene);
   const [haveValueChange, setHaveValueChange] = useState(false);
 
-  const updateSceneBackground = (newBackgroundId: string | null) => {
+  const updateSceneBackground = async (newBackgroundId: string | null) => {
     let maxWidth = 240;
     let maxHeight = 160;
 
@@ -35,33 +41,38 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
     }
 
     // Calcula tamanho mínimo com projeção de troca de background
-    if (elementSelected && elementSelected.backgrounds) {
-      // Copia os backgrounds atuais
-      let projectedBackgrounds = [...elementSelected.backgrounds];
-
-      // Substitui o background do layer escolhido pelo novo
-      projectedBackgrounds = projectedBackgrounds.map(bg =>
+    const projectedBackgrounds = (() => {
+      const current = [...(elementSelected?.backgrounds ?? [])];
+      if (current.some(bg => bg.layerId === layerKey)) {
+        return current.map(bg =>
         bg.layerId === layerKey
           ? { ...bg, backgroundId: newBackgroundId }
-          : bg
-      );
-
-      // Lista de IDs após projeção
-      const elementBackgroundsId = projectedBackgrounds.map(bg => bg.backgroundId);
-
-      // Filtra backgrounds disponíveis que correspondem aos IDs
-      const sceneBackgrounds = backgroundsAvaible.filter(bg =>
-        elementBackgroundsId.includes(bg.id)
-      );
-
-      if (sceneBackgrounds.length > 0) {
-        const calcWidth = Math.max(...sceneBackgrounds.map(img => img.imageWidth));
-        const calcHeight = Math.max(...sceneBackgrounds.map(img => img.imageHeight));
-
-        // GBA: mínimo 240x160
-        maxWidth = calcWidth > 240 ? calcWidth : 240;
-        maxHeight = calcHeight > 160 ? calcHeight : 160;
+          : bg);
       }
+      return [...current, { layerId: layerKey, backgroundId: newBackgroundId }];
+    })();
+    const sceneBackgrounds = projectedBackgrounds
+      .map(layer => backgroundsRef.current.find(background => !background._deleted && background.id === layer.backgroundId))
+      .filter((background): background is NonNullable<typeof background> => Boolean(background));
+    try {
+      const projectedTileCount = await countDistinctImageTiles(sceneBackgrounds.map(background => joinLocalAssetPath(
+        background.hd ? settingUtils.localImagePathHD : settingUtils.localImagePath,
+        background.filename,
+      )));
+      if (projectedTileCount > 4096) {
+        message.error(`A cena ultrapassa o limite de 4096 tiles distintos (${projectedTileCount}/4096).`);
+        return;
+      }
+    } catch {
+      // The live scene counter recalculates once its images finish loading.
+      // Do not reject a selection from only width/height metadata: repeated
+      // art is valid and must not be counted as a different tile.
+    }
+    if (sceneBackgrounds.length > 0) {
+      const calcWidth = Math.max(...sceneBackgrounds.map(img => img.imageWidth));
+      const calcHeight = Math.max(...sceneBackgrounds.map(img => img.imageHeight));
+      maxWidth = Math.max(calcWidth, 240);
+      maxHeight = Math.max(calcHeight, 160);
     }
 
     // Atualiza o elementSelected com width, height e backgrounds projetados
@@ -69,23 +80,7 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
       ...elementSelected,
       width: maxWidth,
       height: maxHeight,
-      backgrounds: (() => {
-        const exists = elementSelected?.backgrounds?.some(bg => bg.layerId === layerKey);
-        if (exists) {
-          // Atualiza a camada existente
-          return elementSelected?.backgrounds?.map(bg =>
-            bg.layerId === layerKey
-              ? { ...bg, backgroundId: newBackgroundId, name: "", path: "" }
-              : bg
-          );
-        } else {
-          // Cria a camada se não existir
-          return [
-            ...(elementSelected?.backgrounds ?? []),
-            { layerId: layerKey, backgroundId: newBackgroundId, name: "", path: "" }
-          ];
-        }
-      })(),
+      backgrounds: projectedBackgrounds.map(bg => bg.layerId === layerKey ? { ...bg, name: "", path: "" } : bg),
       _saved: false
     };
 
@@ -97,6 +92,29 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
         scene.id === selectedElementId ? { ...scene, ...updatedElement } : scene
       )
     );
+  };
+
+  const previewVisibilityKey = `${selectedElementId}:${layerKey}`;
+  const isPreviewVisible = !userSettings.hiddenBackgroundLayers?.includes(previewVisibilityKey);
+  const togglePreviewVisibility = () => setUserSettings(previous => {
+    const hidden = previous.hiddenBackgroundLayers ?? [];
+    return {
+      ...previous,
+      hiddenBackgroundLayers: hidden.includes(previewVisibilityKey)
+        ? hidden.filter(key => key !== previewVisibilityKey)
+        : [...hidden, previewVisibilityKey],
+    };
+  });
+
+  const layer = elementSelected?.backgrounds?.find(item => item.layerId === layerKey);
+  const updateLayerPosition = (axis: 'x' | 'y', value: number | null) => {
+    if (!elementSelected) return;
+    const backgrounds = (elementSelected.backgrounds ?? []).some(item => item.layerId === layerKey)
+      ? (elementSelected.backgrounds ?? []).map(item => item.layerId === layerKey ? { ...item, [axis]: Number(value) || 0 } : item)
+      : [...(elementSelected.backgrounds ?? []), { layerId: layerKey, backgroundId: null, x: axis === 'x' ? Number(value) || 0 : 0, y: axis === 'y' ? Number(value) || 0 : 0 }];
+    const updated = { ...elementSelected, backgrounds, _saved: false };
+    setElementSelected(updated);
+    setScenes(previous => previous.map(scene => scene.id === updated.id ? updated : scene));
   };
 
   const initialValue = (): string | null | undefined => {
@@ -117,14 +135,16 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
   }
 
   return (
+    <Space direction="vertical" size={8} style={{ width: '100%' }}>
+    <Space.Compact block>
     <Select
       showSearch
-      optionFilterProp="label"
+      optionFilterProp="title"
       suffixIcon={null}
       placeholder={'No background'}
       value={ initialValue() }
       onChange={(newBackgroundId) => updateSceneBackground(newBackgroundId)}
-      style={{ width: '100%' }}
+      style={{ width: '100%', height: 40 }}
     >
       <Select.Option value={null} key="none">
         <em>No background</em>
@@ -134,20 +154,36 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
         .map(background => {
           const path = isHDScene ? settingUtils.localImagePathHD : settingUtils.localImagePath;
 
-          return (
-            <Select.Option title={'Background Options'} key={background.id} value={background.id} label={background.name}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
+          const optionLabel = <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 36, lineHeight: 1 }}>
                 <img
                   src={`${path}/${background.filename}`}
-                  alt={background.name}
-                  style={{ width: 24, height: 24, marginRight: 8 }}
+                  alt=""
+                  style={{ display: 'block', flex: '0 0 36px', width: 36, height: 24, objectFit: 'cover', imageRendering: 'pixelated' }}
                 />
-                {background.name}
-              </div>
+                <span>{background.name}</span>
+              </span>;
+
+          return (
+            <Select.Option title={background.name} key={background.id} value={background.id} label={optionLabel}>
+              {optionLabel}
             </Select.Option>
           );
         })
       }
     </Select>
+    {showPreviewVisibilityToggle && <Button
+      title={isPreviewVisible ? 'Hide layer in editor preview' : 'Show layer in editor preview'}
+      aria-label={isPreviewVisible ? 'Hide layer in editor preview' : 'Show layer in editor preview'}
+      icon={isPreviewVisible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+      onClick={togglePreviewVisibility}
+      style={{ width: 40, height: 40 }}
+    />}
+    </Space.Compact>
+    <Typography.Text type="secondary">Image position</Typography.Text>
+    <Space.Compact block>
+      <StepInputNumber addonBefore="X" value={layer?.x ?? 0} onChange={value => updateLayerPosition('x', value)} style={{ width: '50%' }} />
+      <StepInputNumber addonBefore="Y" value={layer?.y ?? 0} onChange={value => updateLayerPosition('y', value)} style={{ width: '50%' }} />
+    </Space.Compact>
+    </Space>
   );
 };

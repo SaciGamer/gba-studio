@@ -1,10 +1,12 @@
 import imgPlaceholder from '@/img/placeholder.png';
+import { joinLocalAssetPath } from '@/utils/localAssetUrl';
 import useAppContexts from "@/providers/contexts/AppContexts";
 import { ISceneSettings, IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
 import { CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled } from "@ant-design/icons";
-import { Button, Flex, Form, InputNumber, Radio, Select, Space } from "antd";
+import { Button, Flex, Form, Radio, Select, Space } from "antd";
+import StepInputNumber, { InputNumber } from '../StepInputNumber';
 import { Content } from 'antd/es/layout/layout';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { AntdToken } from '../common/AntDToken';
 import { IChangeScene } from './interfaces/IScene';
 
@@ -40,11 +42,16 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
     if (!scene.backgrounds) return imgPlaceholder;
 
     const response = getFileNameByBackgroundId(scene);
-    if (scene.sceneType != "Logo" && scene.sceneType != "Point Click" && scene.backgrounds?.length > 1) {
-      return response ? settingUtils.localImagePath + '/' + response : imgPlaceholder;
-    }
+    const background = backgrounds.find(
+      item => !item._deleted && item.filename === response,
+    );
+    const imagePath = background?.hd
+      ? settingUtils.localImagePathHD
+      : settingUtils.localImagePath;
 
-    return response ? settingUtils.localImagePathHD + '/' + response : imgPlaceholder;
+    return response
+      ? joinLocalAssetPath(imagePath, response)
+      : imgPlaceholder;
   };
 
   const defaultValues = useMemo(() => {
@@ -52,8 +59,6 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
     const scene = scenes.find(s => s.id === (args?.sceneId || s.id === initValue.sceneId) && s._deleted !== true);
     // const imagePath = getImagePath(scene!);
     const sceneName = scene?.name || 'Unknown Scene';
-
-    customTitle(` To ${sceneName} At {${args?.x?.value ?? initValue.x?.value},${args?.y?.value ?? initValue.y?.value}}`);
 
     return {
       sceneId: args?.sceneId ?? initValue.sceneId,
@@ -66,6 +71,10 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
     };
   }, [event?.args, scenes]);
 
+  useEffect(() => {
+    customTitle(` To ${defaultValues.sceneName} At {${defaultValues.x?.value ?? 0},${defaultValues.y?.value ?? 0}}`);
+  }, [defaultValues.sceneName, defaultValues.x?.value, defaultValues.y?.value]);
+
 	return (
     <Form layout="vertical">
       <Form.Item name="scene" label={ "Change Scene" } style={{ flex: 1, textAlign: 'center' }}>
@@ -73,17 +82,17 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
           showSearch
           optionFilterProp="label"
           defaultValue={defaultValues.sceneId}
+          style={{ height: 40 }}
           options={scenes.filter(sf => !sf._deleted).map(scene => ({
             value: scene.id, // ID único da cena
             label: (
-              <Content style={{ display: 'flex', alignItems: 'center' }}>
-                  {/* <Image
-                    preview={false}
-                    src={getImagePath(scene)} // Caminho da imagem da miniatura
-                    alt={scene.name} 
-                    style={{ display: 'flex', alignItems: 'center', width: 24, height: 24, marginRight: 8 }}
-                  /> */}
-                  {scene.name} {/* Nome da cena */}
+              <Content style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8, minHeight: 36, lineHeight: 1 }}>
+                <img
+                  src={getImagePath(scene)}
+                  alt=""
+                  style={{ display: 'block', flex: '0 0 36px', width: 36, height: 24, objectFit: 'cover', imageRendering: 'pixelated' }}
+                />
+                <span>{scene.name}</span>
               </Content>
             ),
           }))}
