@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 type StepInputNumberProps = React.ComponentProps<typeof AntInputNumber>;
 
 /** InputNumber with a consistent fine/coarse increment across the editor. */
-const StepInputNumber: React.FC<StepInputNumberProps> = ({ step, addonBefore, ...props }) => {
+const StepInputNumber: React.FC<StepInputNumberProps> = ({ step, addonBefore, className, ...props }) => {
   const [ctrlPressed, setCtrlPressed] = useState(false);
   const requestedStep = typeof step === 'number' ? step : Number(step);
   // Integer fields move one pixel/unit at a time. Preserve fractional fields
@@ -28,8 +28,8 @@ const StepInputNumber: React.FC<StepInputNumberProps> = ({ step, addonBefore, ..
     };
   }, []);
 
-  const input = <AntInputNumber {...props} step={ctrlPressed ? normalStep * 8 : normalStep} />;
-  return addonBefore ? <Space.Compact><span style={{ paddingInline: 8, display: 'inline-flex', alignItems: 'center' }}>{addonBefore}</span>{input}</Space.Compact> : input;
+  const input = <AntInputNumber {...props} className={className} step={ctrlPressed ? normalStep * 8 : normalStep} />;
+  return addonBefore ? <Space.Compact><Space.Addon>{addonBefore}</Space.Addon>{input}</Space.Compact> : input;
 };
 
 export default StepInputNumber;

@@ -27,6 +27,7 @@ bin/
 
 # Testes
 coverage/
+test-results/
 
 # Ambiente
 .env

@@ -3,11 +3,10 @@ import { joinLocalAssetPath } from '@/utils/localAssetUrl';
 import useAppContexts from "@/providers/contexts/AppContexts";
 import { ISceneSettings, IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
 import { CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled } from "@ant-design/icons";
-import { Button, Flex, Form, Radio, Select, Space } from "antd";
+import { Flex, Form, Radio, Select, Space } from "antd";
 import StepInputNumber, { InputNumber } from '../StepInputNumber';
 import { Content } from 'antd/es/layout/layout';
 import { useEffect, useMemo } from 'react';
-import { AntdToken } from '../common/AntDToken';
 import { IChangeScene } from './interfaces/IScene';
 
 interface ChangeSceneEventProps {
@@ -17,7 +16,6 @@ interface ChangeSceneEventProps {
 }
 
 export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEventProps) {
-  const { token } = AntdToken();
   // const {scenes} = useSceneContext();
   // const {backgrounds} = useSceneContext();
   // const {settingUtils} = useSettingsUtilsContext();
@@ -104,9 +102,9 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
       <Flex style={{ flex: 1, textAlign: 'center' }}>
         <Form.Item label="X" style={{ flex: 1 }}>
           <Space.Compact block>
-            <Button icon={'#'} style={{ backgroundColor: token.colorBgBase }}/>
+            <Space.Addon>X</Space.Addon>
             {defaultValues.x?.type === 'number' && (
-              <InputNumber 
+              <InputNumber
                 min={0} 
                 defaultValue={defaultValues.x.value as number} 
                 style={{ flex: 1, textAlign: 'center' }} 
@@ -117,9 +115,9 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
         </Form.Item>
         <Form.Item label="Y" style={{ flex: 1, marginLeft: "10px"  }}>
           <Space.Compact block>
-            <Button icon={'#'} style={{ backgroundColor: token.colorBgBase }}/>
+            <Space.Addon>Y</Space.Addon>
             {defaultValues.x?.type === 'number' && (
-              <InputNumber 
+              <InputNumber
                 min={0} 
                 defaultValue={defaultValues.y?.value as number} 
                 style={{ flex: 1 }}

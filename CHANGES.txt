@@ -19,6 +19,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Standardized X/Y/W/H numeric controls on the existing `Space.Addon` visual
+  pattern across sprite, scene, layer, and runtime event editors.
+- Added a dark, labeled Sprite Preview control header for playback, animation
+  speed, tile counts, and grid controls.
+- Ignored generated Playwright `test-results/` artifacts.
 - Scene, actor, player, camera, event graph, build/transcoding, and asset
   pipelines now share stronger validation and typed resource contracts.
 - The sample project now exercises expanded scenes, triggers, collisions,

@@ -905,12 +905,13 @@ const SpriteEditor: React.FC = () => {
       <Splitter.Panel min={360}>
       <ResourceDropSurface onFiles={handleDroppedSprites} hint="Drop a sprite image here">
       <Flex vertical style={{ width: '100%', height: '100%', minWidth: 0, background: token.colorBgContainer, overflow: 'hidden' }}>
-        <Flex gap={8} align="center" justify="space-between" wrap="wrap" style={{ padding: 8, background: token.colorBgContainer, borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
+        <Flex gap={8} align="center" justify="space-between" wrap="wrap" style={{ padding: 8, background: token.colorBorder, borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
           <Flex gap={8} align="center" style={{ flex: 1, minWidth: 300 }}>
+            <Typography.Text strong style={{ color: '#fff', whiteSpace: 'nowrap' }}>PREVIEW</Typography.Text>
             <Tooltip title="Previous frame"><Button size="small" icon={<StepBackwardOutlined />} onClick={() => stepFrame(-1)} /></Tooltip>
             <Tooltip title={isPlaying ? 'Pause' : 'Play'}><Button size="small" icon={isPlaying ? <PauseOutlined /> : <PlaySquareOutlined />} onClick={() => setIsPlaying(value => !value)} /></Tooltip>
             <Tooltip title="Next frame"><Button size="small" icon={<StepForwardOutlined />} onClick={() => stepFrame(1)} /></Tooltip>
-            <Typography.Text type="secondary" style={{ whiteSpace: 'nowrap' }}>Speed</Typography.Text>
+            <Typography.Text style={{ color: '#fff', whiteSpace: 'nowrap' }}>Speed</Typography.Text>
             <Tooltip title="Preview speed uses the same animation speed levels as actors and settings.">
               <Slider
                 min={0}
@@ -921,12 +922,12 @@ const SpriteEditor: React.FC = () => {
                 style={{ flex: 1, minWidth: 160, maxWidth: 260, margin: '0 8px' }}
               />
             </Tooltip>
-            <Typography.Text type="secondary" style={{ width: 108, whiteSpace: 'nowrap' }}>
+            <Typography.Text style={{ color: '#fff', width: 108, whiteSpace: 'nowrap' }}>
               {ANIMATION_SPEED_OPTIONS[previewAnimationSpeed]?.label} · {ANIMATION_SPEED_OPTIONS[previewAnimationSpeed]?.fps || 0} FPS
             </Typography.Text>
           </Flex>
           <Flex gap={6} align="center">
-            <Typography.Text type="secondary">Tiles {tilePreviews.length} · Unique {new Set(tilePreviews).size}</Typography.Text>
+            <Typography.Text style={{ color: '#fff' }}>Tiles {tilePreviews.length} · Unique {new Set(tilePreviews).size}</Typography.Text>
             <Tooltip title="Toggle grid"><Button size="small" type={showGrid ? 'primary' : 'default'} icon={<TableOutlined />} onClick={() => setShowGrid(value => !value)} /></Tooltip>
           </Flex>
         </Flex>

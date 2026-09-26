@@ -307,7 +307,7 @@ export default function RuntimeEventPanel({ event, customTitle, onValueChange }:
     };
   });
   const number = (label: string, key: string, min = 0, max?: number) => <Form.Item label={label}>
-    <InputNumber style={{ width: '100%' }} min={min} max={max} precision={0} value={Number(args[key] ?? min)} onChange={value => update({ [key]: value ?? min })} />
+    <InputNumber addonBefore={key === 'x' ? 'X' : key === 'y' ? 'Y' : undefined} style={{ width: '100%' }} min={min} max={max} precision={0} value={Number(args[key] ?? min)} onChange={value => update({ [key]: value ?? min })} />
   </Form.Item>;
 
   switch (event.command) {

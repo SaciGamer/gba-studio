@@ -1,10 +1,9 @@
-import { Button, Dropdown, Flex, Form, Segmented, Select, Space, Switch, Tabs, Typography } from "antd";
+import { Dropdown, Flex, Form, Segmented, Select, Space, Switch, Tabs, Typography } from "antd";
 import StepInputNumber, { InputNumber } from '../StepInputNumber';
 import { IChangeBackgroundArgs, ILayerOptions, ILayerMovement, LayerMultiProps, MultiLayers } from "./interfaces/ILayer";
 import { ETypeScene, IArgs, IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
 import { Content } from "antd/es/layout/layout";
 import Title from "antd/lib/typography/Title";
-import { AntdToken } from "../common/AntDToken";
 import useAppContexts from "@/providers/contexts/AppContexts";
 import { CurrentBackgroundThumbnail } from './BackgroundEvents';
 import { useEffect } from 'react';
@@ -63,7 +62,6 @@ export function ChangeLayerEvent({ event, onValueChange }: LayerEventProps) {
 }
 
 export function MoveLayerEvent({ event, onValueChange }: LayerEventProps) {
-	const { token } = AntdToken();
 	const args = event?.args as LayerMultiProps;
     
   return (
@@ -76,7 +74,7 @@ export function MoveLayerEvent({ event, onValueChange }: LayerEventProps) {
       <Flex style={{ flex: 1, textAlign: 'left' }}>
         <Form.Item label="X" style={{ flex: 1 }}>
 					<Space.Compact block>
-						<Button icon={'#'} style={{ backgroundColor: token.colorBgBase }}/>
+						<Space.Addon>X</Space.Addon>
 						<InputNumber
 							defaultValue={0}
 							placeholder="X"
@@ -89,7 +87,7 @@ export function MoveLayerEvent({ event, onValueChange }: LayerEventProps) {
 				<Form.Item label="Y" style={{ flex: 1, marginLeft: "10px"  }}>
 					<Space.Compact block>
 						
-						<Button icon={'#'} style={{ backgroundColor: token.colorBgBase }}/>
+						<Space.Addon>Y</Space.Addon>
 						<InputNumber
 							defaultValue={0}
 							placeholder="Y"
@@ -103,7 +101,7 @@ export function MoveLayerEvent({ event, onValueChange }: LayerEventProps) {
 			<Flex>
 				<Form.Item label="SpeedX" style={{ flex: 1 }}>
 					<Space.Compact block>
-						<Button icon={'#'} style={{ backgroundColor: token.colorBgBase }}/>
+						<Space.Addon>Speed X</Space.Addon>
 						<InputNumber
 							defaultValue={0}
 							placeholder="SpeedX"
@@ -116,7 +114,7 @@ export function MoveLayerEvent({ event, onValueChange }: LayerEventProps) {
 				<Form.Item label="SpeedY" style={{ flex: 1, marginLeft: "10px"  }}>
 					<Space.Compact block>
 						
-						<Button icon={'#'} style={{ backgroundColor: token.colorBgBase }}/>
+						<Space.Addon>Speed Y</Space.Addon>
 						<InputNumber
 							defaultValue={0}
 							placeholder="SpeedY"
