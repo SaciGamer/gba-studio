@@ -42,3 +42,9 @@ export function fontCharacterWidth(font: PreviewFontId, character: string): numb
   const accentIndex = FONT_ACCENTS.indexOf(character);
   return accentIndex >= 0 ? metrics.accentWidths?.[accentIndex] ?? metrics.glyphWidth : metrics.glyphWidth;
 }
+
+export function measureFontText(font: PreviewFontId, value: string): { width: number; height: number } {
+  const lines = String(value).split('\n');
+  const width = Math.max(0, ...lines.map(line => Array.from(line).reduce((sum, character) => sum + fontCharacterWidth(font, character), 0)));
+  return { width, height: Math.max(1, lines.length) * PREVIEW_FONTS[font].glyphHeight };
+}

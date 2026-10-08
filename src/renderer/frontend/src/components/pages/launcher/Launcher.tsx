@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Layout, Menu, Image, message, App as AntDApp, Spin } from 'antd';
 import {
@@ -101,7 +101,7 @@ const Launcher = () => {
     };
   }, []);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const loadPreferences = async () => {
       try {
         await window.electronAPI.loadPreferences().then((preferencias: { recentProjects?: Project[] }) => {
@@ -149,6 +149,16 @@ const Launcher = () => {
 
     setIsLoading(false);
   }, [preferencesLoaded]);
+
+  useEffect(() => {
+    let active = true;
+    void window.electronAPI.getVersionsAPI().then((versions: { projectVersion: string }) => {
+      if (active) setVersionAPI(versions.projectVersion);
+    }).catch((error: unknown) => {
+      console.warn('Could not load launcher version:', error);
+    });
+    return () => { active = false; };
+  }, []);
 
   const handleRemoveProject = (title: string, path: any) => {
     message.success(`${title} removido dos recentes`);
@@ -199,13 +209,6 @@ const Launcher = () => {
       </AntDApp>
     );
   }
-
-  const fetchVersions = async () => {
-    const fetchedVersions = await window.electronAPI.getVersionsAPI();
-    setVersionAPI(fetchedVersions.projectVersion);
-  };
-
-  fetchVersions();
 
   return (
     <AntDApp>

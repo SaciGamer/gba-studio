@@ -1,0 +1,11 @@
+{
+  "_resourceType": "background",
+  "id": "original_stars",
+  "name": "stars",
+  "filename": "stars.bmp",
+  "imageWidth": 512,
+  "imageHeight": 256,
+  "hd": false,
+  "tileColors": "",
+  "_deleted": false
+}

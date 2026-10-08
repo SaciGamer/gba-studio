@@ -45,6 +45,34 @@
   /* --border-radius: 4px; */
 }
 
+/* Shared alignment for searchable select inputs across the editor. */
+.ant-select-single .ant-select-selector {
+  align-items: center !important;
+  text-align: left !important;
+}
+
+.ant-select-single .ant-select-selection-item,
+.ant-select-single .ant-select-selection-placeholder {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+/* Ant Design message toasts use compact default padding; give app-wide status
+   messages enough room while keeping their content and placement unchanged. */
+.ant-message .ant-message-notice-wrapper .ant-message-notice-content {
+  padding: 12px 20px !important;
+}
+
+.ant-message .ant-message-custom-content {
+  gap: 8px !important;
+}
+
+.ant-btn-dangerous {
+  box-shadow: none !important;
+}
+
 .gba-theme-glass {
   background: #dce7f0;
 }
@@ -285,6 +313,18 @@ body, html {
 
 .custom-tree .ant-tree-switcher-noop {
   display: none !important;
+}
+
+/* CaretRight starts pointing right; prevent Ant Design's default closed rotation. */
+.custom-tree.ant-tree .ant-tree-switcher_close .left-panel-switcher svg {
+  transform: rotate(0deg);
+}
+
+.left-navigation-section.ant-collapse > .ant-collapse-item > .ant-collapse-header {
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 16px;
+  align-items: center;
 }
 
 /* .ant-collapse-content-box {

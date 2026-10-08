@@ -285,9 +285,9 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
     if (copiedResourceRef.current) {
       const { type, value } = copiedResourceRef.current;
       const duplicated = { ...clone(value), id: nextId(), _saved: false, name: `${value.name ?? value.symbol ?? type} Copy` };
-      if (type === 'scripts') scripts.setScripts(previous => ({ ...previous, scripts: [...previous.scripts, duplicated] }));
-      else if (type === 'variables') variables.setVariables(previous => ({ ...previous, variables: [...previous.variables, duplicated] }));
-      else if (type === 'palettes') palettes.setPalettes(previous => ({ ...previous, palettes: [...previous.palettes, duplicated] }));
+      if (type === 'scripts') scripts.setScripts(previous => ({ ...previous, scripts: [...previous.scripts, duplicated], _saved: false }));
+      else if (type === 'variables') variables.setVariables(previous => ({ ...previous, variables: [...previous.variables, duplicated], _saved: false }));
+      else if (type === 'palettes') palettes.setPalettes(previous => ({ ...previous, palettes: [...previous.palettes, duplicated], _saved: false }));
       else if (type === 'sprites') sprites.setSpriteResources(previous => [...previous, duplicated]);
       else if (type === 'backgrounds') backgrounds.setBackgrounds(previous => [...previous, duplicated]);
       return;
@@ -403,11 +403,13 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
     window.addEventListener('gba-studio:scene-paste', onPaste);
     window.addEventListener('gba-studio:scene-cut', onCut);
     window.addEventListener('gba-studio:clear-scene-clipboard', onClearClipboard);
-    window.electronAPI?.on?.('history-undo', onUndo);
-    window.electronAPI?.on?.('history-redo', onRedo);
-    window.electronAPI?.on?.('scene-copy', onCopy);
-    window.electronAPI?.on?.('scene-paste', onPaste);
-    window.electronAPI?.on?.('scene-cut', onCut);
+    const unsubscribe = [
+      window.electronAPI?.subscribe?.('history-undo', onUndo),
+      window.electronAPI?.subscribe?.('history-redo', onRedo),
+      window.electronAPI?.subscribe?.('scene-copy', onCopy),
+      window.electronAPI?.subscribe?.('scene-paste', onPaste),
+      window.electronAPI?.subscribe?.('scene-cut', onCut),
+    ].filter((cancel): cancel is () => void => typeof cancel === 'function');
     return () => {
       document.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('gba-studio:undo', onUndo);
@@ -416,11 +418,7 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
       window.removeEventListener('gba-studio:scene-paste', onPaste);
       window.removeEventListener('gba-studio:scene-cut', onCut);
       window.removeEventListener('gba-studio:clear-scene-clipboard', onClearClipboard);
-      window.electronAPI?.removeListener?.('history-undo', onUndo);
-      window.electronAPI?.removeListener?.('history-redo', onRedo);
-      window.electronAPI?.removeListener?.('scene-copy', onCopy);
-      window.electronAPI?.removeListener?.('scene-paste', onPaste);
-      window.electronAPI?.removeListener?.('scene-cut', onCut);
+      unsubscribe.forEach(cancel => cancel());
     };
   }, [clearSceneClipboard, copySelectedScene, cutSelectedScene, pasteScene, redo, undo]);
 

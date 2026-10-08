@@ -11,6 +11,10 @@ const defaultMainSettings: IMainSettings = {
     startDirection: 'right',
     colorMode: 'mono',
     fadeDirection: 0,
+    inputMap: {
+        move_left: ['LEFT'], move_right: ['RIGHT'], move_up: ['UP'], move_down: ['DOWN'],
+        confirm: ['A'], cancel: ['B'], jump: ['B'], shoot: ['B'], pause: ['START'], menu: ['SELECT'],
+    },
     demoAudioVolume: 1,
     demoAudioMuted: false,
     playerSpriteId: null,

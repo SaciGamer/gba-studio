@@ -11,7 +11,6 @@ import { promisify } from 'util';
 import windowStateKeeper from 'electron-window-state';
 import { getPreferences, updatePreferences, initializeDefaultPaths, getBuildConfig } from './handlers/preferenceHandlers';
 import { prepareProjectSandbox, requestSaveChanges, setProjectDirectory, setProjectFile, waitForSaveComplete, copyDirectoryContents } from './services/saveSettingsService';
-import { saveEvents } from './services/saveSettingsService';
 import { createProjectStruct } from './structs/mainProjectStruct';
 import menuTemplate from './menuTemplate';
 import compileGBA, { cancelActiveCompile } from './utils/gbaCompiler/compile-gba';
@@ -23,6 +22,7 @@ import { setCurrentActiveSandboxDirectory } from './states/tempProjectState';
 import { loadLauncherCredits, refreshLauncherCredits } from './services/creditsService';
 import { checkForUpdates } from './services/updateService';
 
+import { RuntimeMonitorWindow, registerRuntimeMonitorIpc } from './managers/RuntimeMonitorWindow';
 import express from 'express';
 import { CompileResult } from './utils/types/BuildTypes';
 
@@ -69,6 +69,7 @@ interface Windows {
   launcher: BrowserWindow | null;
   main: BrowserWindow | null;
   emulator: BrowserWindow | null;
+  runtimeMonitor: BrowserWindow | null;
   about: BrowserWindow | null;
 }
 
@@ -78,8 +79,19 @@ export const windows: Windows = {
   launcher: null,
   main: null,
   emulator: null,
+  runtimeMonitor: null,
   about: null
 };
+
+const runtimeMonitor = new RuntimeMonitorWindow({
+  preloadPath,
+  iconPath,
+  rendererUrl: isDev
+    ? 'http://localhost:5173#/runtime-monitor'
+    : `file://${path.join(__dirname, '../renderer', 'index.html')}#/runtime-monitor`,
+  onWindowChange: window => { windows.runtimeMonitor = window; },
+});
+registerRuntimeMonitorIpc(ipcMain, runtimeMonitor);
 
 // Detect if app was started with a project file in args (Windows: double-clicking a .gbaproj)
 const initialProjectArg = process.argv.find(a => typeof a === 'string' && a.toLowerCase().endsWith('.gbaproj')) as string | undefined;
@@ -391,6 +403,7 @@ function launchEmulatorWindow(romPath: string) {
     },
   });
 
+  runtimeMonitor.attach(windows.emulator);
   windows.emulator?.setMenu(null);
 
   // passa o caminho da ROM via query string ou IPC
@@ -549,6 +562,11 @@ async function loadProject(filePath: string) {
     }
     windows.main.close();
   }
+
+  // Stop subscriptions from the previous project before changing the global
+  // source and sandbox paths. The old BrowserWindow is intentionally closed
+  // from this flow, so its regular close handler does not clear these.
+  await clearWatchers();
   
   // cleanAllTargetDir();
   
@@ -571,7 +589,12 @@ async function loadProject(filePath: string) {
   console.log('..: File:', file);
   console.log('..: Directory:', directory);
 
-  updatePreferences('recentProjects', { title: file  , path: directory});
+  let cartridgeImage: string | null = null;
+  try {
+    const projectMetadata = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    cartridgeImage = typeof projectMetadata.cartridgeImage === 'string' ? projectMetadata.cartridgeImage : null;
+  } catch { /* Older or not-yet-created project files use the default cartridge. */ }
+  updatePreferences('recentProjects', { title: file, path: directory, hasCartridgeImage: Boolean(cartridgeImage), cartridgeImage });
 
   createProjectWindow(filePath);
 };
@@ -716,6 +739,7 @@ ipcMain.on('save-project-as', async (event) => {
     }
 
     const { sandboxDirectory: newSandbox } = prepareProjectSandbox(targetProjectFilePath);
+    await clearWatchers();
     setProjectWorkspacePaths(newSandbox, targetProjectDirectory);
     setProjectFile(saveAsName);
 
@@ -725,7 +749,12 @@ ipcMain.on('save-project-as', async (event) => {
       projectName: saveAsProjectName,
     });
 
-    updatePreferences('recentProjects', { title: saveAsName, path: saveAsDirectory });
+    let cartridgeImage: string | null = null;
+    try {
+      const projectMetadata = JSON.parse(fs.readFileSync(targetProjectFilePath, 'utf8'));
+      cartridgeImage = typeof projectMetadata.cartridgeImage === 'string' ? projectMetadata.cartridgeImage : null;
+    } catch { /* Keep recent project metadata usable if an older project has no settings yet. */ }
+    updatePreferences('recentProjects', { title: saveAsName, path: saveAsDirectory, hasCartridgeImage: Boolean(cartridgeImage), cartridgeImage });
   } catch (err) {
     console.error('save-project-as error', err);
   }
@@ -899,7 +928,7 @@ ipcMain.handle('export-executable', () => runExclusiveExport(async () => {
   if (result.canceled || !result.filePaths[0]) return { success: false, cancelled: true };
   try {
     const name = path.basename(projectFile, path.extname(projectFile));
-    const destinationDir = path.join(result.filePaths[0], 'Build');
+    const destinationDir = path.join(result.filePaths[0], 'build');
     fs.mkdirSync(destinationDir, { recursive: true });
     fs.copyFileSync(sourceGba, path.join(destinationDir, `${name}.gba`));
     const sourceElf = sourceGba.replace(/\.gba$/i, '.elf');
@@ -963,15 +992,10 @@ async function transcodeAndCompile(): Promise<CompileResult> {
   if (!windows.main) return { success: false, stdout: '', stderr: '' };
 
   requestSaveChanges({ source: 'build', persistToOriginal: false, markAsSaved: false });
-  
-  // Wait for save to complete (timeout 10s)
-  await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Save timeout for build')), 10000);
-    saveEvents.once('saved', () => { clearTimeout(timeout); resolve(true); });
-  });
+  await waitForSaveComplete();
   
   // Notify renderer that transcode is starting
-  windows.main?.webContents.send('compile-progress', { status: 'started', message: '>> Iniciando transcodificação do projeto...' });
+  windows.main?.webContents.send('compile-progress', { status: 'started', message: '>> Iniciando transcodificação do projeto...', messageKey: 'compiler.transcodeStarted' });
 
   const activeProjectDir = directoryPathProject || originalProjectDirectory || '';
   if (!activeProjectDir) {
@@ -980,10 +1004,13 @@ async function transcodeAndCompile(): Promise<CompileResult> {
   }
 
   // Transcode project using the sandbox workspace directly
+  const buildCfg = getBuildConfig();
   const transRes: any = await transcodeProject({
     projectDir: activeProjectDir,
     markerProjectDir: originalProjectDirectory || activeProjectDir,
+    parallel: buildCfg?.parallel,
     includeAssets: true,
+    onProgress: (message, messageKey, messageParams) => windows.main?.webContents.send('compile-progress', { status: 'running', message, messageKey, messageParams }),
   });
 
   if (!transRes.success || !transRes.outputDir) {
@@ -999,10 +1026,9 @@ async function transcodeAndCompile(): Promise<CompileResult> {
   const tempBuild = transRes.outputDir;
 
   // Notify renderer that transcode finished and compilation will start
-  windows.main?.webContents.send('compile-progress', { status: 'started', message: '>> Transcodificação concluída.' });
+  windows.main?.webContents.send('compile-progress', { status: 'started', message: '>> Transcodificação concluída.', messageKey: 'compiler.transcodeFinished' });
 
   // Compile with new parameter-based interface (use saved build config)
-  const buildCfg = getBuildConfig();
   const compileRes = await compileGBA({
     buildDir: tempBuild,
     parallel: buildCfg?.parallel,
@@ -1266,6 +1292,50 @@ ipcMain.handle('fetch-images', async (event, folderName) => {
   return startWatch(windows.main, originalProjectDirectory, folderName);
 });
 
+const cartridgeImageMimeTypes: Record<string, string> = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
+};
+
+ipcMain.handle('select-cartridge-image', async () => {
+  if (!originalProjectDirectory && !directoryPathProject) return { status: 'error', message: 'No project is currently open.' };
+  const result = windows.main
+    ? await dialog.showOpenDialog(windows.main, { title: 'Select cartridge cover image', properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }] })
+    : await dialog.showOpenDialog({ title: 'Select cartridge cover image', properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }] });
+  if (result.canceled || !result.filePaths.length) return { status: 'cancelled' };
+
+  const source = result.filePaths[0];
+  const extension = path.extname(source).toLowerCase();
+  if (!cartridgeImageMimeTypes[extension]) return { status: 'error', message: 'Unsupported image format.' };
+  const roots = [originalProjectDirectory, directoryPathProject].filter((root): root is string => Boolean(root)).filter((root, index, all) => all.indexOf(root) === index);
+  const destinations = roots.map(root => path.join(root, 'assets', 'cartridge'));
+  destinations.forEach(destination => fs.mkdirSync(destination, { recursive: true }));
+  const parsed = path.parse(source);
+  let filename = parsed.base;
+  let suffix = 1;
+  while (destinations.some(destination => fs.existsSync(path.join(destination, filename)))) {
+    filename = `${parsed.name}-${suffix}${parsed.ext}`;
+    suffix += 1;
+  }
+  destinations.forEach(destination => fs.copyFileSync(source, path.join(destination, filename)));
+  const data = fs.readFileSync(source).toString('base64');
+  return { status: 'success', filename, dataUrl: `data:${cartridgeImageMimeTypes[extension]};base64,${data}` };
+});
+
+ipcMain.handle('get-cartridge-image', async (_event, projectDirectory: string | null | undefined, filename: string | null | undefined) => {
+  if (!filename || path.basename(filename) !== filename || !/\.(png|jpe?g|webp)$/i.test(filename)) return null;
+  const roots = projectDirectory
+    ? [path.resolve(projectDirectory)]
+    : [originalProjectDirectory, directoryPathProject].filter((root): root is string => Boolean(root));
+  for (const root of roots) {
+    const imagePath = path.resolve(root, 'assets', 'cartridge', filename);
+    const relative = path.relative(path.resolve(root, 'assets', 'cartridge'), imagePath);
+    if (relative.startsWith('..') || path.isAbsolute(relative) || !fs.existsSync(imagePath)) continue;
+    const mimeType = cartridgeImageMimeTypes[path.extname(filename).toLowerCase()];
+    return `data:${mimeType};base64,${fs.readFileSync(imagePath).toString('base64')}`;
+  }
+  return null;
+});
+
 ipcMain.handle('get-common-font-images', async () => {
   const filenames = [
     'common_fixed_8x8_font.bmp',
@@ -1303,8 +1373,39 @@ ipcMain.handle('read-image-bytes', async (_event, source: string) => {
   return image.buffer.slice(image.byteOffset, image.byteOffset + image.byteLength);
 });
 
+ipcMain.handle('save-tracker-module', async (_event, filename: string, data: string) => {
+  const allowedExtensions = new Set(['.mod', '.xm', '.s3m', '.it']);
+  const parsed = path.parse(filename ?? '');
+  if (parsed.dir || !parsed.name || !allowedExtensions.has(parsed.ext.toLowerCase()) || !/^[a-zA-Z0-9._-]+$/.test(parsed.base)) {
+    return { status: 'error', message: 'Invalid tracker module filename.' };
+  }
+  if (typeof data !== 'string' || !data) return { status: 'error', message: 'Tracker module data is empty.' };
+
+  const roots = [originalProjectDirectory, directoryPathProject]
+    .filter((root): root is string => Boolean(root))
+    .filter((root, index, all) => all.indexOf(root) === index);
+  if (!roots.length) return { status: 'error', message: 'No project is currently open.' };
+
+  try {
+    const bytes = Buffer.from(data, 'base64');
+    if (!bytes.length) return { status: 'error', message: 'Tracker module data is empty.' };
+    const destinations = roots.map(root => path.join(root, 'assets', 'musics', parsed.base));
+    if (destinations.some(destination => fs.existsSync(destination))) {
+      return { status: 'error', message: 'A music asset with this name already exists.' };
+    }
+    destinations.forEach(destination => {
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.writeFileSync(destination, bytes);
+    });
+    return { status: 'success', filename: parsed.base };
+  } catch (error) {
+    console.error('save-tracker-module error:', error);
+    return { status: 'error', message: 'Unable to save tracker module.' };
+  }
+});
+
 ipcMain.handle('rename-asset', async (_event, folderName: string, filename: string, nextFilename: string) => {
-  const allowedFolders = new Set(['backgrounds', 'backgrounds-hd', 'avatars', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui']);
+  const allowedFolders = new Set(['auto-tiles', 'backgrounds', 'backgrounds-hd', 'avatars', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui']);
   if (!allowedFolders.has(folderName) || path.basename(filename) !== filename || path.basename(nextFilename) !== nextFilename) {
     return { status: 'error', message: 'Invalid asset name.' };
   }
@@ -1373,7 +1474,7 @@ const copyAssetsToProject = (folderName: string, sources: string[]) => {
 };
 
 ipcMain.handle('import-assets', async (_event, folderName: string) => {
-  const allowedFolders = new Set(['backgrounds', 'backgrounds-hd', 'avatars', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui']);
+  const allowedFolders = new Set(['auto-tiles', 'backgrounds', 'backgrounds-hd', 'avatars', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui']);
   if (!allowedFolders.has(folderName)) {
     return { status: 'error', message: `Unsupported asset folder: ${folderName}` };
   }
@@ -1393,7 +1494,7 @@ ipcMain.handle('import-assets', async (_event, folderName: string) => {
 });
 
 ipcMain.handle('import-dropped-assets', async (_event, folderName: string, filePaths: string[]) => {
-  const allowedFolders = new Set(['backgrounds', 'backgrounds-hd', 'avatars', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui']);
+  const allowedFolders = new Set(['auto-tiles', 'backgrounds', 'backgrounds-hd', 'avatars', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui']);
   if (!allowedFolders.has(folderName) || !Array.isArray(filePaths)) {
     return { status: 'error', message: `Unsupported asset import: ${folderName}` };
   }

@@ -7,6 +7,12 @@ import fs from 'fs';
 import path from 'path';
 import { TemplateConfig, BuildConfig } from '../types/BuildTypes';
 
+/** Make targets must be a single filename, without whitespace or make syntax. */
+export function makeTargetName(projectName?: string): string {
+  return (projectName || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'gba-project';
+}
+
 export class TemplateBuilder {
   private templateDir: string;
   private buildDir: string;
@@ -127,8 +133,8 @@ export class TemplateBuilder {
 
     // Replace template values with project-specific ones
     content = content.replace(
-      /^TARGET\s*:=\s*\$\(notdir \$\(CURDIR\)\)/m,
-      `TARGET\t\t:= ${buildConfig.projectName || 'gba-project'}`
+      /^TARGET\s*:=.*$/m,
+      `TARGET\t\t:= ${makeTargetName(buildConfig.projectName)}`
     );
 
     content = content.replace(

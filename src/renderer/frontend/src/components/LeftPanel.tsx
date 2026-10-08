@@ -2,7 +2,7 @@ import useAppContexts from '@/providers/contexts/AppContexts';
 import { ETypeScene, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
 import { BuildOutlined, CaretRightFilled, CaretRightOutlined, FileFilled, GatewayOutlined, PlusOutlined, SearchOutlined, SettingOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { Button, Collapse, Flex, Input, Layout, Space, Splitter, Tooltip, Tree, TreeDataNode, Typography } from 'antd';
-import React, { Key, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Key, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { AntdToken } from '../components/common/AntDToken';
 import { IVariableDefinition } from '@/providers/contexts/interfaces/IVariablesElement';
@@ -29,6 +29,8 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
   const [isScenesOpen, setIsScenesOpen] = useState(true);
   const [isScriptsOpen, setIsScriptsOpen] = useState(true);
   const [isVariablesOpen, setIsVariablesOpen] = useState(true);
+  const [expandedTrees, setExpandedTrees] = useState<Record<'scenes' | 'scripts' | 'variables', Key[] | undefined>>({ scenes: undefined, scripts: undefined, variables: undefined });
+  const loadedNavigationProjectRef = useRef<string | null>(null);
 
   const [searchOpen, setSearchOpen] = useState({ scenes: false, scripts: false, variables: false });
   const searchInputRef = useRef<any>(null);
@@ -40,6 +42,63 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
   const [treeHeightScenes, setTreeHeightScenes] = useState(window.innerHeight);
   const [treeHeightScripts, setTreeHeightScripts] = useState(window.innerHeight);
   const [treeHeightVariables, setTreeHeightVariables] = useState(window.innerHeight);
+  const navigationRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const panels = navigationRef.current?.querySelectorAll<HTMLElement>('.ant-splitter-panel');
+    if (!panels) return;
+
+    const updateTreeHeights = () => {
+      setTreeHeightScenes(Math.max(0, (panels[0]?.clientHeight ?? 0) - 60));
+      setTreeHeightScripts(Math.max(0, (panels[1]?.clientHeight ?? 0) - 60));
+      setTreeHeightVariables(Math.max(0, (panels[2]?.clientHeight ?? 0) - 60));
+    };
+    const observer = new ResizeObserver(updateTreeHeights);
+    panels.forEach(panel => observer.observe(panel));
+    updateTreeHeights();
+    return () => observer.disconnect();
+  }, [showScriptsAndVariables]);
+  const leftNavigationProjectId = encodeURIComponent((settingUtils.projectPathFile || 'unsaved-project').replace(/\\/g, '/').toLowerCase());
+
+  useEffect(() => {
+    let cancelled = false;
+    loadedNavigationProjectRef.current = null;
+    setExpandedTrees({ scenes: undefined, scripts: undefined, variables: undefined });
+    window.electronAPI.loadLastPositionSplitters(leftNavigationProjectId).then((saved: any) => {
+      if (cancelled) return;
+      loadedNavigationProjectRef.current = leftNavigationProjectId;
+      const expandedKeys = saved?.leftNavigation?.expandedKeys;
+      const restoreKeys = (keys: unknown): Key[] | undefined => Array.isArray(keys)
+        ? keys.filter((key): key is Key => typeof key === 'string' || typeof key === 'number')
+        : undefined;
+      setExpandedTrees({ scenes: restoreKeys(expandedKeys?.scenes), scripts: restoreKeys(expandedKeys?.scripts), variables: restoreKeys(expandedKeys?.variables) });
+      if (!saved?.leftNavigation) {
+        setIsScenesOpen(true);
+        setIsScriptsOpen(true);
+        setIsVariablesOpen(true);
+        const defaultSize = (navigationRef.current?.clientHeight ?? window.innerHeight) / 3;
+        setPanelSizes([defaultSize, defaultSize, defaultSize]);
+        return;
+      }
+      const navigation = saved.leftNavigation;
+      const sections = navigation.sections ?? { scenes: true, scripts: true, variables: true };
+      setIsScenesOpen(sections.scenes !== false);
+      setIsScriptsOpen(sections.scripts !== false);
+      setIsVariablesOpen(sections.variables !== false);
+      const open = [sections.scenes !== false, sections.scripts !== false, sections.variables !== false];
+      const closedSize = HEADER_HEIGHT;
+      const closedCount = open.filter(isOpen => !isOpen).length;
+      const availableSize = Math.max(120, (navigationRef.current?.clientHeight ?? window.innerHeight) - closedCount * closedSize);
+      const savedSizes = Array.isArray(navigation.sizes) && navigation.sizes.length === 3 ? navigation.sizes : [1, 1, 1];
+      const openSavedTotal = savedSizes.reduce((total: number, size: number, index: number) => total + (open[index] ? Math.max(1, size) : 0), 0);
+      const openCount = open.filter(Boolean).length;
+      const restoredSizes = open.map((isOpen, index) => isOpen
+        ? openSavedTotal > 0 ? availableSize * Math.max(1, savedSizes[index]) / openSavedTotal : availableSize / Math.max(1, openCount)
+        : closedSize);
+      setPanelSizes(restoredSizes);
+    }).catch(error => console.error('Failed to load navigation splitter sizes:', error));
+    return () => { cancelled = true; };
+  }, [leftNavigationProjectId]);
 
   // Adicione esse novo estado no início do componente
   const [globalSelectedKey, setGlobalSelectedKey] = useState<string | null>(null);
@@ -62,115 +121,17 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
     }
   }, [elementSelected]);
 
-  const toggleSection = (section: string) => {
-    if (!showScriptsAndVariables) {
-      // Se não mostrar Scripts/Variables, apenas alternar scenes
-      setIsScenesOpen(!isScenesOpen);
-      return;
-    }
-    
-    setPanelSizes(prevSizes => {
-      const newSizes = [...prevSizes];
-      const collapsedSize = 40;
-      const totalHeight = window.innerHeight;
-
-      const calculateExpandedSize = (openPanels: number) => {
-        return (totalHeight - (collapsedSize * (3 - openPanels))) / openPanels;
-      };
-
-      switch (section) {
-        case 'scenes':
-          if (isScenesOpen) {
-            // Fechando scenes
-            newSizes[0] = collapsedSize;
-
-            // Redistribui o espaço entre os painéis abertos
-            const openPanels = [isScriptsOpen, isVariablesOpen].filter(Boolean).length;
-            if (openPanels > 0) {
-              const expandedSize = calculateExpandedSize(openPanels);
-              if (isScriptsOpen) newSizes[1] = expandedSize;
-              if (isVariablesOpen) newSizes[2] = expandedSize;
-            } else {
-              // Se não há painéis abertos, abre o próximo
-              newSizes[1] = totalHeight - (2 * collapsedSize);
-              setIsScriptsOpen(true);
-            }
-          } else {
-            // Abrindo scenes
-            const openPanels = [true, isScriptsOpen, isVariablesOpen].filter(Boolean).length;
-            const expandedSize = calculateExpandedSize(openPanels);
-
-            newSizes[0] = expandedSize;
-            if (isScriptsOpen) newSizes[1] = expandedSize;
-            if (isVariablesOpen) newSizes[2] = expandedSize;
-            if (!isScriptsOpen) newSizes[1] = collapsedSize;
-            if (!isVariablesOpen) newSizes[2] = collapsedSize;
-          }
-          setIsScenesOpen(!isScenesOpen);
-          break;
-
-        case 'scripts':
-          if (isScriptsOpen) {
-            // Fechando scripts
-            newSizes[1] = collapsedSize;
-
-            const openPanels = [isScenesOpen, isVariablesOpen].filter(Boolean).length;
-            if (openPanels > 0) {
-              const expandedSize = calculateExpandedSize(openPanels);
-              if (isScenesOpen) newSizes[0] = expandedSize;
-              if (isVariablesOpen) newSizes[2] = expandedSize;
-            } else {
-              newSizes[2] = totalHeight - (2 * collapsedSize);
-              setIsVariablesOpen(true);
-            }
-          } else {
-            // Abrindo scripts
-            const openPanels = [isScenesOpen, true, isVariablesOpen].filter(Boolean).length;
-            const expandedSize = calculateExpandedSize(openPanels);
-
-            if (isScenesOpen) newSizes[0] = expandedSize;
-            newSizes[1] = expandedSize;
-            if (isVariablesOpen) newSizes[2] = expandedSize;
-            if (!isScenesOpen) newSizes[0] = collapsedSize;
-            if (!isVariablesOpen) newSizes[2] = collapsedSize;
-          }
-          setIsScriptsOpen(!isScriptsOpen);
-          break;
-
-        case 'variables':
-          if (isVariablesOpen) {
-            // Fechando variables
-            newSizes[2] = collapsedSize;
-
-            const openPanels = [isScenesOpen, isScriptsOpen].filter(Boolean).length;
-            if (openPanels > 0) {
-              const expandedSize = calculateExpandedSize(openPanels);
-              if (isScenesOpen) newSizes[0] = expandedSize;
-              if (isScriptsOpen) newSizes[1] = expandedSize;
-            } else {
-              newSizes[0] = totalHeight - (2 * collapsedSize);
-              setIsScenesOpen(true);
-            }
-          } else {
-            // Abrindo variables
-            const openPanels = [isScenesOpen, isScriptsOpen, true].filter(Boolean).length;
-            const expandedSize = calculateExpandedSize(openPanels);
-
-            if (isScenesOpen) newSizes[0] = expandedSize;
-            if (isScriptsOpen) newSizes[1] = expandedSize;
-            newSizes[2] = expandedSize;
-            if (!isScenesOpen) newSizes[0] = collapsedSize;
-            if (!isScriptsOpen) newSizes[1] = collapsedSize;
-          }
-          setIsVariablesOpen(!isVariablesOpen);
-          break;
-      }
-
-      setTreeHeightScenes(newSizes[0] - 60);
-      setTreeHeightScripts(newSizes[1] - 60);
-      setTreeHeightVariables(newSizes[2] - 60);
-      return newSizes;
-    });
+  const toggleSection = (section: 'scenes' | 'scripts' | 'variables') => {
+    const next = getNextSectionState(section);
+    setIsScenesOpen(next.scenes);
+    setIsScriptsOpen(next.scripts);
+    setIsVariablesOpen(next.variables);
+    if (!showScriptsAndVariables) return;
+    const totalHeight = navigationRef.current?.clientHeight ?? window.innerHeight;
+    const open = [next.scenes, next.scripts, next.variables];
+    const openCount = open.filter(Boolean).length;
+    const expandedSize = Math.max(0, totalHeight - HEADER_HEIGHT * (3 - openCount)) / openCount;
+    setPanelSizes(open.map(isOpen => isOpen ? expandedSize : HEADER_HEIGHT));
   };
 
   const [searchTerms, setSearchTerms] = useState({ scenes: '', scripts: '', variables: '' });
@@ -310,7 +271,7 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
   const panelStyle: React.CSSProperties = {
     backgroundColor: token.colorBorder,
     borderRadius: 0,
-    height: 40
+    height: HEADER_HEIGHT
   };
 
   const getSelectedKeyFromGlobal = (prefix: string): Key[] => {
@@ -347,6 +308,35 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
     console.log('.: ---------------------- :. ');
   };
 
+  const getNextSectionState = (section: 'scenes' | 'scripts' | 'variables') => {
+    const next = { scenes: isScenesOpen, scripts: isScriptsOpen, variables: isVariablesOpen };
+    next[section] = !next[section];
+    if (!showScriptsAndVariables) return next;
+    if (!next.scenes && !next.scripts && !next.variables) {
+      if (section === 'scenes') next.scripts = true;
+      else if (section === 'scripts') next.variables = true;
+      else next.scenes = true;
+    }
+    return next;
+  };
+
+  useEffect(() => {
+    if (loadedNavigationProjectRef.current !== leftNavigationProjectId) return;
+    window.electronAPI.saveLastPositionSplitters({
+      projectId: leftNavigationProjectId,
+      leftNavigation: {
+        sizes: panelSizes.map(Math.round),
+        sections: { scenes: isScenesOpen, scripts: isScriptsOpen, variables: isVariablesOpen },
+        expandedKeys: expandedTrees,
+      },
+    }).catch(error => console.error('Failed to save navigation state:', error));
+  }, [leftNavigationProjectId, panelSizes, isScenesOpen, isScriptsOpen, isVariablesOpen, expandedTrees]);
+
+  const handleTreeExpand = (section: 'scenes' | 'scripts' | 'variables', keys: Key[]) => {
+    const nextExpandedTrees = { ...expandedTrees, [section]: keys };
+    setExpandedTrees(nextExpandedTrees);
+  };
+
   const handleResizeEnd = (sizes:Array<number>) => {
     // Ajuste o tamanho da barra de arrastar aqui
     console.log('.: Resize LeftPanel end :. ');
@@ -354,43 +344,41 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
     console.log('.: Resize LeftPanel Tela 2: ', sizes[1]);
     console.log('.: Resize LeftPanel Tela 3: ', sizes[2]);
     console.log('.: ---------------------- :. ');
+    handleResize(sizes);
   };
 
   const handleResize = (sizes:Array<number>) => {
     const newSizes = [...sizes];
 
     // Verifica se o painel 3 atingiu o tamanho 
-    if (newSizes[0] <= 50) {
+    if (newSizes[0] <= HEADER_HEIGHT) {
       // console.log(".: Fixar tela 1");
-      newSizes[0] = 40;
+      newSizes[0] = HEADER_HEIGHT;
       setIsScenesOpen(false);
     } else {
       setIsScenesOpen(true);
     }
 
-    if (newSizes[1] <= 50) {
+    if (newSizes[1] <= HEADER_HEIGHT) {
       // console.log(".: Fixar tela 2");
-      newSizes[1] = 40;
+      newSizes[1] = HEADER_HEIGHT;
       setIsScriptsOpen(false);
     } else {
       setIsScriptsOpen(true);
     }
 
-    if (newSizes[2] <= 50) {
+    if (newSizes[2] <= HEADER_HEIGHT) {
       // console.log(".: Fixar tela 3: ", sizes[2]);
-      newSizes[2] = 40;
+      newSizes[2] = HEADER_HEIGHT;
       setIsVariablesOpen(false);
     } else {
       setIsVariablesOpen(true);
     }
 
     setPanelSizes(newSizes);
-    setTreeHeightScenes(newSizes[0] - 60);
-    setTreeHeightScripts(newSizes[1] - 60);
-    setTreeHeightVariables(newSizes[2] - 60);
   };
 
-  const handleSelectElement = (elementId: Key | undefined, selectedKeys: Key[] = []) => {
+  const handleSelectElement = (elementId: Key | undefined, shiftKey = false) => {
     const key = elementId?.toString();
     if (!key) return;
     const objectMatch = /^(actor|trigger):([^:]+):(.+)$/.exec(key);
@@ -398,16 +386,23 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
       const [, type, sceneId, id] = objectMatch;
       const scene = scenes.find(item => item.id === sceneId);
       if (!scene) return;
-      setElementSelected({ ...scene, _recenter: true });
+      const currentSceneIds = settingUtils.selectedSceneIds ?? (elementSelected?.id ? [elementSelected.id] : []);
+      setElementSelected({ ...scene, _recenter: currentSceneIds.includes(scene.id) ? undefined : true });
       setSettingUtils(previous => ({ ...previous, tileEditSceneId: sceneId, tileEditLayerId: 4, activeSceneObject: { sceneId, type: type as 'actor' | 'trigger', id }, activeTriggerId: type === 'trigger' ? id : null }));
       return;
     }
     const element = filteredScenes.filter(s => s.id === key).map(scene => scene).at(0);
     if (!element) return;
 
-    const sceneIds = selectedKeys.map(item => String(item)).filter(id => scenes.some(scene => scene.id === id));
-    const activeId = sceneIds.at(-1) ?? element.id;
-    const activeScene = scenes.find(scene => scene.id === activeId) ?? element;
+    const currentSceneIds = settingUtils.selectedSceneIds ?? (elementSelected?.id ? [elementSelected.id] : []);
+    const shouldRecenter = !currentSceneIds.includes(element.id);
+    const sceneIds = shiftKey
+      ? currentSceneIds.includes(element.id)
+        ? currentSceneIds.filter(id => id !== element.id)
+        : [...currentSceneIds, element.id]
+      : [element.id];
+    const activeId = shiftKey && currentSceneIds.includes(element.id) ? sceneIds.at(-1) : element.id;
+    const activeScene = activeId ? scenes.find(scene => scene.id === activeId) : null;
 
     setGlobalSelectedKey(null);
     setSettingUtils(previous => ({
@@ -415,30 +410,32 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
       tileEditSceneId: previous.activeButton === 'add' && (previous.activeSubButton === 'Actor' || previous.activeSubButton === 'Trigger') ? element.id : previous.tileEditSceneId,
       activeSceneObject: null,
       activeTriggerId: null,
-      selectedSceneIds: sceneIds.length ? sceneIds : [element.id],
+      selectedSceneIds: sceneIds,
     }));
-    setElementSelected({ ...activeScene, _recenter: true });
+    setElementSelected(activeScene ? { ...activeScene, _recenter: shouldRecenter || undefined } : null);
   }
 
   return (
+    <div ref={navigationRef} style={{ height: '100%', minHeight: 0 }}>
     <Splitter data-testid="left-panel" layout="vertical"
       onResize={handleResize}
       onResizeStart={handleResizeStart}
       onResizeEnd={handleResizeEnd}
     >
       {/* PAINEL 1 */}
-      <Splitter.Panel size={panelSizes[0]} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Splitter.Panel size={panelSizes[0]} min={HEADER_HEIGHT} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Collapse
+          className="left-navigation-section"
           defaultActiveKey={['1']}
           activeKey={isScenesOpen ? 1 : 0}
-          onChange={(keys) => { toggleSection('scenes'); console.log("..: Leftpanel scene key: ", keys); }}
+          onChange={() => toggleSection('scenes')}
           expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} style={{ fontSize: token.fontSize, }} />}
           style={{ height: 40, border: 'none' }}
           items={[
             {
               key: '1',
               label: 'SCENES',
-              extra: [functionAdd(), functionSearch('scenes')],
+              extra: <Flex gap={4}>{functionAdd()}{functionSearch('scenes')}</Flex>,
               style: panelStyle,
               children: (
                 <Content style={{ height: '100vh', flex: 1 }}>
@@ -457,17 +454,22 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                     />
                   )}
                   <Tree
+                    key={`scenes-${leftNavigationProjectId}`}
                     className="custom-tree"
                     showIcon
+                    showLine={{ showLeafIcon: false }}
+                    switcherIcon={({ expanded }) => <CaretRightOutlined className="left-panel-switcher" rotate={expanded ? 90 : 0} />}
                     multiple
-                    height={searchOpen.scenes ? treeHeightScenes - 25 : treeHeightScenes }
+                    height={Math.max(0, treeHeightScenes - (searchOpen.scenes ? 30 : 0))}
                     treeData={treeDataScenes}
                     defaultExpandAll
+                    {...(expandedTrees.scenes === undefined ? {} : { expandedKeys: expandedTrees.scenes })}
+                    onExpand={keys => handleTreeExpand('scenes', keys)}
                     blockNode
                     selectedKeys={settingUtils.activeSceneObject
                       ? [settingUtils.activeSceneObject.sceneId, `${settingUtils.activeSceneObject.type}:${settingUtils.activeSceneObject.sceneId}:${settingUtils.activeSceneObject.id}`]
                       : settingUtils.selectedSceneIds ?? (elementSelected ? [elementSelected.id] : [])}
-                    onSelect={(keys, info) => handleSelectElement(info.node.key, keys)}
+                    onSelect={(_, info) => handleSelectElement(info.node.key, info.nativeEvent.shiftKey)}
                     style={{ background: token.colorBgBase }}
                   />
                 </Content>
@@ -480,11 +482,12 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
       {showScriptsAndVariables && (
         <>
           {/* PAINEL 2 */}
-          <Splitter.Panel size={panelSizes[1]} style={{ overflow: 'hidden' }}>
+          <Splitter.Panel size={panelSizes[1]} min={HEADER_HEIGHT} style={{ overflow: 'hidden' }}>
             <Collapse
+              className="left-navigation-section"
               defaultActiveKey={['1']}
               activeKey={isScriptsOpen ? 1 : 0}
-              onChange={(keys) => { toggleSection('scripts'); console.log("novo teste: ", keys); }}
+              onChange={() => toggleSection('scripts')}
               expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} style={{ fontSize: token.fontSize, }} />}
               style={{ height: 40, border: 'none' }}
               items={[
@@ -497,18 +500,23 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                     <Content style={{ height: '100vh', flex: 1 }}>
                     {searchOpen.scripts && <Input ref={searchInputRef} placeholder="Search..." value={searchTerms.scripts} onChange={event => setSearchTerms(previous => ({ ...previous, scripts: event.target.value }))} style={{ marginBottom: 5, height: 25, border: 'none', backgroundColor: searchTerms.scripts === '' ? token.colorBgBase : token.colorBorder }} />}
                     <Tree
+                      key={`scripts-${leftNavigationProjectId}`}
                       className="custom-tree"
                       showIcon
+                      showLine={{ showLeafIcon: false }}
+                      switcherIcon={({ expanded }) => <CaretRightOutlined className="left-panel-switcher" rotate={expanded ? 90 : 0} />}
                       // icon={<FileFilled />}
-                      height={searchOpen.scripts ? treeHeightScripts - 25 : treeHeightScripts}
+                      height={Math.max(0, treeHeightScripts - (searchOpen.scripts ? 30 : 0))}
                       treeData={treeDataScripts}
                       defaultExpandAll
+                      {...(expandedTrees.scripts === undefined ? {} : { expandedKeys: expandedTrees.scripts })}
+                      onExpand={keys => handleTreeExpand('scripts', keys)}
                       blockNode
                       selectedKeys={getSelectedKeyFromGlobal('scripts')}
                       onSelect={(selectedKeys, info) =>
                         onSelectTree(selectedKeys, info, 'scripts')
                       }
-                      style={{ height: treeHeightScripts, background: token.colorBgBase }}
+                      style={{ background: token.colorBgBase }}
                     /></Content>
                   )
                 },
@@ -517,11 +525,12 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
               
           </Splitter.Panel>
           {/* PAINEL 3 */}
-          <Splitter.Panel size={panelSizes[2]} style={{ overflow: 'hidden', }}>
+          <Splitter.Panel size={panelSizes[2]} min={HEADER_HEIGHT} style={{ overflow: 'hidden', }}>
             <Collapse
+              className="left-navigation-section"
               defaultActiveKey={['1']}
               activeKey={isVariablesOpen ? 1 : 0}
-              onChange={(keys) => { toggleSection('variables'); console.log("novo teste: ", keys); }}
+              onChange={() => toggleSection('variables')}
               expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} style={{ fontSize: token.fontSize, }} />}
               style={{ height: 40, border: 'none' }}
               items={[
@@ -541,18 +550,23 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
                     <Content style={{ height: '100vh', flex: 1 }}>
                     {searchOpen.variables && <Input ref={searchInputRef} placeholder="Search..." value={searchTerms.variables} onChange={event => setSearchTerms(previous => ({ ...previous, variables: event.target.value }))} style={{ marginBottom: 5, height: 25, border: 'none', backgroundColor: searchTerms.variables === '' ? token.colorBgBase : token.colorBorder }} />}
                     <Tree
+                      key={`variables-${leftNavigationProjectId}`}
                       className="custom-tree"
                       showIcon
+                      showLine={{ showLeafIcon: false }}
+                      switcherIcon={({ expanded }) => <CaretRightOutlined className="left-panel-switcher" rotate={expanded ? 90 : 0} />}
                       // icon={<div>$</div>}
-                      height={searchOpen.variables ? treeHeightVariables - 25 : treeHeightVariables}
+                      height={Math.max(0, treeHeightVariables - (searchOpen.variables ? 30 : 0))}
                       treeData={treeDataVariables}
                       defaultExpandAll
+                      {...(expandedTrees.variables === undefined ? {} : { expandedKeys: expandedTrees.variables })}
+                      onExpand={keys => handleTreeExpand('variables', keys)}
                       blockNode
                       selectedKeys={getSelectedKeyFromGlobal('variables')}
                       onSelect={(selectedKeys, info) =>
                         onSelectTree(selectedKeys, info, 'variables')
                       }
-                      style={{ height: treeHeightVariables, backgroundColor: token.colorBgBase }}
+                      style={{ backgroundColor: token.colorBgBase }}
                     /></Content>
                   )
                 },
@@ -562,6 +576,7 @@ const LeftPanel: React.FC<{ showScriptsAndVariables?: boolean }> = ({ showScript
         </>
       )}
     </Splitter>
+    </div>
   );
 };
 

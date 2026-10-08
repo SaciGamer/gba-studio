@@ -48,6 +48,7 @@ export default function DefaultValueEvents(command: string | undefined, scenes?:
         value: { kind: 'literal', type: 'number', value: 0 },
       };
     case EEvents.SET_ANIMATION_SPEED:
+    case EEvents.ACTOR_SET_ANIMATION:
       return { actorId: '', speed: 4 };
     case EEvents.SET_ACTOR_PRIORITY:
       return { actorId: '', priority: 2 };

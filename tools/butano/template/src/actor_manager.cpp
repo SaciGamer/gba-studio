@@ -8,13 +8,13 @@ ActorManager& ActorManager::instance()
 
 bool ActorManager::valid(ActorHandle handle) const
 {
-    return handle.slot >= 0 && handle.slot < int(slots.size()) &&
+    return handle.slot >= 0 && handle.slot < 16 &&
            slots[handle.slot].occupied && slots[handle.slot].generation == handle.generation;
 }
 
 ActorHandle ActorManager::spawn(const bn::string<64>& actor_id, int x, int y)
 {
-    for(int index = 0; index < int(slots.size()); ++index) {
+    for(int index = 0; index < 16; ++index) {
         Slot& slot = slots[index];
         if(slot.occupied && slot.actor_id == actor_id) {
             slot.x = x;
@@ -23,7 +23,7 @@ ActorHandle ActorManager::spawn(const bn::string<64>& actor_id, int x, int y)
             return { index, slot.generation };
         }
     }
-    for(int index = 0; index < int(slots.size()); ++index) {
+    for(int index = 0; index < 16; ++index) {
         Slot& slot = slots[index];
         if(!slot.occupied) {
             slot.actor_id = actor_id;
@@ -66,7 +66,7 @@ bool ActorManager::get_position(ActorHandle handle, int& x, int& y) const
 
 bool ActorManager::set_position_by_id(const bn::string<64>& actor_id, int x, int y)
 {
-    for(int index = 0; index < int(slots.size()); ++index) {
+    for(int index = 0; index < 16; ++index) {
         if(slots[index].occupied && slots[index].actor_id == actor_id) {
             return set_position({ index, slots[index].generation }, x, y);
         }
@@ -76,7 +76,7 @@ bool ActorManager::set_position_by_id(const bn::string<64>& actor_id, int x, int
 
 bool ActorManager::remove_by_id(const bn::string<64>& actor_id)
 {
-    for(int index = 0; index < int(slots.size()); ++index)
+    for(int index = 0; index < 16; ++index)
         if(slots[index].occupied && slots[index].actor_id == actor_id)
             return remove({ index, slots[index].generation });
     return false;
@@ -84,7 +84,7 @@ bool ActorManager::remove_by_id(const bn::string<64>& actor_id)
 
 bool ActorManager::set_visible_by_id(const bn::string<64>& actor_id, bool visible)
 {
-    for(int index = 0; index < int(slots.size()); ++index)
+    for(int index = 0; index < 16; ++index)
         if(slots[index].occupied && slots[index].actor_id == actor_id)
             return set_visible({ index, slots[index].generation }, visible);
     return false;
@@ -93,7 +93,7 @@ bool ActorManager::set_visible_by_id(const bn::string<64>& actor_id, bool visibl
 bool ActorManager::set_animation_speed_by_id(const bn::string<64>& actor_id, int speed)
 {
     if(speed < 0 || speed > 60) return false;
-    for(int index = 0; index < int(slots.size()); ++index)
+    for(int index = 0; index < 16; ++index)
         if(slots[index].occupied && slots[index].actor_id == actor_id) {
             slots[index].animation_speed = speed;
             return true;

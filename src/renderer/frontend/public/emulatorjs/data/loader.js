@@ -199,6 +199,7 @@ const config = {
     disableBatchBootup: window.EJS_disableBatchBootup,
     askBeforeExit: window.EJS_askBeforeExit,
     showBottomMenu: window.EJS_showBottomMenu,
+    gbaStudioGamepad: window.EJS_gbaStudioGamepad,
 };
 
 async function prepareLanguage() {

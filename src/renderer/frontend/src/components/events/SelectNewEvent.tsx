@@ -8,9 +8,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { AntdToken } from '../common/AntDToken';
 import DefaultValueEvents, { VariableEventPreset } from './DefaultValueEvents';
 import FlowEditorManager, { ScriptKey } from './FlowEditorManager';
-import { EEvents, EVENT_INFO } from './interfaces/IEvents';
-
-const CATEGORIES = ["Player", "Actor", "Camera", "Scene", "Screen", "Timer", "Audio", "Dialogue", "Scripts", "Variables"];
+import { useI18n } from '@/i18n/I18n';
+import { EEvents, EVENT_INFO, getEventLabel } from './interfaces/IEvents';
+import { EVENT_CATALOG_BY_CODE } from '../../../../../shared/events/eventCatalog';
 
 type EventOption = { id: EEvents; name: string; preset?: VariableEventPreset };
 
@@ -54,84 +54,136 @@ const FUNCTIONS_BY_CATEGORY = {
   Camera: {
     Position: [
       { id: EEvents.PAN_CAMERA, name: EVENT_INFO[EEvents.PAN_CAMERA].name },
-    ],
-  },
-  Audio: {
-    Music: [
-      { id: EEvents.PLAY_MUSIC, name: EVENT_INFO[EEvents.PLAY_MUSIC].name },
-      { id: EEvents.PLAY_SOUND, name: EVENT_INFO[EEvents.PLAY_SOUND].name },
-      { id: EEvents.STOP_MUSIC, name: EVENT_INFO[EEvents.STOP_MUSIC].name },
-      { id: EEvents.SET_MUSIC_VOLUME, name: EVENT_INFO[EEvents.SET_MUSIC_VOLUME].name },
-    ],
-  },
-  Dialogue: {
-    Text: [
-      { id: EEvents.DISPLAY_DIALOGUE, name: EVENT_INFO[EEvents.DISPLAY_DIALOGUE].name },
-      { id: EEvents.HIDE_DIALOGUE, name: EVENT_INFO[EEvents.HIDE_DIALOGUE].name },
-      { id: EEvents.DIALOGUE_CHOICE, name: EVENT_INFO[EEvents.DIALOGUE_CHOICE].name },
+      { id: EEvents.CAMERA_MOVE_TO, name: EVENT_INFO[EEvents.CAMERA_MOVE_TO].name },
+      { id: EEvents.CAMERA_FOLLOW, name: EVENT_INFO[EEvents.CAMERA_FOLLOW].name },
+      { id: EEvents.CAMERA_SHAKE, name: EVENT_INFO[EEvents.CAMERA_SHAKE].name },
     ],
   },
   Scene: {
     Scene: [
       { id: EEvents.CHANGE_SCENE, name: EVENT_INFO[EEvents.CHANGE_SCENE].name },
     ],
-    Layer:[
-      {
-        id: EEvents.CHANGE_LAYER, name: EVENT_INFO[EEvents.CHANGE_LAYER].name
-      },
-      {
-        id: EEvents.VISIBLE_BACKGROUND, name: EVENT_INFO[EEvents.VISIBLE_BACKGROUND].name
-      },
-      {
-        id: EEvents.CHANGE_PALETTE_BACKGROUND, name: EVENT_INFO[EEvents.CHANGE_PALETTE_BACKGROUND].name
-      },
-      // {
-      //   id: EEvents.MOVE_LAYER, name: EVENT_INFO[EEvents.MOVE_LAYER].name
-      // }
+    "Background Layers": [
+      { id: EEvents.CHANGE_LAYER, name: EVENT_INFO[EEvents.CHANGE_LAYER].name },
+      { id: EEvents.VISIBLE_BACKGROUND, name: EVENT_INFO[EEvents.VISIBLE_BACKGROUND].name },
+      { id: EEvents.BACKGROUND_SCROLL, name: EVENT_INFO[EEvents.BACKGROUND_SCROLL].name },
+      { id: EEvents.BACKGROUND_SET_PARALLAX, name: EVENT_INFO[EEvents.BACKGROUND_SET_PARALLAX].name },
+      { id: EEvents.CHANGE_PALETTE_BACKGROUND, name: EVENT_INFO[EEvents.CHANGE_PALETTE_BACKGROUND].name },
     ],
-    // Tiles: [
-    //   {
-    //     id: EEvents.REPLC_TL_AT_POS, name: EVENT_INFO[EEvents.REPLC_TL_AT_POS].name,
-    //   },
-    //   {
-    //     id: EEvents.REPLC_TL_AT_POS_FROM_SQNCE, name: EVENT_INFO[EEvents.REPLC_TL_AT_POS_FROM_SQNCE].name,
-    //   }
-    // ]
   },
   Actor: {
     "Actor Functions": [
       { id: EEvents.SPAWN_ACTOR, name: EVENT_INFO[EEvents.SPAWN_ACTOR].name },
+      { id: EEvents.ACTOR_SPAWN, name: EVENT_INFO[EEvents.ACTOR_SPAWN].name },
       { id: EEvents.MOVE_ACTOR, name: EVENT_INFO[EEvents.MOVE_ACTOR].name },
+      { id: EEvents.ACTOR_MOVE_TO, name: EVENT_INFO[EEvents.ACTOR_MOVE_TO].name },
+      { id: EEvents.ACTOR_SET_POSITION, name: EVENT_INFO[EEvents.ACTOR_SET_POSITION].name },
       { id: EEvents.REMOVE_ACTOR, name: EVENT_INFO[EEvents.REMOVE_ACTOR].name },
+      { id: EEvents.ACTOR_DESPAWN, name: EVENT_INFO[EEvents.ACTOR_DESPAWN].name },
     ],
     Visibility: [
       { id: EEvents.HIDE_ACTOR, name: EVENT_INFO[EEvents.HIDE_ACTOR].name },
       { id: EEvents.HIDE_ALL_SPRITES, name: EVENT_INFO[EEvents.HIDE_ALL_SPRITES].name },
       { id: EEvents.SHOW_ACTOR, name: EVENT_INFO[EEvents.SHOW_ACTOR].name },
+      { id: EEvents.ACTOR_SET_VISIBLE, name: EVENT_INFO[EEvents.ACTOR_SET_VISIBLE].name },
+      { id: EEvents.VISIBLE_ACTOR, name: EVENT_INFO[EEvents.VISIBLE_ACTOR].name },
       { id: EEvents.SHOW_ALL_SPRITES, name: EVENT_INFO[EEvents.SHOW_ALL_SPRITES].name },
     ],
     Animation: [
       { id: EEvents.SET_ANIMATION_SPEED, name: EVENT_INFO[EEvents.SET_ANIMATION_SPEED].name },
+      { id: EEvents.ACTOR_SET_STATE, name: EVENT_INFO[EEvents.ACTOR_SET_STATE].name },
+      { id: EEvents.ACTOR_SET_ANIMATION, name: EVENT_INFO[EEvents.ACTOR_SET_ANIMATION].name },
       { id: EEvents.SET_ACTOR_PRIORITY, name: EVENT_INFO[EEvents.SET_ACTOR_PRIORITY].name },
-    ],
-  },
-  "Joypad Input": {
-    Buttons: [
-      { id: EEvents.WAIT_FOR_BUTTON, name: EVENT_INFO[EEvents.WAIT_FOR_BUTTON].name },
-      { id: EEvents.IF_BUTTON_HELD, name: EVENT_INFO[EEvents.IF_BUTTON_HELD].name },
+      { id: EEvents.SPRITE_EFFECT, name: EVENT_INFO[EEvents.SPRITE_EFFECT].name },
     ],
   },
   Screen: {
-    "Fade": [
+    "H-Blank Effects": [
+      { id: EEvents.HBE_EFFECT_ENABLE, name: EVENT_INFO[EEvents.HBE_EFFECT_ENABLE].name },
+      { id: EEvents.HBE_EFFECT_DISABLE, name: EVENT_INFO[EEvents.HBE_EFFECT_DISABLE].name },
+    ],
+    Transparency: [
+      { id: EEvents.BLEND_ALPHA, name: EVENT_INFO[EEvents.BLEND_ALPHA].name },
+    ],
+    Fade: [
       { id: EEvents.FADE_IN, name: EVENT_INFO[EEvents.FADE_IN].name },
       { id: EEvents.FADE_OUT, name: EVENT_INFO[EEvents.FADE_OUT].name },
       { id: EEvents.FADE_OPTIONS, name: EVENT_INFO[EEvents.FADE_OPTIONS].name },
     ],
   },
+  UI: {
+    Text: [
+      { id: EEvents.UI_SET_TEXT, name: EVENT_INFO[EEvents.UI_SET_TEXT].name },
+      { id: EEvents.UI_SET_VALUE, name: EVENT_INFO[EEvents.UI_SET_VALUE].name },
+      { id: EEvents.UI_ANIMATE, name: EVENT_INFO[EEvents.UI_ANIMATE].name },
+      { id: EEvents.UI_ANIMATION_STOP, name: EVENT_INFO[EEvents.UI_ANIMATION_STOP].name },
+      { id: EEvents.UI_HIDE, name: EVENT_INFO[EEvents.UI_HIDE].name },
+      { id: EEvents.UI_SHOW, name: EVENT_INFO[EEvents.UI_SHOW].name },
+      { id: EEvents.UI_DESTROY, name: EVENT_INFO[EEvents.UI_DESTROY].name },
+
+    ],
+  },
+  Audio: {
+    Music: [
+      { id: EEvents.PLAY_MUSIC, name: EVENT_INFO[EEvents.PLAY_MUSIC].name },
+      { id: EEvents.MUSIC_PLAY_JINGLE, name: EVENT_INFO[EEvents.MUSIC_PLAY_JINGLE].name },
+      { id: EEvents.STOP_MUSIC, name: EVENT_INFO[EEvents.STOP_MUSIC].name },
+      { id: EEvents.MUSIC_STOP, name: EVENT_INFO[EEvents.MUSIC_STOP].name },
+      { id: EEvents.SET_MUSIC_VOLUME, name: EVENT_INFO[EEvents.SET_MUSIC_VOLUME].name },
+      { id: EEvents.MUSIC_RESUME, name: EVENT_INFO[EEvents.MUSIC_RESUME].name },
+      { id: EEvents.MUSIC_PAUSE, name: EVENT_INFO[EEvents.MUSIC_PAUSE].name },
+      { id: EEvents.MUSIC_FADE, name: EVENT_INFO[EEvents.MUSIC_FADE].name },
+    ],
+    Sound: [
+      { id: EEvents.PLAY_SOUND, name: EVENT_INFO[EEvents.PLAY_SOUND].name },
+      { id: EEvents.SOUND_STOP, name: EVENT_INFO[EEvents.SOUND_STOP].name },
+      { id: EEvents.RUMBLE, name: EVENT_INFO[EEvents.RUMBLE].name },
+    ],
+  },
+  Shooter: {
+    Session: [
+      { id: EEvents.SHOOTER_START, name: EVENT_INFO[EEvents.SHOOTER_START].name },
+      { id: EEvents.SHOOTER_SPAWN_WAVE, name: EVENT_INFO[EEvents.SHOOTER_SPAWN_WAVE].name },
+      { id: EEvents.SHOOTER_LOAD_STAGE, name: EVENT_INFO[EEvents.SHOOTER_LOAD_STAGE].name },
+      { id: EEvents.SHOOTER_SET_BACKGROUND_MODE, name: EVENT_INFO[EEvents.SHOOTER_SET_BACKGROUND_MODE].name },
+      { id: EEvents.SHOOTER_PAUSE, name: EVENT_INFO[EEvents.SHOOTER_PAUSE].name },
+      { id: EEvents.SHOOTER_STOP, name: EVENT_INFO[EEvents.SHOOTER_STOP].name },
+      { id: EEvents.SHOOTER_CLEAR_ENEMIES, name: EVENT_INFO[EEvents.SHOOTER_CLEAR_ENEMIES].name },
+      { id: EEvents.SHOOTER_SPAWN_BOSS, name: EVENT_INFO[EEvents.SHOOTER_SPAWN_BOSS].name },
+      { id: EEvents.SHOOTER_SET_BOSS_PHASE, name: EVENT_INFO[EEvents.SHOOTER_SET_BOSS_PHASE].name },
+      { id: EEvents.SHOOTER_WAIT_SIGNAL, name: EVENT_INFO[EEvents.SHOOTER_WAIT_SIGNAL].name },
+      { id: EEvents.SHOOTER_GRANT, name: EVENT_INFO[EEvents.SHOOTER_GRANT].name },
+      { id: EEvents.SHOOTER_SET_STAT, name: EVENT_INFO[EEvents.SHOOTER_SET_STAT].name },
+      { id: EEvents.SHOOTER_ADD_STAT, name: EVENT_INFO[EEvents.SHOOTER_ADD_STAT].name },
+      { id: EEvents.SHOOTER_SET_PLAYER_ENABLED, name: EVENT_INFO[EEvents.SHOOTER_SET_PLAYER_ENABLED].name },
+    ],
+  },
+  Dialogue: {
+    Dialogue: [
+      { id: EEvents.DISPLAY_DIALOGUE, name: EVENT_INFO[EEvents.DISPLAY_DIALOGUE].name },
+      { id: EEvents.DIALOGUE_SHOW, name: EVENT_INFO[EEvents.DIALOGUE_SHOW].name },
+      { id: EEvents.HIDE_DIALOGUE, name: EVENT_INFO[EEvents.HIDE_DIALOGUE].name },
+      { id: EEvents.DIALOGUE_CLOSE, name: EVENT_INFO[EEvents.DIALOGUE_CLOSE].name },
+      { id: EEvents.TEXT_SCROLL, name: EVENT_INFO[EEvents.TEXT_SCROLL].name },
+      { id: EEvents.CREDITS_PLAY, name: EVENT_INFO[EEvents.CREDITS_PLAY].name },
+    ],
+    Menus: [
+      { id: EEvents.DIALOGUE_CHOICE, name: EVENT_INFO[EEvents.DIALOGUE_CHOICE].name },
+      { id: EEvents.MENU_OPEN, name: EVENT_INFO[EEvents.MENU_OPEN].name },
+    ],
+  },
+  "Joypad Input": {
+    Buttons: [
+      { id: EEvents.WAIT_FOR_BUTTON, name: EVENT_INFO[EEvents.WAIT_FOR_BUTTON].name },
+      { id: EEvents.WAIT_INPUT, name: EVENT_INFO[EEvents.WAIT_INPUT].name },
+      { id: EEvents.IF_BUTTON_HELD, name: EVENT_INFO[EEvents.IF_BUTTON_HELD].name },
+      { id: EEvents.INPUT_ENABLE, name: EVENT_INFO[EEvents.INPUT_ENABLE].name },
+      { id: EEvents.INPUT_DISABLE, name: EVENT_INFO[EEvents.INPUT_DISABLE].name },
+    ],
+  },
   Timer: {
     "Wait": [
       { id: EEvents.WAIT, name: EVENT_INFO[EEvents.WAIT].name },
-      // { id: EEvents.IDLE, name: EVENT_INFO[EEvents.IDLE].name }
     ]
   },
   Scripts: {
@@ -158,21 +210,34 @@ const FUNCTIONS_BY_CATEGORY = {
     Reset: [
       { id: EEvents.VARIABLE_RESET_ALL, name: EVENT_INFO[EEvents.VARIABLE_RESET_ALL].name },
     ],
+    Persistence: [
+      { id: EEvents.SAVE_WRITE, name: EVENT_INFO[EEvents.SAVE_WRITE].name },
+      { id: EEvents.SAVE_LOAD, name: EVENT_INFO[EEvents.SAVE_LOAD].name },
+    ],
   }
 };
 
+const CATEGORIES = Object.keys(FUNCTIONS_BY_CATEGORY);
+
 interface EventMenuItemProps {
   eventId: EEvents;
+  preset?: VariableEventPreset;
   isFavorite: boolean;
   onToggleFavorite: (id: EEvents) => void;
   onSelect: () => void;
   searchTerm?: string;
 }
 
-const EventMenuItem: React.FC<EventMenuItemProps> = ({ eventId, isFavorite, onToggleFavorite, onSelect, searchTerm }) => (
-  <Menu.Item key={eventId} onClick={onSelect}>
+const optionLabel = (eventId: EEvents, preset: VariableEventPreset | undefined, t: (key: string) => string) =>
+  eventId === EEvents.VARIABLE && (preset === 'true' || preset === 'false')
+    ? t(`events.variable.set${preset === 'true' ? 'True' : 'False'}`) : getEventLabel(eventId, t);
+
+const EventMenuItem: React.FC<EventMenuItemProps> = ({ eventId, preset, isFavorite, onToggleFavorite, onSelect, searchTerm }) => {
+  const { t } = useI18n();
+  return (
+  <Menu.Item key={`${eventId}:${preset ?? 'default'}`} onClick={onSelect}>
     <Space style={{ width: "100%", justifyContent: "space-between" }}>
-      <Typography.Text>{searchTerm ? highlightText(EVENT_INFO[eventId].name, searchTerm) : EVENT_INFO[eventId].name}</Typography.Text>
+      <Typography.Text>{searchTerm ? highlightText(optionLabel(eventId, preset, t), searchTerm) : optionLabel(eventId, preset, t)}</Typography.Text>
       <Button
         icon={isFavorite ? <StarFilled /> : <StarOutlined />}
         type="text"
@@ -181,6 +246,7 @@ const EventMenuItem: React.FC<EventMenuItemProps> = ({ eventId, isFavorite, onTo
     </Space>
   </Menu.Item>
 );
+};
 
 interface ISelectEventProps {
   tabIndex?: string;
@@ -191,6 +257,7 @@ interface ISelectEventProps {
 }
 
 const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, showFlowButton = true, compact = false, onEventCreated }) => {
+  const { t } = useI18n();
   // const { scenes, setScenes, ignoredFields } = useSceneContext();
   // const { settingUtils, setSettingUtils } = useSettingsUtilsContext();
   // const { elementSelected, setElementSelected } = useElementContext();
@@ -237,15 +304,15 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, sh
     Object.values(FUNCTIONS_BY_CATEGORY).forEach(category => {
       Object.values(category).forEach(subCategory => {
         subCategory.forEach(event => {
-          if (EVENT_INFO[event.id].name.toLowerCase().includes(searchTerm.toLowerCase())) {
+          if (`${optionLabel(event.id, event.preset, t)} ${event.name}`.toLowerCase().includes(searchTerm.toLowerCase())) {
             results.push(event);
           }
         });
       });
     });
     
-    return results.sort((a, b) => a.name.localeCompare(b.name));
-  }, [searchTerm]);
+    return results.sort((a, b) => optionLabel(a.id, a.preset, t).localeCompare(optionLabel(b.id, b.preset, t)));
+  }, [searchTerm, t]);
 
   const handleClose = (eventCode: string, variablePreset: VariableEventPreset = 'value') => {
     const firstVariableValue = (): IConditionValue => {
@@ -260,12 +327,14 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, sh
       ? { left: firstVariableValue(), operator: '==', right: firstVariableValue() }
       : DefaultValueEvents(eventCode, scenes, variablePreset);
     const isSingleLayerScene = elementSelected?.sceneType === ETypeScene.LOGO || elementSelected?.sceneType === ETypeScene.POINTNCLICK;
-    if (isSingleLayerScene && [EEvents.CHANGE_LAYER, EEvents.VISIBLE_BACKGROUND, EEvents.CHANGE_PALETTE_BACKGROUND].includes(eventCode as EEvents) && defaultArgs) {
+    if (isSingleLayerScene && [EEvents.CHANGE_LAYER, EEvents.VISIBLE_BACKGROUND, EEvents.CHANGE_PALETTE_BACKGROUND, EEvents.HBE_EFFECT_ENABLE].includes(eventCode as EEvents) && defaultArgs) {
       (defaultArgs as { layerId?: number }).layerId = 2;
     }
+    if (eventCode === EEvents.CAMERA_MOVE_TO) eventCode = EEvents.PAN_CAMERA;
+    if (eventCode === EEvents.ACTOR_MOVE_TO) eventCode = EEvents.MOVE_ACTOR;
     const newScript: IScriptsElement = {
       id: uuidv4(),
-      version: 1,
+      version: EVENT_CATALOG_BY_CODE[eventCode]?.version ?? 1,
       command: eventCode,
       args: defaultArgs,
       ...([EEvents.IF, EEvents.WHILE, EEvents.FOR, EEvents.WAIT_FOR_BUTTON].includes(eventCode as EEvents) ? { children: { then: [] } } : {}),
@@ -338,14 +407,14 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, sh
   return (
     <Content style={{ margin: compact ? 0 : 10 }}>
       <Flex vertical gap="middle" align="center" >
-        {!compact && shouldShowEmpty && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+        {!compact && shouldShowEmpty && elementSelected?._resourceType !== 'script' && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />}
       
         <Flex gap="small" style={{ width: '100%' }}>
           <Button
             type={compact ? 'text' : 'default'}
             icon={<PlusSquareOutlined style={{fontSize: 20}}/>}
             style={{ flex: 1, ...(compact ? { backgroundColor: '#6b6b6b', color: '#fff' } : {}) }}
-            onClick={() => setOpen(true)}
+            onClick={() => { setSearchTerm(''); setOpen(true); }}
           >
             Add Event
           </Button>
@@ -396,8 +465,9 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, sh
           <Menu selectable={false} style={{ background: "transparent", borderInlineEnd: "none" }}>
             {filteredEventsList.map((fn) => (
               <EventMenuItem
-                key={fn.id}
+                key={`${fn.id}:${fn.preset ?? 'default'}`}
                 eventId={fn.id}
+                preset={fn.preset}
                 isFavorite={favoriteEvents.includes(fn.id)}
                 onToggleFavorite={toggleFavorite}
                 onSelect={() => handleClose(fn.id, fn.preset)}
@@ -449,8 +519,9 @@ const SelectNewEvent: React.FC<ISelectEventProps> = ({ tabIndex, subTabIndex, sh
                 <Menu selectable={false} style={{ background: "transparent", borderInlineEnd: "none" }}>
                   {funcs.map((fn) => (
                     <EventMenuItem
-                      key={fn.id}
+                      key={`${fn.id}:${'preset' in fn ? fn.preset : 'default'}`}
                       eventId={fn.id}
+                      preset={'preset' in fn ? fn.preset as VariableEventPreset : undefined}
                       isFavorite={favoriteEvents.includes(fn.id)}
                       onToggleFavorite={toggleFavorite}
                       onSelect={() => handleClose(fn.id, 'preset' in fn ? fn.preset as VariableEventPreset : undefined)}

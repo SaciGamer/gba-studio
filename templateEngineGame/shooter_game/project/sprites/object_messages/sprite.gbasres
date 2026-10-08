@@ -1,0 +1,423 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "original_object_messages",
+  "name": "object_messages",
+  "filename": "object_messages.bmp",
+  "imageWidth": 16,
+  "imageHeight": 480,
+  "playerFrameWidth": 16,
+  "playerFrameHeight": 8,
+  "playerFramesPerDirection": 15,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 8,
+  "playerCanvasOriginY": 4,
+  "playerCollisionX": -8,
+  "playerCollisionY": -4,
+  "playerCollisionWidth": 16,
+  "playerCollisionHeight": 8,
+  "playerAnimations": [
+    {
+      "id": "idle-down",
+      "name": "Idle Down",
+      "type": "idle",
+      "frames": [
+        0
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_object_messages-idle-down",
+          "width": 16,
+          "height": 8,
+          "pieces": [
+            {
+              "id": "piece-original_object_messages-idle-down",
+              "sourceX": 0,
+              "sourceY": 0,
+              "width": 16,
+              "height": 8,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-down",
+      "name": "Moving Down",
+      "type": "movement",
+      "frames": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-left",
+      "name": "Idle Left",
+      "type": "idle",
+      "frames": [
+        15
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_object_messages-idle-left",
+          "width": 16,
+          "height": 8,
+          "pieces": [
+            {
+              "id": "piece-original_object_messages-idle-left",
+              "sourceX": 0,
+              "sourceY": 120,
+              "width": 16,
+              "height": 8,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-left",
+      "name": "Moving Left",
+      "type": "movement",
+      "frames": [
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-right",
+      "name": "Idle Right",
+      "type": "idle",
+      "frames": [
+        30
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_object_messages-idle-right",
+          "width": 16,
+          "height": 8,
+          "pieces": [
+            {
+              "id": "piece-original_object_messages-idle-right",
+              "sourceX": 0,
+              "sourceY": 240,
+              "width": 16,
+              "height": 8,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-right",
+      "name": "Moving Right",
+      "type": "movement",
+      "frames": [
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-up",
+      "name": "Idle Up",
+      "type": "idle",
+      "frames": [
+        45
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_object_messages-idle-up",
+          "width": 16,
+          "height": 8,
+          "pieces": [
+            {
+              "id": "piece-original_object_messages-idle-up",
+              "sourceX": 0,
+              "sourceY": 360,
+              "width": 16,
+              "height": 8,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-up",
+      "name": "Moving Up",
+      "type": "movement",
+      "frames": [
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59
+      ],
+      "canvasFrames": []
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "default",
+      "name": "Default",
+      "type": "default",
+      "animations": [
+        {
+          "id": "idle-down",
+          "name": "Idle Down",
+          "type": "idle",
+          "frames": [
+            0
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_object_messages-idle-down",
+              "width": 16,
+              "height": 8,
+              "pieces": [
+                {
+                  "id": "piece-original_object_messages-idle-down",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 16,
+                  "height": 8,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-down",
+          "name": "Moving Down",
+          "type": "movement",
+          "frames": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-left",
+          "name": "Idle Left",
+          "type": "idle",
+          "frames": [
+            15
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_object_messages-idle-left",
+              "width": 16,
+              "height": 8,
+              "pieces": [
+                {
+                  "id": "piece-original_object_messages-idle-left",
+                  "sourceX": 0,
+                  "sourceY": 120,
+                  "width": 16,
+                  "height": 8,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-left",
+          "name": "Moving Left",
+          "type": "movement",
+          "frames": [
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-right",
+          "name": "Idle Right",
+          "type": "idle",
+          "frames": [
+            30
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_object_messages-idle-right",
+              "width": 16,
+              "height": 8,
+              "pieces": [
+                {
+                  "id": "piece-original_object_messages-idle-right",
+                  "sourceX": 0,
+                  "sourceY": 240,
+                  "width": 16,
+                  "height": 8,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-right",
+          "name": "Moving Right",
+          "type": "movement",
+          "frames": [
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-up",
+          "name": "Idle Up",
+          "type": "idle",
+          "frames": [
+            45
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_object_messages-idle-up",
+              "width": 16,
+              "height": 8,
+              "pieces": [
+                {
+                  "id": "piece-original_object_messages-idle-up",
+                  "sourceX": 0,
+                  "sourceY": 360,
+                  "width": 16,
+                  "height": 8,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-up",
+          "name": "Moving Up",
+          "type": "movement",
+          "frames": [
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59
+          ],
+          "canvasFrames": []
+        }
+      ]
+    }
+  ]
+}

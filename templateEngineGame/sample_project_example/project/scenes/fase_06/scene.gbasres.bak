@@ -1,0 +1,24 @@
+{
+  "id": "9cdbe869-24f0-4ba4-8c7a-f522601b77e1",
+  "_resourceType": "scene",
+  "_index": 5,
+  "_deleted": false,
+  "name": "Fase_06",
+  "backgroundId": "2fcd4f90-d996-47fb-98cc-2125ba155f37",
+  "background": "local://E:/VisualStudio/GBAStudioProject/gba-studio/templateEngineGame/sample_project_example/assets/backgrounds\\background.png",
+  "backgrounds": [
+    {
+      "layerId": 2,
+      "backgroundId": "2fcd4f90-d996-47fb-98cc-2125ba155f37"
+    }
+  ],
+  "x": 2394,
+  "y": 434,
+  "width": 256,
+  "height": 256,
+  "cameraPosition": {
+    "x": 0,
+    "y": 0
+  },
+  "sceneType": "Top Down"
+}

@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
 import { v4 as uuidv4 } from 'uuid';
 import FloatButtons, { IActions, SubMenuType } from './FloatButtons';
+import { getSceneCollisionColor, getSceneCollisionFill, getCollisionSideForScene, drawLadderCollisionIcon } from '@/utils/collisionColors';
 
 type Tool = 'move' | 'brush' | 'stamp' | 'fill' | 'erase' | 'collision' | 'trigger' | 'actor' | 'spawn';
 type Overlay = 'tiles' | 'collisions' | 'triggers' | 'objects';
@@ -24,6 +25,12 @@ export default function TileCanvasEditor({ scene, resetPanelSize, setShowFloatBu
   const { token } = theme.useToken();
   const { t } = useI18n();
   const { elementSelected, setElementSelected, setScenes, settingUtils, setSettingUtils } = useAppContexts();
+  const [assetReloadVersion, setAssetReloadVersion] = useState(0);
+  useEffect(() => {
+    const reload = () => setAssetReloadVersion(version => version + 1);
+    window.addEventListener('gba-studio:assets-reloaded', reload);
+    return () => window.removeEventListener('gba-studio:assets-reloaded', reload);
+  }, []);
   const active = (elementSelected?.id === scene.id ? elementSelected : scene) as ISceneSettings;
   const grid = active.gridSize ?? 16;
   const width = Math.max(grid, Math.ceil((active.width || 240) / grid) * grid);
@@ -65,7 +72,7 @@ export default function TileCanvasEditor({ scene, resetPanelSize, setShowFloatBu
       } catch { setTileset(null); }
     };
     void load();
-  }, [active.selectedTilesetId]);
+  }, [active.selectedTilesetId, assetReloadVersion]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -94,15 +101,15 @@ export default function TileCanvasEditor({ scene, resetPanelSize, setShowFloatBu
       for (let y = 0; y <= height; y += grid) { context.moveTo(0, y + .5); context.lineTo(width, y + .5); }
       context.stroke();
     }
-    active.collisions?.forEach(shape => { context.fillStyle = 'rgba(255,77,79,.25)'; context.strokeStyle = '#ff4d4f'; context.fillRect(shape.x, shape.y, shape.width, shape.height); context.strokeRect(shape.x + .5, shape.y + .5, shape.width - 1, shape.height - 1); });
+    active.collisions?.forEach(shape => { context.fillStyle = getSceneCollisionFill(shape.collisionSide, .7); context.strokeStyle = getSceneCollisionColor(shape.collisionSide); context.fillRect(shape.x, shape.y, shape.width, shape.height); context.strokeRect(shape.x + .5, shape.y + .5, shape.width - 1, shape.height - 1); if (shape.collisionSide === 'ladder') drawLadderCollisionIcon(context, shape.x, shape.y, shape.width, shape.height); });
     active.triggers?.forEach(shape => { context.fillStyle = 'rgba(82,196,26,.22)'; context.strokeStyle = '#52c41a'; context.fillRect(shape.x, shape.y, shape.width, shape.height); context.strokeRect(shape.x + .5, shape.y + .5, shape.width - 1, shape.height - 1); });
     active.actors?.forEach(actor => { context.fillStyle = '#1677ff'; context.fillRect(actor.x, actor.y, actor.width || grid, actor.height || grid); context.fillStyle = '#fff'; context.font = '9px sans-serif'; context.fillText('A', actor.x + 4, actor.y + 11); });
     active.spawnPoints?.forEach(point => { context.fillStyle = '#faad14'; context.beginPath(); context.arc(point.x + grid / 2, point.y + grid / 2, Math.max(4, grid / 3), 0, Math.PI * 2); context.fill(); });
     if (start && pointer && (tool === 'collision' || tool === 'trigger')) {
-      context.fillStyle = tool === 'trigger' ? 'rgba(82,196,26,.35)' : 'rgba(255,77,79,.35)';
+      context.fillStyle = tool === 'trigger' ? 'rgba(82,196,26,.35)' : getSceneCollisionFill(settingUtils.collisionSide, .7);
       context.fillRect(Math.min(start.col, pointer.col) * grid, Math.min(start.row, pointer.row) * grid, (Math.abs(start.col - pointer.col) + 1) * grid, (Math.abs(start.row - pointer.row) + 1) * grid);
     }
-  }, [active.actors, active.collisions, active.spawnPoints, active.triggers, grid, height, map, pointer, showGrid, start, tileset, token.colorBgContainer, tool, width]);
+  }, [active.actors, active.collisions, active.spawnPoints, active.triggers, grid, height, map, pointer, settingUtils.collisionSide, showGrid, start, tileset, token.colorBgContainer, tool, width]);
 
   const getCell = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current; if (!canvas) return null;
@@ -151,7 +158,7 @@ export default function TileCanvasEditor({ scene, resetPanelSize, setShowFloatBu
         const trigger = { ...shape, sceneId: active.id, activation: 'enter' as const, enabled: true, once: false, cooldownFrames: 0, script: [], onEnterScript: [], onLeaveScript: [] };
         update({ triggers: [...(active.triggers ?? []), trigger] });
         setSettingUtils(previous => ({ ...previous, activeTriggerId: trigger.id }));
-      } else update({ collisions: [...(active.collisions ?? []), shape] });
+      } else update({ collisions: [...(active.collisions ?? []), { ...shape, collisionSide: getCollisionSideForScene(settingUtils.collisionSide, active.sceneType) }] });
     }
     setPainting(false); setStart(null);
   };

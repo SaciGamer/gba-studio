@@ -1,0 +1,336 @@
+{
+  "_resourceType": "scene",
+  "id": "d2a84604-f664-42eb-82a8-4604f6642eb9",
+  "_index": 1,
+  "_deleted": false,
+  "name": "Title",
+  "backgroundId": "original_butano_background",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": "original_butano_background",
+      "name": "",
+      "path": ""
+    }
+  ],
+  "x": 106,
+  "y": 402.2857142857143,
+  "width": 256,
+  "height": 256,
+  "sceneType": "Top Down",
+  "showCamera": true,
+  "editorPosition": {
+    "x": 106,
+    "y": 402.2857142857143
+  },
+  "renderMode": "regular_tilemap",
+  "gridSize": 8,
+  "paletteIds": [],
+  "spritePaletteIds": [],
+  "spawnPoints": [],
+  "autoFadeSpeed": 2,
+  "interactionButton": "A",
+  "eventGraphs": {},
+  "script": [
+    {
+      "id": "b72d429a-c275-449b-872d-429ac27549bd",
+      "version": 1,
+      "command": "EVENT_HBE_EFFECT_ENABLE",
+      "args": {
+        "preset": "mosaic_wave",
+        "intensity": 6,
+        "layerId": 0,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "b418e149-ed2e-4645-8418-e149ed2e6458",
+      "version": 1,
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 2,
+        "__automatic": true,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "a50d3912-f122-43ce-850d-3912f1223ce6",
+      "version": 1,
+      "command": "EVENT_MENU_OPEN",
+      "args": {
+        "prompt": "BUTANO FIGHTER",
+        "options": [
+          "START",
+          "HOW TO PLAY",
+          "CREDITS",
+          "RUMBLE ON/OFF"
+        ],
+        "resultVariable": "a0a7f9a0-002f-43b2-80a7-f9a0002f3b2d",
+        "__collapse": true
+      }
+    },
+    {
+      "id": "f5221ae5-bd1f-4619-8522-1ae5bd1f6191",
+      "version": 1,
+      "command": "EVENT_IF",
+      "args": {
+        "left": {
+          "kind": "variable",
+          "variableId": "a0a7f9a0-002f-43b2-80a7-f9a0002f3b2d"
+        },
+        "operator": "==",
+        "right": {
+          "kind": "literal",
+          "type": "number",
+          "value": 0
+        },
+        "children": {
+          "then": [
+            {
+              "id": "d0df608a-3a37-4fd5-80df-608a3a37fd57",
+              "version": 1,
+              "command": "EVENT_HBE_EFFECT_DISABLE",
+              "args": {
+                "__collapse": true
+              }
+            },
+            {
+              "id": "9497ac39-9152-4f1b-8497-ac399152f1b7",
+              "version": 1,
+              "command": "EVENT_CHANGE_SCENE",
+              "args": {
+                "sceneId": "76109f64-78b8-4ce6-8610-9f6478b8ce67",
+                "x": {
+                  "type": "number",
+                  "value": 120
+                },
+                "y": {
+                  "type": "number",
+                  "value": 136
+                },
+                "direction": "up",
+                "fadeSpeed": 2
+              }
+            }
+          ],
+          "else": []
+        },
+        "__collapse": false
+      }
+    },
+    {
+      "id": "611c3703-9ef3-4a4b-811c-37039ef3a4b2",
+      "version": 1,
+      "command": "EVENT_IF",
+      "args": {
+        "left": {
+          "kind": "variable",
+          "variableId": "a0a7f9a0-002f-43b2-80a7-f9a0002f3b2d"
+        },
+        "operator": "==",
+        "right": {
+          "kind": "literal",
+          "type": "number",
+          "value": 1
+        },
+        "children": {
+          "then": [
+            {
+              "id": "62c5365f-3fe2-419e-82c5-365f3fe219e5",
+              "version": 1,
+              "command": "EVENT_HBE_EFFECT_DISABLE",
+              "args": {
+                "__collapse": true
+              }
+            },
+            {
+              "id": "55900113-bdca-43cb-8590-0113bdca3cbe",
+              "version": 1,
+              "command": "EVENT_CHANGE_SCENE",
+              "args": {
+                "sceneId": "39057e0e-71af-4b65-8905-7e0e71afb65c",
+                "x": {
+                  "type": "number",
+                  "value": 120
+                },
+                "y": {
+                  "type": "number",
+                  "value": 136
+                },
+                "direction": "right",
+                "fadeSpeed": 2
+              }
+            }
+          ],
+          "else": []
+        },
+        "__collapse": false
+      }
+    },
+    {
+      "id": "e6eef12b-bc0b-4412-86ee-f12bbc0b412d",
+      "version": 1,
+      "command": "EVENT_IF",
+      "args": {
+        "left": {
+          "kind": "variable",
+          "variableId": "a0a7f9a0-002f-43b2-80a7-f9a0002f3b2d"
+        },
+        "operator": "==",
+        "right": {
+          "kind": "literal",
+          "type": "number",
+          "value": 2
+        },
+        "children": {
+          "then": [
+            {
+              "id": "8f6820a3-884a-42a1-8f68-20a3884a2a15",
+              "version": 1,
+              "command": "EVENT_HBE_EFFECT_DISABLE",
+              "args": {
+                "__collapse": true
+              }
+            },
+            {
+              "id": "33765d7c-66fe-4138-8376-5d7c66fe1382",
+              "version": 1,
+              "command": "EVENT_CHANGE_SCENE",
+              "args": {
+                "sceneId": "a636971f-85c6-4633-8636-971f85c6633f",
+                "x": {
+                  "type": "number",
+                  "value": 120
+                },
+                "y": {
+                  "type": "number",
+                  "value": 136
+                },
+                "direction": "right",
+                "fadeSpeed": 2
+              }
+            }
+          ],
+          "else": []
+        },
+        "__collapse": false
+      }
+    },
+    {
+      "id": "94eda549-2255-4117-84ed-a54922551176",
+      "version": 1,
+      "command": "EVENT_IF",
+      "args": {
+        "left": {
+          "kind": "variable",
+          "variableId": "a0a7f9a0-002f-43b2-80a7-f9a0002f3b2d"
+        },
+        "operator": "==",
+        "right": {
+          "kind": "literal",
+          "type": "number",
+          "value": 3
+        },
+        "children": {
+          "then": [
+            {
+              "id": "60aa9697-e475-4a3b-80aa-9697e475a3bd",
+              "version": 1,
+              "command": "EVENT_RUMBLE",
+              "args": {
+                "durationFrames": 12,
+                "intensity": 70
+              }
+            },
+            {
+              "id": "c6f7689f-e477-4978-86f7-689fe4779784",
+              "version": 1,
+              "command": "EVENT_HBE_EFFECT_DISABLE",
+              "args": {
+                "__collapse": true
+              }
+            },
+            {
+              "id": "8ea9a3df-5286-4f87-8ea9-a3df5286f87b",
+              "version": 1,
+              "command": "EVENT_CHANGE_SCENE",
+              "args": {
+                "sceneId": "d2a84604-f664-42eb-82a8-4604f6642eb9",
+                "x": {
+                  "type": "number",
+                  "value": 120
+                },
+                "y": {
+                  "type": "number",
+                  "value": 136
+                },
+                "direction": "right",
+                "fadeSpeed": 2
+              }
+            }
+          ],
+          "else": []
+        },
+        "__collapse": false
+      }
+    }
+  ],
+  "actors": [
+    {
+      "id": "333944b0-97f4-459a-8339-44b097f459a7",
+      "actorId": "333944b0-97f4-459a-8339-44b097f459a7",
+      "name": "Title Artwork",
+      "x": 120,
+      "y": 90,
+      "width": 64,
+      "height": 64,
+      "anchor": "center",
+      "direction": "right",
+      "spriteId": "original_stage_1_intro"
+    },
+    {
+      "id": "80666be8-daf8-4284-8066-6be8daf82849",
+      "actorId": "80666be8-daf8-4284-8066-6be8daf82849",
+      "name": "Title butano_big_sprite",
+      "x": 54,
+      "y": 58,
+      "width": 64,
+      "height": 64,
+      "anchor": "center",
+      "direction": "right",
+      "spriteId": "original_butano_big_sprite"
+    },
+    {
+      "id": "638f031c-e810-4f76-838f-031ce810f76b",
+      "actorId": "638f031c-e810-4f76-838f-031ce810f76b",
+      "name": "Title butano_big_silhouette",
+      "x": 186,
+      "y": 58,
+      "width": 64,
+      "height": 64,
+      "anchor": "center",
+      "direction": "right",
+      "spriteId": "original_butano_big_silhouette"
+    },
+    {
+      "id": "80f20273-be4c-4f96-80f2-0273be4cf96a",
+      "actorId": "80f20273-be4c-4f96-80f2-0273be4cf96a",
+      "name": "Title butano_fire",
+      "x": 120,
+      "y": 118,
+      "width": 32,
+      "height": 32,
+      "anchor": "center",
+      "direction": "right",
+      "spriteId": "original_butano_fire"
+    }
+  ],
+  "collisions": [],
+  "triggers": [],
+  "tileAnimations": [],
+  "spawnerTimelines": [],
+  "cameraPosition": {
+    "x": 0,
+    "y": 0
+  }
+}

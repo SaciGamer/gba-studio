@@ -99,7 +99,9 @@ function createProvider<T>(
 
         // Função para atualizar tanto o estado quanto a ref
         const updateValue = (newValue: T | ((prev: T) => T)) => {
-            const nextValue = newValue instanceof Function ? newValue(stateValue) : newValue;
+            // Updates can arrive several times between React renders (for
+            // example during a drag), so always build from the latest value.
+            const nextValue = newValue instanceof Function ? newValue(stateValueRef.current) : newValue;
             stateValueRef.current = nextValue; // Atualiza o valor na ref
             setStateValue(nextValue); // Atualiza o estado (se precisar refletir na UI)
         };

@@ -1,3 +1,4 @@
+import { MOVEMENT_SPEED_OPTIONS, ANIMATION_SPEED_OPTIONS } from '@/utils/movementSpeedOptions';
 import imgPlaceholder from '@/img/placeholder.png';
 import { joinLocalAssetPath } from '@/utils/localAssetUrl';
 import { loadPaletteTransparentImage } from '@/utils/paletteTransparency';
@@ -5,7 +6,7 @@ import useAppContexts from "@/providers/contexts/AppContexts";
 import { IProjectSettings } from "@/providers/contexts/interfaces/IProjectElement";
 import { ISceneSettings } from "@/providers/contexts/interfaces/ISceneElement";
 import { EColorMode, IMainSettings } from "@/providers/contexts/interfaces/ISettingElement";
-import { CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled } from "@ant-design/icons";
+import { CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { Button, Checkbox, Divider, Flex, Form, Input, Radio, Select, Space, theme, Typography } from "antd";
 import StepInputNumber, { InputNumber } from './StepInputNumber';
 import { Content } from "antd/es/layout/layout";
@@ -27,11 +28,13 @@ const SceneLayersThumbnail: React.FC<{
   alt: string;
   canvasWidth: number;
   canvasHeight: number;
-}> = ({ layers, alt, canvasWidth, canvasHeight }) => {
+  cameraPosition?: ISceneSettings['cameraPosition'];
+}> = ({ layers, alt, canvasWidth, canvasHeight, cameraPosition }) => {
   const [transparentSources, setTransparentSources] = useState<Record<string, string>>({});
   const layerSignature = useMemo(() => layers.map(layer => `${layer.key}:${layer.path}`).join('|'), [layers]);
-  const cropX = 0;
-  const cropY = 0;
+  // Camera coordinates are the world-space top-left of the 240x160 view.
+  const cropX = Number.isFinite(cameraPosition?.x) ? Number(cameraPosition!.x) : 0;
+  const cropY = Number.isFinite(cameraPosition?.y) ? Number(cameraPosition!.y) : 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -174,11 +177,131 @@ interface IGameSettingsForm {
   controllerView: (value: number) => void
 }
 
+const DEFAULT_INPUT_MAP: Record<string, string[]> = {
+  move_left: ['LEFT'], move_right: ['RIGHT'], move_up: ['UP'], move_down: ['DOWN'],
+  confirm: ['A'], cancel: ['B'], shoot: ['B'], pause: ['START'], menu: ['SELECT'],
+};
+const INPUT_BUTTON_OPTIONS = ['A', 'B', 'L', 'R', 'START', 'SELECT', 'UP', 'DOWN', 'LEFT', 'RIGHT']
+  .map(button => ({ value: button, label: button }));
+
+export const InputMapEditor: React.FC<{
+  settings: IMainSettings;
+  setSettings: React.Dispatch<React.SetStateAction<IMainSettings>>;
+}> = ({ settings, setSettings }) => {
+  const inputMap = settings.inputMap ?? DEFAULT_INPUT_MAP;
+  const [newAction, setNewAction] = useState('');
+  const updateMap = (nextMap: Record<string, string[]>) => {
+    setSettings(previous => ({ ...previous, inputMap: nextMap, _saved: false }));
+  };
+  const updateAction = (action: string, buttons: string[]) => {
+    updateMap({ ...inputMap, [action]: buttons });
+  };
+  const addAction = () => {
+    const action = newAction.trim();
+    if (!/^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(action) || INPUT_BUTTON_OPTIONS.some(option => option.value === action) || inputMap[action] || Object.keys(inputMap).length >= 32) return;
+    updateMap({ ...inputMap, [action]: ['A'] });
+    setNewAction('');
+  };
+  const removeAction = (action: string) => {
+    const nextMap = { ...inputMap };
+    delete nextMap[action];
+    updateMap(nextMap);
+  };
+  return <Space direction="vertical" style={{ width: '100%' }}>
+    <Typography.Title level={5} style={{ margin: 0 }}>Controls</Typography.Title>
+    <Typography.Text strong>Input Map</Typography.Text>
+    <Typography.Text type="secondary">Project wide logical actions used by scenes, events, and shooter controls.</Typography.Text>
+    <Space.Compact style={{ width: '100%' }}>
+      <Input aria-label="New logical input action" placeholder="New action (e.g. fire_special)" value={newAction}
+        onChange={event => setNewAction(event.target.value)} onPressEnter={addAction} />
+      <Button aria-label="Add logical input action" icon={<PlusOutlined />} onClick={addAction} />
+    </Space.Compact>
+    {Object.entries(inputMap).map(([action, buttons]) => (
+      <Flex key={action} align="center" gap={8}>
+        <Typography.Text style={{ width: 110 }}>{action}</Typography.Text>
+        <Select mode="multiple" style={{ flex: 1 }} value={buttons} options={INPUT_BUTTON_OPTIONS}
+          onChange={next => updateAction(action, next)} maxTagCount="responsive" />
+        <Button aria-label={`Remove logical input action ${action}`} icon={<DeleteOutlined />} type="text" danger onClick={() => removeAction(action)} />
+      </Flex>
+    ))}
+  </Space>;
+};
+
+export const CombatConfigEditor: React.FC<{
+  settings: IMainSettings;
+  setSettings: React.Dispatch<React.SetStateAction<IMainSettings>>;
+}> = ({ settings, setSettings }) => {
+  const config = settings.combatConfig ?? {};
+  const update = (field: keyof NonNullable<IMainSettings['combatConfig']>, value: number | null) => {
+    setSettings(previous => ({
+      ...previous,
+      combatConfig: { ...(previous.combatConfig ?? {}), [field]: value ?? 0 },
+      _saved: false,
+    }));
+  };
+  const fields = [
+    ['maxProjectiles', 'Projectiles', 128],
+    ['maxEnemies', 'Enemies', 64],
+    ['maxPickups', 'Pickups', 32],
+    ['playerHitPoints', 'Player HP', 255],
+    ['defaultDamage', 'Default Damage', 255],
+  ] as const;
+  return <Space direction="vertical" style={{ width: '100%' }}>
+    <Typography.Text strong>Combat Config</Typography.Text>
+    <Typography.Text type="secondary">Fixed runtime budgets used by combat kits; values are validated before the ROM build.</Typography.Text>
+    <Flex wrap="wrap" gap={8}>
+      {fields.map(([field, label, max]) => (
+        <Flex key={field} vertical style={{ minWidth: 108, flex: '1 1 108px' }}>
+          <Typography.Text type="secondary">{label}</Typography.Text>
+          <InputNumber aria-label={label} min={0} max={max} value={config[field]} onChange={value => update(field, value)} />
+        </Flex>
+      ))}
+    </Flex>
+  </Space>;
+};
+
+export const ShooterConfigEditor: React.FC<{
+  settings: IMainSettings;
+  setSettings: React.Dispatch<React.SetStateAction<IMainSettings>>;
+}> = ({ settings, setSettings }) => {
+  const config = settings.shooterConfig ?? {};
+  const updateNumber = (field: 'playerHitPoints' | 'defaultDamage' | 'bossHitPoints', value: number | null) => {
+    setSettings(previous => ({ ...previous, shooterConfig: { ...(previous.shooterConfig ?? {}), [field]: value ?? 0 }, _saved: false }));
+  };
+  const updateWave = (defaultWaveId: string) => {
+    setSettings(previous => ({ ...previous, shooterConfig: { ...(previous.shooterConfig ?? {}), defaultWaveId }, _saved: false }));
+  };
+  return <Space direction="vertical" style={{ width: '100%' }}>
+    <Typography.Text strong>Shooter Config</Typography.Text>
+    <Typography.Text type="secondary">Defaults used by the reusable shooter kit when a wave does not specify its own ID.</Typography.Text>
+    <Form.Item label="Default wave" style={{ marginBottom: 8 }}>
+      <Input aria-label="Default shooter wave" value={config.defaultWaveId ?? ''} placeholder="wave_01" onChange={event => updateWave(event.target.value)} />
+    </Form.Item>
+    <Form.Item label="Projectile sprite" style={{ marginBottom: 8 }}>
+      <Input aria-label="Shooter projectile sprite" value={config.projectileSpriteId ?? ''} placeholder="bullet" onChange={event => setSettings(previous => ({ ...previous, shooterConfig: { ...(previous.shooterConfig ?? {}), projectileSpriteId: event.target.value }, _saved: false }))} />
+    </Form.Item>
+    <Flex wrap="wrap" gap={8}>
+      <Flex vertical style={{ minWidth: 108, flex: '1 1 108px' }}>
+        <Typography.Text type="secondary">Player HP</Typography.Text>
+        <InputNumber aria-label="Shooter player HP" min={0} max={255} value={config.playerHitPoints} onChange={value => updateNumber('playerHitPoints', value)} />
+      </Flex>
+      <Flex vertical style={{ minWidth: 108, flex: '1 1 108px' }}>
+        <Typography.Text type="secondary">Default Damage</Typography.Text>
+        <InputNumber aria-label="Shooter default damage" min={0} max={255} value={config.defaultDamage} onChange={value => updateNumber('defaultDamage', value)} />
+      </Flex>
+      <Flex vertical style={{ minWidth: 108, flex: '1 1 108px' }}>
+        <Typography.Text type="secondary">Boss HP</Typography.Text>
+        <InputNumber aria-label="Shooter boss HP" min={1} max={65535} value={config.bossHitPoints} onChange={value => updateNumber('bossHitPoints', value)} />
+      </Flex>
+    </Flex>
+  </Space>;
+};
+
 const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
   const { token } = useToken();
   const [form] = Form.useForm();
   // const [loading, setLoading] = useState(true);
-  const [customSpeed, setCustomSpeed] = useState(true);
+  const [customSpeedRequested, setCustomSpeed] = useState(false);
   const [animDropDownOpen, setAnimDropdownOpen] = useState(false);
   const [moveDropdownOpen, setMoveDropdownOpen] = useState(false);
 
@@ -186,25 +309,9 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
     settings, setSettings,
     scenes, backgrounds, settingUtils,
   } = useAppContexts();
-  const optionsMoveSpeed = [
-    { value: 0.25, label: "Speed ¼ (Slower)", ppf: "0.25 PPF" },
-    { value: 0.5, label: "Speed ½", ppf: "0.5 PPF" },
-    { value: 1, label: "Speed 1", ppf: "1 PPF" },
-    { value: 2, label: "Speed 2", ppf: "2 PPF" },
-    { value: 3, label: "Speed 3", ppf: "3 PPF" },
-    { value: 4, label: "Speed 4 (Faster)", ppf: "4 PPF" },
-  ];
-  const optionsAnimSpeed = [
-    { value: 0, label: "None", fps: "0" },
-    { value: 1, label: "Speed 1 (Slower)", fps: "0.47 FPS" },
-    { value: 2, label: "Speed 2", fps: "0.94 FPS" },
-    { value: 3, label: "Speed 3", fps: "1.88 FPS" },
-    { value: 4, label: "Speed 4", fps: "3.75 FPS" },
-    { value: 5, label: "Speed 5", fps: "7.5 FPS" },
-    { value: 6, label: "Speed 6", fps: "15 FPS" },
-    { value: 7, label: "Speed 7", fps: "30 FPS" },
-    { value: 8, label: "Speed 8 (Faster)", fps: "60 FPS" },
-  ];
+  const optionsMoveSpeed = MOVEMENT_SPEED_OPTIONS;
+  const customSpeed = customSpeedRequested || !optionsMoveSpeed.some(option => option.value === settings?.startMoveSpeed);
+  const optionsAnimSpeed = ANIMATION_SPEED_OPTIONS;
 
   const clampPlayerPosition = (settings: IMainSettings, scene: ISceneSettings) => {
     const maxX = Math.floor(scene.width / 16) - 2;
@@ -226,6 +333,8 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
       allValues.colorMode = updatedColorMode;
 
       console.log("..: Updated Color Mode Enum:", updatedColorMode);
+    } else {
+      allValues.colorMode = settings.colorMode;
     }
 
     if ('startSceneId' in changedValues) {
@@ -243,7 +352,7 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
     form.setFieldsValue(newValues); // Define os valores no formulário
 
     // Aciona manualmente o onValuesChange
-    const allValues = form.getFieldsValue(); // Obtém todos os valores atuais do formulário
+    const allValues = { ...form.getFieldsValue(), ...newValues };
     handleValuesChange(newValues, allValues); // Substitua 'onValuesChange' pelo nome da sua função
   };
 
@@ -264,7 +373,6 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
           colorMode: settings?.colorMode === 'mixed',
         };
 
-        setCustomSpeed(!optionsMoveSpeed.map((values) => values.value).includes(transformedSettings?.startMoveSpeed as number));
 
         const normalizedSettings = {
           ...transformedSettings,
@@ -328,18 +436,41 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
           // value={scenes.filter(sf => !sf._deleted && sf.id === settings.startSceneId) ?? null }
           options={scenes.filter(sf => !sf._deleted).map(scene => ({
             value: scene.id, // ID único da cena
-            label: (
+            label: scene.name,
+            scene,
+          }))}
+          optionRender={option => {
+            const scene = (option as any).data?.scene ?? scenes.find(item => item.id === option.value);
+            if (!scene) return option.label;
+            return (
               <span style={{ display: 'inline-flex', width: '100%', minHeight: 36, alignItems: 'center', justifyContent: 'flex-start', gap: 8, lineHeight: 1 }}>
                 <SceneLayersThumbnail
                   layers={getSceneBackgroundLayers(scene)}
                   alt={scene.name}
                   canvasWidth={Math.max(240, scene.width || 0)}
                   canvasHeight={Math.max(160, scene.height || 0)}
+                  cameraPosition={scene.cameraPosition}
                 />
                 <span>{scene.name}</span>
               </span>
-            ),
-          }))}
+            );
+          }}
+          labelRender={({ value, label }) => {
+            const scene = scenes.find(item => item.id === String(value));
+            if (!scene) return label;
+            return (
+              <span style={{ display: 'inline-flex', width: '100%', height: 40, boxSizing: 'border-box', alignItems: 'center', justifyContent: 'flex-start', gap: 8, lineHeight: 1, textAlign: 'left' }}>
+                <SceneLayersThumbnail
+                  layers={getSceneBackgroundLayers(scene)}
+                  alt={scene.name}
+                  canvasWidth={Math.max(240, scene.width || 0)}
+                  canvasHeight={Math.max(160, scene.height || 0)}
+                  cameraPosition={scene.cameraPosition}
+                />
+                <span>{scene.name}</span>
+              </span>
+            );
+          }}
           style={{ width: '100%', height: 40 }}
         >
         </Select>
@@ -379,35 +510,29 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
       
       {/* Start Position */}
       <Typography.Paragraph >Start Position</Typography.Paragraph>
-      <Flex >
-        <Space.Compact style={{ flex: 1 }}>
-          <Space.Addon>X</Space.Addon>
-          <Form.Item name={"startX"} noStyle>
-            <InputNumber min={0} max={getSceneMax(settings.startSceneId, 15)} style={{ flex: 1 }}/>
-          </Form.Item>
-        </Space.Compact>
-
-        <Space.Compact style={{ flex: 1, marginLeft: '10px' }}>
-          <Space.Addon>Y</Space.Addon>
-          <Form.Item name={"startY"} noStyle>
-            <InputNumber min={0} max={getSceneMax(settings.startSceneId, 10)} style={{ flex: 1 }}/>
-          </Form.Item>
-        </Space.Compact>
+      <Flex gap={8}>
+        <Form.Item name={"startX"} noStyle style={{ flex: 1, minWidth: 0 }}>
+          <InputNumber addonBefore="X" min={0} max={getSceneMax(settings.startSceneId, 15)} style={{ width: '100%' }}/>
+        </Form.Item>
+        <Form.Item name={"startY"} noStyle style={{ flex: 1, minWidth: 0 }}>
+          <InputNumber addonBefore="Y" min={0} max={getSceneMax(settings.startSceneId, 10)} style={{ width: '100%' }}/>
+        </Form.Item>
       </Flex>
 
       <Divider style={{ margin: `${token.margin}px 0` }} />
 
-      <Space.Compact block>
+      <Flex gap={8} align="flex-start">
         {/* Movement Speed - Dynamic */}
         {customSpeed ? (
-          <Form.Item label="Movement Speed" style={{ flex: 1, textAlign: 'center' }}>
+          <Form.Item label="Movement Speed" style={{ flex: 1, minWidth: 0, textAlign: 'center', marginBottom: 0 }}>
             <InputNumber
+              aria-label="Movement Speed"
               style={{ width: '100%' }}
               min={0.00}
               max={10.0}
               step={0.0625}
               placeholder="Pixels Per Frame..."
-              value={form.getFieldValue("startMoveSpeed") || 0}
+              value={settings.startMoveSpeed || 0}
               formatter={(formatterValue) => formatterValue ? `${parseFloat(formatterValue)}` : ''}
               parser={displayValue => displayValue?.replace(/[^0-9.]/g, "")}
               onChange={(changeValue) => {
@@ -416,9 +541,7 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
                     startMoveSpeed: ''
                   });
                 } else {
-                  form.setFieldsValue({
-                    startMoveSpeed: changeValue
-                  });
+                  handleCustomUpdate({ startMoveSpeed: Number(changeValue) });
                 }
 
                 console.log("Custom moviment speed:", form.getFieldValue("startMoveSpeed"));
@@ -435,23 +558,17 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
           </Form.Item>
         ) :
           (
-            <Form.Item name="startMoveSpeed" label="Movement Speed" style={{ flex: 1, textAlign: 'center' }}>
+            <Form.Item label="Movement Speed" style={{ flex: 1, minWidth: 0, textAlign: 'center', marginBottom: 0 }}>
               <Select
+                value={settings.startMoveSpeed ?? 1}
+                aria-label="Movement Speed"
                 onChange={(value) => {
-                  const isCustom = value.toString().startsWith("customSpeed");
-                  if (isCustom) {
-                    const customValue = parseFloat(value.split("_")[1]);
-                    console.log("..: Custom movement speed selection start: %s, com valor: %s", value, customValue);
-
-                    form.setFieldsValue({
-                      startMoveSpeed: customValue,
-                    });
-
-                    handleCustomUpdate({ startMoveSpeed: customValue });
-                    setCustomSpeed(isCustom);
+                  if (value === 'customSpeed') {
+                    form.setFieldsValue({ startMoveSpeed: settings.startMoveSpeed || 1 });
+                    setCustomSpeed(true);
                   } else {
-                    handleCustomUpdate({ startMoveSpeed: value });
-                    setCustomSpeed(isCustom);
+                    handleCustomUpdate({ startMoveSpeed: Number(value) });
+                    setCustomSpeed(false);
                   }
                 }}
                 onOpenChange={(open) => {
@@ -468,12 +585,12 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
                     </span>
                   </Select.Option>
                 ))}
-                <Select.Option value={`customSpeed_${form.getFieldValue("startMoveSpeed")}`} label={'Custom Speed'} >Custom Speed</Select.Option>
+                <Select.Option value="customSpeed" label={'Custom Speed'} >Custom Speed</Select.Option>
               </Select>
             </Form.Item>
           )}
         {/* Animation Speed */}
-        <Form.Item name="startAnimSpeed" label="Animation Speed" style={{ flex: 1, textAlign: 'center', marginLeft: "10px" }}>
+        <Form.Item name="startAnimSpeed" label="Animation Speed" style={{ flex: 1, minWidth: 0, textAlign: 'center', marginBottom: 0 }}>
           <Select
             showSearch
             optionFilterProp="label"
@@ -491,7 +608,8 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
             ))}
           </Select>
         </Form.Item>
-      </Space.Compact>
+      </Flex>
+
     </Form>
   );
 

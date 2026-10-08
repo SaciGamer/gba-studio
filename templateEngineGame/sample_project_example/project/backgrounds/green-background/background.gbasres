@@ -1,0 +1,12 @@
+{
+  "_resourceType": "background",
+  "id": "3cbc0c1c-4f66-4ad0-8138-743f71decc96",
+  "autoColor": false,
+  "name": "green-background",
+  "filename": "green-background.bmp",
+  "imageWidth": 256,
+  "imageHeight": 256,
+  "hd": false,
+  "tileColors": "",
+  "_deleted": false
+}

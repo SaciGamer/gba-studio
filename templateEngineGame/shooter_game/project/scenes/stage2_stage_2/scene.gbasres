@@ -1,0 +1,163 @@
+{
+  "_resourceType": "scene",
+  "id": "88e6fe54-5f3c-4aa0-88e6-fe545f3caa07",
+  "_index": 3,
+  "_deleted": false,
+  "name": "Stage2_stage_2",
+  "backgroundId": "original_stage_2",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": "original_stage_2",
+      "name": "",
+      "path": ""
+    }
+  ],
+  "x": 987.2544776822671,
+  "y": 399.98361755582823,
+  "width": 512,
+  "height": 512,
+  "sceneType": "Top Down",
+  "showCamera": true,
+  "editorPosition": {
+    "x": 987.2544776822671,
+    "y": 399.98361755582823
+  },
+  "renderMode": "regular_tilemap",
+  "gridSize": 8,
+  "paletteIds": [],
+  "spritePaletteIds": [],
+  "spawnPoints": [],
+  "autoFadeSpeed": 2,
+  "interactionButton": "A",
+  "eventGraphs": {},
+  "script": [
+    {
+      "id": "1b3e7b44-9dc0-4a49-8b3e-7b449dc0a49a",
+      "version": 1,
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 2,
+        "__automatic": true,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "4f17a7f1-2874-4c44-8f17-a7f12874c44f",
+      "version": 1,
+      "command": "EVENT_SHOOTER_LOAD_STAGE",
+      "args": {
+        "waveId": "wave_stage_2",
+        "musicId": "basic_instinct",
+        "musicVolume": 80,
+        "backgroundId": "original_stage_2",
+        "backgroundLayer": 0,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "546eab80-fbe4-4cea-846e-ab80fbe4cea5",
+      "version": 1,
+      "command": "EVENT_SHOOTER_START",
+      "args": {
+        "waveId": "wave_stage_2",
+        "__collapse": false
+      }
+    },
+    {
+      "id": "914f1eea-8acf-4668-814f-1eea8acf6685",
+      "version": 1,
+      "command": "EVENT_WAIT",
+      "args": {
+        "units": "frames",
+        "frames": 180,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "0188c7b3-c338-4d13-8188-c7b3c338d131",
+      "version": 1,
+      "command": "EVENT_SHOOTER_SPAWN_BOSS",
+      "args": {
+        "archetypeId": "original_stage_2_monsters_2",
+        "x": 120,
+        "y": 32,
+        "dropId": "original_gem",
+        "__collapse": false
+      }
+    },
+    {
+      "id": "8d62e519-8a37-4ae4-8d62-e5198a37ae41",
+      "version": 1,
+      "command": "EVENT_SHOOTER_WAIT_SIGNAL",
+      "args": {
+        "signal": "boss_defeated",
+        "timeoutFrames": 1800,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "39dca0ac-bcea-4f32-89dc-a0acbceaf327",
+      "version": 1,
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "7d8262c2-949c-4479-8d82-62c2949c4790",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "up",
+        "fadeSpeed": 2,
+        "__collapse": true
+      }
+    }
+  ],
+  "actors": [
+    {
+      "id": "79e0b5e6-3b2b-4f84-89e0-b5e63b2bf848",
+      "actorId": "79e0b5e6-3b2b-4f84-89e0-b5e63b2bf848",
+      "name": "Hero",
+      "x": 120,
+      "y": 136,
+      "width": 16,
+      "height": 16,
+      "anchor": "center",
+      "direction": "up",
+      "spriteId": "original_hero_body_flying"
+    }
+  ],
+  "collisions": [],
+  "triggers": [],
+  "tileAnimations": [],
+  "spawnerTimelines": [
+    {
+      "id": "wave_stage_2",
+      "entries": [
+        {
+          "frame": 0,
+          "archetypeId": "original_stage_2_monsters_1",
+          "x": 48,
+          "y": 32,
+          "patternId": "straight",
+          "dropId": "original_gem"
+        },
+        {
+          "frame": 45,
+          "archetypeId": "original_stage_2_monsters_2",
+          "x": 144,
+          "y": 32,
+          "patternId": "sine",
+          "dropId": "original_gem"
+        }
+      ]
+    }
+  ],
+  "cameraPosition": {
+    "x": 0,
+    "y": 0
+  }
+}

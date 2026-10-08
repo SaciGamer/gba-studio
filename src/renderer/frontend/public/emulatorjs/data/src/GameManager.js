@@ -144,7 +144,7 @@ class EJS_GameManager {
         } catch(e) {}
     }
     getRetroArchCfg() {
-        let cfg = "autosave_interval = 60\n" +
+        let cfg = "log_verbosity = true\n" + "libretro_log_level = 1\n" + "autosave_interval = 60\n" +
             "screenshot_directory = \"/\"\n" +
             "block_sram_overwrite = false\n" +
             "video_gpu_screenshot = false\n" +

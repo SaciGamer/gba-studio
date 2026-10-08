@@ -12,7 +12,7 @@ interface RgbColor {
 
 interface ImagePalette {
   colors: RgbColor[];
-  // Present for non-interlaced indexed PNGs. Unlike a color lookup, this
+  // Present for indexed PNGs, including Adam7-interlaced images. Unlike a color lookup, this
   // preserves the original palette slot even when two slots share a color.
   indexes?: Uint8Array;
 }
@@ -90,7 +90,7 @@ async function readIndexedPngPixels(bytes: Uint8Array): Promise<Uint8Array | und
     offset = dataOffset + length + 4;
   }
 
-  if (!indexed || interlaced || !width || !height || ![1, 2, 4, 8].includes(bitDepth) || !idatChunks.length) return undefined;
+  if (!indexed || !width || !height || ![1, 2, 4, 8].includes(bitDepth) || !idatChunks.length) return undefined;
 
   try {
     const compressedSize = idatChunks.reduce((total, chunk) => total + chunk.length, 0);
@@ -104,39 +104,36 @@ async function readIndexedPngPixels(bytes: Uint8Array): Promise<Uint8Array | und
       new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate')),
     ).arrayBuffer();
     const scanlines = new Uint8Array(decompressed);
-    const rowBytes = Math.ceil(width * bitDepth / 8);
-    if (scanlines.length < height * (rowBytes + 1)) return undefined;
-
-    const unfiltered = new Uint8Array(height * rowBytes);
-    for (let row = 0; row < height; row += 1) {
-      const filter = scanlines[row * (rowBytes + 1)];
-      const inputOffset = row * (rowBytes + 1) + 1;
-      const outputOffset = row * rowBytes;
-      for (let column = 0; column < rowBytes; column += 1) {
-        const value = scanlines[inputOffset + column];
-        const left = column ? unfiltered[outputOffset + column - 1] : 0;
-        const up = row ? unfiltered[outputOffset - rowBytes + column] : 0;
-        const upLeft = row && column ? unfiltered[outputOffset - rowBytes + column - 1] : 0;
-        const paeth = () => {
-          const prediction = left + up - upLeft;
-          const leftDistance = Math.abs(prediction - left);
-          const upDistance = Math.abs(prediction - up);
-          const upLeftDistance = Math.abs(prediction - upLeft);
-          return leftDistance <= upDistance && leftDistance <= upLeftDistance ? left : upDistance <= upLeftDistance ? up : upLeft;
-        };
-        const filtered = filter === 0 ? value : filter === 1 ? value + left : filter === 2 ? value + up : filter === 3 ? value + Math.floor((left + up) / 2) : filter === 4 ? value + paeth() : NaN;
-        if (Number.isNaN(filtered)) return undefined;
-        unfiltered[outputOffset + column] = filtered & 0xff;
-      }
-    }
-
     const indexes = new Uint8Array(width * height);
-    const mask = (1 << bitDepth) - 1;
-    for (let row = 0; row < height; row += 1) {
-      for (let column = 0; column < width; column += 1) {
-        const bitOffset = column * bitDepth;
-        const byte = unfiltered[row * rowBytes + Math.floor(bitOffset / 8)];
-        indexes[row * width + column] = (byte >> (8 - bitDepth - (bitOffset % 8))) & mask;
+    const passes = interlaced
+      ? [[0, 0, 8, 8], [4, 0, 8, 8], [0, 4, 4, 8], [2, 0, 4, 4], [0, 2, 2, 4], [1, 0, 2, 2], [0, 1, 1, 2]]
+      : [[0, 0, 1, 1]];
+    let cursor = 0;
+    for (const [startX, startY, stepX, stepY] of passes) {
+      const passWidth = Math.max(0, Math.ceil((width - startX) / stepX));
+      const passHeight = Math.max(0, Math.ceil((height - startY) / stepY));
+      if (!passWidth || !passHeight) continue;
+      const rowBytes = Math.ceil(passWidth * bitDepth / 8);
+      let previous = new Uint8Array(rowBytes);
+      for (let row = 0; row < passHeight; row++) {
+        const filter = scanlines[cursor++];
+        if (cursor + rowBytes > scanlines.length || filter > 4) return undefined;
+        const unfiltered = new Uint8Array(rowBytes);
+        for (let column = 0; column < rowBytes; column++) {
+          const value = scanlines[cursor++];
+          const left = column ? unfiltered[column - 1] : 0;
+          const up = previous[column], upLeft = column ? previous[column - 1] : 0;
+          const prediction = left + up - upLeft;
+          const da = Math.abs(prediction - left), db = Math.abs(prediction - up), dc = Math.abs(prediction - upLeft);
+          const paeth = da <= db && da <= dc ? left : db <= dc ? up : upLeft;
+          unfiltered[column] = (value + (filter === 0 ? 0 : filter === 1 ? left : filter === 2 ? up : filter === 3 ? Math.floor((left + up) / 2) : paeth)) & 255;
+        }
+        for (let column = 0; column < passWidth; column++) {
+          const bit = column * bitDepth;
+          indexes[(startY + row * stepY) * width + startX + column * stepX] =
+            (unfiltered[bit >> 3] >> (8 - bitDepth - (bit & 7))) & ((1 << bitDepth) - 1);
+        }
+        previous = unfiltered;
       }
     }
     return indexes;
@@ -212,6 +209,14 @@ function parseColor(color: string): RgbColor | null {
   } : null;
 }
 
+// Butano stores palette channels as 5-bit GBA values. Round-trip through the
+// same 5-bit representation before painting the desktop preview, otherwise a
+// color can look slightly different from the ROM despite using the same slot.
+export function quantizeGbaColor(color: RgbColor): RgbColor {
+  const channel = (value: number) => Math.round(Math.round(value * 31 / 255) * 255 / 31);
+  return { red: channel(color.red), green: channel(color.green), blue: channel(color.blue) };
+}
+
 export function loadPaletteTransparentImage(src: string, replacementColors?: string[]): Promise<HTMLCanvasElement | null> {
   const cacheKey = `${src}:${replacementColors?.join(',') ?? ''}`;
   const cached = transparentImageCache.get(cacheKey);
@@ -223,7 +228,7 @@ export function loadPaletteTransparentImage(src: string, replacementColors?: str
       const canvas = document.createElement('canvas');
       canvas.width = image.naturalWidth;
       canvas.height = image.naturalHeight;
-      const context = canvas.getContext('2d');
+      const context = canvas.getContext('2d', { willReadFrequently: true });
       if (!context) return resolve(null);
 
       context.imageSmoothingEnabled = false;
@@ -231,7 +236,9 @@ export function loadPaletteTransparentImage(src: string, replacementColors?: str
       const imagePalette = await getImagePalette(src);
       try {
         const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
-        const replacements = replacementColors?.map(parseColor).filter((color): color is RgbColor => color !== null) ?? [];
+        const replacements = replacementColors?.map(parseColor)
+          .filter((color): color is RgbColor => color !== null)
+          .map(quantizeGbaColor) ?? [];
         const sourceColors = imagePalette.colors.length ? imagePalette.colors : [];
 
         // PNG/BMP indexed palettes preserve the exact index used by every pixel. For

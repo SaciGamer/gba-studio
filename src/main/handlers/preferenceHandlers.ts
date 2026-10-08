@@ -11,10 +11,12 @@ const __store = new Store<IStoreData>();
 // Defina um objeto de preferência padrão 
 const defaultPreferences: IPreferences = {
   theme: 'systemDefault',
-  language: 'pt_BR',
+  language: 'systemDefault',
   recentProjects: [],
   tempProjectBackupLimit: 5,
   historyLimit: 50,
+  gameWorldPanInertia: true,
+  gameWorldMovementMode: 'grid',
 };
 
 // THEME --------------------------------------------------------
@@ -57,7 +59,7 @@ export const updatePreferences = (key: keyof IPreferences, value: any): void => 
     if (projectExistIndex !== -1) {
       const [projectExist] = recentProjects.splice(projectExistIndex, 1); 
       console.log('..: updatePreferences exite: ', projectExist);
-      recentProjects.unshift(projectExist);
+      recentProjects.unshift({ ...projectExist, ...value });
     } else {
       console.log('..: updatePreferences NO exite: ', value);
       recentProjects.unshift(value);
@@ -71,6 +73,17 @@ export const updatePreferences = (key: keyof IPreferences, value: any): void => 
   savePreferences(preferences); 
   // console.log("..: Atualizou preferencesConfig");
 }
+
+export const setGameWorldPreferences = (values: { panInertia: boolean; movementMode: 'free' | 'grid' }) => {
+  const preferences = getPreferences();
+  preferences.gameWorldPanInertia = Boolean(values.panInertia);
+  preferences.gameWorldMovementMode = values.movementMode === 'free' ? 'free' : 'grid';
+  savePreferences(preferences);
+  return {
+    gameWorldPanInertia: preferences.gameWorldPanInertia,
+    gameWorldMovementMode: preferences.gameWorldMovementMode,
+  };
+};
 
 export const deletePreference = (key: keyof IPreferences, value: any): void => {
   console.log('..: Deletando preference: ', value);
@@ -111,15 +124,35 @@ const saveUsedSplashTab = (lastSplashTab: string): void => {
 // LAST USED SPLASH TAB END ---------------------------------------------
 
 // LAST POSITION SPLITTERS -------------------------------------------------
-const saveLastPositionSplitters = (lastPositionSplitters: number[]): void => {
-  // console.log('..: saveLastPositionSplitters lastPositionSplitters: %s', lastPositionSplitters);
-  __store.set('navigatorSidebarWidth', lastPositionSplitters[0]);
-  __store.set('worldSidebarWidth', lastPositionSplitters[1]);
-  __store.set('filesSidebarWidth', lastPositionSplitters[2]);
+const saveLastPositionSplitters = (lastPositionSplitters: number[] | Record<string, any>): void => {
+  if (Array.isArray(lastPositionSplitters)) {
+    __store.set('navigatorSidebarWidth', lastPositionSplitters[0]);
+    __store.set('worldSidebarWidth', lastPositionSplitters[1]);
+    __store.set('filesSidebarWidth', lastPositionSplitters[2]);
+    return;
+  }
+  if (typeof lastPositionSplitters.projectId === 'string' && lastPositionSplitters.leftNavigation) {
+    __store.set(`splitter:leftNavigation:${lastPositionSplitters.projectId}`, lastPositionSplitters.leftNavigation);
+  }
+  if (typeof lastPositionSplitters.projectId === 'string' && lastPositionSplitters.spriteNavigation) {
+    __store.set(`splitter:spriteNavigation:${lastPositionSplitters.projectId}`, lastPositionSplitters.spriteNavigation);
+  }
+  Object.entries(lastPositionSplitters).forEach(([key, sizes]) => {
+    if (key !== 'projectId' && key !== 'leftNavigation' && Array.isArray(sizes) && sizes.every(size => Number.isFinite(size))) {
+      __store.set(`splitter:${key}`, sizes);
+    }
+  });
 }
 
-const getLastPositionSplitters = () => {
-  return [__store.get('navigatorSidebarWidth', 200), __store.get('worldSidebarWidth', 200), __store.get('filesSidebarWidth', 200)];
+const getLastPositionSplitters = (projectId?: string) => {
+  return {
+    main: [__store.get('navigatorSidebarWidth', 200), __store.get('worldSidebarWidth', 200), __store.get('filesSidebarWidth', 200)],
+    leftNavigation: projectId
+      ? __store.get(`splitter:leftNavigation:${projectId}`, null)
+      : __store.get('splitter:leftNavigation', null),
+    spriteNavigation: projectId ? __store.get(`splitter:spriteNavigation:${projectId}`, null) : null,
+    centerWorkspace: __store.get('splitter:centerWorkspace', null),
+  };
 }
 // LAST POSITION SPLITTERS END ---------------------------------------------
 
@@ -237,6 +270,7 @@ export const initializeDefaultPaths = (): void => {
 
 export const configurarPreferenceHandlers = () => {
   ipcMain.handle('loadPreferences', () => getPreferences());
+  ipcMain.handle('set-game-world-preferences', (_event: IpcMainInvokeEvent, values: { panInertia: boolean; movementMode: 'free' | 'grid' }) => setGameWorldPreferences(values));
   ipcMain.handle('removePreferences', (_event: IpcMainInvokeEvent, key: keyof IPreferences, value: unknown) => deletePreference(key, value));
   //--
   ipcMain.handle('loadLastUsedPath', () => getLastUsedPath());
@@ -245,8 +279,8 @@ export const configurarPreferenceHandlers = () => {
   ipcMain.handle('loadLastUsedSplashTab', () => getLastUsedSplashTab());
   ipcMain.handle('lastUsedSplashTab', (_event: IpcMainInvokeEvent, lastSplashTab: string) => saveUsedSplashTab(lastSplashTab));
   //--
-  ipcMain.handle('lastPositionSplitters', (_event: IpcMainInvokeEvent, lastPositionSplitters: number[]) => saveLastPositionSplitters(lastPositionSplitters));
-  ipcMain.handle('loadLastPositionSplitters', () => getLastPositionSplitters());
+  ipcMain.handle('lastPositionSplitters', (_event: IpcMainInvokeEvent, lastPositionSplitters: number[] | Record<string, any>) => saveLastPositionSplitters(lastPositionSplitters));
+  ipcMain.handle('loadLastPositionSplitters', (_event: IpcMainInvokeEvent, projectId?: string) => getLastPositionSplitters(projectId));
   //--
   ipcMain.handle('get-temp-build-path', () => getTempBuildPath());
   ipcMain.handle('set-temp-build-path', (_event: IpcMainInvokeEvent, tempBuildPath: string) => setTempBuildPath(tempBuildPath));

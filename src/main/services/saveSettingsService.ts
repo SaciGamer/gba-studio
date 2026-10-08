@@ -5,14 +5,17 @@ import { EventEmitter } from 'events';
 import { SettingsController } from '@/controllers/SettingsController';
 import { createGenericSettingsStruct } from '@/structs/projectSettingsStruct';
 import { getPreferences } from '@/handlers/preferenceHandlers';
+import { updatePreferences } from '@/handlers/preferenceHandlers';
 import { windows, directoryPathProject, originalProjectDirectory } from '@/main';
 import { setCurrentActiveSandboxDirectory } from '@/states/tempProjectState';
-import { startWatch, stopAllWatchers } from './imagemService';
 
 //Controllers
 const settingsController = SettingsController.getInstance();
 let processingToSaved = false;
 let pendingSaveOptions: SaveOptions | null = null;
+let saveInProgress = false;
+let lastWindowBaseTitle = '';
+let lastProjectTitle = '';
 // Event emitter to signal save completion so other modules (eg. build) can wait
 export const saveEvents = new EventEmitter();
 
@@ -24,11 +27,18 @@ export interface SaveOptions {
 }
 
 export function updateWindowTitle(baseTitle: string, projectName: string, isSaved: boolean): void {
+    lastWindowBaseTitle = baseTitle;
+    lastProjectTitle = projectName;
     if (windows.main) {
         const title = `${baseTitle ? baseTitle : ''} - ${projectName ? projectName : ''}`;
-        windows.main.setTitle(`${title}${!isSaved ? ' (Modified)' : ''}`);
+        windows.main.setTitle(`${title}${saveInProgress ? ' (Salvando...)' : !isSaved ? ' (Modified)' : ''}`);
         settingsController.setIsSaved(isSaved);
     }
+}
+
+function updateSaveProgress(isInProgress: boolean): void {
+    saveInProgress = isInProgress;
+    updateWindowTitle(lastWindowBaseTitle, lastProjectTitle, settingsController.isSaved());
 }
 
 // Default project path
@@ -73,6 +83,7 @@ export function requestSaveChanges(options: SaveOptions = {}) {
     if (windows.main && !processingToSaved) {
         processingToSaved = true;
         pendingSaveOptions = mergedOptions;
+        updateSaveProgress(true);
         windows.main.webContents.send('get-data', { type: 'SAVE_DATA', ...mergedOptions });
     }
 }
@@ -98,14 +109,13 @@ export function waitForSaveComplete(timeoutMs = 10000): Promise<void> {
 }
 
 // Response FE para salvar nos arquivos
-export function responseSaveChanges(dataToSave: any) {
+export function responseSaveChanges(dataToSave: any): boolean {
     console.log('..: DATA response to save:', dataToSave);
-    stopAllWatchers();
-    processingToSaved = saveChanges(dataToSave, pendingSaveOptions || {});
-
-    var foldersToWatch = ["backgrounds", "backgrounds-hd", "tilesets", "sprites"];
-    foldersToWatch.forEach((folder) => startWatch(windows.main, originalProjectDirectory, folder));
+    const saveSucceeded = saveChanges(dataToSave, pendingSaveOptions || {});
+    processingToSaved = false;
     pendingSaveOptions = null;
+    updateSaveProgress(false);
+    return saveSucceeded;
 }
 
 // Function to save changes
@@ -152,7 +162,14 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
             }
 
             if (fileData && fileData._resourceType === 'project') {
-                saveSettingsToStore(activeProjectDirectory, '', path.basename(settingsUtils.projectPathFile || 'project.gbaproj'), fileData);
+                const projectFilename = path.basename(settingsUtils.projectPathFile || 'project.gbaproj');
+                saveSettingsToStore(activeProjectDirectory, '', projectFilename, fileData);
+                updatePreferences('recentProjects', {
+                    title: projectFilename,
+                    path: originalProjectDirectory || activeProjectDirectory,
+                    hasCartridgeImage: typeof fileData.cartridgeImage === 'string' && Boolean(fileData.cartridgeImage),
+                    cartridgeImage: typeof fileData.cartridgeImage === 'string' ? fileData.cartridgeImage : null,
+                });
             } else if (fileData && fileData._resourceType === 'palettes') {
                 const palettePath = path.join(activeProjectDirectory, 'project', 'palettes');
                 fileData.palettes.forEach((palette: any) => saveWithFolders(palettePath, palette.name, { ...palette, _resourceType: 'palette' }));
@@ -170,10 +187,10 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
             settingsController.setIsSaved(true);
         }
         emitSaveComplete(options);
-        return false;
+        return true;
     } catch (error) {
         console.error('..: Erro ao salvar configurações:', error);
-        emitSaveComplete(options);
+        emitSaveComplete(options, false);
         return false;
     }
 }

@@ -1,0 +1,146 @@
+{
+  "id": "1155b235-5e58-4d07-a457-e90bbddf967e",
+  "_resourceType": "scene",
+  "_index": 8,
+  "_deleted": false,
+  "name": "Game_Over",
+  "backgroundId": "2fcd4f90-d996-47fb-98cc-2125ba155f37",
+  "background": "local://E:/VisualStudio/GBAStudioProject/gba-studio/templateEngineGame/sample_project_example/assets/backgrounds\\background.png",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": "2fcd4f90-d996-47fb-98cc-2125ba155f37",
+      "name": "",
+      "path": "",
+      "y": 0
+    },
+    {
+      "layerId": 1,
+      "backgroundId": "b508d1ce-a1ca-4e23-b346-63128fd90412",
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 2,
+      "backgroundId": null,
+      "name": "",
+      "path": "",
+      "x": 0
+    }
+  ],
+  "x": 2682,
+  "y": 114,
+  "width": 256,
+  "height": 256,
+  "cameraPosition": {
+    "x": 8,
+    "y": 48
+  },
+  "sceneType": "Top Down",
+  "editorPosition": {
+    "x": 2682,
+    "y": 114
+  },
+  "script": [
+    {
+      "id": "e994a749-f584-452e-ae6d-0ada4476b2a4",
+      "version": 1,
+      "command": "EVENT_FADE_OPTIONS",
+      "args": {
+        "color": "black",
+        "__collapse": true
+      }
+    },
+    {
+      "id": "1866f38e-1a52-4694-a19a-fbe0e5747234",
+      "version": 1,
+      "command": "EVENT_HIDE_ALL_SPRITES",
+      "args": {
+        "__collapse": true
+      }
+    },
+    {
+      "id": "3a2a0de3-4a57-4db5-adf1-1f0c81fed598",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 2,
+        "__automatic": true,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "d749dcb3-03be-44d8-b2e3-52a8ed279fdf",
+      "version": 2,
+      "command": "EVENT_FOR",
+      "args": {
+        "variableId": "f9bb5b28-5973-4192-9053-7b974a8ee7a2",
+        "start": 0,
+        "end": {
+          "kind": "variable",
+          "variableId": "50388943-fb13-4b80-8ee8-564162326266"
+        },
+        "step": -1,
+        "__collapse": false,
+        "__comment": true
+      },
+      "children": {
+        "then": [
+          {
+            "id": "dae9752a-c096-4afe-af02-f408ed81fe55",
+            "version": 1,
+            "command": "EVENT_BACKGROUND_SCROLL",
+            "args": {
+              "layerId": 0,
+              "x": 0,
+              "y": -1,
+              "__collapse": true
+            }
+          },
+          {
+            "id": "5dc70876-2bf5-4092-b617-dc2e87972c2b",
+            "version": 1,
+            "command": "EVENT_WAIT",
+            "args": {
+              "units": "frames",
+              "time": 1,
+              "frames": 8,
+              "__collapse": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ebfdbe41-e786-4927-ab11-96bb7f79fe01",
+      "version": 1,
+      "command": "EVENT_WAIT",
+      "args": {
+        "units": "frames",
+        "time": 0,
+        "frames": 120,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "2cc0fca8-da3e-4e30-b0a1-e72b883b52ff",
+      "version": 1,
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "738ec3e3-374f-44a8-8bda-8a027cce1d08",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "right",
+        "fadeSpeed": 2,
+        "__collapse": true
+      }
+    }
+  ],
+  "_recenter": true,
+  "showCamera": true
+}

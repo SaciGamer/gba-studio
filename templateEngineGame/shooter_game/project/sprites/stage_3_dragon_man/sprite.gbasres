@@ -1,0 +1,311 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "original_stage_3_dragon_man",
+  "name": "stage_3_dragon_man",
+  "filename": "stage_3_dragon_man.bmp",
+  "imageWidth": 64,
+  "imageHeight": 192,
+  "playerFrameWidth": 64,
+  "playerFrameHeight": 64,
+  "playerFramesPerDirection": 1,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 32,
+  "playerCanvasOriginY": 32,
+  "playerCollisionX": -32,
+  "playerCollisionY": -32,
+  "playerCollisionWidth": 64,
+  "playerCollisionHeight": 64,
+  "playerAnimations": [
+    {
+      "id": "idle-down",
+      "name": "Idle Down",
+      "type": "idle",
+      "frames": [
+        0
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_stage_3_dragon_man-idle-down",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_stage_3_dragon_man-idle-down",
+              "sourceX": 0,
+              "sourceY": 0,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-down",
+      "name": "Moving Down",
+      "type": "movement",
+      "frames": [
+        0
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-left",
+      "name": "Idle Left",
+      "type": "idle",
+      "frames": [
+        1
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_stage_3_dragon_man-idle-left",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_stage_3_dragon_man-idle-left",
+              "sourceX": 0,
+              "sourceY": 64,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-left",
+      "name": "Moving Left",
+      "type": "movement",
+      "frames": [
+        1
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-right",
+      "name": "Idle Right",
+      "type": "idle",
+      "frames": [
+        2
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_stage_3_dragon_man-idle-right",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_stage_3_dragon_man-idle-right",
+              "sourceX": 0,
+              "sourceY": 128,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-right",
+      "name": "Moving Right",
+      "type": "movement",
+      "frames": [
+        2
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-up",
+      "name": "Idle Up",
+      "type": "idle",
+      "frames": [
+        3
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_stage_3_dragon_man-idle-up",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_stage_3_dragon_man-idle-up",
+              "sourceX": 0,
+              "sourceY": 192,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-up",
+      "name": "Moving Up",
+      "type": "movement",
+      "frames": [
+        3
+      ],
+      "canvasFrames": []
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "default",
+      "name": "Default",
+      "type": "default",
+      "animations": [
+        {
+          "id": "idle-down",
+          "name": "Idle Down",
+          "type": "idle",
+          "frames": [
+            0
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_stage_3_dragon_man-idle-down",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_stage_3_dragon_man-idle-down",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-down",
+          "name": "Moving Down",
+          "type": "movement",
+          "frames": [
+            0
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-left",
+          "name": "Idle Left",
+          "type": "idle",
+          "frames": [
+            1
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_stage_3_dragon_man-idle-left",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_stage_3_dragon_man-idle-left",
+                  "sourceX": 0,
+                  "sourceY": 64,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-left",
+          "name": "Moving Left",
+          "type": "movement",
+          "frames": [
+            1
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-right",
+          "name": "Idle Right",
+          "type": "idle",
+          "frames": [
+            2
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_stage_3_dragon_man-idle-right",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_stage_3_dragon_man-idle-right",
+                  "sourceX": 0,
+                  "sourceY": 128,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-right",
+          "name": "Moving Right",
+          "type": "movement",
+          "frames": [
+            2
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-up",
+          "name": "Idle Up",
+          "type": "idle",
+          "frames": [
+            3
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_stage_3_dragon_man-idle-up",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_stage_3_dragon_man-idle-up",
+                  "sourceX": 0,
+                  "sourceY": 192,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-up",
+          "name": "Moving Up",
+          "type": "movement",
+          "frames": [
+            3
+          ],
+          "canvasFrames": []
+        }
+      ]
+    }
+  ]
+}

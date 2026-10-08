@@ -10,15 +10,61 @@
 #include "bn_log.h"
 #include "bn_vector.h"
 #include "bn_regular_bg_ptr.h"
+#include "bn_regular_bg_map_cell_info.h"
+#include "bn_regular_bg_map_ptr.h"
 #include "bn_bg_palette_item.h"
+#include "bn_bg_palette_ptr.h"
+#include "bn_sprite_palette_ptr.h"
 #include "bn_array.h"
 
 #include "graphics_manager.h"
+#include "actor_motion_manager.h"
 #include "actor_manager.h"
+#include "shooter_kit.h"
 #include "script_command_manager.h"
 #include "bn_keypad.h"
 #include "camera_manager.h"
 #include "input_manager.h"
+#include "common_variable_8x8_sprite_font.h"
+
+#ifndef BN_DATA_EWRAM_BSS
+#define BN_DATA_EWRAM_BSS __attribute__((section(".sbss")))
+#endif
+
+GraphicsManager& GraphicsManager::instance()
+{
+    // Sprite/background state is large enough to crowd the IWRAM stack and
+    // overwrite the audio mixer during graphics updates. Keep it in EWRAM.
+    static BN_DATA_EWRAM_BSS GraphicsManager gm;
+    return gm;
+}
+
+namespace
+{
+    bool animation_frames_fit(const SpriteAnimationDefinition& animation, int graphics_count)
+    {
+        if(!animation.frames || animation.frames_count <= 0 || graphics_count <= 0) return false;
+        for(int index = 0; index < animation.frames_count; ++index)
+            if(animation.frames[index] < 0 || animation.frames[index] >= graphics_count) return false;
+        return true;
+    }
+
+    struct SpriteEffectState
+    {
+        int frame;
+        int duration;
+        int start_rotation;
+        int target_rotation;
+        int start_scale;
+        int target_scale;
+        int start_fade;
+        int target_fade;
+        bool active;
+        bool fade_white;
+    };
+
+    BN_DATA_EWRAM_BSS SpriteEffectState sprite_effect_states[16];
+}
 
 bn::optional<bn::regular_bg_item> get_bg_item_from_name(const bn::string<64>& name)
 {
@@ -47,6 +93,9 @@ bn::optional<bn::direct_bitmap_item> get_bitmap_bg_item_from_name(const bn::stri
 
 bn::optional<bn::sprite_item> get_sprite_item_from_name(const bn::string<64>& name)
 {
+    (void) name;
+    (void) name;
+    (void) name;
     {{SPRITE_CONDITIONALS_FROM_NAME}}
     return bn::nullopt;
 }
@@ -131,7 +180,10 @@ void generate_palette_bitmap_bg_manager(bn::optional<bn::palette_bitmap_bg_ptr>&
 
 // ----------------- Implementação da classe -----------------
 
-GraphicsManager::GraphicsManager() : sprite_count(0) {}
+GraphicsManager::GraphicsManager() : sprite_count(0)
+{
+    for(int& index : shooter_projectile_indices) index = -1;
+}
 GraphicsManager::~GraphicsManager() {}
 
 const Scenes* GraphicsManager::initialize()
@@ -161,6 +213,7 @@ const Scenes* GraphicsManager::initialize()
 
 void GraphicsManager::spawn_player(const Scenes& scene, int tile_x, int tile_y, const char* direction)
 {
+    BN_LOG("Player init: begin");
     const Settings* settings = get_settings();
     if(!settings || !settings->player_sprite_id || settings->player_sprite_id[0] == '\0')
     {
@@ -192,9 +245,14 @@ void GraphicsManager::spawn_player(const Scenes& scene, int tile_x, int tile_y, 
     // position. Butano sprite coordinates refer to the sprite centre.
     player_world_x = tile_x * TILE_SIZE + player->canvas_origin_x;
     player_world_y = tile_y * TILE_SIZE + player->canvas_origin_y;
+    player_vertical_velocity_q8 = 0;
+    player_vertical_remainder_q8 = 0;
+    player_grounded = false;
+    player_climbing = false;
     const int x = player_world_x - camera_x - SCREEN_CENTER_X + (player->frame_width / 2) - player->canvas_origin_x;
     const int y = player_world_y - camera_y - SCREEN_CENTER_Y + (player->frame_height / 2) - player->canvas_origin_y;
     player_direction = direction ? direction : "right";
+    BN_LOG("Player init: create sprite at frame dimensions ", player->frame_width, "x", player->frame_height);
     const auto player_sprite = create_sprite(*player, item.value(), x, y, player_direction.data());
     if(!player_sprite.has_value())
     {
@@ -202,14 +260,18 @@ void GraphicsManager::spawn_player(const Scenes& scene, int tile_x, int tile_y, 
         return;
     }
     player_slot = sprite_count - 1;
+    BN_LOG("Player init: sprite created in slot ", player_slot);
     set_camera_position(camera_x, camera_y);
+    BN_LOG("Player init: camera positioned");
 }
 
-void GraphicsManager::set_player_animation(bool moving)
+void GraphicsManager::set_player_animation(bool moving, const char* requested_type)
 {
     if(player_slot < 0 || player_slot >= sprite_count || !sprites[player_slot].has_value()) return;
     const Sprites* player = sprite_resources[player_slot];
     if(!player || !player->animations) return;
+    const int graphics_count = sprite_tiles_items[player_slot].has_value()
+        ? sprite_tiles_items[player_slot]->graphics_count() : 0;
 
     const char* family = moving ? "moving-" : "idle-";
     bn::string<32> directional_id(family);
@@ -219,10 +281,11 @@ void GraphicsManager::set_player_animation(bool moving)
     for(int index = 0; index < player->animations_count; ++index)
     {
         const SpriteAnimationDefinition& animation = player->animations[index];
-        if(!animation.frames || animation.frames_count <= 0) continue;
+        if(sprite_main_states[player_slot] && bn::string<64>(animation.state_id ? animation.state_id : "") != sprite_main_states[player_slot]) continue;
+        if(!animation_frames_fit(animation, graphics_count)) continue;
         const bn::string<32> animation_id(animation.animation_id ? animation.animation_id : "");
         const bn::string<16> animation_type(animation.animation_type ? animation.animation_type : "");
-        if(animation_type == (moving ? "movement" : "idle"))
+        if(animation_type == (requested_type ? requested_type : moving ? "movement" : "idle"))
         {
             if(!fallback) fallback = &animation;
             if(animation_id == directional_id || animation_id == (moving ? "moving" : "idle"))
@@ -233,6 +296,9 @@ void GraphicsManager::set_player_animation(bool moving)
         }
     }
     selected = selected ? selected : fallback;
+    if (!selected && requested_type) { set_player_animation(false); return; }
+    if (!selected && sprite_animations[player_slot] && sprite_animations[player_slot]->animation_type &&
+        bn::string<16>(sprite_animations[player_slot]->animation_type) == "climb") sprite_animations[player_slot] = nullptr;
     if(selected && sprite_animations[player_slot] != selected)
     {
         sprite_animations[player_slot] = selected;
@@ -247,7 +313,8 @@ void GraphicsManager::set_player_animation(bool moving)
     {
         const bn::string<32> animation_id(selected->animation_id ? selected->animation_id : "");
         sprites[player_slot]->set_horizontal_flip(player_direction == "left" &&
-            (animation_id == "moving-right" || animation_id == "idle-right") &&
+            (animation_id == "moving-right" || animation_id == "idle-right" ||
+             animation_id == "running" || animation_id == "moving" || animation_id == "idle") &&
             selected->flip_right_to_create_left_frames);
     }
 }
@@ -263,7 +330,6 @@ bool GraphicsManager::update_actor_interaction(bool interact_pressed)
         for(int index = 0; index < currentScene->actors_count; ++index)
         {
             const SceneActor& actor = currentScene->actors[index];
-            const Sprites* resource = actor.sprite_id ? get_sprite_by_id(bn::string<64>(actor.sprite_id)) : nullptr;
             // Scene actor coordinates are the sprite canvas anchor, matching
             // the editor preview. Do not convert them to the sprite's
             // top-left corner for interaction checks.
@@ -297,7 +363,6 @@ bool GraphicsManager::update_actor_interaction(bool interact_pressed)
 bool GraphicsManager::spawn_actor(const char* actor_id, int x, int y)
 {
     if(!currentScene || !actor_id) return false;
-    ActorManager::instance().spawn(bn::string<64>(actor_id), x, y);
     for(int i = 0; i < actor_count; ++i)
     {
         if(bn::string<64>(actor_ids[i]) == actor_id) return move_actor(actor_id, x, y);
@@ -322,6 +387,11 @@ bool GraphicsManager::spawn_actor(const char* actor_id, int x, int y)
     const int screen_y = y - camera_y - 80 + resource->frame_height / 2 - resource->canvas_origin_y;
     auto sprite = create_sprite(*resource, item.value(), screen_x, screen_y, definition->direction);
     if(!sprite.has_value()) return false;
+    if(ActorManager::instance().spawn(bn::string<64>(actor_id), x, y).slot < 0)
+    {
+        remove_sprite(sprite.value());
+        return false;
+    }
     actor_ids[actor_count] = actor_id;
     actor_slots[actor_count] = sprite_count - 1;
     actor_world_x[actor_count] = x;
@@ -330,15 +400,111 @@ bool GraphicsManager::spawn_actor(const char* actor_id, int x, int y)
     return true;
 }
 
+const Sprites* GraphicsManager::read_script_actor_state(const char* actor_id, actor_motion::State& state) const
+{
+    if(!actor_id) return nullptr;
+    if(bn::string<64>(actor_id) == "__PLAYER__") {
+        if(player_slot < 0 || !sprites[player_slot]) return nullptr;
+        state = {}; state.x = player_world_x; state.y = player_world_y;
+        state.velocity_q8 = player_vertical_velocity_q8; state.remainder_q8 = player_vertical_remainder_q8;
+        state.grounded = player_grounded; state.climbing = player_climbing;
+        state.direction = player_direction == "left" ? 3 : player_direction == "up" ? 0 : player_direction == "down" ? 2 : 1;
+        return sprite_resources[player_slot];
+    }
+    for(int i = 0; i < actor_count; ++i) if(actor_ids[i] == actor_id && actor_slots[i] >= 0 && sprites[actor_slots[i]]) {
+        state = {}; state.x = actor_world_x[i]; state.y = actor_world_y[i];
+        return sprite_resources[actor_slots[i]];
+    }
+    return nullptr;
+}
+
+bool GraphicsManager::apply_script_actor_state(const char* actor_id, const actor_motion::State& state, actor_motion::Action action)
+{
+    int slot = -1;
+    const bool player = actor_id && bn::string<64>(actor_id) == "__PLAYER__";
+    int old_x = 0, old_y = 0;
+    if(player) {
+        slot = player_slot; old_x = player_world_x; old_y = player_world_y;
+        player_world_x = state.x; player_world_y = state.y;
+        player_vertical_velocity_q8 = state.velocity_q8; player_vertical_remainder_q8 = state.remainder_q8;
+        player_grounded = state.grounded; player_climbing = state.climbing;
+        player_direction = state.direction == 3 ? "left" : state.direction == 0 ? "up" : state.direction == 2 ? "down" : "right";
+    } else {
+        for(int i = 0; actor_id && i < actor_count; ++i) if(actor_ids[i] == actor_id) {
+            slot = actor_slots[i]; old_x = actor_world_x[i]; old_y = actor_world_y[i];
+            actor_world_x[i] = state.x; actor_world_y[i] = state.y;
+            ActorManager::instance().set_position_by_id(actor_ids[i], state.x, state.y);
+            break;
+        }
+    }
+    if(slot < 0 || slot >= sprite_count || !sprites[slot] || !sprite_resources[slot]) return false;
+    const auto& resource = *sprite_resources[slot];
+    const bool moving = state.x != old_x || state.y != old_y;
+    const char* requested = state.climbing ? "climb" : actor_motion::platformer(*currentScene) && !state.grounded && state.x == old_x ? "jump" : moving ? "movement" : "idle";
+    if(player) set_player_animation(moving, state.climbing ? "climb" : actor_motion::platformer(*currentScene) && !state.grounded && state.x == old_x ? "jump" : nullptr);
+    else if(resource.animations && sprite_tiles_items[slot]) {
+        const char* direction = state.direction == 3 ? "left" : state.direction == 0 ? "up" : state.direction == 2 ? "down" : "right";
+        bn::string<32> directional(moving ? "moving-" : "idle-"); directional += direction;
+        const SpriteAnimationDefinition* selected = nullptr;
+        for(int i = 0; i < resource.animations_count; ++i) {
+            const auto& clip = resource.animations[i];
+            if(sprite_main_states[slot] && !actor_motion::same_text(clip.state_id, sprite_main_states[slot])) continue;
+            if(!clip.animation_type || bn::string<16>(clip.animation_type) != requested || !animation_frames_fit(clip, sprite_tiles_items[slot]->graphics_count())) continue;
+            if(!selected) selected = &clip;
+            if(clip.animation_id && bn::string<32>(clip.animation_id) == directional) { selected = &clip; break; }
+        }
+        if(selected) {
+            if(sprite_animations[slot] != selected) {
+                sprite_animations[slot] = selected; sprite_animation_frames[slot] = sprite_animation_updates[slot] = 0;
+                sprites[slot]->set_tiles(*sprite_tiles_items[slot], selected->frames[0]);
+            }
+            sprites[slot]->set_horizontal_flip(state.direction == 3 && selected->flip_right_to_create_left_frames);
+        }
+    }
+    sprite_script_motion[slot] = true;
+    sprite_script_climb_direction[slot] = state.climbing && state.y != old_y ? (state.y > old_y ? 1 : -1) : 0;
+    sprites[slot]->set_position(state.x - camera_x - 120 + resource.frame_width / 2 - resource.canvas_origin_x,
+        state.y - camera_y - 80 + resource.frame_height / 2 - resource.canvas_origin_y);
+    (void) action;
+    return true;
+}
+
+void GraphicsManager::stop_script_actor_motion(const char* actor_id)
+{
+    int slot = actor_id && bn::string<64>(actor_id) == "__PLAYER__" ? player_slot : -1;
+    for(int i = 0; actor_id && slot < 0 && i < actor_count; ++i) if(actor_ids[i] == actor_id) slot = actor_slots[i];
+    if(slot >= 0 && slot < sprite_count) {
+        if(slot == player_slot) set_player_animation(false, player_climbing ? "climb" : nullptr);
+        else if(sprite_resources[slot] && sprite_tiles_items[slot]) {
+            const auto& resource = *sprite_resources[slot];
+            for(int i = 0; resource.animations && i < resource.animations_count; ++i) {
+                const auto& clip = resource.animations[i];
+                if(sprite_main_states[slot] && !actor_motion::same_text(clip.state_id, sprite_main_states[slot])) continue;
+                if(clip.animation_type && bn::string<16>(clip.animation_type) == "idle" && animation_frames_fit(clip, sprite_tiles_items[slot]->graphics_count())) {
+                    sprite_animations[slot] = &clip; sprite_animation_frames[slot] = sprite_animation_updates[slot] = 0;
+                    sprites[slot]->set_tiles(*sprite_tiles_items[slot], clip.frames[0]);
+                    break;
+                }
+            }
+        }
+        sprite_script_climb_direction[slot] = 0;
+        sprite_script_motion[slot] = slot != player_slot && sprite_animations[slot] && sprite_animations[slot]->animation_type && bn::string<16>(sprite_animations[slot]->animation_type) == "climb";
+    }
+}
+
 bool GraphicsManager::move_actor(const char* actor_id, int x, int y)
 {
     if(!actor_id) return false;
     if(bn::string<64>(actor_id) == "__PLAYER__")
     {
         if(player_slot < 0 || player_slot >= sprite_count || !sprites[player_slot].has_value()) return false;
+        const Sprites* resource = sprite_resources[player_slot];
+        if(!currentScene || !resource || !actor_motion::clamp_destination(*currentScene, *resource, x, y)) return false;
         player_world_x = x;
         player_world_y = y;
-        const Sprites* resource = sprite_resources[player_slot];
+        player_vertical_velocity_q8 = 0;
+        player_vertical_remainder_q8 = 0;
+        player_grounded = false;
         const int offset_x = resource ? (resource->frame_width / 2) - resource->canvas_origin_x : 0;
         const int offset_y = resource ? (resource->frame_height / 2) - resource->canvas_origin_y : 0;
         sprites[player_slot]->set_position(x - camera_x - 120 + offset_x, y - camera_y - 80 + offset_y);
@@ -349,6 +515,7 @@ bool GraphicsManager::move_actor(const char* actor_id, int x, int y)
         if(bn::string<64>(actor_ids[i]) == actor_id && actor_slots[i] >= 0 && actor_slots[i] < sprite_count && sprites[actor_slots[i]].has_value())
         {
             const Sprites* resource = sprite_resources[actor_slots[i]];
+            if(!currentScene || !resource || !actor_motion::clamp_destination(*currentScene, *resource, x, y)) return false;
             // Keep actor positions in the same canvas-anchor coordinate space
             // used by the scene editor and the initial spawn path.
             const int target_x = x;
@@ -385,6 +552,7 @@ bool GraphicsManager::move_actor(const char* actor_id, int x, int y)
             sprites[actor_slots[i]]->set_position(target_x - camera_x - 120 + offset_x, target_y - camera_y - 80 + offset_y);
             actor_world_x[i] = target_x;
             actor_world_y[i] = target_y;
+            ActorManager::instance().set_position_by_id(actor_ids[i], target_x, target_y);
             return true;
         }
     }
@@ -429,9 +597,49 @@ bool GraphicsManager::set_actor_visible(const char* actor_id, bool visible)
 
 bool GraphicsManager::set_all_actors_visible(bool visible)
 {
+    if(player_slot >= 0 && player_slot < sprite_count && sprites[player_slot].has_value())
+        sprites[player_slot]->set_visible(visible);
     for(int index = 0; index < actor_count; ++index)
         if(actor_slots[index] >= 0 && actor_slots[index] < sprite_count && sprites[actor_slots[index]].has_value())
             sprites[actor_slots[index]]->set_visible(visible);
+    return true;
+}
+
+bool GraphicsManager::set_actor_state(const char* actor_id, const char* state_id)
+{
+    if(!actor_id || !state_id || !*state_id) return false;
+    int slot = actor_motion::same_text(actor_id, "__PLAYER__") ? player_slot : -1;
+    for(int i = 0; slot < 0 && i < actor_count; ++i) if(actor_ids[i] == actor_id) slot = actor_slots[i];
+    if(slot < 0 || slot >= sprite_count || !sprites[slot] || !sprite_resources[slot] || !sprite_tiles_items[slot]) return false;
+    const auto& resource = *sprite_resources[slot];
+    const auto* current = sprite_animations[slot];
+    const bool facing_left = slot == player_slot ? player_direction == "left" : sprites[slot]->horizontal_flip() ||
+        (current && (actor_motion::same_text(current->animation_id, "idle-left") || actor_motion::same_text(current->animation_id, "moving-left")));
+    bn::string<32> desired_id(current && current->animation_id ? current->animation_id : "");
+    if(current && (actor_motion::same_text(current->animation_type, "idle") || actor_motion::same_text(current->animation_type, "movement"))) {
+        desired_id = actor_motion::same_text(current->animation_type, "idle") ? "idle-" : "moving-";
+        const char* direction = slot == player_slot ? player_direction.data() : facing_left ? "left" : "right";
+        desired_id += direction;
+    }
+    const SpriteAnimationDefinition* selected = nullptr;
+    int best = -1;
+    for(int i = 0; resource.animations && i < resource.animations_count; ++i) {
+        const auto& clip = resource.animations[i];
+        if(!actor_motion::same_text(clip.state_id, state_id) || !animation_frames_fit(clip, sprite_tiles_items[slot]->graphics_count())) continue;
+        const int score = clip.animation_id && bn::string<32>(clip.animation_id) == desired_id ? 4
+            : current && actor_motion::same_text(clip.animation_id, current->animation_id) ? 3
+            : current && actor_motion::same_text(clip.animation_type, current->animation_type) ? 2
+            : actor_motion::same_text(clip.animation_type, "idle") ? 1 : 0;
+        if(score > best) { selected = &clip; best = score; }
+    }
+    if(!selected) { BN_LOG("Set Actor State: state or valid frames not found"); return false; }
+    sprite_main_states[slot] = selected->state_id;
+    sprite_animations[slot] = selected;
+    sprite_animation_frames[slot] = sprite_animation_updates[slot] = 0;
+    sprites[slot]->set_tiles(*sprite_tiles_items[slot], selected->frames[0]);
+    const bn::string<32> selected_id(selected->animation_id ? selected->animation_id : "");
+    sprites[slot]->set_horizontal_flip(facing_left && selected->flip_right_to_create_left_frames &&
+        (selected_id == "idle-right" || selected_id == "moving-right" || selected_id == "idle" || selected_id == "moving" || selected_id == "running"));
     return true;
 }
 
@@ -465,6 +673,105 @@ bool GraphicsManager::set_actor_priority(const char* actor_id, int priority)
     return false;
 }
 
+bool GraphicsManager::set_actor_effect(const char* actor_id, int rotation, int scale_percent, bool visible, const char* fade_color, int fade_intensity, int duration_frames)
+{
+    if(!actor_id || duration_frames < 1 || duration_frames > 600) return false;
+    for(int index = 0; index < actor_count; ++index)
+    {
+        if(actor_ids[index] != actor_id) continue;
+        const int slot = actor_slots[index];
+        if(slot < 0 || slot >= MAX_SPRITES || !sprites[slot].has_value()) return false;
+        const int target_rotation = bn::clamp(rotation, -180, 180);
+        const int target_scale = bn::clamp(scale_percent, 10, 400);
+        const int target_fade = bn::clamp(fade_intensity, 0, 100);
+        const bool fade_enabled = fade_color && (fade_color[0] == 'b' || fade_color[0] == 'w');
+        bn::sprite_palette_ptr palette(sprites[slot]->palette());
+        const int current_fade = int(palette.fade_intensity() * 100);
+        if(duration_frames == 1)
+        {
+            sprites[slot]->set_rotation_angle(bn::fixed(target_rotation));
+            sprites[slot]->set_scale(bn::fixed(target_scale) / 100);
+            sprites[slot]->set_visible(visible);
+            if(fade_enabled)
+            {
+                const bn::color fade_tint = fade_color[0] == 'w' ? bn::color(31, 31, 31) : bn::color(0, 0, 0);
+                palette.set_fade(fade_tint, bn::fixed(target_fade) / 100);
+            }
+            else palette.set_fade_intensity(bn::fixed(0));
+            sprite_effect_states[index].active = false;
+        }
+        else
+        {
+            SpriteEffectState& state = sprite_effect_states[index];
+            state.active = true;
+            state.frame = 0;
+            state.duration = duration_frames;
+            state.start_rotation = int(sprites[slot]->rotation_angle());
+            state.target_rotation = target_rotation;
+            state.start_scale = int(sprites[slot]->horizontal_scale() * 100);
+            state.target_scale = target_scale;
+            state.start_fade = current_fade;
+            state.target_fade = fade_enabled ? target_fade : 0;
+            state.fade_white = fade_enabled && fade_color[0] == 'w';
+            sprites[slot]->set_visible(visible);
+        }
+        return true;
+    }
+    return false;
+}
+
+void GraphicsManager::update_sprite_effects()
+{
+    for(int index = 0; index < actor_count; ++index)
+    {
+        const int slot = actor_slots[index];
+        SpriteEffectState& state = sprite_effect_states[index];
+        if(!state.active || slot < 0 || slot >= sprite_count || !sprites[slot].has_value()) continue;
+        const int duration = bn::max(state.duration, 1);
+        const int frame = bn::min(++state.frame, duration);
+        const int rotation = state.start_rotation +
+            (state.target_rotation - state.start_rotation) * frame / duration;
+        const int scale = state.start_scale +
+            (state.target_scale - state.start_scale) * frame / duration;
+        const int fade = state.start_fade +
+            (state.target_fade - state.start_fade) * frame / duration;
+        sprites[slot]->set_rotation_angle(bn::fixed(rotation));
+        sprites[slot]->set_scale(bn::fixed(scale) / 100);
+        bn::sprite_palette_ptr palette(sprites[slot]->palette());
+        if(state.target_fade > 0 || state.start_fade > 0)
+            palette.set_fade(state.fade_white ? bn::color(31, 31, 31) : bn::color(0, 0, 0), bn::fixed(fade) / 100);
+        else palette.set_fade_intensity(bn::fixed(0));
+        if(frame >= duration) state.active = false;
+    }
+}
+
+int GraphicsManager::read_numeric_actor_property(const char* actor_id, int property) const
+{
+    if(!actor_id) return 0;
+    int slot = -1, x = 0, y = 0;
+    const char* direction = "right";
+    if(bn::string<64>(actor_id) == "__PLAYER__") {
+        slot = player_slot; x = player_world_x; y = player_world_y; direction = player_direction.data();
+    } else {
+        for(int index = 0; index < actor_count; ++index) if(actor_ids[index] == actor_id) {
+            slot = actor_slots[index]; x = actor_world_x[index]; y = actor_world_y[index];
+            if(currentScene) for(int actor = 0; actor < currentScene->actors_count; ++actor)
+                if(bn::string<64>(currentScene->actors[actor].id) == actor_id) direction = currentScene->actors[actor].direction;
+            break;
+        }
+    }
+    if(slot < 0 || slot >= sprite_count || !sprites[slot]) { BN_LOG("Numeric actor property: actor not found"); return 0; }
+    if(property == 0) return x;
+    if(property == 1) return y;
+    if(property == 2) {
+        const bn::string<16> facing(direction ? direction : "right");
+        return facing == "up" ? 0 : facing == "right" ? 1 : facing == "down" ? 2 : 3;
+    }
+    if(property == 3) return sprite_animation_frames[slot];
+    if(property == 4) return sprite_animation_speeds[slot];
+    return 0;
+}
+
 void GraphicsManager::set_camera_position(int x, int y)
 {
     if(!currentScene)
@@ -490,9 +797,30 @@ void GraphicsManager::set_camera_position(int x, int y)
             const int height = background && background->image_height > 0 ? background->image_height : 160;
             const int image_x = i < current_bgs_x.size() ? current_bgs_x[i] : 0;
             const int image_y = i < current_bgs_y.size() ? current_bgs_y[i] : 0;
-            current_bgs[i]->set_position(image_x + width / 2 - 120 - camera_x, image_y + height / 2 - 80 - camera_y);
+            const int parallax_x = i < current_bgs_parallax_x.size() ? current_bgs_parallax_x[i] : 100;
+            const int parallax_y = i < current_bgs_parallax_y.size() ? current_bgs_parallax_y[i] : 100;
+            current_bgs[i]->set_position(image_x + width / 2 - 120 - (camera_x * parallax_x) / 100,
+                image_y + height / 2 - 80 - (camera_y * parallax_y) / 100);
         }
     }
+}
+
+bool GraphicsManager::player_on_ladder(int x, int y) const
+{
+    if(!currentScene || !currentScene->scene_type || !currentScene->collisions ||
+       player_slot < 0 || player_slot >= sprite_count) return false;
+    const bn::string<16> type(currentScene->scene_type);
+    if(type != "Platformer" && type != "Platform") return false;
+    const Sprites* player = sprite_resources[player_slot];
+    if(!player) return false;
+    for(int index = 0; index < currentScene->collisions_count; ++index)
+    {
+        const SceneCollision& area = currentScene->collisions[index];
+        if(area.side && bn::string<16>(area.side) == "ladder" &&
+           x + player->collision_x < area.x + area.width && x + player->collision_x + bn::max(1, player->collision_width) > area.x &&
+           y + player->collision_y < area.y + area.height && y + player->collision_y + bn::max(1, player->collision_height) > area.y) return true;
+    }
+    return false;
 }
 
 void GraphicsManager::move_player_from_input()
@@ -508,44 +836,30 @@ void GraphicsManager::move_player_from_input()
     const bn::string<64> scene_type = currentScene->scene_type ? currentScene->scene_type : "";
     const bool platformer = scene_type == "Platformer" || scene_type == "Platform";
     const bool logo = scene_type == "Logo";
-    const bool top_down = scene_type == "Top Down" || scene_type == "TopDown";
+    constexpr int FIXED_POINT_SCALE = 256;
+    constexpr int PLATFORM_GRAVITY_Q8 = FIXED_POINT_SCALE / 4;
+    constexpr int PLATFORM_JUMP_SPEED_Q8 = -5 * FIXED_POINT_SCALE;
+    constexpr int PLATFORM_MAX_FALL_SPEED_Q8 = 6 * FIXED_POINT_SCALE;
 
     if(logo) return;
-    if(platformer) {
-        if(!InputManager::instance().is_overridden("LEFT") && bn::keypad::left_held()) dx = -speed;
-        else if(!InputManager::instance().is_overridden("RIGHT") && bn::keypad::right_held()) dx = speed;
-        // Jump/climbing remain input-driven, while vertical free movement is
-        // intentionally unavailable in the platformer baseline.
-        if(!InputManager::instance().is_overridden("UP") && bn::keypad::up_pressed()) dy = -speed * 4;
-    } else if(top_down || scene_type == "Adventure" || scene_type == "Point Click") {
-        if(!InputManager::instance().is_overridden("LEFT") && bn::keypad::left_held()) dx = -speed;
-        else if(!InputManager::instance().is_overridden("RIGHT") && bn::keypad::right_held()) dx = speed;
-        if(!InputManager::instance().is_overridden("UP") && bn::keypad::up_held()) dy = -speed;
-        else if(!InputManager::instance().is_overridden("DOWN") && bn::keypad::down_held()) dy = speed;
-    } else {
-        if(!InputManager::instance().is_overridden("LEFT") && bn::keypad::left_held()) dx = -speed;
-        else if(!InputManager::instance().is_overridden("RIGHT") && bn::keypad::right_held()) dx = speed;
-        if(!InputManager::instance().is_overridden("UP") && bn::keypad::up_held()) dy = -speed;
-        else if(!InputManager::instance().is_overridden("DOWN") && bn::keypad::down_held()) dy = speed;
-    }
-    if(!dx && !dy) {
+    if(InputManager::instance().held("move_left")) dx = -speed;
+    else if(InputManager::instance().held("move_right")) dx = speed;
+    if(InputManager::instance().held("move_up")) dy = -speed;
+    else if(InputManager::instance().held("move_down")) dy = speed;
+    if(!dx && !dy && !platformer) {
         set_player_animation(false);
         return;
     }
-
-    if(dx < 0) player_direction = "left";
-    else if(dx > 0) player_direction = "right";
-    else if(dy < 0) player_direction = "up";
-    else if(dy > 0) player_direction = "down";
-    set_player_animation(true);
 
     const Sprites* player = sprite_resources[player_slot];
     const int half_width = player ? player->frame_width / 2 : 0;
     const int half_height = player ? player->frame_height / 2 : 0;
     const int old_x = player_world_x;
     const int old_y = player_world_y;
-    const int next_x = bn::clamp(old_x + dx, half_width, bn::max(half_width, currentScene->scene_width - half_width));
-    const int next_y = bn::clamp(old_y + dy, half_height, bn::max(half_height, currentScene->scene_height - half_height));
+    const int min_x = player ? player->canvas_origin_x : half_width;
+    const int min_y = player ? player->canvas_origin_y : half_height;
+    const int max_x = bn::max(min_x, currentScene->scene_width - (player ? player->frame_width : half_width * 2) + min_x);
+    const int max_y = bn::max(min_y, currentScene->scene_height - (player ? player->frame_height : half_height * 2) + min_y);
     const int collision_width = player ? bn::max(1, player->collision_width) : bn::max(1, half_width * 2);
     const int collision_height = player ? bn::max(1, player->collision_height) : bn::max(1, half_height * 2);
     const int collision_offset_x = player ? player->collision_x : -half_width;
@@ -560,6 +874,9 @@ void GraphicsManager::move_player_from_input()
         if(!overlaps(test_x, test_y, collision)) return false;
         const bn::string<16> side = collision.side ? collision.side : "solid";
         if(side == "solid") return true;
+        // Ladder tops support standing; activated climbing passes through them.
+        if(side == "ladder") return platformer && !player_climbing && test_dy > 0 &&
+            old_y + collision_offset_y + collision_height <= collision.y;
         if(side == "top") return test_dy > 0 && old_y + collision_offset_y + collision_height <= collision.y;
         if(side == "down") return test_dy < 0 && old_y + collision_offset_y >= collision.y + collision.height;
         if(side == "left") return test_dx > 0 && old_x + collision_offset_x + collision_width <= collision.x;
@@ -572,15 +889,101 @@ void GraphicsManager::move_player_from_input()
         return false;
     };
 
+    if(platformer)
+    {
+        // Probe one pixel below the player's configured collision box so a
+        // player spawned on a platform can jump on the first input frame.
+        player_grounded = old_y >= max_y || blockedAt(old_x, old_y + 1, 0, 1);
+        const bool jump_pressed = InputManager::instance().pressed("jump");
+        const int climb_input = dy;
+        // Down can reattach from a collision box resting exactly on the top.
+        const bool on_ladder = player_on_ladder(old_x, old_y) ||
+            (climb_input > 0 && player_on_ladder(old_x, old_y + 1));
+        if(!on_ladder) player_climbing = false;
+        const bool jumping = jump_pressed && (player_grounded || player_climbing);
+        if(on_ladder && climb_input && !jumping) player_climbing = true;
+        dy = player_climbing ? climb_input : 0;
+        if(jumping)
+        {
+            player_vertical_velocity_q8 = PLATFORM_JUMP_SPEED_Q8;
+            player_vertical_remainder_q8 = 0;
+            dy = 0;
+            player_grounded = false;
+            player_climbing = false;
+        }
+
+        if(player_climbing && !jumping)
+        {
+            // Only an activated ladder suspends gravity. Released controls hold
+            // the player still; merely touching a ladder never starts climbing.
+            player_vertical_velocity_q8 = 0;
+            player_vertical_remainder_q8 = 0;
+            player_grounded = false;
+        }
+        else if(player_grounded && !jumping)
+        {
+            player_vertical_velocity_q8 = 0;
+            player_vertical_remainder_q8 = 0;
+            dy = 0;
+        }
+        else
+        {
+            player_vertical_velocity_q8 = bn::min(
+                PLATFORM_MAX_FALL_SPEED_Q8,
+                player_vertical_velocity_q8 + PLATFORM_GRAVITY_Q8);
+            player_vertical_remainder_q8 += player_vertical_velocity_q8;
+            dy = player_vertical_remainder_q8 / FIXED_POINT_SCALE;
+            player_vertical_remainder_q8 -= dy * FIXED_POINT_SCALE;
+        }
+    }
+
+    if(dx < 0) player_direction = "left";
+    else if(dx > 0) player_direction = "right";
+    else if(!platformer && dy < 0) player_direction = "up";
+    else if(!platformer && dy > 0) player_direction = "down";
+
+    const int next_x = bn::clamp(old_x + dx, min_x, max_x);
+    const int raw_next_y = old_y + dy;
+    const int next_y = bn::clamp(raw_next_y, min_y, max_y);
+
     // Resolve each axis independently. Testing the complete diagonal at once
     // and then accepting the other axis can let the player pass through a
     // corner when both directions are held.
     int resolved_x = old_x;
     int resolved_y = old_y;
     if(dx != 0 && !blockedAt(next_x, old_y, dx, 0)) resolved_x = next_x;
-    if(dy != 0 && !blockedAt(resolved_x, next_y, 0, dy)) resolved_y = next_y;
+    if(dy != 0)
+    {
+        if(!blockedAt(resolved_x, next_y, 0, dy))
+        {
+            resolved_y = next_y;
+            if(platformer && dy > 0 && raw_next_y >= max_y) player_grounded = true;
+        }
+        else if(platformer)
+        {
+            // A downward collision lands on the floor/platform; an upward
+            // collision ends the jump against a ceiling.
+            player_grounded = dy > 0;
+            player_vertical_velocity_q8 = 0;
+            player_vertical_remainder_q8 = 0;
+        }
+    }
+    if(platformer && dy > 0 && next_y == max_y && resolved_y == max_y)
+    {
+        player_grounded = true;
+        player_vertical_velocity_q8 = 0;
+        player_vertical_remainder_q8 = 0;
+    }
     player_world_x = resolved_x;
     player_world_y = resolved_y;
+    if(!platformer || !player_on_ladder(resolved_x, resolved_y)) player_climbing = false;
+    // Keep a stationary jump animated throughout ascent, apex and descent.
+    // A ceiling collision stops velocity without grounding the player.
+    if(platformer && !player_climbing)
+        player_grounded = resolved_y >= max_y || blockedAt(resolved_x, resolved_y + 1, 0, 1);
+    const bool airborne = platformer && !player_grounded && !player_climbing;
+    set_player_animation(resolved_x != old_x || resolved_y != old_y,
+        player_climbing ? "climb" : airborne && !dx ? "jump" : nullptr);
     const int offset_x = player ? (player->frame_width / 2) - player->canvas_origin_x : 0;
     const int offset_y = player ? (player->frame_height / 2) - player->canvas_origin_y : 0;
     sprites[player_slot]->set_position(player_world_x - camera_x - 120 + offset_x, player_world_y - camera_y - 80 + offset_y);
@@ -592,12 +995,16 @@ void GraphicsManager::init_bg_slots()
     current_bgs_id.clear();
     current_bgs_x.clear();
     current_bgs_y.clear();
+    current_bgs_parallax_x.clear();
+    current_bgs_parallax_y.clear();
     for(int i = 0; i < 4; i++)
     {
         current_bgs.push_back(bn::optional<bn::regular_bg_ptr>());
         current_bgs_id.push_back(bn::string<64>());
         current_bgs_x.push_back(0);
         current_bgs_y.push_back(0);
+        current_bgs_parallax_x.push_back(100);
+        current_bgs_parallax_y.push_back(100);
     }
 }
 
@@ -610,6 +1017,8 @@ void GraphicsManager::render_scene_regular_bg(const Scenes& scene)
     current_bgs_id.clear();
     current_bgs_x.clear();
     current_bgs_y.clear();
+    current_bgs_parallax_x.clear();
+    current_bgs_parallax_y.clear();
 
     bn::core::update();  
 
@@ -656,11 +1065,38 @@ void GraphicsManager::render_scene_regular_bg(const Scenes& scene)
                         BN_LOG("Palette not found: ", layer.paletteId);
                     }
                 }
+                if(layer.map_cell_overrides && layer.map_cell_overrides_count > 0)
+                {
+                    auto map_copy = bn::regular_bg_map_ptr::allocate_optional(
+                        bg_ptr.map().dimensions(), bg_ptr.tiles(), bg_ptr.palette());
+                    if(map_copy)
+                    {
+                        auto source_cells = bg_ptr.map().cells_ref();
+                        auto destination_cells = map_copy->vram();
+                        if(source_cells && destination_cells)
+                        {
+                            const int copy_count = source_cells->size() < destination_cells->size() ?
+                                source_cells->size() : destination_cells->size();
+                            for(int cell_index = 0; cell_index < copy_count; ++cell_index)
+                            {
+                                (*destination_cells)[cell_index] = (*source_cells)[cell_index];
+                            }
+                            for(int override_index = 0; override_index < layer.map_cell_overrides_count; ++override_index)
+                            {
+                                const RegularBgMapCellOverride& cell_override = layer.map_cell_overrides[override_index];
+                                if(cell_override.cell_index >= 0 && cell_override.cell_index < destination_cells->size())
+                                {
+                                    (*destination_cells)[cell_override.cell_index] = cell_override.cell;
+                                }
+                            }
+                            bg_ptr.set_map(*map_copy);
+                        }
+                    }
+                }
                 // Editor layers are ordered back-to-front (0..3), while
-                // Butano/GBA priorities are ordered front-to-back (0..3).
-                const int priority = bn::clamp(3 - layer.layerId, 0, 3);
-                bg_ptr.set_priority(priority);
-                bg_ptr.set_z_order(priority);
+                // Butano uses priority 0 for the frontmost background.
+                bg_ptr.set_priority(3 - bn::clamp(layer.layerId, 0, 3));
+                bg_ptr.set_z_order(bn::clamp(layer.z_order, -32767, 32767));
                 bg_ptr.set_blending_enabled(true);
 
                 bg_ptr.set_position(layer.x + bg_resource->image_width / 2 - 120 - camera_x,
@@ -735,7 +1171,6 @@ void GraphicsManager::render_scene_bitmap_bg(const Scenes& scene)
                 // Usa o painter para desenhar a imagem dentro do BG
                 bn::sp_direct_bitmap_bg_painter painter(bmp_bg);
                 
-                bn::size s = bmp_bg_item.value().dimensions();
                 // Scene layer coordinates are the image top-left in the editor
                 // and in the runtime. Camera pan moves that origin on screen.
                 int x = layer.x - camera_x;
@@ -803,9 +1238,8 @@ bn::vector<bn::regular_bg_ptr, 4> GraphicsManager::load_next_regular_background_
                     BN_LOG("..: Regular BG já existe :..");
                     // Mesmo ID → só atualiza propriedades
                     current_bgs[i]->set_visible(layer.visible);
-                    const int priority = bn::clamp(3 - layer.layer_id, 0, 3);
-                    current_bgs[i]->set_priority(priority);
-                    current_bgs[i]->set_z_order(bn::clamp(priority, 0, 3));
+                    current_bgs[i]->set_priority(3 - bn::clamp(layer.layer_id, 0, 3));
+                    current_bgs[i]->set_z_order(bn::clamp(layer.layer_id, -32767, 32767));
                     result.push_back(current_bgs[i].value());
 
                     BN_LOG("Regular BG atualizado: ", bg_resource->name);
@@ -817,9 +1251,8 @@ bn::vector<bn::regular_bg_ptr, 4> GraphicsManager::load_next_regular_background_
                     current_bgs[i].reset();
 
                     auto bg_ptr = bn::regular_bg_ptr::create(bg_item.value());
-                    const int priority = bn::clamp(3 - layer.layer_id, 0, 3);
-                    bg_ptr.set_priority(priority);
-                    bg_ptr.set_z_order(bn::clamp(priority, 0, 3));
+                    bg_ptr.set_priority(3 - bn::clamp(layer.layer_id, 0, 3));
+                    bg_ptr.set_z_order(bn::clamp(layer.layer_id, -32767, 32767));
                     bg_ptr.set_blending_enabled(true);
                     bg_ptr.set_visible(layer.visible);
 
@@ -837,9 +1270,8 @@ bn::vector<bn::regular_bg_ptr, 4> GraphicsManager::load_next_regular_background_
                 current_bgs[i].reset();
 
                 auto bg_ptr = bn::regular_bg_ptr::create(bg_item.value());
-                const int priority = bn::clamp(3 - layer.layer_id, 0, 3);
-                bg_ptr.set_priority(priority);
-                bg_ptr.set_z_order(bn::clamp(priority, 0, 3));
+                bg_ptr.set_priority(3 - bn::clamp(layer.layer_id, 0, 3));
+                bg_ptr.set_z_order(bn::clamp(layer.layer_id, -32767, 32767));
                 bg_ptr.set_blending_enabled(true);
                 bg_ptr.set_visible(layer.visible);
 
@@ -920,7 +1352,6 @@ bn::optional<bn::sp_direct_bitmap_bg_ptr> GraphicsManager::load_next_bitmap_back
                     BN_LOG("..: Background Bitmap alterando imagem :..");
 
                     bn::sp_direct_bitmap_bg_painter painter(*current_bitmap_bgs);
-                    bn::size s = bmp_bg_item.value().dimensions();
                     int x = -camera_x;
                     int y = -camera_y;
 
@@ -946,7 +1377,6 @@ bn::optional<bn::sp_direct_bitmap_bg_ptr> GraphicsManager::load_next_bitmap_back
                 bmp_bg.set_blending_enabled(true);
 
                 bn::sp_direct_bitmap_bg_painter painter(bmp_bg);
-                bn::size s = bmp_bg_item.value().dimensions();
                 int x = -camera_x;
                 int y = -camera_y;
 
@@ -1004,8 +1434,68 @@ void GraphicsManager::change_single_layer(int layer_id, const bn::string<64>& ba
     while(current_bgs_id.size() < 4)
     {
         current_bgs_id.push_back(bn::string<64>());
-        current_bgs_x.push_back(0);
-        current_bgs_y.push_back(0);
+    }
+    while(current_bgs_x.size() < 4) current_bgs_x.push_back(0);
+    while(current_bgs_y.size() < 4) current_bgs_y.push_back(0);
+    while(current_bgs_parallax_x.size() < 4) current_bgs_parallax_x.push_back(100);
+    while(current_bgs_parallax_y.size() < 4) current_bgs_parallax_y.push_back(100);
+
+    if(!bitmap_scene)
+    {
+        // Events run inside Game::update(). Change only the requested native
+        // slot and leave the frame commit to Game::run(), avoiding a nested
+        // core update and a temporary copy of every active background.
+        BN_LOG("[change_single_layer] regular layer=", safe_layer);
+        if(background_id.empty())
+        {
+            current_bgs[safe_layer].reset();
+            current_bgs_id[safe_layer] = bn::string<64>();
+            return;
+        }
+        if(current_bgs[safe_layer].has_value() && current_bgs_id[safe_layer] == background_id)
+        {
+            current_bgs[safe_layer]->set_visible(visible);
+            return;
+        }
+        const Backgrounds* background = get_background_by_id(background_id);
+        if(!background)
+        {
+            BN_LOG("Change Background: resource not found: ", background_id);
+            return;
+        }
+        auto item = get_bg_item_from_name(background->name);
+        if(!item.has_value())
+        {
+            BN_LOG("Change Background: regular BG item not found: ", background->name);
+            return;
+        }
+        if(current_bgs[safe_layer].has_value())
+        {
+            // Butano releases the old tiles, palette and map before acquiring
+            // the replacement, while retaining the background's native slot.
+            current_bgs[safe_layer]->set_item(item.value());
+        }
+        else
+        {
+            auto created = bn::regular_bg_ptr::create_optional(item.value());
+            if(!created.has_value())
+            {
+                BN_LOG("Change Background: regular BG allocation failed: ", background->name);
+                return;
+            }
+            current_bgs[safe_layer] = created.value();
+            current_bgs[safe_layer]->set_z_order(safe_layer);
+        }
+        auto& bg = current_bgs[safe_layer].value();
+        bg.set_priority(3 - safe_layer);
+        bg.set_blending_enabled(true);
+        bg.set_visible(visible);
+        bg.set_position(current_bgs_x[safe_layer] + background->image_width / 2 - 120 -
+                (camera_x * current_bgs_parallax_x[safe_layer]) / 100,
+            current_bgs_y[safe_layer] + background->image_height / 2 - 80 -
+                (camera_y * current_bgs_parallax_y[safe_layer]) / 100);
+        current_bgs_id[safe_layer] = background_id;
+        return;
     }
     bn::vector<LayerArgs, 4> layers;
     for(int index = 0; index < 4; ++index) {
@@ -1071,6 +1561,32 @@ void GraphicsManager::set_layer_visible(int layer_id, bool visible) {
     }
     const int safe_layer = bn::clamp(layer_id, 0, 3);
     if(safe_layer < current_bgs.size() && current_bgs[safe_layer].has_value()) current_bgs[safe_layer]->set_visible(visible);
+}
+
+void GraphicsManager::scroll_background(int layer_id, int x, int y) {
+    if(!currentScene) return;
+    const bn::string<64> scene_type = currentScene->scene_type;
+    if(scene_type == "Logo" || scene_type == "Point Click") return;
+    const int safe_layer = bn::clamp(layer_id, 0, 3);
+    if(safe_layer >= current_bgs.size() || !current_bgs[safe_layer].has_value()) return;
+    if(safe_layer >= current_bgs_x.size() || safe_layer >= current_bgs_y.size()) return;
+    current_bgs_x[safe_layer] += x;
+    current_bgs_y[safe_layer] += y;
+    set_camera_position(camera_x, camera_y);
+}
+
+void GraphicsManager::set_background_parallax(int layer_id, int x, int y) {
+    const int safe_layer = bn::clamp(layer_id, 0, 3);
+    if(safe_layer >= current_bgs_parallax_x.size() || safe_layer >= current_bgs_parallax_y.size()) return;
+    current_bgs_parallax_x[safe_layer] = bn::clamp(x, -200, 200);
+    current_bgs_parallax_y[safe_layer] = bn::clamp(y, -200, 200);
+    set_camera_position(camera_x, camera_y);
+}
+
+bn::optional<bn::bg_palette_ptr> GraphicsManager::get_layer_palette(int layer_id) const
+{
+    if(layer_id < 0 || layer_id >= current_bgs.size() || !current_bgs[layer_id].has_value()) return bn::nullopt;
+    return bn::bg_palette_ptr(current_bgs[layer_id]->palette());
 }
 
 // ----------------- Tilemap Methods -----------------
@@ -1229,8 +1745,9 @@ bn::optional<bn::sprite_ptr> GraphicsManager::create_sprite(
     for(int i = 0; i < resource.animations_count; ++i)
     {
         const SpriteAnimationDefinition& animation = resource.animations[i];
+        if(resource.animations_count > 0 && !actor_motion::same_text(animation.state_id, resource.animations[0].state_id)) continue;
         if(!animation.animation_type || bn::string<16>(animation.animation_type) != "idle" ||
-           !animation.frames || animation.frames_count <= 0)
+           !animation_frames_fit(animation, item.tiles_item().graphics_count()))
         {
             continue;
         }
@@ -1245,7 +1762,7 @@ bn::optional<bn::sprite_ptr> GraphicsManager::create_sprite(
            (animation_id == "idle-right" && direction && bn::string<16>(direction) == "left"))
         {
             idle_animation = &animation;
-            if(animation_id == directional_idle || animation_id == "idle")
+            if(animation_id == directional_idle)
             {
                 break;
             }
@@ -1254,7 +1771,8 @@ bn::optional<bn::sprite_ptr> GraphicsManager::create_sprite(
 
     const bool flip_horizontally = idle_animation && direction &&
         bn::string<16>(direction) == "left" &&
-        bn::string<32>(idle_animation->animation_id ? idle_animation->animation_id : "") == "idle-right" &&
+        (bn::string<32>(idle_animation->animation_id ? idle_animation->animation_id : "") == "idle-right" ||
+         bn::string<32>(idle_animation->animation_id ? idle_animation->animation_id : "") == "idle") &&
         idle_animation->flip_right_to_create_left_frames;
 
     // Sprite Editor frames point to their actual source rectangle in the
@@ -1274,7 +1792,7 @@ bn::optional<bn::sprite_ptr> GraphicsManager::create_sprite(
            (animation_id == "idle-right" && direction && bn::string<16>(direction) == "left"))
         {
             canvas_idle = &frame;
-            if(animation_id == directional_idle || animation_id == "idle")
+            if(animation_id == directional_idle)
             {
                 break;
             }
@@ -1285,16 +1803,24 @@ bn::optional<bn::sprite_ptr> GraphicsManager::create_sprite(
     if(canvas_idle && canvas_idle->pieces_count > 0 && resource.canvas_pieces &&
        resource.frame_width > 0 && resource.frame_height > 0)
     {
-        const SpriteCanvasPiece& piece = resource.canvas_pieces[canvas_idle->first_piece];
-        int sheet_columns = resource.image_width / resource.frame_width;
-        if(sheet_columns < 1)
+        const int pieces_count = bn::max(0, resource.canvas_pieces_count);
+        const int piece_index = canvas_idle->first_piece;
+        if(piece_index >= 0 && piece_index < pieces_count)
         {
-            sheet_columns = 1;
+            const SpriteCanvasPiece& piece = resource.canvas_pieces[piece_index];
+            int sheet_columns = resource.image_width / resource.frame_width;
+            if(sheet_columns < 1) sheet_columns = 1;
+            initial_frame = (piece.source_y / resource.frame_height) * sheet_columns +
+                            (piece.source_x / resource.frame_width);
         }
-
-        initial_frame = (piece.source_y / resource.frame_height) * sheet_columns +
-                        (piece.source_x / resource.frame_width);
     }
+    const int graphics_count = item.tiles_item().graphics_count();
+    if(initial_frame < 0 || initial_frame >= graphics_count)
+    {
+        BN_LOG("Sprite initial frame out of range: ", initial_frame, " / ", graphics_count, "; using 0");
+        initial_frame = 0;
+    }
+    BN_LOG("Player sprite: create initial graphics frame ", initial_frame, " of ", graphics_count);
     auto spr = item.create_sprite(x, y, initial_frame);
     spr.set_horizontal_flip(flip_horizontally);
     spr.set_blending_enabled(true);
@@ -1307,6 +1833,7 @@ bn::optional<bn::sprite_ptr> GraphicsManager::create_sprite(
     sprite_tiles_items[slot] = item.tiles_item();
     sprite_resources[slot] = &resource;
     sprite_animations[slot] = idle_animation;
+    sprite_main_states[slot] = idle_animation ? idle_animation->state_id : resource.animations_count > 0 ? resource.animations[0].state_id : nullptr;
     sprite_animation_frames[slot] = 0;
     sprite_animation_updates[slot] = 0;
     const Settings* settings = get_settings();
@@ -1328,8 +1855,189 @@ void GraphicsManager::remove_sprite(const bn::sprite_ptr& sprite)
     }
 }
 
+void GraphicsManager::update_tile_animations()
+{
+    if(!currentScene || !currentScene->tile_animations || currentScene->tile_animations_count <= 0)
+    {
+        return;
+    }
+
+    if(tile_animation_scene != currentScene)
+    {
+        tile_animation_scene = currentScene;
+        for(int index = 0; index < 32; ++index)
+        {
+            tile_animation_frames[index] = 0;
+            tile_animation_ticks[index] = 0;
+            tile_animation_initialized[index] = false;
+        }
+    }
+
+    const int animations_count = bn::min(currentScene->tile_animations_count, 32);
+    for(int index = 0; index < animations_count; ++index)
+    {
+        const TileAnimation& animation = currentScene->tile_animations[index];
+        if(animation.layer_id < 0 || animation.layer_id >= current_bgs.size() ||
+           !current_bgs[animation.layer_id].has_value() || !animation.frame_tile_indices ||
+           animation.frames_count <= 0 || animation.target_tile_index < 0 ||
+           animation.target_tile_index >= 1024)
+        {
+            continue;
+        }
+
+        bn::regular_bg_tiles_ptr tiles = current_bgs[animation.layer_id]->tiles();
+        const auto tile_data = tiles.tiles_ref();
+        if(!tile_data.has_value()) continue;
+        const int frame_count = bn::min(animation.frames_count, 32);
+        if(!tile_animation_initialized[index])
+        {
+            tile_animation_frames[index] = bn::clamp(animation.initial_frame, 0, frame_count - 1);
+            tile_animation_initialized[index] = true;
+            tile_animation_ticks[index] = 0;
+            const int source = animation.frame_tile_indices[tile_animation_frames[index]] *
+                (tiles.bpp() == bn::bpp_mode::BPP_8 ? 2 : 1);
+            if(source >= 0 && source < tile_data->size())
+                tiles.overwrite_tile(animation.target_tile_index, (*tile_data)[source]);
+        }
+
+        const int duration = bn::max(animation.duration_frames, 1);
+        if(++tile_animation_ticks[index] < duration) continue;
+        tile_animation_ticks[index] = 0;
+        int next_frame = tile_animation_frames[index] + 1;
+        if(next_frame >= frame_count)
+        {
+            if(!animation.loop) continue;
+            next_frame = 0;
+        }
+        tile_animation_frames[index] = next_frame;
+        const int source = animation.frame_tile_indices[next_frame] *
+            (tiles.bpp() == bn::bpp_mode::BPP_8 ? 2 : 1);
+        if(source >= 0 && source < tile_data->size())
+            tiles.overwrite_tile(animation.target_tile_index, (*tile_data)[source]);
+    }
+}
+
+void GraphicsManager::sync_shooter_projectiles(const ShooterKit& shooter, const char* sprite_id)
+{
+    const bn::string<64> requested_id = sprite_id ? sprite_id : "";
+    const Sprites* resource = requested_id.empty() ? nullptr : get_sprite_by_id(requested_id);
+    auto item = resource ? get_sprite_item_from_name(bn::string<64>(resource->graphics_name)) : bn::optional<bn::sprite_item>();
+
+    for(int slot = 0; slot < MAX_SHOOTER_PROJECTILE_SPRITES; ++slot)
+    {
+        const int source_index = shooter_projectile_indices[slot];
+        ShooterProjectile projectile{};
+        const bool source_active = source_index >= 0 && shooter.projectile_at(source_index, projectile);
+        if(source_active && item.has_value() && resource)
+        {
+            const int screen_x = projectile.x - camera_x - 120 + resource->frame_width / 2 - resource->canvas_origin_x;
+            const int screen_y = projectile.y - camera_y - 80 + resource->frame_height / 2 - resource->canvas_origin_y;
+            if(!shooter_projectile_sprites[slot].has_value())
+            {
+                auto created = item->create_sprite(screen_x, screen_y, resource->idle_frame);
+                created.set_bg_priority(2);
+                created.set_blending_enabled(true);
+                shooter_projectile_sprites[slot] = created;
+            }
+            else
+            {
+                shooter_projectile_sprites[slot]->set_position(screen_x, screen_y);
+            }
+            continue;
+        }
+        shooter_projectile_sprites[slot].reset();
+        shooter_projectile_indices[slot] = -1;
+    }
+
+    if(!item.has_value() || !resource) return;
+    for(int source_index = 0; source_index < 128; ++source_index)
+    {
+        ShooterProjectile projectile{};
+        if(!shooter.projectile_at(source_index, projectile)) continue;
+        bool already_bound = false;
+        for(int slot = 0; slot < MAX_SHOOTER_PROJECTILE_SPRITES; ++slot)
+            if(shooter_projectile_indices[slot] == source_index) { already_bound = true; break; }
+        if(already_bound) continue;
+        for(int slot = 0; slot < MAX_SHOOTER_PROJECTILE_SPRITES; ++slot)
+        {
+            if(shooter_projectile_indices[slot] >= 0) continue;
+            shooter_projectile_indices[slot] = source_index;
+            break;
+        }
+    }
+}
+
+void GraphicsManager::sync_shooter_drops(const ShooterKit& shooter)
+{
+    const int visible_count = bn::min(shooter.drop_count(), MAX_SHOOTER_PROJECTILE_SPRITES);
+    for(int slot = 0; slot < MAX_SHOOTER_PROJECTILE_SPRITES; ++slot)
+    {
+        if(slot >= visible_count)
+        {
+            shooter_drop_sprites[slot].reset();
+            shooter_drop_ids[slot] = "";
+            continue;
+        }
+        ShooterDrop drop{};
+        if(!shooter.drop_at(slot, drop) || !drop.drop_id)
+        {
+            shooter_drop_sprites[slot].reset();
+            continue;
+        }
+        const bn::string<64> drop_id(drop.drop_id);
+        const Sprites* resource = get_sprite_by_id(drop_id);
+        auto item = resource ? get_sprite_item_from_name(bn::string<64>(resource->graphics_name)) : bn::optional<bn::sprite_item>();
+        if(!resource || !item.has_value())
+        {
+            shooter_drop_sprites[slot].reset();
+            shooter_drop_ids[slot] = drop_id;
+            continue;
+        }
+        const int screen_x = drop.x - camera_x - 120 + resource->frame_width / 2 - resource->canvas_origin_x;
+        const int screen_y = drop.y - camera_y - 80 + resource->frame_height / 2 - resource->canvas_origin_y;
+        if(!shooter_drop_sprites[slot].has_value() || shooter_drop_ids[slot] != drop_id)
+        {
+            shooter_drop_sprites[slot].reset();
+            auto created = item->create_sprite(screen_x, screen_y, resource->idle_frame);
+            created.set_bg_priority(2);
+            created.set_blending_enabled(true);
+            shooter_drop_sprites[slot] = created;
+            shooter_drop_ids[slot] = drop_id;
+        }
+        else
+        {
+            shooter_drop_sprites[slot]->set_position(screen_x, screen_y);
+        }
+    }
+}
+
+void GraphicsManager::sync_shooter_hud(const ShooterKit& shooter)
+{
+    shooter_hud_sprites.clear();
+    if(!shooter.running()) return;
+    bn::string<64> text = "HP: ";
+    text += bn::to_string<8>(CombatManager::instance().player_hit_points());
+    text += "  EN: ";
+    text += bn::to_string<8>(shooter.enemy_count());
+    text += "  P: ";
+    text += bn::to_string<8>(shooter.projectile_count());
+    text += "  D: ";
+    text += bn::to_string<8>(shooter.drop_count());
+    if(shooter.boss_active())
+    {
+        text += "  BOSS: ";
+        text += bn::to_string<8>(shooter.boss_hit_points());
+    }
+    bn::sprite_text_generator generator(common::variable_8x8_sprite_font);
+    generator.set_bg_priority(0);
+    generator.set_z_order(-2);
+    generator.generate_top_left(4, 4, text, shooter_hud_sprites);
+}
+
 void GraphicsManager::update_sprites()
 {
+    update_sprite_effects();
+    update_tile_animations();
     for(int i = 0; i < sprite_count; ++i)
     {
         if(!sprites[i].has_value() || !sprite_animations[i] || !sprite_tiles_items[i].has_value())
@@ -1338,7 +2046,11 @@ void GraphicsManager::update_sprites()
         }
 
         const SpriteAnimationDefinition& animation = *sprite_animations[i];
-        if(animation.frames_count <= 1 || !animation.frames)
+        if(sprite_script_motion[i] && animation.animation_type && bn::string<16>(animation.animation_type) == "climb" && !sprite_script_climb_direction[i]) continue;
+        if(!sprite_script_motion[i] && i == player_slot && animation.animation_type && bn::string<16>(animation.animation_type) == "climb" &&
+           (!player_climbing || !player_on_ladder(player_world_x, player_world_y) ||
+            (!InputManager::instance().held("move_up") && !InputManager::instance().held("move_down")))) continue;
+        if(!animation_frames_fit(animation, sprite_tiles_items[i]->graphics_count()) || animation.frames_count <= 1)
         {
             continue;
         }
@@ -1370,21 +2082,34 @@ void GraphicsManager::update_sprites()
         }
 
         sprite_animation_updates[i] = 0;
-        sprite_animation_frames[i] = (sprite_animation_frames[i] + 1) % animation.frames_count;
-        sprites[i]->set_tiles(sprite_tiles_items[i].value(), animation.frames[sprite_animation_frames[i]]);
+        const bool scripted_climbing_down = sprite_script_motion[i] && sprite_script_climb_direction[i] > 0;
+        const bool climbing_down = scripted_climbing_down || (!sprite_script_motion[i] && i == player_slot && player_climbing && animation.animation_type &&
+            bn::string<16>(animation.animation_type) == "climb" &&
+            !InputManager::instance().held("move_up") && InputManager::instance().held("move_down"));
+        const int frame_step = climbing_down ? animation.frames_count - 1 : 1;
+        sprite_animation_frames[i] = (sprite_animation_frames[i] + frame_step) % animation.frames_count;
+        const int next_frame = animation.frames[sprite_animation_frames[i]];
+        if(next_frame >= 0 && next_frame < sprite_tiles_items[i]->graphics_count())
+        {
+            sprites[i]->set_tiles(sprite_tiles_items[i].value(), next_frame);
+        }
     }
 }
 
 void GraphicsManager::clear_sprites()
 {
+    ActorMotionManager::instance().cancel();
     for(int i = 0; i < sprite_count; ++i)
     {
         sprites[i].reset();
         sprite_tiles_items[i].reset();
         sprite_resources[i] = nullptr;
         sprite_animations[i] = nullptr;
+        sprite_main_states[i] = nullptr;
         sprite_animation_frames[i] = 0;
         sprite_animation_updates[i] = 0;
+        sprite_script_motion[i] = false;
+        sprite_script_climb_direction[i] = 0;
     }
     sprite_count = 0;
     player_slot = -1;
@@ -1392,6 +2117,13 @@ void GraphicsManager::clear_sprites()
     actor_interaction_count = 0;
     actor_count = 0;
     ActorManager::instance().reset();
+    tile_animation_scene = nullptr;
+    for(int index = 0; index < 32; ++index)
+    {
+        tile_animation_frames[index] = 0;
+        tile_animation_ticks[index] = 0;
+        tile_animation_initialized[index] = false;
+    }
 }
 
 bn::optional<bn::sprite_ptr> GraphicsManager::create_ui_sprite(const char* graphics_name, int x, int y)

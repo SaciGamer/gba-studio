@@ -1,0 +1,24 @@
+{
+  "id": "preset-gba",
+  "name": "GBA Classic",
+  "custom": false,
+  "colors": [
+    "#000000",
+    "#ffffff",
+    "#b5d8a8",
+    "#73a55c",
+    "#3d6b3d",
+    "#203c56",
+    "#456b8c",
+    "#8fb8d8",
+    "#f4d35e",
+    "#ee964b",
+    "#f95738",
+    "#9e2a2b",
+    "#6a4c93",
+    "#8e7dbe",
+    "#2a9d8f",
+    "#264653"
+  ],
+  "_resourceType": "palette"
+}

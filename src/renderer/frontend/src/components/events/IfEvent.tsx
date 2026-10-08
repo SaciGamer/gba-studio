@@ -2,6 +2,7 @@ import useAppContexts from '@/providers/contexts/AppContexts';
 import { IConditionValue, IIfArgs, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { Cascader, Input, Select, Space, Typography } from 'antd';
 import StepInputNumber, { InputNumber } from '../StepInputNumber';
+import NumericEventInput from '../NumericEventInput';
 import { useEffect, useState } from 'react';
 
 interface IfEventProps {
@@ -39,10 +40,12 @@ const prefixForValue = (value: IConditionValue): string => {
 function Operand({
   value,
   variables,
+  buttonOptions,
   onChange,
 }: {
   value: IConditionValue;
   variables: ReturnType<typeof useAppContexts>['variables']['variables'];
+  buttonOptions: Array<{ value: string; label: string }>;
   onChange: (value: IConditionValue) => void;
 }) {
   const selectedVariable = value.kind === 'variable'
@@ -50,12 +53,12 @@ function Operand({
     : undefined;
   const type = selectedVariable?.type || value.type;
 
+  if (type === 'number' || (value.kind === 'variable' && value.type === undefined) || (!['literal', 'variable', 'button'].includes(value.kind))) {
+    return <NumericEventInput value={value} onChange={next => onChange(typeof next === 'number' ? { kind: 'literal', type: 'number', value: next } : next)} />;
+  }
   const renderLiteral = () => {
     if (value.kind === 'button') {
-      return <Select value={value.button} options={['A', 'B', 'L', 'R', 'START', 'SELECT', 'UP', 'DOWN', 'LEFT', 'RIGHT'].map(button => ({ value: button, label: button }))} onChange={button => onChange({ kind: 'button', type: 'boolean', button })} />;
-    }
-    if (type === 'number') {
-      return <InputNumber value={value.kind === 'literal' ? value.value as number : 0} onChange={(next) => onChange({ kind: 'literal', type, value: next ?? 0 })} />;
+      return <Select value={value.button} options={buttonOptions} onChange={button => onChange({ kind: 'button', type: 'boolean', button })} />;
     }
     if (type === 'boolean') {
       return (
@@ -67,7 +70,7 @@ function Operand({
         />
       );
     }
-    return <Input value={value.kind === 'literal' ? value.value as string : ''} onChange={(event) => onChange({ kind: 'literal', type, value: event.target.value })} />;
+    return <Input value={value.kind === 'literal' ? value.value as string : ''} onChange={(event) => onChange({ kind: 'literal', type: 'string', value: event.target.value })} />;
   };
 
   return (
@@ -80,7 +83,7 @@ function Operand({
           { value: 'Text', label: 'Text' },
           { value: 'Variables', label: 'Variables', children: variables.map(variable => ({ value: variable.id, label: variable.name || variable.symbol })) },
           { value: 'Boolean', label: 'Boolean', children: [{ value: 'true', label: 'True' }, { value: 'false', label: 'False' }] },
-          { value: 'Button', label: 'Button', children: ['A', 'B', 'L', 'R', 'START', 'SELECT', 'UP', 'DOWN', 'LEFT', 'RIGHT'].map(button => ({ value: button, label: button })) },
+          { value: 'Button', label: 'Button', children: buttonOptions },
         ]}
         displayRender={() => prefixForValue(value)}
         style={{ width: 42 }}
@@ -117,7 +120,11 @@ function Operand({
 }
 
 export default function IfEvent({ event, onValueChange }: IfEventProps) {
-  const { variables } = useAppContexts();
+  const { variables, settings } = useAppContexts();
+  const buttonOptions = [
+    ...['A', 'B', 'L', 'R', 'START', 'SELECT', 'UP', 'DOWN', 'LEFT', 'RIGHT'].map(button => ({ value: button, label: button })),
+    ...Object.keys(settings?.inputMap ?? {}).map(action => ({ value: action, label: `Action: ${action}` })),
+  ];
   const args = event?.args as IIfArgs | undefined;
   const [condition, setCondition] = useState<IIfArgs>({
     left: args?.left || firstVariableValue(variables.variables),
@@ -137,7 +144,7 @@ export default function IfEvent({ event, onValueChange }: IfEventProps) {
   return (
     <Space direction="vertical" style={{ width: '100%' }}>
       <Typography.Text strong>Condition</Typography.Text>
-      <Operand value={condition.left} variables={variables.variables} onChange={(left) => update({ ...condition, left })} />
+      <Operand value={condition.left} variables={variables.variables} buttonOptions={buttonOptions} onChange={(left) => update({ ...condition, left })} />
       <Cascader
         style={{ width: '100%' }}
         allowClear={false}
@@ -146,7 +153,7 @@ export default function IfEvent({ event, onValueChange }: IfEventProps) {
         displayRender={(labels) => labels[labels.length - 1]}
         onChange={(path) => update({ ...condition, operator: path[path.length - 1] as IIfArgs['operator'] })}
       />
-      <Operand value={condition.right} variables={variables.variables} onChange={(right) => update({ ...condition, right })} />
+      <Operand value={condition.right} variables={variables.variables} buttonOptions={buttonOptions} onChange={(right) => update({ ...condition, right })} />
     </Space>
   );
 }

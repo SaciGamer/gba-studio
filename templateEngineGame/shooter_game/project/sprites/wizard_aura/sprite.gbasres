@@ -1,0 +1,335 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "original_wizard_aura",
+  "name": "wizard_aura",
+  "filename": "wizard_aura.bmp",
+  "imageWidth": 64,
+  "imageHeight": 1024,
+  "playerFrameWidth": 64,
+  "playerFrameHeight": 64,
+  "playerFramesPerDirection": 4,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 32,
+  "playerCanvasOriginY": 32,
+  "playerCollisionX": -32,
+  "playerCollisionY": -32,
+  "playerCollisionWidth": 64,
+  "playerCollisionHeight": 64,
+  "playerAnimations": [
+    {
+      "id": "idle-down",
+      "name": "Idle Down",
+      "type": "idle",
+      "frames": [
+        0
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_wizard_aura-idle-down",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_wizard_aura-idle-down",
+              "sourceX": 0,
+              "sourceY": 0,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-down",
+      "name": "Moving Down",
+      "type": "movement",
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-left",
+      "name": "Idle Left",
+      "type": "idle",
+      "frames": [
+        4
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_wizard_aura-idle-left",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_wizard_aura-idle-left",
+              "sourceX": 0,
+              "sourceY": 256,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-left",
+      "name": "Moving Left",
+      "type": "movement",
+      "frames": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-right",
+      "name": "Idle Right",
+      "type": "idle",
+      "frames": [
+        8
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_wizard_aura-idle-right",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_wizard_aura-idle-right",
+              "sourceX": 0,
+              "sourceY": 512,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-right",
+      "name": "Moving Right",
+      "type": "movement",
+      "frames": [
+        8,
+        9,
+        10,
+        11
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-up",
+      "name": "Idle Up",
+      "type": "idle",
+      "frames": [
+        12
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_wizard_aura-idle-up",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_wizard_aura-idle-up",
+              "sourceX": 0,
+              "sourceY": 768,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-up",
+      "name": "Moving Up",
+      "type": "movement",
+      "frames": [
+        12,
+        13,
+        14,
+        15
+      ],
+      "canvasFrames": []
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "default",
+      "name": "Default",
+      "type": "default",
+      "animations": [
+        {
+          "id": "idle-down",
+          "name": "Idle Down",
+          "type": "idle",
+          "frames": [
+            0
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_wizard_aura-idle-down",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_wizard_aura-idle-down",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-down",
+          "name": "Moving Down",
+          "type": "movement",
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-left",
+          "name": "Idle Left",
+          "type": "idle",
+          "frames": [
+            4
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_wizard_aura-idle-left",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_wizard_aura-idle-left",
+                  "sourceX": 0,
+                  "sourceY": 256,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-left",
+          "name": "Moving Left",
+          "type": "movement",
+          "frames": [
+            4,
+            5,
+            6,
+            7
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-right",
+          "name": "Idle Right",
+          "type": "idle",
+          "frames": [
+            8
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_wizard_aura-idle-right",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_wizard_aura-idle-right",
+                  "sourceX": 0,
+                  "sourceY": 512,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-right",
+          "name": "Moving Right",
+          "type": "movement",
+          "frames": [
+            8,
+            9,
+            10,
+            11
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-up",
+          "name": "Idle Up",
+          "type": "idle",
+          "frames": [
+            12
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_wizard_aura-idle-up",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_wizard_aura-idle-up",
+                  "sourceX": 0,
+                  "sourceY": 768,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-up",
+          "name": "Moving Up",
+          "type": "movement",
+          "frames": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "canvasFrames": []
+        }
+      ]
+    }
+  ]
+}

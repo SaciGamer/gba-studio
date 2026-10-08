@@ -1,3 +1,4 @@
+import type { NumericValue } from '../../../../../../shared/numericValues';
 import { IChangeScene } from "@/components/events/interfaces/IScene";
 import { IFade, IFadeOptions } from "@/components/events/interfaces/IFade";
 import { IWait } from "@/components/events/interfaces/IWaiting";
@@ -10,6 +11,7 @@ export enum ETypeScene {
     PLATFORM = 'Platformer',
     ADVENTURE = 'Adventure',
     SHMUP = 'Shoot Em\'Up',
+    SHOOTER = 'Shoot Em\'Up',
     POINTNCLICK = 'Point Click',
     LOGO = 'Logo'
 }
@@ -30,6 +32,19 @@ export interface IBackgroundElement {
     tileMap?: number[][];
     /** Palette selected for each painted 8×8 cell; all scene layers share 16 palette banks. */
     tilePaletteIds?: Array<Array<string | null>>;
+    /** Source tileset for each painted tile-map cell, allowing mixed tilesets per layer. */
+    tileMapTilesetIds?: Array<Array<string | null>>;
+    /** Blob-47 terrain anchor per 8x8 map cell; -1 is empty. */
+    autoTileMap?: number[][];
+    autoTileMapVersion?: 1;
+    /** Optional regular_bg map-cell attributes authored by index. */
+    tileMapCellOverrides?: Array<{
+        index: number;
+        tileIndex: number;
+        horizontalFlip?: boolean;
+        verticalFlip?: boolean;
+        paletteId?: number;
+    }>;
     paintPaletteId?: string | null;
     selectedTilesetId?: string;
     selectedTiles?: number[];
@@ -50,7 +65,8 @@ export interface IArgs {
 export type IConditionValue =
     | { kind: 'literal'; value: VariableValue; type: EVariableType }
     | { kind: 'variable'; variableId: string; symbol: string; type: EVariableType }
-    | { kind: 'button'; button: string; type: 'boolean' };
+    | { kind: 'button'; button: string; type: 'boolean' }
+    | (NumericValue & { type?: 'number'; symbol?: string });
 
 export interface IIfArgs extends IArgs {
     left: IConditionValue;
@@ -83,7 +99,7 @@ export type IVariableValue = IVariableReference | IVariableLiteral;
 export interface IVariableSetValueArgs extends IArgs {
     variableId: string;
     variableSymbol: string;
-    value: IVariableValue;
+    value: IVariableValue | NumericValue;
 }
 
 export interface IVariableBooleanArgs extends IArgs {
@@ -110,7 +126,7 @@ interface IPosAndWidth {
     y: number;
     width: number;
     height: number;
-    collisionSide?: 'solid' | 'top' | 'down' | 'left' | 'right';
+    collisionSide?: 'solid' | 'top' | 'down' | 'left' | 'right' | 'ladder';
     activation?: 'enter' | 'exit' | 'stay' | 'interact' | 'touch' | 'input' | 'timer';
     enabled?: boolean;
     once?: boolean;
@@ -198,11 +214,25 @@ export interface ISceneSettings extends IResourceSettings, ICameraSettings {
     playerHit3Script?: IScriptsElement[],
     eventGraphs?: Record<string, IScriptGraph>;
     // Tiles editor fields
+    /** @deprecated Legacy per-scene definitions; Engine migrates these to project settings. */
+    autoTileSlots?: Array<{ autoTileId?: string; name?: string; tileSize?: 8 | 16 | 32; parts: Array<number | null> }>;
     imageType?: EImageType;
     selectedTilesetId?: string;
     selectedTiles?: number[];
     tileMap?: number[][];
     isEditingMap?: boolean;
+    tileAnimations?: ITileAnimation[];
+}
+
+/** Declarative regular_bg tile animation shared by editor, preview and build. */
+export interface ITileAnimation {
+    id?: string;
+    layerId: number;
+    targetTileIndex: number;
+    frameTileIndices: number[];
+    durationFrames: number;
+    loop: boolean;
+    initialFrame: number;
 }
 export interface SceneContextType {
     // Scene Settings

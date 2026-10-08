@@ -18,7 +18,12 @@ const EVENT_MIGRATORS: Record<number, EventMigrator> = {
 /** Normalize persisted event records before they enter the canonical graph. */
 export function migrateScriptEvent(event: IScriptsElement): IScriptsElement {
   const version = event.version;
-  if (version === undefined || version === 1) return { ...event, version: 1 };
+  if (version === undefined || version === 1) {
+    if (event.command === EEvents.UI_ANIMATE && event.args && !event.args.uiId) {
+      return { ...event, version: 1, args: { ...event.args, uiId: '__LAST_UI__', animation: 'move', speed: 2 } };
+    }
+    return { ...event, version: 1 };
+  }
   const migrator = EVENT_MIGRATORS[version];
   if (!migrator) {
     throw new Error(`Unsupported event schema version ${version} for ${event.command}`);

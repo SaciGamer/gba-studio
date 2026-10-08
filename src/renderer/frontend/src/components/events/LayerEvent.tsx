@@ -73,55 +73,45 @@ export function MoveLayerEvent({ event, onValueChange }: LayerEventProps) {
       {/* Move Layer */}
       <Flex style={{ flex: 1, textAlign: 'left' }}>
         <Form.Item label="X" style={{ flex: 1 }}>
-					<Space.Compact block>
-						<Space.Addon>X</Space.Addon>
-						<InputNumber
+					<InputNumber
+						addonBefore="X"
 							defaultValue={0}
 							placeholder="X"
-							style={{ flex: 1, textAlign: 'left' }} 
+							style={{ width: '100%', textAlign: 'left' }}
         onChange={(x) => moveLayer(args.layerId, { x: x ?? undefined })}
 						/>
-					</Space.Compact>
 				</Form.Item>
 
 				<Form.Item label="Y" style={{ flex: 1, marginLeft: "10px"  }}>
-					<Space.Compact block>
-						
-						<Space.Addon>Y</Space.Addon>
-						<InputNumber
+					<InputNumber
+							addonBefore="Y"
 							defaultValue={0}
 							placeholder="Y"
-							style={{ flex: 1, textAlign: 'left' }} 
+							style={{ width: '100%', textAlign: 'left' }}
         onChange={(y) => moveLayer(args.layerId, { y: y ?? undefined })}
 						/>
-					</Space.Compact>
 				</Form.Item>
       </Flex>
 
 			<Flex>
 				<Form.Item label="SpeedX" style={{ flex: 1 }}>
-					<Space.Compact block>
-						<Space.Addon>Speed X</Space.Addon>
-						<InputNumber
+					<InputNumber
+							addonBefore="Speed X"
 							defaultValue={0}
 							placeholder="SpeedX"
-							style={{ flex: 1, textAlign: 'left' }} 
+							style={{ width: '100%', textAlign: 'left' }}
         onChange={(speedX) => moveLayer(args.layerId, { speedX: speedX ?? undefined })}
 						/>
-					</Space.Compact>
 				</Form.Item>
 
 				<Form.Item label="SpeedY" style={{ flex: 1, marginLeft: "10px"  }}>
-					<Space.Compact block>
-						
-						<Space.Addon>Speed Y</Space.Addon>
-						<InputNumber
+					<InputNumber
+							addonBefore="Speed Y"
 							defaultValue={0}
 							placeholder="SpeedY"
-							style={{ flex: 1, textAlign: 'left' }} 
+							style={{ width: '100%', textAlign: 'left' }}
         onChange={(speedY) => moveLayer(args.layerId, { speedY: speedY ?? undefined })}
 						/>
-					</Space.Compact>
 				</Form.Item>
 			</Flex>
 

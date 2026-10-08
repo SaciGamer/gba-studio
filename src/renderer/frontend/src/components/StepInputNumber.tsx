@@ -5,12 +5,12 @@ import React, { useEffect, useState } from 'react';
 type StepInputNumberProps = React.ComponentProps<typeof AntInputNumber>;
 
 /** InputNumber with a consistent fine/coarse increment across the editor. */
-const StepInputNumber: React.FC<StepInputNumberProps> = ({ step, addonBefore, className, ...props }) => {
+const StepInputNumber: React.FC<StepInputNumberProps> = ({ step, addonBefore, className, style, ...props }) => {
   const [ctrlPressed, setCtrlPressed] = useState(false);
   const requestedStep = typeof step === 'number' ? step : Number(step);
-  // Integer fields move one pixel/unit at a time. Preserve fractional fields
-  // such as speed controls, with Ctrl providing the coarse x8 increment.
-  const normalStep = Number.isFinite(requestedStep) && requestedStep > 0 && requestedStep < 1
+  // Preserve an explicit step for fields with domain-specific increments.
+  // Otherwise use single-unit arrows. Ctrl is a consistent 8-unit step.
+  const normalStep = Number.isFinite(requestedStep) && requestedStep > 0
     ? requestedStep
     : 1;
 
@@ -28,8 +28,13 @@ const StepInputNumber: React.FC<StepInputNumberProps> = ({ step, addonBefore, cl
     };
   }, []);
 
-  const input = <AntInputNumber {...props} className={className} step={ctrlPressed ? normalStep * 8 : normalStep} />;
-  return addonBefore ? <Space.Compact><Space.Addon>{addonBefore}</Space.Addon>{input}</Space.Compact> : input;
+  const input = <AntInputNumber
+    {...props}
+    className={className}
+    style={addonBefore ? { flex: 1, minWidth: 0 } : style}
+    step={ctrlPressed ? 8 : normalStep}
+  />;
+  return addonBefore ? <Space.Compact style={style}><Space.Addon>{addonBefore}</Space.Addon>{input}</Space.Compact> : input;
 };
 
 export default StepInputNumber;

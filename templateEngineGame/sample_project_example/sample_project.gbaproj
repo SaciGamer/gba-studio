@@ -1,0 +1,9 @@
+{
+  "_resourceType": "project",
+  "name": "Sample Project",
+  "author": "SampleProject",
+  "notes": "",
+  "_version": "0.4.1",
+  "_release": "1",
+  "cartridgeImage": "sample_cartrige.png"
+}

@@ -30,9 +30,18 @@ export default function ResourceDropSurface({ children, onFiles, onText, hint = 
   const isInternalEditorDrag = (event: React.DragEvent<HTMLDivElement>) =>
     Array.from(event.dataTransfer.types).includes('application/x-gba-studio-frame');
 
+  // Images rendered by the engine are draggable in Chromium by default. They
+  // are previews, not import sources; dropping one back into the Images
+  // editor must never create a duplicate asset. Real file drops still carry
+  // the `Files` data type and remain accepted.
+  const isInternalPreviewDrag = (event: React.DragEvent<HTMLDivElement>) => {
+    const types = Array.from(event.dataTransfer.types);
+    return !types.includes('Files') && (types.includes('text/uri-list') || types.includes('text/html'));
+  };
+
   const handleDrop = (event: React.DragEvent<HTMLDivElement>, targetId?: string) => {
     event.preventDefault();
-    if (isInternalEditorDrag(event)) {
+    if (isInternalEditorDrag(event) || isInternalPreviewDrag(event)) {
       event.stopPropagation();
       clearDragState();
       return;
@@ -53,19 +62,19 @@ export default function ResourceDropSurface({ children, onFiles, onText, hint = 
     <div
       style={{ position: 'relative', width: '100%', height: '100%', minHeight: 180 }}
       onDragEnter={event => {
-        if (isInternalEditorDrag(event)) return;
+        if (isInternalEditorDrag(event) || isInternalPreviewDrag(event)) return;
         event.preventDefault();
         dragDepth.current += 1;
         setActive(true);
       }}
       onDragOver={event => {
-        if (isInternalEditorDrag(event)) return;
+        if (isInternalEditorDrag(event) || isInternalPreviewDrag(event)) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = 'copy';
         setActive(true);
       }}
       onDragLeave={event => {
-        if (isInternalEditorDrag(event)) return;
+        if (isInternalEditorDrag(event) || isInternalPreviewDrag(event)) return;
         dragDepth.current = Math.max(0, dragDepth.current - 1);
         const bounds = event.currentTarget.getBoundingClientRect();
         const pointerIsInside = event.clientX >= bounds.left && event.clientX <= bounds.right && event.clientY >= bounds.top && event.clientY <= bounds.bottom;

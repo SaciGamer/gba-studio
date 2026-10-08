@@ -14,6 +14,7 @@ import Engine from './components/pages/engine/Engine';
 import Launcher from './components/pages/launcher/Launcher';
 import SplashScreen from './components/pages/splashScreen/SplashScreen';
 import Emulator from './components/pages/emulator/Emulator';
+import RuntimeMonitor from './components/pages/emulator/RuntimeMonitor';
 import PreferencesModal from './components/PreferencesModal';
 import './components/themes/globalStyles.css'; // Importe o arquivo CSS global
 import Themes from './components/themes/Themes';
@@ -21,6 +22,7 @@ import AppProvider from './providers/AppProviders';
 import { AppLanguage, I18nProvider, resolveLanguage } from './i18n/I18n';
 import { clearImageCache } from './utils/imageCache';
 import { clearPaletteTransparentImageCache } from './utils/paletteTransparency';
+import { shareInFlightRequest } from './utils/inFlightRequest';
 
 interface Preferences {
   theme: string;
@@ -37,11 +39,21 @@ interface RecentProject {
 const App: React.FC = () => {
   const [theme, setTheme] = useState<any>();
   const [themeName, setThemeName] = useState('light');
+  const [themePreference, setThemePreference] = useState('systemDefault');
   const [locale, setLocale] = useState<Locale>(en_US);
   const [language, setLanguage] = useState<AppLanguage>('en_US');
 
   const [isLoading, setIsLoading] = useState(true);
   const [prefsOpen, setPrefsOpen] = useState(false);
+
+  const applyThemePreference = (preference: string) => {
+    const resolvedTheme = preference === 'systemDefault'
+      ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : Themes[preference] ? preference : 'light';
+    setThemePreference(preference);
+    setTheme(Themes[resolvedTheme]);
+    setThemeName(resolvedTheme);
+  };
 
   // Carregar preferências iniciais --------------------------------
   // Função auxiliar para carregar o locale
@@ -81,20 +93,14 @@ const App: React.FC = () => {
     }
 
     const loadPreferences = async () => {
-      await window.electronAPI.loadPreferences().then((preferencias: Preferences) => {
+      await shareInFlightRequest('app:initial-preferences', async () => {
+        const preferencias: Preferences = await window.electronAPI.loadPreferences();
         // Carrega tema
         console.log('..: Carregando Tema: ', preferencias.theme);
-        if (Themes[preferencias.theme]) {
-          setTheme(Themes[preferencias.theme]);
-          setThemeName(preferencias.theme);
-        } else {
-          console.error(`Theme ${preferencias.theme} not found, falling back to default.`);
-          setTheme(Themes.light);
-          setThemeName('light');
-        }
+        applyThemePreference(preferencias.theme || 'systemDefault');
 
         // Carrega idioma
-        const language = preferencias.language || 'en_US';
+        const language = preferencias.language || 'systemDefault';
         loadLocale(language);
         setIsLoading(false);
       });
@@ -109,10 +115,7 @@ const App: React.FC = () => {
     if (!window.electronAPI) return;
 
     const themeChangeHandler = (event: any, newTheme: string) => {
-      if (Themes[newTheme]) {
-        setTheme(Themes[newTheme]);
-        setThemeName(newTheme);
-      }
+      applyThemePreference(newTheme);
     };
 
     window.electronAPI.on('change-theme', themeChangeHandler);
@@ -120,17 +123,33 @@ const App: React.FC = () => {
   }, []);
   // Evento para CHANGE THEME END ----------------------------------
 
+  useEffect(() => {
+    const systemTheme = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!systemTheme) return;
+    const handleSystemThemeChange = () => {
+      if (themePreference === 'systemDefault') applyThemePreference('systemDefault');
+    };
+    systemTheme.addEventListener('change', handleSystemThemeChange);
+    return () => systemTheme.removeEventListener('change', handleSystemThemeChange);
+  }, [themePreference]);
+
   // Assets are cached across navigation so returning to Game World is instant.
   // Reload Assets is the explicit escape hatch that invalidates those caches.
   useEffect(() => {
     if (!window.electronAPI) return;
-    const reloadAssets = () => {
+    const notifyAssetsReloaded = () => {
       clearImageCache();
       clearPaletteTransparentImageCache();
       window.dispatchEvent(new Event('gba-studio:assets-reloaded'));
     };
+    const reloadAssets = () => notifyAssetsReloaded();
+    const handleWatchedAssets = () => notifyAssetsReloaded();
     window.electronAPI.on('reload-assets', reloadAssets);
-    return () => window.electronAPI.removeListener('reload-assets', reloadAssets);
+    window.electronAPI.on('update-images', handleWatchedAssets);
+    return () => {
+      window.electronAPI.removeListener('reload-assets', reloadAssets);
+      window.electronAPI.removeListener('update-images', handleWatchedAssets);
+    };
   }, []);
 
   // Evento para CHANGE LANGUAGE 
@@ -211,7 +230,7 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <ConfigProvider theme={theme} locale={locale}>
+      <ConfigProvider theme={theme} locale={locale} select={{ showSearch: true }}>
         <Layout style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <Spin size="large" percent={'auto'} indicator={<LayoutOutlined spin />} />
         </Layout>
@@ -223,6 +242,7 @@ const App: React.FC = () => {
     <ConfigProvider
       theme={theme}
       locale={locale}
+      select={{ showSearch: true }}
     // wave={{
     //   disabled: false, // Desabilitar o efeito de onda
     //   showEffect: (node, { event, component }) => {
@@ -255,21 +275,22 @@ const App: React.FC = () => {
     >
       <I18nProvider language={language}>
         <AppProvider>
-          <HashRouter>
+          <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Content className={`gba-theme gba-theme-${themeName}`} data-theme={themeName} style={{ height: '100vh', filter: isWindowActive ? 'none' : 'grayscale(100%)' }}>
               <Routes>
                 <Route path="/launcher" element={<Launcher />} />
                 <Route path="/engine" element={<Engine />} />
                 <Route path="/splash" element={<SplashScreen />} />
                 <Route path="/emulator" element={<Emulator />} />
+                <Route path="/runtime-monitor" element={<RuntimeMonitor />} />
                 <Route path="/about" element={<About />} />
                 <Route path="*" element={<Navigate to="/launcher" replace />} />
               </Routes>
             </Content>
           </HashRouter>
         </AppProvider>
+        <PreferencesModal open={prefsOpen} onClose={() => setPrefsOpen(false)} />
       </I18nProvider>
-      <PreferencesModal open={prefsOpen} onClose={() => setPrefsOpen(false)} />
     </ConfigProvider>
   );
 }

@@ -5,6 +5,7 @@ export interface ISpriteSettings extends IResourceSettings {
     _resourceType: 'sprite';
     imageWidth: number;
     imageHeight: number;
+    playerAnimationStripOrientation?: 'horizontal' | 'vertical';
     playerFrameWidth: number;
     playerFrameHeight: number;
     playerFramesPerDirection: number;

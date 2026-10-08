@@ -3,6 +3,7 @@
 
 #include "graphics_manager.h"
 #include "script_command_manager.h"
+#include <cstdint>
 
 /**
  * Main Game class for {{PROJECT_NAME}}
@@ -11,6 +12,7 @@
 class Game {
 private:
     bool running;
+    uint32_t shooter_scene_revision = 0;
     // bn::scene::status status;
 
 public:

@@ -328,4 +328,25 @@ const Themes: Record<string, any> = {
   },
 };
 
+// Informational alerts use each theme's primary color, lightened by 40% white.
+// Component tokens keep this styling consistent for every Ant Design Alert.
+for (const configuredTheme of Object.values(Themes)) {
+  const primary = configuredTheme.token.colorPrimary as string;
+  const background = '#' + [1, 3, 5].map(offset => {
+    const channel = parseInt(primary.slice(offset, offset + 2), 16);
+    return Math.round(channel * 0.6 + 255 * 0.4).toString(16).padStart(2, '0');
+  }).join('');
+  configuredTheme.components = {
+    ...configuredTheme.components,
+    Alert: {
+      ...configuredTheme.components?.Alert,
+      colorInfoBg: background,
+      colorInfoBorder: primary,
+      colorInfo: '#141414',
+      colorText: '#141414',
+      colorTextHeading: '#141414',
+    },
+  };
+}
+
 export default Themes;

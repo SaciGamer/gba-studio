@@ -36,7 +36,12 @@ async function launchProjectApplication() {
   const electronApp = await electron.launch({
     args: [
       electronEntryPoint,
-      path.join(repositoryRoot, 'sample_project_example', 'sample_project.gbaproj'),
+      path.join(
+        repositoryRoot,
+        'templateEngineGame',
+        'sample_project_example',
+        'sample_project.gbaproj',
+      ),
     ],
   });
 

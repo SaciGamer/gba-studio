@@ -1,0 +1,215 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "stage_1_monsters_1",
+  "name": "stage_1_monsters_1",
+  "filename": "stage_1_monsters_1.bmp",
+  "imageWidth": 16,
+  "imageHeight": 64,
+  "playerFrameWidth": 16,
+  "playerFrameHeight": 16,
+  "playerFramesPerDirection": 4,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 0,
+  "playerCanvasOriginY": 8,
+  "playerCollisionX": 0,
+  "playerCollisionY": 0,
+  "playerCollisionWidth": 16,
+  "playerCollisionHeight": 8,
+  "playerAnimations": [
+    {
+      "id": "idle",
+      "name": "Idle",
+      "type": "idle",
+      "frames": [],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-1791314923682",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-1791314927067",
+              "sourceX": 0,
+              "sourceY": 32,
+              "width": 16,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving",
+      "name": "Moving",
+      "type": "movement",
+      "frames": [],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-1791314930510",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-1791314933529",
+              "sourceX": 0,
+              "sourceY": 32,
+              "width": 16,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-1791314930976",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-1791314948262",
+              "sourceX": 0,
+              "sourceY": 48,
+              "width": 16,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "player",
+      "name": "morcego",
+      "type": "fixed-direction-movement",
+      "animations": [
+        {
+          "id": "idle",
+          "name": "Idle",
+          "type": "idle",
+          "frames": [
+            0
+          ]
+        },
+        {
+          "id": "moving",
+          "name": "Moving",
+          "type": "movement",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-1791314890394",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-1791314893511",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 16,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-1791314895195",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-1791314896129",
+                  "sourceX": 0,
+                  "sourceY": 16,
+                  "width": 16,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "state-1791314901378",
+      "name": "goblin",
+      "type": "fixed-direction-movement",
+      "flipRightToCreateLeftFacingFrames": true,
+      "animations": [
+        {
+          "id": "idle",
+          "name": "Idle",
+          "type": "idle",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-1791314923682",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-1791314927067",
+                  "sourceX": 0,
+                  "sourceY": 32,
+                  "width": 16,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving",
+          "name": "Moving",
+          "type": "movement",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-1791314930510",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-1791314933529",
+                  "sourceX": 0,
+                  "sourceY": 32,
+                  "width": 16,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-1791314930976",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-1791314948262",
+                  "sourceX": 0,
+                  "sourceY": 48,
+                  "width": 16,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

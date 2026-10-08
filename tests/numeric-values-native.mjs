@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import {spawnSync}from'node:child_process';import {pathToFileURL}from'node:url';
+const root=path.resolve('.');const {NUMERIC_OPERATIONS,numericInstructions,validateNumericValue}=await import(pathToFileURL(path.join(root,'dist/shared/numericValues.js')));
+const number=value=>({kind:'number',value}),expression=(operation,a,b)=>({kind:'expression',operation,left:number(a),...(b===undefined?{}:{right:number(b)})});
+const examples={add:[4,5,9],subtract:[4,5,-1],multiply:[4,5,20],divide:[9,2,4],modulo:[9,2,1],min:[4,5,4],max:[4,5,5],abs:[-4,undefined,4],atan2:[1,0,90],sqrt:[25,undefined,5],and:[1,0,0],or:[1,0,1],not:[0,undefined,1],equal:[4,4,1],notEqual:[4,5,1],greater:[5,4,1],greaterEqual:[4,4,1],less:[4,5,1],lessEqual:[4,4,1],shiftLeft:[3,2,12],shiftRight:[12,2,3],bitAnd:[7,3,3],bitOr:[4,3,7],bitXor:[7,3,4],bitNot:[0,undefined,-1]};
+const programs=Object.entries(examples).map(([operation,[a,b,expected]])=>({name:operation,value:expression(operation,a,b),expected}));
+programs.push({name:'nested',value:{kind:'expression',operation:'add',left:{kind:'expression',operation:'modulo',left:{kind:'variable',variableId:'local-0'},right:number(7)},right:number(15)},expected:21},
+ {name:'constant',value:{kind:'constant',constant:'screenWidth'},expected:240},{name:'property',value:{kind:'property',actorId:'__PLAYER__',property:'y'},expected:30},{name:'engine',value:{kind:'engine',field:'sceneWidth'},expected:730},{name:'direction',value:{kind:'direction',direction:'left'},expected:3},
+ {name:'divideZero',value:expression('divide',5,0),expected:0},{name:'negativeSqrt',value:expression('sqrt',-2),expected:0},{name:'overflow',value:expression('add',2147483647,1),expected:2147483647},{name:'minimumAbs',value:expression('abs',-2147483648),expected:2147483647});
+programs.push({name:'formula',value:{kind:'formula',source:'($LOCAL0 % 7) + 15',variables:{LOCAL0:'local-0'}},expected:21});
+assert.equal(Object.keys(NUMERIC_OPERATIONS).length,Object.keys(examples).length+1);
+assert.throws(()=>validateNumericValue({kind:'expression',operation:'add',left:number(0)}));assert.throws(()=>validateNumericValue(number(1.5)));
+let deep=number(1);for(let i=0;i<9;i++)deep={kind:'expression',operation:'abs',left:deep};assert.throws(()=>validateNumericValue(deep));
+const declarations=programs.map(({name,value})=>{const instructions=numericInstructions(value);return `const NumericInstruction ${name}_ops[]={${instructions.map(item=>`{NumericOperation::op_${item.operation},${item.value??0},${item.reference?JSON.stringify(item.reference):'nullptr'},${item.argument??0}}`).join(',')}};const NumericProgram ${name}_program={${name}_ops,${instructions.length}};`;}).join('\n');
+const cpp=`#include <cassert>
+#include <iostream>
+#include "numeric_values.h"
+int variable_reads=0;int read_variable(const char*){++variable_reads;return 20;}int property(const char*,int){return 30;}int engine(int){return 730;}
+int main(){numeric_runtime_hooks={read_variable,property,engine};${declarations}
+${programs.map(({name,expected})=>`assert(evaluate_numeric_program(${name}_program)==${expected});`).join('\n')}
+const NumericInstruction random_ops[]={{NumericOperation::op_number,2,nullptr,0},{NumericOperation::op_number,5,nullptr,0},{NumericOperation::op_random,0,nullptr,0}};const NumericProgram random_program={random_ops,3};for(int i=0;i<100;i++){int value=evaluate_numeric_program(random_program);assert(value>=2&&value<=5);}
+struct Payload{const char* id;int x;int y;};Payload source{"actor",0,12},target{};const NumericEventField fields[]={{offsetof(Payload,x),&nested_program,0,100}};const NumericEventValues event{fields,1,sizeof(Payload)};NumericEventCache cache;int before=variable_reads;
+assert(resolve_numeric_event(event,&source,&source,&target,sizeof(target),cache));assert(target.x==21&&target.y==12);assert(resolve_numeric_event(event,&source,&source,&target,sizeof(target),cache));assert(variable_reads==before+1);cache.reset();assert(resolve_numeric_event(event,&source,&source,&target,sizeof(target),cache));assert(variable_reads==before+2);
+assert(!resolve_numeric_event(event,&source,&source,&target,1,cache));std::cout<<"Numeric values: all reference operations, nested variables, properties, engine fields, directions, zero division, integer saturation and blocking-event caching passed.\\n";}`;
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'gba-numeric-native-'));
+try{const file=path.join(temp,'test.cpp'),exe=path.join(temp,'test.exe');fs.writeFileSync(file,cpp);const build=spawnSync(process.env.CXX||'g++',['-std=c++17','-Wall','-Wextra','-Werror','-I',path.join(root,'tools/butano/template/include'),file,'-o',exe],{encoding:'utf8',windowsHide:true});assert.equal(build.status,0,build.stdout+build.stderr);const run=spawnSync(exe,[],{encoding:'utf8',windowsHide:true});assert.equal(run.status,0,run.stdout+run.stderr);process.stdout.write(run.stdout);}finally{fs.rmSync(temp,{recursive:true,force:true});}

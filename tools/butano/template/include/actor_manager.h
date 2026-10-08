@@ -1,6 +1,7 @@
 #ifndef ACTOR_MANAGER_H
 #define ACTOR_MANAGER_H
 
+#include <cstdint>
 #include "bn_array.h"
 #include "bn_string.h"
 

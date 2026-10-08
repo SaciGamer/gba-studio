@@ -1,9 +1,10 @@
 import { App as AntDApp, Flex, FloatButton, Layout, Spin, Splitter, Typography, notification } from 'antd';
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import BottomPanel from '../../BottomPanel';
+import BottomPanel, { COMPILER_STATUS_HEADER_HEIGHT } from '../../BottomPanel';
 import LeftPanel from '../../LeftPanel';
 import RightPanel from '../../RightPanel';
+import RightPanelScroll from '../../RightPanelScroll';
 import TopBar from '../../TopBar';
 
 // import './Engine.css';
@@ -20,6 +21,7 @@ import { ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
 import { IMainSettings } from '@/providers/contexts/interfaces/ISettingElement';
 import { ISpriteSettings } from '@/providers/contexts/interfaces/ISpriteElement';
 import { ISettingUtils } from '@/providers/contexts/interfaces/ISettingUtils';
+import { migrateBlob47Parts } from '@/utils/blobAutoTile';
 import { LayoutOutlined } from '@ant-design/icons';
 import ErrorBoundary from 'antd/es/alert/ErrorBoundary';
 import { useLocation } from 'react-router-dom';
@@ -29,6 +31,13 @@ import Settings from './Settings';
 import { Header } from 'antd/es/layout/layout';
 import AssetLibraryEditor from '../../resourceEditors/AssetLibraryEditor';
 import DialogueReviewEditor from '../../resourceEditors/DialogueReviewEditor';
+import { clearImageCache } from '@/utils/imageCache';
+import { clearPaletteTransparentImageCache } from '@/utils/paletteTransparency';
+import { clearProjectAssetFileCache, loadProjectAssetFiles } from '@/utils/projectAssetCache';
+import { clearSceneCanvasCache } from '@/utils/sceneRenderCache';
+import { loadPaletteLibrary } from '../../resourceEditors/paletteLibrary';
+import { preloadSceneVisualAssets } from '@/utils/preloadSceneVisualAssets';
+import { shareInFlightRequest } from '@/utils/inFlightRequest';
 
 // The menu event can be delivered to more than one mounted Engine listener.
 // Keep this lock at module scope so all listeners share the same export state.
@@ -51,6 +60,9 @@ const Engine: React.FC = () => {
   const location = useLocation();
   const [contentView, setContentView] = useState<number>(1);
   const [loading, setLoading] = useState(true);
+  const [centerWorkspaceSizes, setCenterWorkspaceSizes] = useState<Array<number | string>>(['75%', '25%']);
+  const loadedProjectPathRef = useRef<string | null>(null);
+  const loadGenerationRef = useRef(0);
 
 
   // const { scenes, setScenes, scenesRef, ignoredFields: ignoredFieldsScenes} = useSceneContext();
@@ -122,6 +134,12 @@ collisionSide: 'solid',
     setPanelSizes(sizes);
   };
 
+  const handleCenterWorkspaceResize = (sizes: number[]) => setCenterWorkspaceSizes(sizes);
+  const handleCenterWorkspaceResizeEnd = (sizes: number[]) => {
+    setCenterWorkspaceSizes(sizes);
+    window.electronAPI.saveLastPositionSplitters({ centerWorkspace: sizes.map(Math.round) });
+  };
+
   const handleResizeEnd = (sizes: number[]) => {
     // setIsResizing(false);
     const newSizes = [...sizes];
@@ -158,7 +176,7 @@ collisionSide: 'solid',
   };
 
   // Loading Sizes Splitters
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!window.electronAPI) {
       console.error('window.electronAPI is undefined');
       return;
@@ -167,8 +185,16 @@ collisionSide: 'solid',
     const loadSizesSplitters = async () => {
       const newSizesSplitter = await window.electronAPI.loadLastPositionSplitters();
       console.log('>> Splitters: ', newSizesSplitter);
-      if (newSizesSplitter)
-        handleResizeEnd(newSizesSplitter)
+      if (Array.isArray(newSizesSplitter)) {
+        handleResizeEnd(newSizesSplitter);
+      } else if (newSizesSplitter) {
+        if (Array.isArray(newSizesSplitter.main)) handleResizeEnd(newSizesSplitter.main);
+        if (Array.isArray(newSizesSplitter.centerWorkspace) && newSizesSplitter.centerWorkspace.length === 2) {
+          const [worldSize, compilerSize] = newSizesSplitter.centerWorkspace;
+          const restoredCompilerSize = Math.max(COMPILER_STATUS_HEADER_HEIGHT, compilerSize);
+          setCenterWorkspaceSizes([Math.max(40, worldSize + compilerSize - restoredCompilerSize), restoredCompilerSize]);
+        }
+      }
       else
         setPanelSizes([250, window.innerWidth - 500, 250]);
     };
@@ -193,25 +219,43 @@ collisionSide: 'solid',
   //   favoriteEvents();
   // }, []);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const query = new URLSearchParams(location.search);
     console.log("..: Engine - query:", query);
 
     const projectFilePath = query.get('path');
+    const loadGeneration = ++loadGenerationRef.current;
 
     const loadFile = async (projectFilePath: string | null) => {
       if (!projectFilePath) return;
 
       try {
+        const projectChanged = loadedProjectPathRef.current !== projectFilePath;
+        if (projectChanged) {
+          clearImageCache();
+          clearPaletteTransparentImageCache();
+          clearProjectAssetFileCache();
+          clearSceneCanvasCache();
+          loadedProjectPathRef.current = projectFilePath;
+        }
         // Initialize settings utils first
         console.log("..: Engine - File Path:", projectFilePath);
         initializeSettingUtils(projectFilePath);
         console.log('..: useEffect settingUtils default ', settingUtils);
 
-        const file = await window.electronAPI.loadSettings(projectFilePath);
+        const [file, normalCatalog, hdCatalog, tilesetCatalog, autoTileCatalog, spriteCatalog] = await Promise.all([
+          shareInFlightRequest(`engine:${projectFilePath}:settings`, () => window.electronAPI.loadSettings(projectFilePath)),
+          shareInFlightRequest(`engine:${projectFilePath}:backgrounds`, () => window.electronAPI.fetchImages('backgrounds')).catch(() => null),
+          shareInFlightRequest(`engine:${projectFilePath}:backgrounds-hd`, () => window.electronAPI.fetchImages('backgrounds-hd')).catch(() => null),
+          loadProjectAssetFiles('tilesets', projectFilePath).catch(() => []),
+          loadProjectAssetFiles('auto-tiles', projectFilePath).catch(() => []),
+          loadProjectAssetFiles('sprites', projectFilePath).catch(() => []),
+        ]);
+        if (loadGeneration !== loadGenerationRef.current) return;
         console.log("..: Engine - Response BE:", file);
         if (!file || !Array.isArray(file)) {
           console.error('Invalid file data:', file);
+          if (loadGeneration === loadGenerationRef.current) setLoading(false);
           return;
         }
 
@@ -226,7 +270,7 @@ collisionSide: 'solid',
           return acc;
         }, {} as Record<string, any[]>);
 
-        const scenesFromFile: ISceneSettings[] = categorized.scene || [];
+        const loadedScenesFromFile: ISceneSettings[] = categorized.scene || [];
         const backgroundsFromFile: IBackgroundSettings[] = categorized.background || [];
         const spritesFromFile: ISpriteSettings[] = categorized.sprite || [];
         const projectFromFile: IProjectSettings | null = categorized.project?.[0] || null;          // Assume apenas um projeto
@@ -234,27 +278,85 @@ collisionSide: 'solid',
         const userSettingsFromFile: IUserSettings | null = categorized.user_settings?.[0] || null;  // Assume apenas uma configuração
         const variablesFromFile = categorized.variables?.[0] || null;
         const scriptsFromFile = categorized.scripts?.[0] || null;
+        const migrateLegacyAutoTiles = Boolean(settingsFromFile && !Array.isArray(settingsFromFile.autoTileSlots)
+          && loadedScenesFromFile.some(scene => scene.autoTileSlots?.length));
+        const migratedAutoTileSlots: NonNullable<IMainSettings['autoTileSlots']> = [];
+        const scenesWithProjectAutoTiles = migrateLegacyAutoTiles ? loadedScenesFromFile.map(scene => {
+          const slotMapping = (scene.autoTileSlots ?? []).map(slot => {
+            const normalized = { autoTileId: slot.autoTileId ?? undefined, name: slot.name, tileSize: slot.tileSize ?? 16 as const, parts: Array.from({ length: 47 }, (_, index) => slot.parts[index] ?? null) };
+            const signature = JSON.stringify(normalized);
+            let globalIndex = migratedAutoTileSlots.findIndex(existing => JSON.stringify(existing) === signature);
+            if (globalIndex < 0) {
+              globalIndex = migratedAutoTileSlots.length;
+              migratedAutoTileSlots.push(normalized);
+            }
+            return globalIndex;
+          });
+          const backgrounds = scene.backgrounds?.map(layer => layer.autoTileMap
+            ? { ...layer, autoTileMap: layer.autoTileMap.map(row => row.map(slotIndex => slotMapping[slotIndex] ?? slotIndex)) }
+            : layer);
+          return { ...scene, autoTileSlots: undefined, ...(backgrounds ? { backgrounds } : {}), _saved: false };
+        }) : loadedScenesFromFile;
+        const scenesFromFile = scenesWithProjectAutoTiles.map(scene => {
+          let migrated = false;
+          const backgrounds = scene.backgrounds?.map(layer => {
+            if (!layer.autoTileMap || layer.autoTileMapVersion === 1) return layer;
+            migrated = true;
+            const rows = Math.max(layer.autoTileMap.length * 2, Math.ceil(scene.height / 8));
+            const columns = Math.max((layer.autoTileMap[0]?.length ?? 0) * 2, Math.ceil(scene.width / 8));
+            const autoTileMap = Array.from({ length: rows }, () => Array.from({ length: columns }, () => -1));
+            layer.autoTileMap.forEach((row, y) => row.forEach((slotIndex, x) => {
+              if (slotIndex >= 0 && autoTileMap[y * 2]?.[x * 2] !== undefined) autoTileMap[y * 2][x * 2] = slotIndex;
+            }));
+            return { ...layer, autoTileMap, autoTileMapVersion: 1 as const };
+          });
+          return migrated ? { ...scene, backgrounds, _saved: false } : scene;
+        });
+        const projectSettingsFromFile = migrateLegacyAutoTiles && settingsFromFile
+          ? { ...settingsFromFile, autoTileSlots: migratedAutoTileSlots, _saved: false }
+          : settingsFromFile;
+        const projectSettingsWithBlobOrder = projectSettingsFromFile && projectSettingsFromFile.autoTilePartOrderVersion !== 1
+          ? {
+            ...projectSettingsFromFile,
+            autoTileSlots: (projectSettingsFromFile.autoTileSlots ?? []).map(slot => ({ ...slot, tileSize: slot.tileSize ?? 16, parts: migrateBlob47Parts(slot.parts) })),
+            autoTilePartOrderVersion: 1 as const,
+            _saved: false,
+          }
+          : projectSettingsFromFile;
         const palettesFromFile = categorized.palette || [];
+        const visualPreload = preloadSceneVisualAssets({
+          scenes: scenesFromFile,
+          backgrounds: backgroundsFromFile,
+          normalCatalog,
+          hdCatalog,
+          tilesets: tilesetCatalog,
+          autoTiles: autoTileCatalog,
+          sprites: spriteCatalog,
+          palettes: palettesFromFile.length ? palettesFromFile : loadPaletteLibrary(),
+        });
 
         // Atualize os estados de uma vez só:
-        if (scenesFromFile.length > 0) {
+        if (scenesFromFile.length > 0 || projectChanged) {
           setScenes(prev => {
+            if (projectChanged) return scenesFromFile;
             const prevIds = prev.map(s => s.id);
             const novos = scenesFromFile.filter(s => !prevIds.includes(s.id));
             return [...prev, ...novos];
           });
         }
 
-        if (backgroundsFromFile.length > 0) {
+        if (backgroundsFromFile.length > 0 || projectChanged) {
           setBackgrounds(prev => {
+            if (projectChanged) return backgroundsFromFile;
             const prevIds = prev.map(b => b.id);
             const novos = backgroundsFromFile.filter(b => !prevIds.includes(b.id));
             return [...prev, ...novos];
           });
         }
 
-        if (spritesFromFile.length > 0) {
+        if (spritesFromFile.length > 0 || projectChanged) {
           setSpriteResources(prev => {
+            if (projectChanged) return spritesFromFile;
             const previousIds = prev.map(sprite => sprite.id);
             const newSprites = spritesFromFile.filter(sprite => !previousIds.includes(sprite.id));
             return [...prev, ...newSprites];
@@ -265,8 +367,8 @@ collisionSide: 'solid',
           setProject(projectFromFile);
         }
 
-        if (settingsFromFile) {
-          setSettings(settingsFromFile);
+        if (projectSettingsWithBlobOrder) {
+          setSettings(projectSettingsWithBlobOrder);
         }
 
         if (userSettingsFromFile) {
@@ -279,13 +381,22 @@ collisionSide: 'solid',
         if (scriptsFromFile) setScripts(scriptsFromFile);
         if (palettesFromFile.length) setPalettes(previous => ({ ...previous, palettes: palettesFromFile }));
 
-        setTimeout(() => {
-          setLoading(false); // Finaliza o estado de carregamento
-        }, 500); // Aguarde 500ms para garantir a consistência
+        setSettingUtils(previous => ({
+          ...previous,
+          images: normalCatalog?.status === 'success' ? normalCatalog.fileImages : [],
+          imagesHD: hdCatalog?.status === 'success' ? hdCatalog.fileImages : [],
+          localImagePath: normalCatalog?.localPath ?? previous.localImagePath,
+          localImagePathHD: hdCatalog?.localPath ?? previous.localImagePathHD,
+        }));
+
+        await visualPreload;
+        if (loadGeneration !== loadGenerationRef.current) return;
+
+        setLoading(false);
 
       } catch (error) {
         console.error('Error parsing file data:', error);
-        setLoading(false);
+        if (loadGeneration === loadGenerationRef.current) setLoading(false);
       }
     }
 
@@ -414,7 +525,7 @@ collisionSide: 'solid',
       );
     };
 
-    const callback = (requestToSave: string | { type?: string; markAsSaved?: boolean; persistToOriginal?: boolean }) => {
+    const callback = async (requestToSave: string | { type?: string; markAsSaved?: boolean; persistToOriginal?: boolean }) => {
       const requestType = typeof requestToSave === 'string' ? requestToSave : requestToSave?.type;
       const saveOptions = typeof requestToSave === 'object' ? requestToSave : {};
 
@@ -450,26 +561,53 @@ collisionSide: 'solid',
 
       console.log('..: Infos to save:', allToSave);
       // Enviar dados para o Backend
-      window.electronAPI.responseProjectToSave(allToSave);
+      let saveSucceeded = false;
+      try {
+        saveSucceeded = await window.electronAPI.responseProjectToSave(allToSave) === true;
+      } catch (error) {
+        console.error('Save request failed before the main process confirmed the write:', error);
+      }
+      if (saveSucceeded !== true) {
+        console.error('Save was rejected by the main process; keeping editor state dirty.');
+        return;
+      }
 
       if (saveOptions.markAsSaved !== false) {
-        // Marcar todos os elementos como salvos
-        setScenes(() => scenesRef.current.map(s => ({ ...s, _saved: true })));
-        setProject(() => ({ ...projectRef.current!, _saved: true }));
-        setSettings(() => ({ ...settingsRef.current, _saved: true }));
-        setUserSettings(() => ({ ...userSettingsRef.current, _saved: true }));
-        setBackgrounds(() => backgroundsRef.current.map(b => ({ ...b, _saved: true })));
-        setSpriteResources(() => spriteResourcesRef.current.map(sprite => ({ ...sprite, _saved: true })));
-        setVariables(() => ({ ...variablesRef.current, _saved: true }));
-        setScripts(() => ({ ...scriptsRef.current, _saved: true }));
-        setPalettes(() => ({ ...palettesRef.current, _saved: true }));
+        // Only clear dirty flags for the exact records that were written.
+        // An edit made while IPC was in flight must remain dirty.
+        const samePersistedData = (current: any, persisted: any, ignoredFields: string[]) => {
+          const comparable = (value: any) => Object.fromEntries(
+            Object.entries(value).filter(([key]) => !ignoredFields.includes(key))
+          );
+          return JSON.stringify(comparable(current)) === JSON.stringify(persisted);
+        };
+        const sentRecords = allToSave.flatMap((item: any) => Array.isArray(item) ? item : [item]);
+        const wasRecordSaved = (current: any, ignoredFields: string[]) => {
+          const persisted = sentRecords.find((item: any) => item?._resourceType === current?._resourceType && item?.id === current?.id);
+          return Boolean(persisted && samePersistedData(current, persisted, ignoredFields));
+        };
+        const sentResource = (resourceType: string) => sentRecords.find((item: any) => item?._resourceType === resourceType);
+        const markResourceSaved = (current: any, resourceType: string, ignoredFields: string[]) => {
+          const persisted = sentResource(resourceType);
+          return persisted && samePersistedData(current, persisted, ignoredFields) ? { ...current, _saved: true } : current;
+        };
+
+        setScenes(() => scenesRef.current.map(scene => wasRecordSaved(scene, ignoredFieldsScenes!) ? { ...scene, _saved: true } : scene));
+        if (projectRef.current) setProject(() => markResourceSaved(projectRef.current, 'project', ignoredFieldsProject!));
+        setSettings(() => markResourceSaved(settingsRef.current, 'settings', ignoredFieldsSettings!));
+        setUserSettings(() => markResourceSaved(userSettingsRef.current, 'user_settings', ignoredFieldsUserSettings!));
+        setBackgrounds(() => backgroundsRef.current.map(item => wasRecordSaved(item, ignoredFieldsBackgrounds!) ? { ...item, _saved: true } : item));
+        setSpriteResources(() => spriteResourcesRef.current.map(item => wasRecordSaved(item, ignoredFieldsSpriteResources!) ? { ...item, _saved: true } : item));
+        setVariables(() => markResourceSaved(variablesRef.current, 'variables', ignoredFieldsVariables!));
+        setScripts(() => markResourceSaved(scriptsRef.current, 'scripts', ignoredFieldsScripts!));
+        setPalettes(() => markResourceSaved(palettesRef.current, 'palettes', ignoredFieldsPalettes!));
         // setSettingUtils(settingUtils => ({ ...settingUtils, _saved: true }));
 
         console.log('..: Todos os itens agora estão com _saved = true.');
       }
     };
 
-    window.electronAPI.onRequestProjectToSave(callback);
+    const unsubscribeProjectSave = window.electronAPI.onRequestProjectToSave(callback);
 
     const handleProjectSavedAs = (event: any, data: { projectPathFile: string; projectDirectory: string; projectName: string }) => {
       console.log('..: project saved as:', data);
@@ -486,12 +624,12 @@ collisionSide: 'solid',
       }
     };
 
-    window.electronAPI.on('project-saved-as', handleProjectSavedAs);
+    const unsubscribeProjectSavedAs = window.electronAPI.subscribe('project-saved-as', handleProjectSavedAs);
 
     // Remover o listener ao desmontar o componente
     return () => {
-      window.electronAPI.onRequestProjectToSave(() => {});
-      window.electronAPI.removeListener('project-saved-as', handleProjectSavedAs);
+      unsubscribeProjectSave?.();
+      unsubscribeProjectSavedAs?.();
     };
   }, [project, setProject, setSettingUtils]);
 
@@ -631,15 +769,15 @@ collisionSide: 'solid',
 
                   {/* CENTRO */}
                   <Splitter.Panel /*size={panelSizes[1]}*/>
-                    <Splitter layout="vertical">
-                      <Content style={{ backgroundColor: token.colorBgContainer }}>
+                    <Splitter layout="vertical" style={{ height: '100%', minHeight: 0, overflow: 'hidden' }} onResize={handleCenterWorkspaceResize} onResizeEnd={handleCenterWorkspaceResizeEnd}>
+                      <Splitter.Panel size={centerWorkspaceSizes[0]} min={40} style={{ minHeight: 0, overflow: 'hidden', backgroundColor: token.colorBgContainer }}>
                         <GameWorld
                           resetPanelSize={resetPanelSize}
                           setShowFloatButton={setShowFloatButton}
                           showFloatButton={showFloatButton}
                         />
-                      </Content>
-                      <Splitter.Panel defaultSize="25%" min={40} max="90%">
+                      </Splitter.Panel>
+                      <Splitter.Panel size={centerWorkspaceSizes[1]} min={COMPILER_STATUS_HEADER_HEIGHT} max="90%" style={{ minHeight: 0, overflow: 'hidden' }}>
                         {/* <Footer> */}
                         <BottomPanel />
                         {/* </Footer> */}
@@ -648,8 +786,8 @@ collisionSide: 'solid',
                   </Splitter.Panel>
 
                   {/* PAINEL DIREITO */}
-                  <Splitter.Panel defaultSize="35%" min={360} size={panelSizes[2]} style={{ minWidth: 360, flexShrink: 0 }} >
-                    <RightPanel controllerView={setContentView} />
+                  <Splitter.Panel defaultSize="35%" min={365} size={panelSizes[2]} style={{ minWidth: 365, flexShrink: 0, overflow: 'hidden' }} >
+                    <RightPanelScroll><RightPanel controllerView={setContentView} /></RightPanelScroll>
                   </Splitter.Panel>
                 </Splitter>
               </Layout>

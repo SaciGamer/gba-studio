@@ -5,6 +5,7 @@ export interface IProjectSettings extends IFileSettings {
     name: string;
     author: string;
     notes: string;
+    cartridgeImage?: string | null;
 }
 
 export interface ProjectContextType {

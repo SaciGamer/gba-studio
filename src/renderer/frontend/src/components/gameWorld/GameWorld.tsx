@@ -1,12 +1,11 @@
 import { DndContext, DragEndEvent, DragMoveEvent } from '@dnd-kit/core';
-import { App, FloatButton, Layout, Progress, Tooltip } from 'antd';
+import { App, Button, FloatButton, Layout, Progress, Tooltip } from 'antd';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { AntdToken } from '../common/AntDToken';
-import DragAndDrop from './DragAndDrop';
 import GameElement from './GameElement';
 
-import { AimOutlined, AppstoreAddOutlined, ArrowDownOutlined, ArrowLeftOutlined, ArrowRightOutlined, ArrowUpOutlined, AuditOutlined, BgColorsOutlined, BlockOutlined, BorderInnerOutlined, ClearOutlined, CloseSquareOutlined, EditOutlined, ExpandOutlined, ExperimentOutlined, FormatPainterFilled, FormatPainterOutlined, InsertRowAboveOutlined, LayoutOutlined, PicLeftOutlined, PictureFilled, PlusSquareFilled, SelectOutlined, VerticalAlignMiddleOutlined } from '@ant-design/icons';
+import { AimOutlined, AppstoreAddOutlined, ArrowDownOutlined, ArrowLeftOutlined, ArrowRightOutlined, ArrowUpOutlined, AuditOutlined, BgColorsOutlined, BlockOutlined, BorderInnerOutlined, ClearOutlined, CloseSquareOutlined, EditOutlined, EyeInvisibleOutlined, EyeOutlined, ExpandOutlined, ExperimentOutlined, FormatPainterFilled, FormatPainterOutlined, InsertRowAboveOutlined, LayoutOutlined, PicLeftOutlined, PictureFilled, PlusSquareFilled, SelectOutlined, SwapOutlined, VerticalAlignMiddleOutlined } from '@ant-design/icons';
 import { Content } from 'antd/es/layout/layout';
 import { ReactZoomPanPinchRef, TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
 import FloatButttons from '../FloatButtons';
@@ -19,6 +18,8 @@ import { IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { Spin } from 'antd/lib';
 import { joinLocalAssetPath } from '@/utils/localAssetUrl';
 import { countDistinctImageTiles } from '@/utils/tileCount';
+import { useI18n } from '@/i18n/I18n';
+import { deleteCachedSceneCanvas } from '@/utils/sceneRenderCache';
 
 enum SubMenuType {
   TOOLTIP = 'tooltip',
@@ -33,6 +34,8 @@ interface IActions {
   iconSize?: number;
   tooltip?: string;
   active?: boolean;
+  preserveActiveTool?: boolean;
+  selectOnly?: boolean;
   onClick?: () => void;
   subMenu?: {
     type?: SubMenuType;
@@ -49,7 +52,6 @@ interface IActions {
   };
 }
 
-let gridValue = 16;
 const titleHeight = 82; // Altura do Titulo
 const leftLimite = 106
 
@@ -87,7 +89,18 @@ interface ResourceUsage {
 
 const formatBytes = (bytes: number) => bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(2)} MB` : `${(bytes / 1024).toFixed(1)} KB`;
 
-const calculateSceneVram = (scene: ISceneSettings, backgrounds: any[], distinctBackgroundTiles = new Map<string, number>()): number => {
+const calculateSceneVram = (scene: ISceneSettings, backgrounds: any[], sprites: any[], playerSpriteId?: string | null, distinctBackgroundTiles = new Map<string, number>()): number => {
+  // A sprite instance keeps one frame's tiles in VRAM. Count every actor and
+  // the configured player, rounded to 8x8 GBA tiles (4bpp = 32 bytes/tile).
+  const spriteIds = (scene.actors ?? []).map(actor => actor.spriteId ?? actor.actorId).filter((id): id is string => Boolean(id));
+  if (playerSpriteId) spriteIds.push(playerSpriteId);
+  const spriteBytes = spriteIds.reduce((total, id) => {
+    const sprite = sprites.find(item => !item._deleted && item.id === id);
+    if (!sprite) return total;
+    const frameWidth = Number(sprite.playerFrameWidth) || 16;
+    const frameHeight = Number(sprite.playerFrameHeight) || 16;
+    return total + Math.ceil(frameWidth / 8) * Math.ceil(frameHeight / 8) * 32;
+  }, 0);
   const isBitmapScene = scene.renderMode === 'direct_bitmap' || scene.sceneType === ETypeScene.LOGO || scene.sceneType === ETypeScene.POINTNCLICK;
   if (isBitmapScene) {
     // The template owns a single `current_bitmap_bgs` pointer. Change Layer
@@ -113,7 +126,7 @@ const calculateSceneVram = (scene: ISceneSettings, backgrounds: any[], distinctB
     walk(scene.playerHit2Script);
     walk(scene.playerHit3Script);
     Object.values(scene.eventGraphs ?? {}).forEach(graph => walk(graph.nodes));
-    return Math.max(0, ...candidates.map(bitmapBytes)) + 512 + 512;
+    return Math.max(0, ...candidates.map(bitmapBytes)) + spriteBytes + 512 + 512;
   }
   const grid = scene.gridSize ?? 8;
   const columns = Math.max(1, Math.ceil(scene.width / grid));
@@ -134,14 +147,14 @@ const calculateSceneVram = (scene: ISceneSettings, backgrounds: any[], distinctB
     const map = layer.tileMap;
     if (map?.length) {
       mapTiles += map.reduce((total, line) => total + line.length, 0);
-      map.forEach(line => line.forEach(tile => { if (Number.isInteger(tile) && tile >= 0) graphicTiles.add(`tileset:${layer.selectedTilesetId ?? scene.selectedTilesetId ?? 'default'}:${tile}`); }));
+      map.forEach((line, rowIndex) => line.forEach((tile, colIndex) => { if (Number.isInteger(tile) && tile >= 0) graphicTiles.add(`tileset:${layer.tileMapTilesetIds?.[rowIndex]?.[colIndex] ?? layer.selectedTilesetId ?? scene.selectedTilesetId ?? 'default'}:${tile}`); }));
     } else if (layer.backgroundId || layer.selectedTilesetId) mapTiles += columns * rows;
   });
   if (!layers.length && scene.tileMap?.length) {
     mapTiles = scene.tileMap.reduce((total, line) => total + line.length, 0);
     scene.tileMap.forEach(line => line.forEach(tile => { if (Number.isInteger(tile) && tile >= 0) graphicTiles.add(`tileset:${scene.selectedTilesetId ?? 'default'}:${tile}`); }));
   }
-  return graphicTiles.size * bytesPerTile + mapTiles * 2 + 512 + 512;
+  return graphicTiles.size * bytesPerTile + mapTiles * 2 + spriteBytes + 512 + 512;
 };
 
 const getChangeSceneTracePath = (source: ISceneSettings, target: ISceneSettings, preview: ChangeScenePreview): string => {
@@ -172,12 +185,14 @@ const getTileCoordinate = (value: unknown, allowNegative = false): number => {
   return allowNegative ? coordinate : Math.max(0, coordinate);
 };
 
+const triggerPreviewScriptKeys = ['script', 'onEnterScript', 'onLeaveScript', 'onInteractScript', 'onInitScript', 'onUpdateScript'] as const;
+
 const collectChangeScenePreviews = (scene: ISceneSettings): ChangeScenePreview[] => {
   const previews: ChangeScenePreview[] = [];
   const visited = new Set<string>();
   const walk = (events: IScriptsElement[] | undefined) => {
     events?.forEach(event => {
-      if(visited.has(event.id)) return;
+      if(event.args?.__comment || visited.has(event.id)) return;
       visited.add(event.id);
       if(event.command === 'EVENT_CHANGE_SCENE' && !event.args?.__comment)
       {
@@ -199,7 +214,7 @@ const collectChangeScenePreviews = (scene: ISceneSettings): ChangeScenePreview[]
   };
 
   walk(scene.script);
-  scene.triggers?.forEach(trigger => walk(trigger.script));
+  scene.triggers?.forEach(trigger => triggerPreviewScriptKeys.forEach(key => walk(trigger[key])));
   walk(scene.playerHit1Script);
   walk(scene.playerHit2Script);
   walk(scene.playerHit3Script);
@@ -260,10 +275,13 @@ const moveChangeScenePreview = (
   ...scene,
   _saved: false,
   script: updateChangeSceneEvent(scene.script, eventId, targetSceneId, x, y),
-  triggers: scene.triggers?.map(trigger => ({
-    ...trigger,
-    script: updateChangeSceneEvent(trigger.script, eventId, targetSceneId, x, y),
-  })),
+  triggers: scene.triggers?.map(trigger => {
+    const updated = { ...trigger };
+    triggerPreviewScriptKeys.forEach(key => {
+      updated[key] = updateChangeSceneEvent(trigger[key], eventId, targetSceneId, x, y);
+    });
+    return updated;
+  }),
   playerHit1Script: updateChangeSceneEvent(scene.playerHit1Script, eventId, targetSceneId, x, y),
   playerHit2Script: updateChangeSceneEvent(scene.playerHit2Script, eventId, targetSceneId, x, y),
   playerHit3Script: updateChangeSceneEvent(scene.playerHit3Script, eventId, targetSceneId, x, y),
@@ -280,6 +298,7 @@ interface IGameWorld {
 }
 
 const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, showFloatButton }) => {
+  const { t } = useI18n();
   const { token } = AntdToken();
   const { message, notification, modal } = App.useApp();
   const { 
@@ -293,18 +312,36 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
 
   const [worldSize, setWorldSize] = useState({ width: 1920, height: 1080 });
   const [isMovedBackground, setIsMovedBackground] = useState(false);
-  const zoomLevel = userSettings.zoom / 100;
+  const finiteNumber = (value: unknown, fallback: number) => {
+    const numeric = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+  };
+  const zoomLevel = Math.max(0.25, Math.min(16, finiteNumber(userSettings.zoom, 100) / 100));
+  const [panInertia, setPanInertia] = useState(true);
+  const [sceneMovementMode, setSceneMovementMode] = useState<'free' | 'grid'>('grid');
+  const worldScrollX = finiteNumber(userSettings.worldScrollX, 0);
+  const worldScrollY = finiteNumber(userSettings.worldScrollY, 0);
+  const [gridTransform, setGridTransform] = useState({ x: worldScrollX, y: worldScrollY, scale: zoomLevel });
+  const worldViewportRef = useRef<HTMLDivElement | null>(null);
+  const [worldCursorPosition, setWorldCursorPosition] = useState<{ x: number; y: number } | null>(null);
 
   const [updatedImages, setUpdatedImages] = useState<any>();
   const [changeScenePreviewLayer, setChangeScenePreviewLayer] = useState<HTMLDivElement | null>(null);
   const [draggingSceneOffset, setDraggingSceneOffset] = useState<{ id: string; x: number; y: number } | null>(null);
   const [activeCameraPreview, setActiveCameraPreview] = useState<CameraPreview | null>(null);
-  const [sceneMousePosition, setSceneMousePosition] = useState<{ scene: string; col: number; row: number } | null>(null);
-  const [worldOverlayPosition, setWorldOverlayPosition] = useState({ left: 12, top: 12, right: 12, bottom: 12, width: 0, measured: false });
+  const [actorPositionPreview, setActorPositionPreview] = useState<{ eventId: string; sceneId: string; actorId: string; x: number; y: number } | null>(null);
+  const [sceneMousePosition, setSceneMousePosition] = useState<{ scene: string; x: number; y: number } | null>(null);
+  const [worldOverlayPosition, setWorldOverlayPosition] = useState({ left: 12, top: 12, right: 12, bottom: 12, width: 0, height: 0, measured: false });
+  const [isMiniMapDragging, setIsMiniMapDragging] = useState(false);
+  const miniMapRef = useRef<SVGSVGElement | null>(null);
+  const miniMapDragBoundsRef = useRef<{ minX: number; minY: number; width: number; height: number } | null>(null);
   const [romUsage, setRomUsage] = useState<ResourceUsage>({ binary: 0, engine: 0, graphics: 0, audio: 0, scripts: 0, total: 0, source: 'assets' });
   const [loading, setLoading] = useState(true);
   const selectedScene = scenes.find(scene => !scene._deleted && scene.id === elementSelected?.id);
   const selectedSceneIds = settingUtils.selectedSceneIds ?? (selectedScene ? [selectedScene.id] : []);
+  const movingSceneIds = draggingSceneOffset
+    ? new Set(selectedSceneIds.includes(draggingSceneOffset.id) ? selectedSceneIds : [draggingSceneOffset.id])
+    : null;
   const tileEditSceneId = settingUtils.tileEditSceneId;
   const selectedScenePreviews = selectedScene ? collectChangeScenePreviews(selectedScene) : [];
   const selectedCameraPreviews = selectedScene ? collectCameraPreviews(selectedScene, activeCameraPreview) : [];
@@ -321,7 +358,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       }
       const isBitmapScene = selectedScene.renderMode === 'direct_bitmap' || selectedScene.sceneType === ETypeScene.LOGO || selectedScene.sceneType === ETypeScene.POINTNCLICK;
       if (isBitmapScene) {
-        setSelectedSceneVram(calculateSceneVram(selectedScene, backgrounds));
+        setSelectedSceneVram(calculateSceneVram(selectedScene, backgrounds, spriteResources, settings?.playerSpriteId));
         return;
       }
       const usedBackgroundIds = [...new Set((selectedScene.backgrounds ?? []).map(layer => layer.backgroundId).filter((id): id is string => Boolean(id)))];
@@ -338,11 +375,11 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
           if (background.imageWidth && background.imageHeight) tileCounts.set(backgroundId, Math.ceil(background.imageWidth / 8) * Math.ceil(background.imageHeight / 8));
         }
       }));
-      if (!cancelled) setSelectedSceneVram(calculateSceneVram(selectedScene, backgrounds, tileCounts));
+      if (!cancelled) setSelectedSceneVram(calculateSceneVram(selectedScene, backgrounds, spriteResources, settings?.playerSpriteId, tileCounts));
     };
     void updateSceneVram();
     return () => { cancelled = true; };
-  }, [backgrounds, selectedScene, settingUtils.localImagePath, settingUtils.localImagePathHD]);
+  }, [backgrounds, selectedScene, settingUtils.localImagePath, settingUtils.localImagePathHD, settings?.playerSpriteId, spriteResources]);
 
   useEffect(() => {
     let cancelled = false;
@@ -383,16 +420,17 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     window.addEventListener('gba-studio:camera-preview', handleCameraPreview);
     return () => window.removeEventListener('gba-studio:camera-preview', handleCameraPreview);
   }, []);
+  useEffect(() => {
+    const handlePreview = (event: Event) => setActorPositionPreview((event as CustomEvent).detail ?? null);
+    window.addEventListener('gba-studio:actor-position-preview', handlePreview);
+    return () => window.removeEventListener('gba-studio:actor-position-preview', handlePreview);
+  }, []);
   const changeSceneTraces = selectedScenePreviews.reduce<ChangeSceneTrace[]>((traces, preview) => {
     if (!selectedScene) return traces;
     const targetScene = scenes.find(scene => !scene._deleted && scene.id === preview.targetSceneId);
     if (!targetScene) return traces;
-    // The destination may be dragged while the source scene remains selected.
-    // Arrival markers and traces live in the shared overlay, so they need the
-    // live offset for the actively dragged scene even when it is not selected.
-    const isMovingInPreview = (sceneId: string) => Boolean(draggingSceneOffset && (
-      draggingSceneOffset.id === sceneId || selectedSceneIds.includes(sceneId)
-    ));
+    // The live preview must match the exact drag group committed on release.
+    const isMovingInPreview = (sceneId: string) => Boolean(movingSceneIds?.has(sceneId));
     const liveOffset = draggingSceneOffset;
     const withDraggingOffset = (scene: ISceneSettings) => isMovingInPreview(scene.id) && liveOffset
       ? { ...scene, x: scene.x + liveOffset.x, y: scene.y + liveOffset.y }
@@ -417,11 +455,29 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     });
   }, [selectedScene, setScenes, setElementSelected]);
 
-  const wrapperRef = useRef<ReactZoomPanPinchRef | null>(null);;
+  const wrapperRef = useRef<ReactZoomPanPinchRef | null>(null);
+  const sceneDragScaleRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const applyPreferences = (preferences: { gameWorldPanInertia?: boolean; gameWorldMovementMode?: 'free' | 'grid' } | null | undefined) => {
+      setPanInertia(preferences?.gameWorldPanInertia !== false);
+      setSceneMovementMode(preferences?.gameWorldMovementMode === 'free' ? 'free' : 'grid');
+    };
+    let cancelled = false;
+    void window.electronAPI.loadPreferences?.().then((preferences: any) => {
+      if (!cancelled) applyPreferences(preferences);
+    }).catch((error: unknown) => console.warn('Unable to load Game World preferences:', error));
+    const onPreferencesChanged = (event: Event) => applyPreferences((event as CustomEvent).detail);
+    window.addEventListener('gba-studio:game-world-preferences', onPreferencesChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('gba-studio:game-world-preferences', onPreferencesChanged);
+    };
+  }, []);
 
   useEffect(() => {
     const updateOverlayPosition = () => {
-      const viewport = document.querySelector<HTMLElement>('.react-transform-wrapper');
+      const viewport = worldViewportRef.current?.querySelector<HTMLElement>('.react-transform-wrapper');
       if (!viewport) return;
       const rect = viewport.getBoundingClientRect();
       setWorldOverlayPosition({
@@ -430,6 +486,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
         right: Math.max(12, Math.round(window.innerWidth - rect.right + 12)),
         bottom: Math.max(12, Math.round(window.innerHeight - rect.bottom + 12)),
         width: Math.round(rect.width),
+        height: Math.round(rect.height),
         measured: true,
       });
     };
@@ -440,7 +497,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     const timer = window.setTimeout(updateOverlayPosition, 100);
     const settledTimer = window.setTimeout(updateOverlayPosition, 300);
     const observer = new ResizeObserver(updateOverlayPosition);
-    const viewport = document.querySelector<HTMLElement>('.react-transform-wrapper');
+    const viewport = worldViewportRef.current?.querySelector<HTMLElement>('.react-transform-wrapper');
     if (viewport) observer.observe(viewport);
     window.addEventListener('resize', updateOverlayPosition);
     return () => {
@@ -494,12 +551,15 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     };
   }, []);
   const toggleTileGrid = () => {
-    if (!tileEditSceneId) return;
-    setUserSettings(previous => {
-      const hidden = previous.hiddenTileGridSceneIds ?? [];
-      const isHidden = hidden.includes(tileEditSceneId);
-      return { ...previous, hiddenTileGridSceneIds: isHidden ? hidden.filter(id => id !== tileEditSceneId) : [...hidden, tileEditSceneId], _saved: false };
-    });
+    setUserSettings(previous => ({ ...previous, showTileEditorGrid: !(previous.showTileEditorGrid ?? true), _saved: false }));
+  };
+  const setTileGridSize = (gridSize: 8 | 16) => {
+    if (userSettings.tileEditorGridSize === gridSize) return;
+    setUserSettings(previous => ({
+      ...previous,
+      tileEditorGridSize: gridSize,
+      _saved: false,
+    }));
   };
 
   useEffect(() => {
@@ -541,7 +601,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
         type: SubMenuType.POPOVER,
         items: [
           { key: '8px', icon: <ExpandOutlined />, iconSize: 16, tooltip: 'Pincel 8 px', active: settingUtils.activeSubButton == '8px', onClick: () => <></> },
-          { key: '16px', icon: <ExpandOutlined />, iconSize: 24, tooltip: 'Pincel 16 px (em breve)', disabled: true, active: settingUtils.activeSubButton == '16px', onClick: () => <></> },
+          { key: '16px', icon: <ExpandOutlined />, iconSize: 24, tooltip: 'Pincel 16 px', active: settingUtils.activeSubButton == '16px', onClick: () => undefined },
           { key: 'subAction1', icon: <ExperimentOutlined />,  tooltip: 'New Command (em breve)', disabled: true, separator: true, active: settingUtils.activeSubButton == 'subAction1', onClick: () => <></>},
           { key: 'subAction2', icon: <CloseSquareOutlined />, tooltip: 'New Command (em breve)', disabled: true, active: settingUtils.activeSubButton == 'subAction2', onClick: () => <></>},
         ],
@@ -563,6 +623,13 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
           { key: 'collision-down-8', icon: <ArrowDownOutlined />, tooltip: 'Colisão embaixo', active: settingUtils.collisionSide === 'down', onClick: () => setSettingUtils(previous => ({ ...previous, collisionSide: 'down' })) },
           { key: 'collision-left-8', icon: <ArrowLeftOutlined />, tooltip: 'Colisão à esquerda', active: settingUtils.collisionSide === 'left', onClick: () => setSettingUtils(previous => ({ ...previous, collisionSide: 'left' })) },
           { key: 'collision-right-8', icon: <ArrowRightOutlined />, tooltip: 'Colisão à direita', active: settingUtils.collisionSide === 'right', onClick: () => setSettingUtils(previous => ({ ...previous, collisionSide: 'right' })) },
+          ...(['Platformer', 'Platform'].includes(String((scenes.find(scene => scene.id === tileEditSceneId) ?? selectedScene)?.sceneType)) ? [{
+            key: 'collision-ladder',
+            icon: <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1v14M12 1v14M4 4h8M4 8h8M4 12h8" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>,
+            tooltip: t('collisions.ladderHint'),
+            active: settingUtils.collisionSide === 'ladder',
+            onClick: () => setSettingUtils(previous => ({ ...previous, collisionSide: 'ladder' })),
+          }] : []),
         ],
       }
     }] : []),
@@ -595,8 +662,24 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
         items: [
           { key: 'pencil', icon: <EditOutlined />, tooltip: 'Tile pencil (p)', active: settingUtils.activeSubButton == 'pencil', onClick: () => undefined },
           { key: 'square', icon: <BorderInnerOutlined />, tooltip: 'Tile square (q)', active: settingUtils.activeSubButton == 'square', onClick: () => undefined },
-          { key: 'same', icon: <SelectOutlined />, tooltip: 'Paint matching tiles', active: settingUtils.activeSubButton == 'same', onClick: () => undefined },
-          { key: 'grid', icon: <BorderInnerOutlined />, tooltip: `${userSettings.hiddenTileGridSceneIds?.includes(tileEditSceneId) ? 'Show' : 'Hide'} grid (g)`, active: false, onClick: toggleTileGrid },
+          { key: 'same', icon: <SelectOutlined />, tooltip: 'Paint matching tiles', active: settingUtils.activeSubButton == 'same', separator: true, onClick: () => undefined },
+          { key: 'flip-horizontal', icon: <SwapOutlined />, tooltip: 'Flip tiles horizontally', active: settingUtils.tileFlipHorizontal === true, onClick: () => setSettingUtils(previous => ({ ...previous, tileFlipHorizontal: !previous.tileFlipHorizontal })) },
+          { key: 'flip-vertical', icon: <SwapOutlined style={{ transform: 'rotate(90deg)' }} />, tooltip: 'Flip tiles vertically', active: settingUtils.tileFlipVertical === true, onClick: () => setSettingUtils(previous => ({ ...previous, tileFlipVertical: !previous.tileFlipVertical })) },
+        ],
+      },
+    }] : []),
+    ...(tileEditSceneId ? [{
+      key: 'grid',
+      icon: <BorderInnerOutlined />,
+      tooltip: t('world.tileGrid'),
+      active: settingUtils.activeButton === 'grid',
+      selectOnly: true,
+      subMenu: {
+        type: SubMenuType.POPOVER,
+        items: [
+          { key: 'grid-visible', icon: (userSettings.showTileEditorGrid ?? true) ? <EyeOutlined /> : <EyeInvisibleOutlined />, tooltip: `${t((userSettings.showTileEditorGrid ?? true) ? 'world.hideTileGrid' : 'world.showTileGrid')} (g)`, active: userSettings.showTileEditorGrid ?? true, separator: true, onClick: toggleTileGrid },
+          { key: 'grid-8', icon: <span>8</span>, iconSize: 16, tooltip: t('world.tileGrid8'), active: (userSettings.tileEditorGridSize ?? 8) === 8, onClick: () => setTileGridSize(8) },
+          { key: 'grid-16', icon: <span>16</span>, iconSize: 16, tooltip: t('world.tileGrid16'), active: userSettings.tileEditorGridSize === 16, onClick: () => setTileGridSize(16) },
         ],
       },
     }] : []),
@@ -645,6 +728,9 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
         return;
       }
 
+      // In scene edit mode, Delete targets objects, never the parent scene.
+      if (currentUtils.tileEditSceneId) return;
+
       if (currentSelection != null && !isDeleting.current) {
         console.log("..: Confirme deletando elemento!!", isDeleting.current)
         isDeleting.current = true;
@@ -670,6 +756,26 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
 
       if (isEditingField(target) || isEditingField(activeElement)) return;
 
+      if (settingUtils.tileEditSceneId && ['1', '2', '3', '4', '5'].includes(event.key)) {
+        const editingScene = scenes.find(scene => scene.id === settingUtils.tileEditSceneId);
+        const isSingleLayerScene = editingScene?.sceneType === ETypeScene.LOGO || editingScene?.sceneType === ETypeScene.POINTNCLICK;
+        const keyIndex = Number(event.key);
+        const layerId = isSingleLayerScene
+          ? keyIndex === 2 ? 4 : null
+          : keyIndex === 5 ? 4 : keyIndex - 1;
+        if (layerId !== null) {
+          event.preventDefault();
+          setSettingUtils(previous => ({
+            ...previous,
+            tileEditLayerId: layerId,
+            ...(layerId === 4 && (previous.activeButton === 'tiles' || previous.activeButton === 'colorize')
+              ? { activeButton: 'select', activeSubButton: '' }
+              : {}),
+          }));
+          return;
+        }
+      }
+
       if (event.key === 'Escape' && settingUtils.activeButton === 'add' && settingUtils.activeSubButton === 'Scene') {
         event.preventDefault();
         setPendingScenePlacement(null);
@@ -694,7 +800,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       window.electronAPI?.removeListener?.('scene-delete', deleteSelection);
       window.removeEventListener('gba-studio:scene-delete', deleteSceneById);
     };
-  }, [elementSelected, scenes, settings, settingUtils.activeButton, settingUtils.activeSceneObject, settingUtils.activeSubButton, settingUtils.selectedSceneIds]);
+  }, [elementSelected, scenes, settings, settingUtils.activeButton, settingUtils.activeSceneObject, settingUtils.activeSubButton, settingUtils.selectedSceneIds, settingUtils.tileEditSceneId]);
 
   const showConfirmSceneObject = (selectedObject: { sceneId: string; type: 'actor' | 'trigger'; id: string }) => {
     const scene = scenes.find(item => item.id === selectedObject.sceneId);
@@ -706,11 +812,12 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       [selectedObject.type === 'actor' ? 'actors' : 'triggers']: (selectedObject.type === 'actor' ? item.actors : item.triggers)?.filter(entry => entry.id !== selectedObject.id),
       _saved: false,
     }));
-    // Object deletion must not leave the parent scene selected implicitly.
-    // Otherwise the next Delete key can remove the scene as a side effect of
-    // deleting an actor or trigger.
-    setElementSelected(null);
-    setSettingUtils(previous => ({ ...previous, activeSceneObject: null, activeTriggerId: null, selectedSceneIds: [] }));
+    setElementSelected({
+      ...scene,
+      [selectedObject.type === 'actor' ? 'actors' : 'triggers']: collection?.filter(entry => entry.id !== selectedObject.id),
+      _saved: false,
+    });
+    setSettingUtils(previous => ({ ...previous, activeSceneObject: null, activeTriggerId: null, selectedSceneIds: [scene.id] }));
     isDeleting.current = false;
   };
 
@@ -723,6 +830,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     } else if (resourceType === 'variables') {
       setVariables(previous => ({ ...previous, variables: previous.variables.map(variable => variable.id === elementDelete.id ? { ...variable, _saved: false, _deleted: true } : variable), _saved: false }));
     } else {
+      idsToDelete.forEach(deleteCachedSceneCanvas);
       setScenes(previous => previous.map(scene => idsToDelete.includes(scene.id) ? { ...scene, _saved: false, _deleted: true } : scene));
       if (idsToDelete.includes(settings.startSceneId)) {
         const nextStartSceneId = scenes.find(scene => !scene._deleted && !idsToDelete.includes(scene.id))?.id ?? '';
@@ -745,12 +853,14 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   // Lógica selecionar Objeto
   const handleSelect = useCallback((scene: ISceneSettings, event?: React.MouseEvent) => {
     const current = settingUtils.selectedSceneIds ?? (elementSelected?.id ? [elementSelected.id] : []);
+    const shouldRecenter = !current.includes(scene.id);
     const ids = event?.shiftKey
       ? (current.includes(scene.id) ? current.filter(id => id !== scene.id) : [...current, scene.id])
       : [scene.id];
     const activeId = event?.shiftKey && current.includes(scene.id) ? ids.at(-1) : scene.id;
     setSettingUtils(previous => ({ ...previous, selectedSceneIds: ids }));
-    setElementSelected(scenes.find(item => item.id === activeId) ?? null);
+    const activeScene = scenes.find(item => item.id === activeId);
+    setElementSelected(activeScene ? { ...activeScene, _recenter: shouldRecenter || undefined } : null);
   }, [elementSelected?.id, scenes, setElementSelected, setSettingUtils, settingUtils.selectedSceneIds]);
 
   const selectAllScenes = useCallback(() => {
@@ -761,28 +871,33 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     setElementSelected(primaryScene);
   }, [elementSelected?.id, scenes, setElementSelected, setSettingUtils]);
 
+  const selectAllScenesRef = useRef(selectAllScenes);
   useEffect(() => {
-    window.electronAPI?.on?.('scene-select-all', selectAllScenes);
-    return () => window.electronAPI?.removeListener?.('scene-select-all', selectAllScenes);
+    selectAllScenesRef.current = selectAllScenes;
   }, [selectAllScenes]);
+
+  useEffect(() => {
+    return window.electronAPI?.subscribe?.('scene-select-all', () => selectAllScenesRef.current());
+  }, []);
 
    // função utilitária para calcular o tamanho do mundo
   const calculateWorldSize = (scenes: ISceneSettings[]) => {
-    const maxWidth = Math.max(1920, ...scenes.map(el => el.x + el.width));
-    const maxHeight = Math.max(1080, ...scenes.map(el => el.y + el.height));
+    const activeScenes = scenes.filter(scene => !scene._deleted);
+    const maxWidth = Math.max(1920, ...activeScenes.map(el => el.x + el.width + 512));
+    const maxHeight = Math.max(1080, ...activeScenes.map(el => el.y + el.height + 512));
     return { width: maxWidth, height: maxHeight };
   };
 
   // useEffect para inicialização
   useEffect(() => {
-    if (scenes.length > 0) {
-      setWorldSize(calculateWorldSize(scenes));
-    }
+    setWorldSize(calculateWorldSize(scenes));
     setLoading(false);
   }, [scenes]);
 
   // Movendo tela de trabalho
   const handleMoveBackStart = () => {
+    sceneDragScaleRef.current = getWorldScale();
+    setDraggingSceneOffset(null);
     setIsMovedBackground(true);
     // console.log(isMovedBackground);
   };
@@ -791,12 +906,33 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     const scale = wrapperRef.current?.instance?.transformState?.scale;
     return typeof scale === 'number' && Number.isFinite(scale) && scale > 0 ? scale : zoomLevel;
   };
-  const snapWorldCoordinate = (coordinate: number) => Math.round(coordinate / gridValue) * gridValue;
-  const getSnappedSceneMovement = (scene: ISceneSettings, delta: { x: number; y: number }) => {
-    const scale = getWorldScale();
-    const x = snapWorldCoordinate(scene.x + delta.x / scale);
-    const y = snapWorldCoordinate(scene.y + delta.y / scale);
-    return { x: x - scene.x, y: y - scene.y };
+  const getWorldPositionFromClient = (clientX: number, clientY: number) => {
+    const instance = wrapperRef.current?.instance;
+    const viewport = instance?.wrapperComponent ?? worldViewportRef.current;
+    const rect = viewport?.getBoundingClientRect();
+    const transform = instance?.transformState;
+    const scale = typeof transform?.scale === 'number' && transform.scale > 0 ? transform.scale : zoomLevel;
+    if (!rect) return { x: 0, y: 0 };
+    return {
+      x: (clientX - rect.left - finiteNumber(transform?.positionX, worldScrollX)) / scale,
+      y: (clientY - rect.top - finiteNumber(transform?.positionY, worldScrollY)) / scale,
+    };
+  };
+  const snapSceneCoordinate = (coordinate: number, origin: number) => origin + Math.round((coordinate - origin) / 16) * 16;
+  const getScenePlacement = (worldX: number, worldY: number) => ({
+    x: snapSceneCoordinate(worldX - 120, leftLimite),
+    y: snapSceneCoordinate(worldY - 80, titleHeight),
+  });
+  const getSceneWorldMovement = (delta: { x: number; y: number }) => {
+    const scale = sceneDragScaleRef.current ?? getWorldScale();
+    const snapMovement = (pixels: number) => sceneMovementMode === 'grid'
+      ? Math.round(pixels / scale / 16) * 16
+      : Math.round(pixels / scale);
+    const movement = {
+      x: snapMovement(delta.x),
+      y: snapMovement(delta.y),
+    };
+    return movement;
   };
 
   const handleDragMove = (event: DragMoveEvent) => {
@@ -804,7 +940,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     // by the draggable scene while it is still being moved.
     const scene = scenesRef.current.find(item => item.id === String(event.active.id));
     if (!scene) return;
-    const movement = getSnappedSceneMovement(scene, event.delta);
+    const movement = getSceneWorldMovement(event.delta);
     setDraggingSceneOffset({
       id: String(event.active.id),
       ...movement,
@@ -820,30 +956,35 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       // dnd transform. Raw pointer pixels are incorrect whenever the world
       // is zoomed, and left the Change Scene arrival preview behind.
       // event.delta is the pointer movement in viewport pixels. Recompute the
-      // same world-space snap used by the live preview instead of reusing a
-      // potentially stale state update from the final pointer event.
-      const movement = { id: String(active.id), ...getSnappedSceneMovement(draggedElement, delta) };
+      // same world-space movement used by the live preview instead of
+      // reusing a potentially stale state update from the final pointer event.
+      // Commit the exact offset rendered by the last drag preview. Pointer-up
+      // may arrive with a newer delta than the final onDragMove frame, which
+      // otherwise makes the card jump as soon as the preview is removed.
+      const latestPreview = draggingSceneOffset;
+      const movement = latestPreview?.id === String(active.id)
+        ? { id: String(active.id), x: latestPreview.x, y: latestPreview.y }
+        : { id: String(active.id), ...getSceneWorldMovement(delta) };
       const newX = draggedElement.x + movement.x;
       const newY = draggedElement.y + movement.y;
 
-      // Calcula com limite
-      const snappedX = Math.max(leftLimite, newX);
-      const snappedY = Math.max(titleHeight, newY);
+      const clampedX = newX;
+      const clampedY = newY;
 
       // Ajusta a posição do elemento arrastado
       const ids = selectedSceneIds.includes(String(active.id)) ? selectedSceneIds : [String(active.id)];
       setScenes(prev => prev.map(el => {
         if (!ids.includes(el.id)) return el;
-        const x = el.id === active.id ? snappedX : Math.max(leftLimite, el.x + movement.x);
-        const y = el.id === active.id ? snappedY : Math.max(titleHeight, el.y + movement.y);
+        const x = el.id === active.id ? clampedX : el.x + movement.x;
+        const y = el.id === active.id ? clampedY : el.y + movement.y;
         return { ...el, x, y, editorPosition: { x, y }, _saved: false };
       }));
 
       const newWorld = calculateWorldSize([
         ...scenes.map(el => {
           if (!ids.includes(el.id)) return el;
-          const x = el.id === active.id ? snappedX : Math.max(leftLimite, el.x + movement.x);
-          const y = el.id === active.id ? snappedY : Math.max(titleHeight, el.y + movement.y);
+          const x = el.id === active.id ? clampedX : el.x + movement.x;
+          const y = el.id === active.id ? clampedY : el.y + movement.y;
           return { ...el, x, y };
         })
       ]);
@@ -855,6 +996,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       setIsMovedBackground(false);
     }
     setDraggingSceneOffset(null);
+    sceneDragScaleRef.current = null;
   };
 
   const handleImageUpload = async (file: File) => {
@@ -910,20 +1052,16 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   };
 
   // Lógica para dropar imagem no projeto
-  const handleDropOrCreate = (event: DragEvent, zoomScale: number) => {
+  const handleDropOrCreate = (event: React.MouseEvent<HTMLDivElement> | React.DragEvent<HTMLDivElement>) => {
     event.preventDefault(); // Previne o comportamento padrão de impedir o drop
     
     const { clientX, clientY } = event;
     // Calcula a posição relativa ao GameWorld
-    const gameWorldRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    let relativeX = (clientX - gameWorldRect.left) / zoomScale;
-    let relativeY = (clientY - gameWorldRect.top) / zoomScale;
+    const worldPosition = getWorldPositionFromClient(clientX, clientY);
+    const { x: relativeX, y: relativeY } = getScenePlacement(worldPosition.x, worldPosition.y);
 
     // Garante que as coordenadas fiquem dentro da grid
-    relativeX = Math.max(leftLimite, relativeX - (240 / 2));
-    relativeY = Math.max(titleHeight - 33, relativeY - (160 / 2));
-
-    const files = event?.dataTransfer?.files != null ? Array.from(event.dataTransfer.files) : null;
+    const files = 'dataTransfer' in event && event.dataTransfer?.files != null ? Array.from(event.dataTransfer.files) : null;
 
     if(files && files.length > 0) {
       files?.forEach(file => {
@@ -982,14 +1120,13 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   };
 
   // ZOOOM ------------------------------------------
-  const [scaleGradientPixel, setScaleGradientPixel] = useState("1px, transparent 1px");
-  const [scaleBorderPixel, setScaleBorderPixel] = useState("16px 16px, 16px 16px, 80px 80px, 80px 80px");
-
   const handleZoomButtonEffect = () => {
     const current = wrapperRef.current?.instance.transformState;
     if (!current) return;
 
-    const { positionX, positionY, scale } = current;
+    const positionX = finiteNumber(current.positionX, worldScrollX);
+    const positionY = finiteNumber(current.positionY, worldScrollY);
+    const scale = Math.max(0.25, Math.min(16, finiteNumber(current.scale, zoomLevel)));
 
     const newScale = zoomLevel;
     const ratio = newScale / scale;
@@ -1002,14 +1139,130 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     const newX = positionX * ratio + (viewportWidth / 2) * (1 - ratio);
     const newY = positionY * ratio + (viewportHeight / 2) * (1 - ratio);
 
-    wrapperRef.current?.setTransform(newX, newY, newScale);
+    if (Number.isFinite(newX) && Number.isFinite(newY) && Number.isFinite(newScale)) {
+      wrapperRef.current?.setTransform(newX, newY, newScale);
+      handleChangeTransform({ x: newX, y: newY, zoom: newScale });
+    }
   };
 
   const handleChangeTransform = (transform: any) => {
-    console.log("transform: ", transform)
-    const zoomLevel = Math.trunc(transform.zoom * 100);
-    setUserSettings(prev => ({ ...prev, worldScrollX: transform.x, worldScrollY: transform.y, zoom: zoomLevel, _saved: false }));
-  }
+    const x = finiteNumber(transform?.x, worldScrollX);
+    const y = finiteNumber(transform?.y, worldScrollY);
+    const scale = Math.max(0.25, Math.min(16, finiteNumber(transform?.zoom, zoomLevel)));
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(scale)) return;
+    setGridTransform({ x, y, scale });
+    setUserSettings(prev => ({ ...prev, worldScrollX: x, worldScrollY: y, zoom: Math.trunc(scale * 100), _saved: false }));
+  };
+
+  const handleWorldTransformed = (_ref: ReactZoomPanPinchRef, state: { positionX: number; positionY: number; scale: number }) => {
+    const next = {
+      x: finiteNumber(state?.positionX, gridTransform.x),
+      y: finiteNumber(state?.positionY, gridTransform.y),
+      scale: Math.max(0.25, Math.min(16, finiteNumber(state?.scale, gridTransform.scale || zoomLevel))),
+    };
+    setGridTransform(previous => previous.x === next.x && previous.y === next.y && previous.scale === next.scale ? previous : next);
+  };
+
+  const miniMapWorldBounds = (() => {
+    const scale = Math.max(0.25, finiteNumber(gridTransform.scale, zoomLevel));
+    const viewWidth = Math.max(1, worldOverlayPosition.width) / scale;
+    const viewHeight = Math.max(1, worldOverlayPosition.height) / scale;
+    const viewX = -gridTransform.x / scale;
+    const viewY = -gridTransform.y / scale;
+    const activeScenes = scenes.filter(scene => !scene._deleted).map(scene => {
+      const previewOffset = draggingSceneOffset && movingSceneIds?.has(scene.id) ? draggingSceneOffset : null;
+      return {
+        ...scene,
+        x: scene.x + (previewOffset?.x ?? 0),
+        y: scene.y + (previewOffset?.y ?? 0),
+      };
+    });
+    const minSceneX = Math.min(viewX, ...activeScenes.map(scene => scene.x));
+    const minSceneY = Math.min(viewY, ...activeScenes.map(scene => scene.y));
+    const maxSceneX = Math.max(viewX + viewWidth, ...activeScenes.map(scene => scene.x + scene.width));
+    const maxSceneY = Math.max(viewY + viewHeight, ...activeScenes.map(scene => scene.y + scene.height));
+    const padding = Math.max(64, Math.max(maxSceneX - minSceneX, maxSceneY - minSceneY) * 0.04);
+    let minX = minSceneX - padding;
+    let minY = minSceneY - padding;
+    let width = Math.max(128, maxSceneX - minSceneX + padding * 2);
+    let height = Math.max(128, maxSceneY - minSceneY + padding * 2);
+    const aspect = 176 / 94;
+    if (width / height < aspect) {
+      const expandedWidth = height * aspect;
+      minX -= (expandedWidth - width) / 2;
+      width = expandedWidth;
+    } else {
+      const expandedHeight = width / aspect;
+      minY -= (expandedHeight - height) / 2;
+      height = expandedHeight;
+    }
+    return { minX, minY, width, height };
+  })();
+
+  const moveCameraFromMiniMap = (clientX: number, clientY: number) => {
+    const svg = miniMapRef.current;
+    const wrapper = wrapperRef.current?.instance.wrapperComponent;
+    if (!svg || !wrapper) return;
+    const bounds = miniMapDragBoundsRef.current ?? miniMapWorldBounds;
+    const rect = svg.getBoundingClientRect();
+    const worldX = bounds.minX + Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * bounds.width;
+    const worldY = bounds.minY + Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)) * bounds.height;
+    const scale = getWorldScale();
+    const positionX = wrapper.offsetWidth / 2 - worldX * scale;
+    const positionY = wrapper.offsetHeight / 2 - worldY * scale;
+    wrapperRef.current?.setTransform(positionX, positionY, scale, 0);
+  };
+
+  const finishMiniMapNavigation = () => {
+    miniMapDragBoundsRef.current = null;
+    const transform = wrapperRef.current?.instance.transformState;
+    if (transform) handleChangeTransform({ x: transform.positionX, y: transform.positionY, zoom: transform.scale });
+  };
+
+  const recenterWorldView = () => {
+    const wrapper = wrapperRef.current?.instance.wrapperComponent;
+    if (!wrapper) return;
+    const activeScenes = scenes.filter(scene => !scene._deleted);
+    const minX = activeScenes.length ? Math.min(...activeScenes.map(scene => scene.x)) : leftLimite;
+    const minY = activeScenes.length ? Math.min(...activeScenes.map(scene => scene.y)) : titleHeight;
+    const maxX = activeScenes.length ? Math.max(...activeScenes.map(scene => scene.x + scene.width)) : leftLimite + 1920;
+    const maxY = activeScenes.length ? Math.max(...activeScenes.map(scene => scene.y + scene.height)) : titleHeight + 1080;
+    const padding = Math.max(64, Math.max(maxX - minX, maxY - minY) * 0.08);
+    const worldWidth = maxX - minX + padding * 2;
+    const worldHeight = maxY - minY + padding * 2;
+    const scale = Math.max(0.25, Math.min(16, (wrapper.offsetWidth - 96) / worldWidth, (wrapper.offsetHeight - 96) / worldHeight));
+    const positionX = (wrapper.offsetWidth - worldWidth * scale) / 2 - (minX - padding) * scale;
+    const positionY = (wrapper.offsetHeight - worldHeight * scale) / 2 - (minY - padding) * scale;
+    wrapperRef.current?.setTransform(positionX, positionY, scale, 180);
+    handleChangeTransform({ x: positionX, y: positionY, zoom: scale });
+  };
+
+  const handleMiniMapKeyDown = (event: React.KeyboardEvent<SVGSVGElement>) => {
+    const wrapper = wrapperRef.current?.instance.wrapperComponent;
+    const transform = wrapperRef.current?.instance.transformState;
+    if (!wrapper || !transform) return;
+    const panStep = Math.max(32, Math.round(Math.min(wrapper.offsetWidth, wrapper.offsetHeight) * 0.12));
+    const offsets: Record<string, { x: number; y: number }> = {
+      ArrowLeft: { x: panStep, y: 0 },
+      ArrowRight: { x: -panStep, y: 0 },
+      ArrowUp: { x: 0, y: panStep },
+      ArrowDown: { x: 0, y: -panStep },
+    };
+    const offset = offsets[event.key];
+    if (!offset) return;
+    event.preventDefault();
+    const x = transform.positionX + offset.x;
+    const y = transform.positionY + offset.y;
+    wrapperRef.current?.setTransform(x, y, transform.scale, 0);
+    handleChangeTransform({ x, y, zoom: transform.scale });
+  };
+
+  const handleWorldWheelCapture = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY) || !Number.isFinite(event.deltaY)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
 
   useEffect(() => {
     if (!settingUtils.buttonZoomPressed) return;
@@ -1028,20 +1281,23 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   }, [settingUtils.buttonZoomPressed, zoomLevel, setSettingUtils]);
 
   useEffect(() => {
-    // console.log("Grid -- level:", zoomLevel);
-    setScaleGradientPixel(`${zoomLevel > 10 ? "0.3px" : zoomLevel > 5 ? "0.5px" : "1px"}, transparent ${zoomLevel > 10 ? "0.3px" : zoomLevel > 5 ? "0.5px" : "1px"}`);
-    setScaleBorderPixel(`${zoomLevel > 10 ? "4px 4px, 4px 4px, 40px 40px, 40px 40px" : zoomLevel > 5 ? "8px 8px, 8px 8px, 80px 80px, 80px 80px" : "16px 16px, 16px 16px, 80px 80px, 80px 80px"}`);
-  }, [zoomLevel]);
+    const instance = wrapperRef.current?.instance;
+    const state = instance?.transformState;
+    if (!instance || !state) return;
+    if (!Number.isFinite(state.positionX) || !Number.isFinite(state.positionY) || !Number.isFinite(state.scale))
+      wrapperRef.current?.setTransform(worldScrollX, worldScrollY, zoomLevel);
+  }, [worldScrollX, worldScrollY, zoomLevel]);
 
   useEffect(() => {
     if (elementSelected && elementSelected._recenter) {
       const el = document.getElementById(elementSelected.id);
       if (el && wrapperRef.current) {
         // centraliza o elemento na viewport
-        wrapperRef.current.zoomToElement(el, userSettings.zoom / 100);
+        wrapperRef.current.zoomToElement(el, zoomLevel);
         setTimeout(() => {
-          const { positionX, positionY, scale } = wrapperRef.current?.instance.transformState!;
-          handleChangeTransform({ x: positionX, y: positionY, zoom: scale });
+          const transformState = wrapperRef.current?.instance.transformState;
+          if (!transformState) return;
+          handleChangeTransform({ x: transformState.positionX, y: transformState.positionY, zoom: transformState.scale });
         }, 600); // tempo da animação
       }
     }
@@ -1054,31 +1310,33 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
 
   // MOUSE ---------------------------------------------
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const worldPosition = getWorldPositionFromClient(e.clientX, e.clientY);
+    setWorldCursorPosition({ x: Math.round(worldPosition.x), y: Math.round(worldPosition.y) });
     // console.log('..: handleMouseMove activeSubButton:', activeSubButton);
     if (settingUtils.activeSubButton === "Scene") {
       // Calcula as coordenadas do retângulo
       const rectX = e.nativeEvent.offsetX - 120*1.5; // Centraliza o retângulo
       const rectY = e.nativeEvent.offsetY - 80*1.5;  // Centraliza o retângulo
-      setMousePos({ x: rectX, y: rectY });
+      setMousePos(getScenePlacement(worldPosition.x, worldPosition.y));
     }
   };
 
   const handleMouseClick = (event: any) => {
+    if ((event.target as HTMLElement).closest?.('.game-element')) return;
     if (mousePos && settingUtils.activeSubButton === "Scene") {
       event.stopPropagation();
       console.log("Scene criada em:", mousePos);
 
       if (pendingScenePlacement) {
-        const gameWorldRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-        const x = Math.max(leftLimite, (event.clientX - gameWorldRect.left) / zoomLevel - (240 / 2));
-        const y = Math.max(titleHeight - 33, (event.clientY - gameWorldRect.top) / zoomLevel - (160 / 2));
-        window.dispatchEvent(new CustomEvent('gba-studio:commit-scene-placement', { detail: { ...pendingScenePlacement, x, y } }));
+        const worldPosition = getWorldPositionFromClient(event.clientX, event.clientY);
+        const position = getScenePlacement(worldPosition.x, worldPosition.y);
+        window.dispatchEvent(new CustomEvent('gba-studio:commit-scene-placement', { detail: { ...pendingScenePlacement, ...position } }));
         notification.success({ message: pendingScenePlacement.mode === 'cut' ? 'Scene Restored' : 'Scene Copied', showProgress: true });
         setPendingScenePlacement(null);
         return;
       }
 
-      const newScene = handleDropOrCreate(event, zoomLevel);
+      const newScene = handleDropOrCreate(event);
 
       notification.success({
         message: 'Create New Scene',
@@ -1091,6 +1349,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   };
 
   const handleMouseLeave = () => {
+    setWorldCursorPosition(null);
     setMousePos(null); // Remove a silhueta quando o mouse sai da área
   };
   // MOUSE END -----------------------------------------
@@ -1180,6 +1439,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
 
   // UseEffect - Gerencia fetch inicial
   useEffect(() => {
+    if (settingUtils.images !== null && settingUtils.imagesHD !== null) return;
     const fetchBackgrounds = async () => {
       try {
         const responseNormal = await window.electronAPI.fetchImages('backgrounds');
@@ -1203,7 +1463,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     };
 
     fetchBackgrounds();
-  }, []);
+  }, [settingUtils.images, settingUtils.imagesHD]);
 
   // UseEffect - Gerencia pastas que foram feitas fetch para inserir novas imagens de background
   useEffect(() => {
@@ -1212,8 +1472,8 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       setUpdatedImages(images);
     };
 
-    window.electronAPI.onUpdateImages(handlerUpdateBackgrounds);
-    return () => window.electronAPI.removeListener('updateImages', handlerUpdateBackgrounds);
+    const listener = window.electronAPI.onUpdateImages(handlerUpdateBackgrounds);
+    return () => window.electronAPI.removeListener('update-images', listener);
   }, []);
 
   useEffect(() => {
@@ -1269,7 +1529,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       onDragStart={handleMoveBackStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => { setDraggingSceneOffset(null); setIsMovedBackground(false); }}
+      onDragCancel={() => { setDraggingSceneOffset(null); sceneDragScaleRef.current = null; setIsMovedBackground(false); }}
     >
       <div style={{ display: worldOverlayPosition.measured && worldOverlayPosition.width < 180 ? 'none' : undefined }}>
           <FloatButttons 
@@ -1280,11 +1540,107 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
             floatingPosition={{ left: worldOverlayPosition.left, top: worldOverlayPosition.top }}
           />
       </div>
-      {sceneMousePosition && <FloatButton.Group shape="square" style={{ position: 'fixed', left: worldOverlayPosition.left, right: 'auto', bottom: worldOverlayPosition.bottom, zIndex: 100, pointerEvents: 'none', width: 'max-content', minWidth: 126, maxWidth: 'calc(100vw - 24px)', height: 'auto', minHeight: 16, maxHeight: 'none', padding: 0, overflow: 'visible', display: 'block' }}>
+        <FloatButton.Group shape="square" style={{ position: 'fixed', left: worldOverlayPosition.left, right: 'auto', bottom: worldOverlayPosition.bottom, zIndex: 100, pointerEvents: 'none', width: 'max-content', minWidth: 126, maxWidth: 'calc(100vw - 24px)', height: 'auto', minHeight: 16, maxHeight: 'none', padding: 0, overflow: 'visible', display: 'block' }}>
           <Content data-testid="scene-tile-position" style={{ width: 'max-content', minWidth: '100%', height: 'auto', minHeight: 16, padding: '0 7px', boxSizing: 'border-box', display: 'flex', alignItems: 'center', borderRadius: token.borderRadius, background: token.colorBgElevated, color: token.colorTextSecondary, boxShadow: token.boxShadowSecondary, fontSize: 11, lineHeight: '16px', whiteSpace: 'nowrap' }}>
-            {sceneMousePosition.scene} · X: {sceneMousePosition.col}, Y: {sceneMousePosition.row}
+            {`${sceneMousePosition ? `${sceneMousePosition.scene} · Tile X: ${Math.floor(sceneMousePosition.x / (userSettings.tileEditorGridSize ?? 8))}, Y: ${Math.floor(sceneMousePosition.y / (userSettings.tileEditorGridSize ?? 8))}` : worldCursorPosition ? `World X: ${worldCursorPosition.x}, Y: ${worldCursorPosition.y}` : 'Game World'} · ${Math.round(gridTransform.scale * 100)}% · Snap 16×16`}
           </Content>
-        </FloatButton.Group>}
+        </FloatButton.Group>
+      <div
+        data-testid="game-world-minimap-panel"
+        role="group"
+        aria-label={t('world.minimap')}
+        style={{
+          position: 'fixed',
+          right: worldOverlayPosition.right,
+          bottom: worldOverlayPosition.bottom + (worldOverlayPosition.width < 390 ? (selectedScene ? 128 : 62) : 62),
+          zIndex: 101,
+          width: 192,
+          maxWidth: 'calc(100vw - 24px)',
+          padding: 8,
+          borderRadius: token.borderRadius,
+          background: token.colorBgElevated,
+          boxShadow: token.boxShadowSecondary,
+        }}
+      >
+        <Button
+          size="small"
+          icon={<AimOutlined />}
+          data-testid="game-world-recenter"
+          aria-label={t('world.recenter')}
+          onClick={recenterWorldView}
+          style={{ width: '100%', marginBottom: 6 }}
+        >
+          {t('world.recenter')}
+        </Button>
+        <svg
+          ref={miniMapRef}
+          data-testid="game-world-minimap"
+          role="group"
+          tabIndex={0}
+          aria-label={t('world.minimapDescription')}
+          viewBox={`${miniMapWorldBounds.minX} ${miniMapWorldBounds.minY} ${miniMapWorldBounds.width} ${miniMapWorldBounds.height}`}
+          preserveAspectRatio="none"
+          onKeyDown={handleMiniMapKeyDown}
+          onPointerDown={event => {
+            event.preventDefault();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            miniMapDragBoundsRef.current = { ...miniMapWorldBounds };
+            setIsMiniMapDragging(true);
+            moveCameraFromMiniMap(event.clientX, event.clientY);
+          }}
+          onPointerMove={event => {
+            if (isMiniMapDragging) moveCameraFromMiniMap(event.clientX, event.clientY);
+          }}
+          onPointerUp={event => {
+            moveCameraFromMiniMap(event.clientX, event.clientY);
+            setIsMiniMapDragging(false);
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+            finishMiniMapNavigation();
+          }}
+          onPointerCancel={() => { setIsMiniMapDragging(false); finishMiniMapNavigation(); }}
+          style={{
+            display: 'block',
+            width: '100%',
+            height: 94,
+            borderRadius: Math.max(0, token.borderRadius - 2),
+            background: token.colorBgContainer,
+            border: `1px solid ${token.colorBorderSecondary}`,
+            cursor: isMiniMapDragging ? 'grabbing' : 'grab',
+            touchAction: 'none',
+          }}
+        >
+          {scenes.filter(scene => !scene._deleted).map(scene => {
+            const isPrimarySelected = scene.id === elementSelected?.id;
+            const isSecondarySelected = !isPrimarySelected && selectedSceneIds.includes(scene.id);
+            const previewOffset = draggingSceneOffset && movingSceneIds?.has(scene.id) ? draggingSceneOffset : null;
+            return <rect
+              key={scene.id}
+              data-testid={`game-world-minimap-scene-${scene.id}`}
+              data-selection={isPrimarySelected ? 'primary' : isSecondarySelected ? 'secondary' : 'none'}
+              x={scene.x + (previewOffset?.x ?? 0)}
+              y={scene.y + (previewOffset?.y ?? 0)}
+              width={Math.max(1, scene.width)}
+              height={Math.max(1, scene.height)}
+              fill={isPrimarySelected || isSecondarySelected ? token.colorPrimary : token.colorTextSecondary}
+              fillOpacity={isPrimarySelected ? 0.9 : isSecondarySelected ? 0.4 : 0.55}
+              stroke={token.colorText}
+              strokeWidth={Math.max(miniMapWorldBounds.width / 220, miniMapWorldBounds.height / 118)}
+            />;
+          })}
+          <rect
+            data-testid="game-world-minimap-viewport"
+            x={-gridTransform.x / gridTransform.scale}
+            y={-gridTransform.y / gridTransform.scale}
+            width={worldOverlayPosition.width / gridTransform.scale}
+            height={worldOverlayPosition.height / gridTransform.scale}
+            fill={token.colorPrimary}
+            fillOpacity={0.12}
+            stroke={token.colorPrimary}
+            strokeWidth={1.25}
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      </div>
       <div data-testid="resource-usage-bars" style={{
         position: 'fixed',
         right: worldOverlayPosition.right,
@@ -1304,7 +1660,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
             <Progress percent={Math.min(100, Number((romUsage.total / ROM_LIMIT_BYTES * 100).toFixed(1)))} size="small" status={romUsage.total > ROM_LIMIT_BYTES ? 'exception' : 'normal'} format={percent => `${percent}%`} />
           </div>
         </Tooltip>
-        {selectedScene && <Tooltip title={`VRAM cena: ${formatBytes(selectedSceneVram)} de 96 KB.`}>
+        {selectedScene && <Tooltip title={`Estimativa de VRAM da cena, incluindo fundos, mapas, player e sprites dos actors: ${formatBytes(selectedSceneVram)} de 96 KB.`}>
           <div data-testid="scene-vram-usage" style={{ order: 1, width: Math.max(110, Math.min(168, worldOverlayPosition.width - 92)), padding: '4px 8px', borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadowSecondary }}>
             <div style={{ fontSize: 11, color: token.colorTextSecondary, marginBottom: 2 }}>VRAM cena</div>
             <Progress percent={Math.min(100, Number((selectedSceneVram / VRAM_LIMIT_BYTES * 100).toFixed(1)))} size="small" status={selectedSceneVram > VRAM_LIMIT_BYTES ? 'exception' : 'normal'} format={percent => `${percent}%`} />
@@ -1312,28 +1668,47 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
         </Tooltip>}
       </div>
 
+      <div data-testid="game-world-viewport" data-world-x={gridTransform.x} data-world-y={gridTransform.y} data-world-scale={gridTransform.scale} data-scene-movement-mode={sceneMovementMode} data-pan-inertia={panInertia} ref={worldViewportRef} onWheelCapture={handleWorldWheelCapture} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} onClick={handleMouseClick} onDragOver={event => event.preventDefault()} onDrop={handleDropOrCreate} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+      {(() => {
+        const scale = gridTransform.scale;
+        const minorPitch = 16 * scale;
+        const majorPitch = 80 * scale;
+        const mod = (value: number, divisor: number) => ((value % divisor) + divisor) % divisor;
+        const originX = gridTransform.x + leftLimite * scale;
+        const originY = gridTransform.y + titleHeight * scale;
+        return <div data-testid="game-world-grid" aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
+          backgroundColor: token.colorBgContainer,
+          backgroundImage: `${minorPitch >= 8 ? `linear-gradient(to right, ${token.colorFillSecondary} 1px, transparent 1px), linear-gradient(to bottom, ${token.colorFillSecondary} 1px, transparent 1px), ` : ''}linear-gradient(to right, ${token.colorBorderSecondary} 1px, transparent 1px), linear-gradient(to bottom, ${token.colorBorderSecondary} 1px, transparent 1px)`,
+          backgroundSize: `${minorPitch >= 8 ? `${minorPitch}px ${minorPitch}px, ${minorPitch}px ${minorPitch}px, ` : ''}${majorPitch}px ${majorPitch}px, ${majorPitch}px ${majorPitch}px`,
+          backgroundPosition: `${minorPitch >= 8 ? `${mod(originX, minorPitch)}px ${mod(originY, minorPitch)}px, ${mod(originX, minorPitch)}px ${mod(originY, minorPitch)}px, ` : ''}${mod(originX, majorPitch)}px ${mod(originY, majorPitch)}px, ${mod(originX, majorPitch)}px ${mod(originY, majorPitch)}px`,
+        }} />;
+      })()}
       <TransformWrapper
         ref={wrapperRef}
-        initialScale={userSettings.zoom / 100}
-        initialPositionX={userSettings.worldScrollX}
-        initialPositionY={userSettings.worldScrollY}
+        initialScale={zoomLevel}
+        initialPositionX={worldScrollX}
+        initialPositionY={worldScrollY}
         
         minScale={0.25} // Ajuste o nível mínimo de zoom out
         maxScale={16}   // Ajuste o nível máximo de zoom in
+        // The viewport grid is infinite; camera movement must not stop at the
+        // finite DOM surface used to size scene content and SVG overlays.
+        limitToBounds={false}
         zoomAnimation={{ disabled: true }}
+        doubleClick={{ disabled: true }}
 
         // limitToBounds={true}
         // minPositionX={ 0 }
         // minPositionY={ 0 }
         // maxPositionX={ worldSize.width }
         // maxPositionY={ worldSize.height }
-        // onTransformed={e => handleChangeTransform({ x: e.state.positionX, y: e.state.positionY, zoom: e.state.scale })}
+        onTransformed={handleWorldTransformed}
         wheel={{ disabled: false, smoothStep: 0.005, step: 1, activationKeys: ['Control'] }}
         onWheelStop={e => handleChangeTransform({ x: e.state.positionX, y: e.state.positionY, zoom: e.state.scale })}
         disabled={isMovedBackground}
         panning={{
           disabled: false,
-          velocityDisabled: false,  // Desativar a animação de elástico
+          velocityDisabled: !panInertia,
           allowLeftClickPan: false,
           allowMiddleClickPan: true,
           allowRightClickPan: false,
@@ -1346,34 +1721,9 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
             position: "relative",
             width: worldSize.width + 100, 
             height: worldSize.height + 50,
-            background: token.colorBgContainer, 
+            background: 'transparent',
           }}>
-          <Content 
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            onClick={(event) => handleMouseClick(event)}
-          >
-            {/* Grid */}
-            <Content 
-              style={{
-                position: "relative",
-                width: "100%",
-                height: "100%",
-                overflow: "hidden",
-                top: `${titleHeight - 33}px`,
-                left: `${leftLimite}px`,
-                right: 0,
-                bottom: 0,
-                backgroundImage: `
-                  linear-gradient(to right, rgba(0,0,0,0.1) ${scaleGradientPixel}),
-                  linear-gradient(to bottom, rgba(0,0,0,0.1) ${scaleGradientPixel}),
-                  linear-gradient(to right, rgba(0,0,0,0.2) ${scaleGradientPixel}),
-                  linear-gradient(to bottom, rgba(0,0,0,0.2) ${scaleGradientPixel})
-                `,
-                backgroundSize: `${scaleBorderPixel}`,
-                backgroundAttachment: "local"
-              }}
-            />
+          <Content>
             {/* Content */}
             <Content 
               onMouseDown={(e) => {
@@ -1387,34 +1737,25 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
                 }
               }}
             >
-              <DragAndDrop onDrop={(event) => handleDropOrCreate(event, zoomLevel)} /*height={worldSize.height + titleHeight} width={worldSize.width + leftLimite}*/ />
               
               {/* Retângulo que segue o mouse */}
               {mousePos && settingUtils.activeSubButton === "Scene" && (
                 <Content
                   style={{
                     position: "absolute",
-                    width: 240*1.5+`px`,
-                    height: 160*1.5+"px",
+                    width: "240px",
+                    height: "160px",
                     left: `${mousePos.x}px`,
                     top: `${mousePos.y}px`,
                     borderRadius: token.borderRadius,
                     backgroundColor: `${token.colorBgMask}`, // Silhueta semitransparente
-                    border: `2px dashed ${token.colorPrimary}`, // Bordas destacadas
                     pointerEvents: "none", // Ignora interação com o retângulo
                     zIndex: 6,
                   }}
-                />
+                ><svg aria-hidden="true" width="240" height="160" viewBox="0 0 240 160" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none' }}><rect x="0.5" y="0.5" width="239" height="159" fill="none" stroke={token.colorPrimary} strokeWidth={1} strokeDasharray="6 4" vectorEffect="non-scaling-stroke" shapeRendering="crispEdges" /></svg></Content>
               )}
 
-              <Content
-                style={{ pointerEvents: settingUtils.activeSubButton === "Scene" ? "none" : "auto", }}
-                onClick={(event) => {
-                  if ((event.target as HTMLElement).closest('.game-element')) return;
-                  setElementSelected(null);
-                  setSettingUtils(previous => ({ ...previous, tileEditSceneId: tileEditSceneId ? null : previous.tileEditSceneId, selectedSceneIds: [], activeButton: 'select', activeSubButton: '' }));
-                }}
-              >
+              <Content style={{ pointerEvents: settingUtils.activeSubButton === "Scene" ? "none" : "auto" }}>
                 {changeSceneTraces.length > 0 && (
                   <svg
                     aria-hidden="true"
@@ -1441,6 +1782,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
                 {scenesRef.current.map(scene => (
                   !scene._deleted ? 
                     <GameElement
+                      key={scene.id}
                       sceneElement={scene}
                       isClipboardSource={clipboardSceneId === scene.id}
                     isSelected={selectedSceneIds.includes(scene.id)}
@@ -1449,13 +1791,14 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
                         .filter(preview => preview.targetSceneId === scene.id)
                         .map(({ id, x, y, direction }) => ({ id, x, y, direction }))}
                       changeScenePreviewLayer={changeScenePreviewLayer}
-                      changeScenePreviewOffset={draggingSceneOffset && (draggingSceneOffset.id === scene.id || selectedSceneIds.includes(scene.id))
+                      changeScenePreviewOffset={draggingSceneOffset && movingSceneIds?.has(scene.id)
                         ? { x: draggingSceneOffset.x, y: draggingSceneOffset.y }
                         : undefined}
-                      sceneDragOffset={draggingSceneOffset && (draggingSceneOffset.id === scene.id || selectedSceneIds.includes(scene.id))
+                      sceneDragOffset={draggingSceneOffset && movingSceneIds?.has(scene.id)
                         ? { x: draggingSceneOffset.x, y: draggingSceneOffset.y }
                         : undefined}
                       cameraPreviews={scene.id === selectedScene?.id ? selectedCameraPreviews : []}
+                      actorPositionPreview={scene.id === selectedScene?.id && scene.id === actorPositionPreview?.sceneId ? actorPositionPreview : null}
                       onMoveChangeScenePreview={handleMoveChangeScenePreview}
                       onSelect={(_, event) => {
                         const isObjectPlacement = settingUtils.activeButton === 'add' && (settingUtils.activeSubButton === 'Actor' || settingUtils.activeSubButton === 'Trigger');
@@ -1468,14 +1811,20 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
                       }}
                       onEditTiles={(target) => {
                         setElementSelected(target);
-                        setSettingUtils(previous => ({ ...previous, tileEditSceneId: target.id, tileEditLayerId: 2, activeButton: 'tiles', activeSubButton: previous.activeSubButton || 'pencil' }));
+                        setSettingUtils(previous => ({
+                          ...previous,
+                          tileEditSceneId: target.id,
+                          tileEditLayerId: 4,
+                          activeButton: 'select',
+                          activeSubButton: '',
+                        }));
                       }}
                       selectedObject={settingUtils.activeSceneObject?.sceneId === scene.id ? settingUtils.activeSceneObject : null}
                       onSelectObject={(type, id) => {
                         setElementSelected(scene);
                         setSettingUtils(previous => ({ ...previous, tileEditSceneId: scene.id, tileEditLayerId: 4, activeSceneObject: { sceneId: scene.id, type, id }, activeTriggerId: type === 'trigger' ? id : null }));
                       }}
-                      onSceneMouseMove={(target, col, row) => setSceneMousePosition({ scene: target.name, col, row })}
+                      onSceneMouseMove={(target, x, y) => setSceneMousePosition({ scene: target.name, x, y })}
                       onSceneMouseLeave={() => setSceneMousePosition(null)}
                       isDimmed={Boolean(tileEditSceneId && tileEditSceneId !== scene.id)}
                       // onElementHovered={(isHovered: boolean) => handleElementHovered(isHovered)}
@@ -1488,6 +1837,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
           </Content>
         </TransformComponent>
       </TransformWrapper>
+      </div>
     </DndContext>
 
   );

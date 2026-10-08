@@ -1,0 +1,11 @@
+{
+  "_resourceType": "background",
+  "id": "original_hero_bomb",
+  "name": "hero_bomb",
+  "filename": "hero_bomb.bmp",
+  "imageWidth": 256,
+  "imageHeight": 256,
+  "hd": false,
+  "tileColors": "",
+  "_deleted": false
+}

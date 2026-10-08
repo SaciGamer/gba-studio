@@ -7,11 +7,13 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button, Collapse, Empty, Flex, Input, Layout } from "antd";
 import { createRef, RefObject, useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { EEvents, EVENT_INFO } from "./interfaces/IEvents";
+import { useI18n } from '@/i18n/I18n';
+import { EEvents, getEventLabel } from "./interfaces/IEvents";
 import MenuEventItem from "./MenuEventItem";
 import PanelEvents from "./PanelEvents";
 import SelectNewEvent from "./SelectNewEvent";
 import { getEventDepthColor } from "./EventColors";
+import { motionEventTitle } from './motionEventTitle';
 
 interface CollapseEventProps {
   scripts: IScriptsElement[] | undefined;
@@ -40,6 +42,7 @@ interface SortableEventHeaderProps {
 }
 
 function NestedEventDragHandle({ event, title, color, isExpanded, index, scriptIds, isRenaming, renameValue, onRenameChange, onRenameCommit }: { event: IScriptsElement; title: string; color: string; isExpanded: boolean; index: number; scriptIds: string[]; isRenaming: boolean; renameValue: string; onRenameChange: (value: string) => void; onRenameCommit: () => void }) {
+  const { t } = useI18n();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: event.id });
   const { active, over } = useDndContext();
   const handleRef = useRef<HTMLElement | null>(null);
@@ -98,7 +101,7 @@ function NestedEventDragHandle({ event, title, color, isExpanded, index, scriptI
         }}
       />
       <RightOutlined style={{ transform: isExpanded ? 'rotate(90deg)' : undefined, fontSize: 10 }} />
-      {isRenaming ? <Input size="small" autoFocus value={renameValue} placeholder={getEventEnum(event.command)} onChange={e => onRenameChange(e.target.value)} onBlur={onRenameCommit} onPressEnter={onRenameCommit} onClick={e => e.stopPropagation()} /> : <span style={{ color }}>{title}</span>}
+      {isRenaming ? <Input size="small" variant="borderless" autoFocus value={renameValue} placeholder={getEventLabel(event.command, t)} onChange={e => onRenameChange(e.target.value)} onBlur={onRenameCommit} onPressEnter={onRenameCommit} onClick={e => e.stopPropagation()} /> : <span style={{ color }}>{title}</span>}
     </Flex>
   );
 }
@@ -138,6 +141,7 @@ function SortableEventHeader({
   onRenameChange,
   onRenameCommit,
 }: SortableEventHeaderProps) {
+  const { t } = useI18n();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: event.id });
   const { active, over } = useDndContext();
   const reservedStyles = useRef<{
@@ -235,7 +239,7 @@ function SortableEventHeader({
         }}
       />
       <RightOutlined style={{ transform: isExpanded ? "rotate(90deg)" : undefined, fontSize: 10 }} />
-      {isRenaming ? <Input size="small" autoFocus value={renameValue} placeholder={getEventEnum(event.command)} onChange={e => onRenameChange(e.target.value)} onBlur={onRenameCommit} onPressEnter={onRenameCommit} onClick={e => e.stopPropagation()} /> : <span style={{ color: titleColor }}>{title}</span>}
+      {isRenaming ? <Input size="small" variant="borderless" autoFocus value={renameValue} placeholder={getEventLabel(event.command, t)} onChange={e => onRenameChange(e.target.value)} onBlur={onRenameCommit} onPressEnter={onRenameCommit} onClick={e => e.stopPropagation()} /> : <span style={{ color: titleColor }}>{title}</span>}
     </Flex>
   );
 }
@@ -269,6 +273,7 @@ function ActiveEventDragOverlay({
   headerPanel: Record<string, string>;
 }) {
   const { active } = useDndContext();
+  const { t } = useI18n();
   const findScript = (items: IScriptsElement[] | undefined): IScriptsElement | undefined => {
     if (!items) return undefined;
     for (const script of items) {
@@ -285,7 +290,7 @@ function ActiveEventDragOverlay({
   if (!activeScript) return null;
 
   const automaticSuffix = activeScript.command === EEvents.FADE_IN && activeScript.args?.__automatic ? ' (Automatic)' : '';
-  const title = `${activeScript.args?.__comment ? "// " : ""}${activeScript.args?.__name || headerPanel[activeScript.id] || getEventEnum(activeScript.command)}${automaticSuffix}`;
+  const title = `${activeScript.args?.__comment ? "// " : ""}${activeScript.args?.__name || headerPanel[activeScript.id] || getEventLabel(activeScript.command, t)}${automaticSuffix}`;
   return (
     <div style={{ border: `1px solid ${getEventDepthColor(1)}`, background: '#303030', padding: '6px 10px', minWidth: 240 }}>
       <Flex align="center" gap={6}>
@@ -297,13 +302,9 @@ function ActiveEventDragOverlay({
   );
 }
 
-const getEventEnum = (command: string): string => {
-  const eventEnum = Object.values(EEvents).find(eventId => eventId === command);
-  
-  return EVENT_INFO[eventEnum as keyof typeof EVENT_INFO].name;
-}
 
 export default function CollapseEventManager(parameters: CollapseEventProps) {
+  const { t } = useI18n();
   // const {setScenes} = useSceneContext();
   // const {elementSelected, setElementSelected} = useElementContext();
 
@@ -604,7 +605,7 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
                   activeKey={branchKeys}
                   items={events.map((child, index) => ({
                   key: child.id,
-                  label: <NestedEventDragHandle event={child} color={childColor} index={index} scriptIds={events.map(item => item.id)} isExpanded={branchKeys.includes(child.id)} title={`${child.args?.__comment ? '// ' : ''}${child.args?.__name || getEventEnum(child.command)}`} isRenaming={renamingEventId === child.id} renameValue={renameDraft} onRenameChange={setRenameDraft} onRenameCommit={commitRename} />,
+                  label: <NestedEventDragHandle event={child} color={childColor} index={index} scriptIds={events.map(item => item.id)} isExpanded={branchKeys.includes(child.id)} title={`${child.args?.__comment ? '// ' : ''}${child.args?.__name || motionEventTitle(child, command => getEventLabel(command as EEvents, t))}`} isRenaming={renamingEventId === child.id} renameValue={renameDraft} onRenameChange={setRenameDraft} onRenameCommit={commitRename} />,
                   collapsible: child.args?.__comment ? 'disabled' : 'header',
                   showArrow: false,
                   style: {
@@ -658,7 +659,7 @@ export default function CollapseEventManager(parameters: CollapseEventProps) {
             size="small"
           items={rootScripts.map((script, index, scripts) => {
               const isDisabled = script.args?.__comment === true;
-              const baseHeader = `${getEventEnum(script.command)}${script.command === EEvents.FADE_IN && script.args?.__automatic ? ' (Automatic)' : ''}`;
+              const baseHeader = `${motionEventTitle(script, command => getEventLabel(command as EEvents, t))}${script.command === EEvents.FADE_IN && script.args?.__automatic ? ' (Automatic)' : ''}`;
 
           const handleValueTitle = (newTitle: string) => {
             setHeaderPanel(prev => ({

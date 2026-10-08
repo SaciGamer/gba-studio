@@ -1,3 +1,4 @@
+import type { NumericValue } from '../../../../../../shared/numericValues';
 import { IArgs } from "@/providers/contexts/interfaces/ISceneElement";
 
 interface CustomField {
@@ -9,8 +10,8 @@ interface CustomField {
 
 export interface IChangeScene extends IArgs {
   sceneId?: string | null,
-  x?: CustomField,
-  y?: CustomField,
+  x?: CustomField | NumericValue,
+  y?: CustomField | NumericValue,
   direction?: string,
   fadeSpeed?: number,
 }

@@ -1,129 +1,11 @@
 import { AntdToken } from "@/components/common/AntDToken";
+import { normalizeDemoControls } from '@/utils/demoControls';
+import { useI18n } from '@/i18n/I18n';
 import { useEffect } from "react";
 
-const defaultControls = {
-  0: {
-    0: {
-      'value': 'x',
-      'value2': 'BUTTON_2'
-    },
-    1: {
-      'value': 's',
-      'value2': 'BUTTON_4'
-    },
-    2: {
-      'value': 'v',
-      'value2': 'SELECT'
-    },
-    3: {
-      'value': 'enter',
-      'value2': 'START'
-    },
-    4: {
-      'value': 'up arrow',
-      'value2': 'DPAD_UP'
-    },
-    5: {
-      'value': 'down arrow',
-      'value2': 'DPAD_DOWN'
-    },
-    6: {
-      'value': 'left arrow',
-      'value2': 'DPAD_LEFT'
-    },
-    7: {
-      'value': 'right arrow',
-      'value2': 'DPAD_RIGHT'
-    },
-    8: {
-      'value': 'z',
-      'value2': 'BUTTON_1'
-    },
-    9: {
-      'value': 'a',
-      'value2': 'BUTTON_3'
-    },
-    10: {
-      'value': 'q',
-      'value2': 'LEFT_TOP_SHOULDER'
-    },
-    11: {
-      'value': 'e',
-      'value2': 'RIGHT_TOP_SHOULDER'
-    },
-    12: {
-      'value': 'tab',
-      'value2': 'LEFT_BOTTOM_SHOULDER'
-    },
-    13: {
-      'value': 'r',
-      'value2': 'RIGHT_BOTTOM_SHOULDER'
-    },
-    14: {
-      'value': '',
-      'value2': 'LEFT_STICK',
-    },
-    15: {
-      'value': '',
-      'value2': 'RIGHT_STICK',
-    },
-    16: {
-      'value': 'h',
-      'value2': 'LEFT_STICK_X:+1'
-    },
-    17: {
-      'value': 'f',
-      'value2': 'LEFT_STICK_X:-1'
-    },
-    18: {
-      'value': 'g',
-      'value2': 'LEFT_STICK_Y:+1'
-    },
-    19: {
-      'value': 't',
-      'value2': 'LEFT_STICK_Y:-1'
-    },
-    20: {
-      'value': 'l',
-      'value2': 'RIGHT_STICK_X:+1'
-    },
-    21: {
-      'value': 'j',
-      'value2': 'RIGHT_STICK_X:-1'
-    },
-    22: {
-      'value': 'k',
-      'value2': 'RIGHT_STICK_Y:+1'
-    },
-    23: {
-      'value': 'i',
-      'value2': 'RIGHT_STICK_Y:-1'
-    },
-    24: {
-      'value': 'undefined'
-    },
-    25: {
-      'value': 'undefined'
-    },
-    26: {
-      'value': 'undefined'
-    },
-    27: {
-      'value': 'f1'
-    },
-    28: {
-      'value': 'f2'
-    },
-    29: {
-      'value': 'f3'
-    },
-  },
-  1: {},
-  2: {},
-  3: {}
-};
 const Emulator: React.FC = () => {
   const { token } = AntdToken();
+  const { t } = useI18n();
 
   let localSettings = null;
   const saved = localStorage.getItem("appSettings");
@@ -131,10 +13,9 @@ const Emulator: React.FC = () => {
     localSettings = JSON.parse(saved);
   }
 
-	const controlsConfig = (localSettings as { controls?: typeof defaultControls } | undefined)?.controls
-		?? defaultControls;
-  const showBottomMenu = (localSettings as any).demoShowMenu ?? false;
-  const rightClickToLicense = (localSettings as any).demoShowLicense ?? false;
+  const controlsConfig = normalizeDemoControls(localSettings?.controls);
+  const showBottomMenu = (localSettings as any)?.demoShowMenu ?? false;
+  const rightClickToLicense = (localSettings as any)?.demoShowLicense ?? false;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.split("?")[1]);
@@ -151,7 +32,15 @@ const Emulator: React.FC = () => {
     emulatorJs.EJS_gameUrl = romPath;
     emulatorJs.EJS_startOnLoaded = true;
     emulatorJs.EJS_hideSettings = [/*'fps',*/ 'videoRotation', 'vsync', 'webgl2Enabled'];
+    const publishMetrics = (event: Event) => window.electronAPI.send('runtime-monitor-metrics', (event as CustomEvent).detail);
+    window.addEventListener('gba-studio:runtime-monitor', publishMetrics);
     emulatorJs.EJS_Buttons = {
+      resourceMonitor: {
+        visible: showBottomMenu,
+        displayName: t('monitor.title'),
+        icon: '<svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0-9 9 9 9 0 0 0 18 0 9 9 0 0 0-9-9zm0 2a7 7 0 0 1 7 7c0 1.6-.5 3.1-1.4 4.3H6.4A7 7 0 0 1 12 5zm4.1 2.8-5.3 3.5a1.8 1.8 0 1 0 2.5 2.5l2.8-6z"/></svg>',
+        callback: () => window.electronAPI.send('open-runtime-monitor', t('monitor.title')),
+      },
       // restart: false,
       // playPause: false,
       screenshot: false,
@@ -225,6 +114,7 @@ const Emulator: React.FC = () => {
     };
 
     emulatorJs.EJS_defaultControls = controlsConfig;
+    emulatorJs.EJS_gbaStudioGamepad = localSettings?.demoJoystick ?? null;
     emulatorJs.EJS_showBottomMenu = showBottomMenu;
 
     const script = document.createElement("script");
@@ -233,6 +123,7 @@ const Emulator: React.FC = () => {
     document.body.appendChild(script);
 
     return () => {
+      window.removeEventListener('gba-studio:runtime-monitor', publishMetrics);
       document.body.removeChild(script);
     };
   }, []);

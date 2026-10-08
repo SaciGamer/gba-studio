@@ -1,3 +1,4 @@
+import type { CanvasAnimationPlan } from '../builders/spriteCanvasPlan';
 /**
  * Types and interfaces for GBA project building using Butano template structure
  */
@@ -30,6 +31,8 @@ export interface BuildConfig {
 }
 
 export interface TranscodeOptions {
+  parallel?: number;
+  onProgress?: (message: string, messageKey?: string, messageParams?: Record<string, string | number>) => void;
   projectDir: string;
   markerProjectDir?: string;
   outputDir?: string;
@@ -83,6 +86,9 @@ export interface GameConfig {
 }
 
 export interface JsonResourceDefault {
+  /** Only attached to the build copy; never serialized into project assets. */
+  __spriteCanvas?: { graphicsName: string; width: number; height: number; frameWidth: number; frameHeight: number; idleFrame: number; animations: CanvasAnimationPlan[] };
+  playerAnimationStripOrientation?: 'horizontal' | 'vertical';
   _resourceType: string;
   _deleted?: boolean;
   id?: string;
@@ -128,6 +134,23 @@ export interface JsonResourceDefault {
     flipRightToCreateLeftFacingFrames?: boolean;
     animations: Array<{ id: string; name: string; frames: number[]; type?: string; canvasFrames?: SpriteCanvasFrame[] }>;
   }>;
+  inputMap?: Record<string, string[]>;
+  combatConfig?: {
+    maxProjectiles?: number;
+    maxEnemies?: number;
+    maxPickups?: number;
+    playerHitPoints?: number;
+    defaultDamage?: number;
+    bossHitPoints?: number;
+    collisionRules?: Array<{ sourceGroup: string; targetGroup: string }>;
+  };
+  shooterConfig?: {
+    defaultWaveId?: string;
+    projectileSpriteId?: string;
+    playerHitPoints?: number;
+    defaultDamage?: number;
+    bossHitPoints?: number;
+  };
 }
 
 interface SpriteCanvasFrame {
@@ -142,6 +165,8 @@ interface SpriteCanvasFrame {
     height: number;
     x: number;
     y: number;
+    flipX?: boolean;
+    flipY?: boolean;
   }>;
 }
 

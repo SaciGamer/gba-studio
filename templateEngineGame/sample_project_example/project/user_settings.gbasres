@@ -1,0 +1,91 @@
+{
+  "_resourceType": "user_settings",
+  "_deleted": false,
+  "worldScrollX": -1053.7744454545455,
+  "worldScrollY": -674.5305545454545,
+  "zoom": 125,
+  "favoriteEvents": [
+    "EVENT_FADE_IN",
+    "EVENT_FADE_OUT",
+    "EVENT_CHANGE_SCENE"
+  ],
+  "hiddenTileGridSceneIds": [
+    "738ec3e3-374f-44a8-8bda-8a027cce1d09",
+    "a997fd6d-45b5-41d7-95fb-3d35f1c46d38",
+    "1d48336d-9f12-4fd0-995e-3fd4033f7bd5"
+  ],
+  "hiddenBackgroundLayers": [],
+  "tilesetViews": {
+    "Back_Tiles": {
+      "cellSize": 16,
+      "zoom": 125,
+      "showGrid": true
+    },
+    "Dungeon_Tile_Set_16_cores": {
+      "cellSize": 16,
+      "zoom": 250,
+      "showGrid": true
+    },
+    "Grass": {
+      "cellSize": 16,
+      "zoom": 350,
+      "showGrid": true
+    },
+    "Ground_Tiles": {
+      "cellSize": 16,
+      "zoom": 150,
+      "showGrid": false
+    },
+    "Props": {
+      "cellSize": 16,
+      "zoom": 250,
+      "showGrid": true
+    },
+    "Ladder": {
+      "cellSize": 16,
+      "zoom": 250,
+      "showGrid": true
+    },
+    "__autotile_picker__": {
+      "cellSize": 16,
+      "zoom": 100,
+      "showGrid": true
+    }
+  },
+  "tileEditorGridSize": 16,
+  "showTileEditorGrid": true,
+  "rightPanelScrollPositions": {
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede": 365,
+    "1d48336d-9f12-4fd0-995e-3fd4033f7bd5": 300,
+    "28f0dc3e-a347-4f86-abba-48601e5be152": 0,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:actor:c3499366-da3c-45d3-bf4b-a315272f02fb": 0,
+    "3623f8fd-b5bc-4c04-997d-d7fa25df67f5": 35,
+    "7ded7879-cf05-4af7-b405-fabd85d38047": 35,
+    "d8191841-adf3-46ed-917d-4d5d74c38ad2": 767,
+    "b9f21dc1-5606-41ee-bca2-8ec1a6059245": 100,
+    "fe360787-c3a4-4adc-9606-d0262568cd14": 563,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:trigger:387bd913-a238-4969-ab34-841efa879706": 523,
+    "1155b235-5e58-4d07-a457-e90bbddf967e": 0,
+    "738ec3e3-374f-44a8-8bda-8a027cce1d08": 0,
+    "86889357-1de2-4fe1-a995-7d7a7b7b89eb": 100,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:trigger:645da2b9-3525-4b14-8cad-847b74a67409": 0
+  },
+  "spriteStateExpandedKeys": {
+    "player": [
+      "[\"state-1791404412611\"]",
+      "[\"state-1791404411961\"]",
+      "[\"player\"]",
+      "[\"state-1791400556442\"]"
+    ]
+  },
+  "spriteSidebarLayout": {
+    "sizes": [
+      600,
+      386
+    ],
+    "sections": {
+      "sprites": true,
+      "states": true
+    }
+  }
+}

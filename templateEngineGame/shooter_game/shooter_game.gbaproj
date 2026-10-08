@@ -1,0 +1,9 @@
+{
+  "_resourceType": "project",
+  "name": "ShooterGameOriginal",
+  "author": "GBA Studio",
+  "notes": "Reconstructed from projeto_exemplo using engine ShooterKit resources.",
+  "_version": "0.5.0",
+  "_release": "1",
+  "cartridgeImage": "shooter_game_catridge.png"
+}

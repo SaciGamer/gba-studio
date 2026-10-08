@@ -1,9 +1,9 @@
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { ETypeScene } from '@/providers/contexts/interfaces/ISceneElement';
 import { EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons';
-import { Button, message, Select, Space, theme, Typography } from 'antd';
+import { Button, Flex, message, Select, Space, theme, Typography } from 'antd';
 import StepInputNumber from './StepInputNumber';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { joinLocalAssetPath } from '@/utils/localAssetUrl';
 import { countDistinctImageTiles } from '@/utils/tileCount';
 
@@ -30,6 +30,18 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
   const isHDScene = elementSelected?.sceneType === ETypeScene.LOGO || elementSelected?.sceneType === ETypeScene.POINTNCLICK;
   const backgroundsAvaible = backgroundsRef.current.filter(b => !b._deleted && b.hd === isHDScene);
   const [haveValueChange, setHaveValueChange] = useState(false);
+  const [previewHovered, setPreviewHovered] = useState(false);
+  const [positionFocused, setPositionFocused] = useState(false);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('gba-studio:background-original-preview', {
+      detail: { sceneId: selectedElementId, layerId: layerKey, active: !isHDScene && (previewHovered || positionFocused) },
+    }));
+  }, [selectedElementId, layerKey, isHDScene, previewHovered, positionFocused]);
+  useEffect(() => () => {
+    window.dispatchEvent(new CustomEvent('gba-studio:background-original-preview', {
+      detail: { sceneId: selectedElementId, layerId: layerKey, active: false },
+    }));
+  }, [selectedElementId, layerKey]);
 
   const updateSceneBackground = async (newBackgroundId: string | null) => {
     let maxWidth = 240;
@@ -73,6 +85,14 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
       const calcHeight = Math.max(...sceneBackgrounds.map(img => img.imageHeight));
       maxWidth = Math.max(calcWidth, 240);
       maxHeight = Math.max(calcHeight, 160);
+    }
+
+    const hasPaintedTiles = elementSelected?.tileMap?.some(row => row.some(tile => Number.isInteger(tile) && tile >= 0)) || (elementSelected?.backgrounds ?? []).some(layer =>
+      layer.tileMap?.some(row => row.some(tile => Number.isInteger(tile) && tile >= 0)),
+    );
+    if (hasPaintedTiles) {
+      maxWidth = Math.max(maxWidth, Number(elementSelected?.width) || 240);
+      maxHeight = Math.max(maxHeight, Number(elementSelected?.height) || 160);
     }
 
     // Atualiza o elementSelected com width, height e backgrounds projetados
@@ -138,8 +158,15 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
     <Space direction="vertical" size={8} style={{ width: '100%' }}>
     <Space.Compact block>
     <Select
+      onMouseEnter={() => setPreviewHovered(true)}
+      onMouseLeave={() => setPreviewHovered(false)}
       showSearch
       optionFilterProp="title"
+      filterOption={(input, option) => {
+        const data = (option as any)?.data ?? option;
+        const searchableText = data?.title ?? data?.value ?? '';
+        return String(searchableText).toLowerCase().includes(input.trim().toLowerCase());
+      }}
       suffixIcon={null}
       placeholder={'No background'}
       value={ initialValue() }
@@ -180,10 +207,13 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
     />}
     </Space.Compact>
     <Typography.Text type="secondary">Image position</Typography.Text>
-    <Space.Compact block>
-      <StepInputNumber addonBefore="X" value={layer?.x ?? 0} onChange={value => updateLayerPosition('x', value)} style={{ width: '50%' }} />
-      <StepInputNumber addonBefore="Y" value={layer?.y ?? 0} onChange={value => updateLayerPosition('y', value)} style={{ width: '50%' }} />
-    </Space.Compact>
+    <Flex gap={8} style={{ width: '100%' }}
+      onMouseEnter={() => setPreviewHovered(true)} onMouseLeave={() => setPreviewHovered(false)}
+      onFocusCapture={() => setPositionFocused(true)}
+      onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setPositionFocused(false); }}>
+      <StepInputNumber addonBefore="X" value={layer?.x ?? 0} onChange={value => updateLayerPosition('x', value)} style={{ flex: 1, minWidth: 0 }} />
+      <StepInputNumber addonBefore="Y" value={layer?.y ?? 0} onChange={value => updateLayerPosition('y', value)} style={{ flex: 1, minWidth: 0 }} />
+    </Flex>
     </Space>
   );
 };

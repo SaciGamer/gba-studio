@@ -3,6 +3,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      const route = window.location.hash.slice(1).split(/[?]/, 1)[0].replace(/^\//, '');
+      // EmulatorJS ships Emscripten extraction helpers that use eval and the
+      // emulator window currently depends on webSecurity being disabled.
+      // Keep this policy on the other app windows until that runtime is
+      // migrated to a CSP-compatible build.
+      if (route !== 'emulator') {
+        const appCsp = document.createElement('meta');
+        appCsp.httpEquiv = 'Content-Security-Policy';
+        appCsp.content = "default-src 'self'; script-src 'self' file: 'wasm-unsafe-eval'; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob: local: http: https:; font-src 'self' file: data: local:; connect-src 'self' file: data: http: https: ws: wss:; worker-src 'self' blob:; media-src 'self' file: data: blob: local: http: https:; object-src 'none'; base-uri 'self'; form-action 'self'";
+        document.head.appendChild(appCsp);
+      }
+    </script>
     <title>GBA Studio</title>
   </head>
   <body>

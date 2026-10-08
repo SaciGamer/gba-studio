@@ -22,6 +22,8 @@ export interface IActions {
   tooltip?: string;
   active?: boolean;
   disabled?: boolean;
+  preserveActiveTool?: boolean;
+  selectOnly?: boolean;
   onClick?: () => void;
   subMenu?: {
     type?: SubMenuType;
@@ -61,7 +63,6 @@ const FloatButttons: React.FC<IFloatButttons> = ({ actions, onResetPanelSize, on
     if (settingUtils) {
       handleButtonClick(settingUtils.activeButton, settingUtils.activeSubButton);
     }
-    console.log('..: handleButtonClick ActiveButtons:', settingUtils.activeButton, settingUtils.activeSubButton);
   }, [settingUtils.activeButton, settingUtils.activeSubButton]);
 
   const handleButtonClick = (activeButtonKey: number | string, subButtonKey?: number | string) => {
@@ -79,6 +80,14 @@ const FloatButttons: React.FC<IFloatButttons> = ({ actions, onResetPanelSize, on
   };
 
   const handleActionClick = (action: IActions) => {
+    if (action.selectOnly) {
+      handleButtonClick(action.key);
+      return;
+    }
+    if (action.preserveActiveTool) {
+      action.onClick?.();
+      return;
+    }
     // A tool with variants is immediately usable on its first variant. This
     // avoids entering erase/collision/colorize with no brush selected.
     const firstSubAction = action.subMenu?.items[0];
@@ -203,7 +212,7 @@ const FloatButttons: React.FC<IFloatButttons> = ({ actions, onResetPanelSize, on
                 ) : 
                 undefined
               }}
-              style={{
+                style={{
                 ...baseButtonStyle,
                 backgroundColor: action.active ? token.colorPrimary : token.colorBgElevated,
               }}
@@ -271,6 +280,7 @@ const FloatButttons: React.FC<IFloatButttons> = ({ actions, onResetPanelSize, on
               const subBtn = (
                 <FloatButton
                   key={subItem.key}
+                  aria-label={subItem.tooltip}
                   disabled={subItem.disabled}
                   icon={React.isValidElement(subItem.icon) ? React.cloneElement(subItem.icon, { style: { ...baseIconStyle(subItem.iconSize) } }) : action.icon }
                   onClick={() => {

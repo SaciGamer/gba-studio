@@ -3,8 +3,23 @@
 #define RESOURCE_TYPES_H
 
 #include <cstdint>
+#include "numeric_values.h"
 #include "bn_color.h"
 #include "event_change_layer.h"
+#include "combat_config.h"
+#include "spawner_timeline.h"
+#include "shooter_config.h"
+
+// Generated resource tables can contain many relocated pointers. Keeping
+// these tables in EWRAM prevents otherwise valid projects from exhausting
+// the 32 KiB IWRAM region used by the runtime. This belongs to the editable
+// template and does not modify the Butano library.
+#ifndef GBA_STUDIO_EWRAM_DATA
+#define GBA_STUDIO_EWRAM_DATA __attribute__((section(".ewram")))
+#endif
+#ifndef GBA_STUDIO_EWRAM_SCRIPT_DATA
+#define GBA_STUDIO_EWRAM_SCRIPT_DATA __attribute__((section(".ewram_script_data")))
+#endif
 
 enum class ResourceType : uint8_t
 {
@@ -87,6 +102,12 @@ struct Backgrounds
 
 };
 
+struct RegularBgMapCellOverride
+{
+    int cell_index;
+    uint16_t cell;
+};
+
 struct SceneLayer
 {
     int layerId;                // LAYER_ID
@@ -96,6 +117,28 @@ struct SceneLayer
     const char* paletteId;
     int x;
     int y;
+    int priority;                // hardware priority relative to sprites
+    int z_order;                 // ordering among backgrounds
+    const RegularBgMapCellOverride* map_cell_overrides;
+    int map_cell_overrides_count;
+};
+
+struct InputBinding
+{
+    const char* action;
+    const char* const* buttons;
+    int buttons_count;
+};
+
+struct TileAnimation
+{
+    int layer_id;
+    int target_tile_index;
+    const int* frame_tile_indices;
+    int frames_count;
+    int duration_frames;
+    bool loop;
+    int initial_frame;
 };
 
 enum class EventStatus : uint8_t
@@ -119,9 +162,96 @@ struct ButtonWaitEventData {
     bool override_button;
 };
 
+struct WaitInputEventData {
+    const char* action;
+    int timeout_frames;
+};
+
 struct ButtonHeldEventData {
     const char* const* buttons;
     int buttons_count;
+};
+
+struct InputGroupEventData {
+    const char* group;
+    bool enabled;
+};
+
+struct RumbleEventData {
+    int duration_frames;
+    int intensity;
+};
+
+struct ShooterStartEventData {
+    const char* wave_id;
+};
+
+struct ShooterLoadStageEventData {
+    const char* wave_id;
+    const char* music_id;
+    int music_volume;
+    const char* background_id;
+    int background_layer;
+};
+
+struct ShooterBackgroundModeEventData {
+    int layer_id;
+    bool visible;
+    int scroll_x;
+    int scroll_y;
+    int parallax_x;
+    int parallax_y;
+};
+
+struct ShooterPauseEventData {
+    bool paused;
+};
+
+struct ShooterPlayerEnabledEventData {
+    bool enabled;
+};
+
+struct ShooterBossSpawnEventData {
+    const char* archetype_id;
+    int x;
+    int y;
+    const char* drop_id;
+};
+
+struct ShooterBossPhaseEventData {
+    int phase;
+};
+
+struct ShooterWaitSignalEventData {
+    const char* signal;
+    int timeout_frames;
+};
+
+struct SaveEventData {
+    int slot;
+    const char* variable_id;
+    const char* variable_ids;
+    int schema;
+    bool write;
+};
+
+struct HbeEffectEventData {
+    const char* preset;
+    int intensity;
+    int layer_id;
+    bool enabled;
+};
+struct BlendAlphaEventData { int alpha; };
+
+struct ShooterStatEventData {
+    const char* stat;
+    int value;
+    bool additive;
+};
+
+struct ShooterGrantEventData {
+    const char* grant;
+    int value;
 };
 
 struct FadeEventData
@@ -133,7 +263,11 @@ struct CameraEventData
 {
     int x;
     int y;
+    bool animated = false;
+    int speed_q8 = 256;
 };
+struct CameraFollowEventData { bool enabled; };
+struct CameraShakeEventData { int frames; int amplitude; };
 
 struct SceneChangeEventData
 {
@@ -154,6 +288,20 @@ struct LayerVisibilityEventData
 {
     int layer_id;
     bool visible;
+};
+
+struct BackgroundScrollEventData
+{
+    int layer_id;
+    int x;
+    int y;
+};
+
+struct BackgroundParallaxEventData
+{
+    int layer_id;
+    int x;
+    int y;
 };
 
 struct PaletteLayerEventData
@@ -196,6 +344,7 @@ struct ScriptCommandData {
     const int nextIndex;
     const int falseIndex;
     const int loopIndex;
+    const NumericEventValues* numeric_values = nullptr;
 };
 
 struct VariableSetValueData {
@@ -235,11 +384,15 @@ struct ActorMoveEventData {
     const char* actor_id;
     int x;
     int y;
+    bool animated = false;
+    int speed_q8 = 256;
+    int animation_speed = -1;
 };
 struct ActorSpawnEventData { const char* actor_id; int x; int y; };
 struct ActorRemoveEventData { const char* actor_id; };
 struct ActorVisibilityEventData { const char* actor_id; bool visible; };
 struct ActorAnimationSpeedEventData { const char* actor_id; int speed; };
+struct ActorStateEventData { const char* actor_id; const char* state_id; };
 struct ActorPriorityEventData { const char* actor_id; int priority; };
 struct SceneActor {
     const char* id;
@@ -252,8 +405,18 @@ struct SceneActor {
 };
 struct SceneCollision { const char* id; int x; int y; int width; int height; const char* side; };
 struct PlayMusicEventData { const char* music_id; int volume; };
-struct PlaySoundEventData { const char* sound_id; int volume; };
+struct PlayJingleEventData { const char* music_id; int volume; };
+struct PlaySoundEventData {
+    const char* sound_id;
+    int volume;       // 0..100 percent
+    int speed;        // 25..400 percent, converted to Butano's fixed rate
+    int panning;      // -100..100 percent
+    int priority;     // Butano range -32767..32767
+    const char* group_id;
+};
+struct SoundStopEventData { const char* group_id; };
 struct MusicVolumeEventData { int volume; };
+struct MusicFadeEventData { int target_volume; int duration_frames; };
 struct DialogueEventData {
     const char* text;
     const char* dialogue_font;
@@ -262,12 +425,53 @@ struct DialogueEventData {
     const char* vertical_align;
     bool animate;
     const char* animation_speed;
+    bool continuous_scroll;
+};
+struct UiSetTextEventData {
+    const char* ui_id;
+    const char* text;
+    int x;
+    int y;
+    const char* font;
+};
+struct UiSetValueEventData {
+    const char* ui_id;
+    const char* label;
+    int value;
+    int x;
+    int y;
+    const char* font;
+};
+struct UiAnimateEventData {
+    const char* ui_id;
+    const char* animation;
+    int x;
+    int y;
+    int speed_units;
+    int duration_frames;
+};
+struct UiTargetEventData {
+    const char* ui_id;
+};
+struct UiAnimationStopEventData {
+    const char* ui_id;
+};
+struct SpriteEffectEventData {
+    const char* actor_id;
+    int rotation;
+    int scale;
+    bool visible;
+    const char* fade_color;
+    int fade_intensity;
+    int duration_frames;
 };
 struct DialogueChoiceEventData {
     const char* prompt;
     const char* option_a;
     const char* option_b;
     const char* result_variable;
+    const char* options;
+    int options_count;
 };
 struct VariableTextEventData {
     const char* variable_id;
@@ -319,6 +523,10 @@ struct Scenes
     int actors_count;
     const SceneCollision* collisions;
     int collisions_count;
+    const TileAnimation* tile_animations;
+    int tile_animations_count;
+    const SpawnerTimeline* spawner_timelines;
+    int spawner_timelines_count;
 };
 
 struct SpriteCanvasPiece
@@ -416,6 +624,10 @@ struct Settings
     int player_canvas_frames_count;
     const SpriteCanvasPiece* player_canvas_pieces;
     int player_canvas_pieces_count;
+    const InputBinding* input_bindings;
+    int input_bindings_count;
+    const CombatConfig* combat_config;
+    const ShooterConfig* shooter_config;
 };
 
 #endif // RESOURCE_TYPES_H

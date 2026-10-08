@@ -1,27 +1,31 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Input, Button, Space, message, Form, Divider, Switch, Typography } from 'antd';
+import { Modal, Input, Button, Space, message, Form, Divider, Switch, Typography, Radio } from 'antd';
 import StepInputNumber, { InputNumber } from './StepInputNumber';
 import { FolderOutlined, CheckCircleOutlined, ExclamationCircleOutlined, CloudDownloadOutlined } from '@ant-design/icons';
+import { useI18n } from '@/i18n/I18n';
 
 const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
+  const { t } = useI18n();
   const [tempBuildPath, setTempBuildPath] = useState('');
   const [tempProjectBackupLimit, setTempProjectBackupLimit] = useState<number | ''>(5);
   const [historyLimit, setHistoryLimit] = useState<number | ''>(50);
   const [parallelBuild, setParallelBuild] = useState(false);
   const [buildThreads, setBuildThreads] = useState(1);
   const [cpuCount, setCpuCount] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [gameWorldPanInertia, setGameWorldPanInertia] = useState(true);
+  const [gameWorldMovementMode, setGameWorldMovementMode] = useState<'free' | 'grid'>('grid');
 
   useEffect(() => {
     if (!open) return;
     (async () => {
       try {
         const tb = await window.electronAPI.getTempBuildPath();
-        const [backupLimit, savedHistoryLimit, buildConfig, availableCpuCount] = await Promise.all([
+        const [backupLimit, savedHistoryLimit, buildConfig, availableCpuCount, preferences] = await Promise.all([
           window.electronAPI.getTempProjectBackupLimit(),
           window.electronAPI.getHistoryLimit(),
           window.electronAPI.getBuildConfig(),
           window.electronAPI.getCpuCount(),
+          window.electronAPI.loadPreferences(),
         ]);
         setTempBuildPath(tb || '');
         setTempProjectBackupLimit(backupLimit ?? 5);
@@ -31,6 +35,8 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
         setCpuCount(availableThreads);
         setParallelBuild(configuredThreads > 1);
         setBuildThreads(Math.min(availableThreads, Math.max(1, configuredThreads)));
+        setGameWorldPanInertia(preferences?.gameWorldPanInertia !== false);
+        setGameWorldMovementMode(preferences?.gameWorldMovementMode === 'free' ? 'free' : 'grid');
       } catch (err) {
         console.error(err);
       }
@@ -50,7 +56,6 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
   };
 
   const save = async () => {
-    setLoading(true);
     try {
       await window.electronAPI.setTempBuildPath(tempBuildPath);
       await window.electronAPI.setTempProjectBackupLimit(Number(tempProjectBackupLimit || 0));
@@ -62,12 +67,17 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
         optimizationLevel: 'O2',
         verbose: false,
       });
+      await window.electronAPI.setGameWorldPreferences({
+        panInertia: gameWorldPanInertia,
+        movementMode: gameWorldMovementMode,
+      });
+      window.dispatchEvent(new CustomEvent('gba-studio:game-world-preferences', {
+        detail: { gameWorldPanInertia, gameWorldMovementMode },
+      }));
       message.success('Preferences saved');
       onClose();
     } catch (err) {
       message.error('Failed to save preferences');
-    } finally { 
-      setLoading(false); 
     }
   };
 
@@ -87,7 +97,7 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
   };
 
   return (
-    <Modal open={open} title="Preferences" onCancel={onClose} footer={null} width={800}>
+    <Modal open={open} title="Preferences" onCancel={() => { void save(); }} maskClosable footer={null} width={800}>
       <Form layout="vertical">
         <Space direction="vertical" size={0} style={{ marginBottom: 24, display: 'flex' }}>
           <Typography.Text strong>GBA Studio Configuration</Typography.Text>
@@ -106,6 +116,30 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
             value={historyLimit}
             onChange={(value) => setHistoryLimit(value === null ? '' : Number(value))}
             style={{ width: 180 }}
+          />
+        </Form.Item>
+
+        <Divider>Canvas Configuration</Divider>
+        <Form.Item label={t('preferences.panInertia')} extra={t('preferences.panInertiaDescription')}>
+          <Switch
+            data-testid="preferences-game-world-pan-inertia"
+            aria-label={t('preferences.panInertia')}
+            checked={gameWorldPanInertia}
+            onChange={setGameWorldPanInertia}
+          />
+        </Form.Item>
+        <Form.Item label={t('preferences.sceneMovement')}>
+          <Radio.Group
+            data-testid="preferences-game-world-movement-mode"
+            aria-label={t('preferences.sceneMovement')}
+            optionType="button"
+            buttonStyle="solid"
+            value={gameWorldMovementMode}
+            onChange={event => setGameWorldMovementMode(event.target.value)}
+            options={[
+              { value: 'free', label: t('preferences.freeMovement') },
+              { value: 'grid', label: t('preferences.gridMovement') },
+            ]}
           />
         </Form.Item>
 
@@ -148,8 +182,6 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
             <Switch
               checked={parallelBuild}
               disabled={cpuCount < 2}
-              checkedChildren="Enabled"
-              unCheckedChildren="Disabled"
               onChange={setParallelBuild}
             />
             {parallelBuild && (
@@ -171,13 +203,6 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
           </Space>
         </Form.Item>
 
-        {/* Action Buttons */}
-        <Form.Item>
-          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
-            <Button onClick={onClose}>Cancel</Button>
-            <Button type="primary" onClick={save} loading={loading}>Save</Button>
-          </Space>
-        </Form.Item>
       </Form>
     </Modal>
   );

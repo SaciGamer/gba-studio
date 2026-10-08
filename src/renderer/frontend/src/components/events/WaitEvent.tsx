@@ -1,6 +1,8 @@
 import { IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
 import { Button, Dropdown, Space, Typography } from "antd";
 import StepInputNumber, { InputNumber } from '../StepInputNumber';
+import NumericEventInput from '../NumericEventInput';
+import { formatNumericValue } from '../../../../../shared/numericValues';
 import { useEffect, useMemo, useState } from "react";
 import { AntdToken } from "../common/AntDToken";
 import { IWait } from './interfaces/IWaiting';
@@ -15,26 +17,26 @@ export function WaitEvent({ event, customTitle, onValueChange }: WaitEventsProps
   const { token } = AntdToken();
 
   const [units, setUnits] = useState<string>("time");
-  const [timeValue, setTimeValue] = useState<number>(1);
-  const [framesValue, setFramesValue] = useState<number>(30);
+  const [timeValue, setTimeValue] = useState<any>(1);
+  const [framesValue, setFramesValue] = useState<any>(30);
 
   const args = event?.args as IWait;
 
   useEffect(() => {
     const initValue = WaitEvent.defaultValue();
     setUnits(args?.units ?? initValue.units);
-    setTimeValue(Math.max(0, Math.round(args?.time ?? initValue.time)));
+    setTimeValue(args?.time ?? initValue.time);
     setFramesValue(args?.frames ?? initValue.frames);
 
     if ((args?.units ?? initValue.units) === "time") {
-      customTitle(` For ${args?.time ?? initValue.time} Seconds`);
+      customTitle(` For ${formatNumericValue(args?.time ?? initValue.time)} Seconds`);
     } else {
-      customTitle(` For ${args?.frames ?? initValue.frames} Frames`);
+      customTitle(` For ${formatNumericValue(args?.frames ?? initValue.frames)} Frames`);
     }
   }, [args]);
 
 
-  const setTimeOrFramesValue = (value: number | null, unit?: string) => {
+  const setTimeOrFramesValue = (value: any, unit?: string) => {
     if (!event?.id) return;
 
     if (unit ? unit === "time" : units === "time") {
@@ -66,14 +68,7 @@ export function WaitEvent({ event, customTitle, onValueChange }: WaitEventsProps
         <Dropdown menu={{ items }} trigger={['click']}>
           <Button style={{ backgroundColor: token.colorBgBase }}>{units === "time" ? "seconds" : "frames"}</Button>
         </Dropdown>
-        <InputNumber 
-          min={0}
-          step={1}
-          precision={0}
-          value={units === "time" ? timeValue : framesValue} 
-          style={{ width: "100%" }}
-          onChange={(e) => setTimeOrFramesValue(Number(e))}
-        />
+        <NumericEventInput min={0} value={units === 'time' ? timeValue : framesValue} style={{ width: '100%' }} onChange={value => setTimeOrFramesValue(value)} />
       </Space.Compact>
     </Space>
   );

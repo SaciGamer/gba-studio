@@ -1,0 +1,371 @@
+# Changelog
+
+All notable changes to GBA Studio are documented in this file.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Unreleased]
+
+### Added
+
+- Actor main-state switching through `EVENT_ACTOR_SET_STATE`, with player/NPC
+  selectors, typed generated payloads, and native runtime support.
+- Scripted actor movement with bounded pathfinding, collision-aware movement,
+  platform physics, ladders, and configurable movement/animation speeds.
+- Reusable numeric-value inputs with variables, actor/player properties,
+  constants, formulas, nested math/boolean/comparison/bitwise operations,
+  and expression copy/paste backed by generated runtime instructions.
+- Autotile asset selection and configuration, Blob-47 terrain painting, and
+  complete mixed tileset/autotile selections for copy, cut, paste, and move.
+- Sprite canvas preparation that assembles editable pieces into generated
+  animation frames without modifying the source spritesheets.
+- Runtime resource-monitor window integrated with the emulator and template
+  telemetry, plus native ELF memory-placement and headroom verification.
+- Required-input warning indicators on events, script descriptions displayed
+  by Call Script, and direct navigation to referenced scene actors/triggers.
+- Localized compiler/transcode stage logs, asset and sprite preparation
+  messages, and live Butano graphics/audio/header generation output.
+- Shooter, combat, spawner, rumble, save/load, and UI lifecycle runtime
+  implementations with generated-resource and native regression coverage.
+- Scene settings now expose an explicit Shooter scene type and per-scene
+  logical controls, with runtime fallback to the project input map.
+- Generated script tables now use per-table EWRAM sections, preventing valid
+  sample projects from overflowing IWRAM during linking; the sample ROM was
+  rebuilt successfully with the editable Butano template.
+- World preview transform input now rejects non-finite wheel coordinates and
+  sanitizes invalid zoom state before applying transforms.
+- Fixed tracker music preview hook ordering, ignored internal preview-image
+  drops in asset editors, opened the selected sprite animation state, and
+  generated directional sprite frames using the original sheet geometry.
+- Change Scene coordinates are now controlled and clamped to the selected
+  destination scene; world placement uses the live transform scale when zoomed.
+- The reconstructed shooter now starts through authored Intro and Title scenes
+  with fade/music/button flow before entering Stage 1, and its verifier checks
+  generated event UUIDs for uniqueness.
+- `EVENT_MENU_OPEN` now supports a bounded list of menu options while retaining
+  the legacy two-option format, including runtime cursor navigation and result
+  selection; the shooter Title menu now routes to Start, How to Play, Credits,
+  and Rumble actions.
+- Menu cursor movement now respects the actual up/down direction instead of
+  advancing for both buttons.
+- The reconstructed shooter now includes authored How to Play and Credits
+  scenes using the engine dialogue/credits events and returns to the Title menu.
+- Shooter game scene resources now include the editor position/grid/render defaults
+  and complete sprite animation-state previews, preventing scene selection from
+  failing when the reconstructed project is opened in the editor.
+- Optional generated-template ROM compilation with `node tools/verify-generated-template.mjs --build` and an installed devkitPro toolchain.
+- Typed event catalog, graph compiler, runtime event panels, and coverage checks.
+- Independent script instances, scene triggers, input bindings, actor, camera,
+  dialogue, audio, and resource-management services in the Butano template.
+- Asset-library editors for music, sound effects, palettes, and dialogue review.
+- Tracker-module inspection for MOD/XM/S3M/IT assets, including format, channel,
+  order, pattern, instrument, speed and tempo metadata without misleading
+  browser PCM playback.
+- Tracker previews support MOD/XM/S3M/IT sample and pattern decoding with
+  bounded Web Audio scheduling and compatibility reporting; supported effects
+  vary by format rather than claiming full tracker-player emulation.
+- Tracker pattern/sample editing includes undo/redo, export of edited copies,
+  project-asset saving, and retained per-channel mute, volume, and pan settings.
+- MOD preview now exposes per-channel mute controls and a compact pattern-row
+  view, making channel structure inspectable without exporting or rewriting the
+  source module.
+- MOD pattern cells can now be edited in the preview (period, sample, effect
+  and parameter) and exported as a new `.mod` copy; the source asset remains
+  untouched.
+- MOD preview handles pattern flow (`Bxx`/`Dxx`) and per-event volume (`Cxx`)
+  in addition to speed/tempo changes.
+- MOD preview also honors `9xx` sample offsets when scheduling a note.
+- Added an executable MOD parser/editor contract fixture covering channel/event
+  decoding, binary cell updates and source-copy immutability.
+- XM pattern headers and packed events are now decoded for channel
+  visualization, with a native parser fixture.
+- S3M packed events are now decoded for the first-pattern view, and IT metadata
+  counts use the correct order/instrument/sample/pattern header offsets.
+- IT pattern masks and channel events are now decoded for the first-pattern
+  view, with a native parser fixture.
+- Sprite and tile editing, palette-index-transparent previews, font metrics,
+  history/undo support, localization, credits, and update services.
+- Generated-template, sample-project, scheduler, trigger, manager, and editor
+  contract tests.
+- Scene tile-animation editor with layer/destination/frame/duration/loop controls
+  and a Butano-oriented frame-timeline preview.
+- Added typed `EVENT_INPUT_ENABLE` and `EVENT_INPUT_DISABLE` events for gameplay,
+  menu, interaction, and all-input groups, with cooperative template runtime
+  blocking and native/build contract fixtures.
+- Added editable settings `InputMap` bindings with build validation, generated
+  `InputBinding` ABI, template startup loading, logical action queries, and a
+  game-settings editor.
+- Added blocking `EVENT_WAIT_INPUT` for logical InputMap actions with optional
+  frame timeout, typed generated ABI, cooperative per-script runtime state, and
+  build/native contract tests.
+- Added InputMap action creation/removal controls with name/capacity validation
+  and accessible editor labels.
+- Migrated default player movement, input snapshots, and menu handling to
+  logical InputMap actions with physical-button compatibility aliases.
+- Added typed `EVENT_ACTOR_SET_ANIMATION` for data-driven actor appearance
+  control, reusing the fixed-capacity animation manager.
+- Added typed `EVENT_ACTOR_SET_POSITION` for data-driven actor placement,
+  reusing the existing position manager and X/Y editor controls.
+
+### Changed
+
+- Moved bundled projects into `templateEngineGame`, expanded the sample
+  project, and added the reconstructed shooter template and build verifiers.
+- Standardized dark asset selectors and tree panels across scenes, scripts,
+  variables, sprites, animation states, images, music, sounds, and palettes.
+  Panel resize/collapse and tree expansion states persist per project/sprite.
+- Sprite Editor opens with 800% preview zoom, retains the 100% reset action,
+  and selects sprite pieces only through explicit preview interaction.
+- Right-panel scroll positions are retained per scene/object; script references
+  open the owning scene in edit mode with the actor or trigger selected.
+- Camera and actor movement share speed controls and destination-aware titles;
+  camera speed offers the same presets and Custom input as actor movement.
+- Dialogue: Show now advances the script immediately and remains visible until
+  explicitly closed; player interaction cannot reveal or dismiss its text.
+- Scroll Background uses the shared layer selector and aligned X/Y controls.
+- Regular-background scene previews repeat images across the scene area;
+  selector hover and Image position editing outline the original image and
+  show its replicas in grayscale, excluding Logo and Point Click scenes.
+- Layer-image generation uses bounded parallel jobs according to the configured
+  Threads value while retaining deterministic resource order and output.
+- Removed warning-only casts and unused template variables/parameters without
+  changing generated ABI or runtime behavior; retained the single benign warning
+  in empty generated audio registries.
+- Standardized X/Y/W/H numeric controls on the existing `Space.Addon` visual
+  pattern across sprite, scene, layer, and runtime event editors.
+- Added a dark, labeled Sprite Preview control header for playback, animation
+  speed, tile counts, and grid controls.
+- Ignored generated Playwright `test-results/` artifacts.
+- Scene, actor, player, camera, event graph, build/transcoding, and asset
+  pipelines now share stronger validation and typed resource contracts.
+- The sample project now exercises expanded scenes, triggers, collisions,
+  scripts, assets, palettes, fonts, sprites, and audio.
+- Emulator integration, launcher, settings, menus, and responsive editor
+  layout were refined for the expanded workflow.
+
+### Fixed
+
+- Empty and editor-only event arguments now generate valid null payloads,
+  fixing undeclared `ARGS_*` references for Hide/Show All Sprites.
+- Hide/Show All Sprites now include the player as well as scene actors.
+- Build targets are sanitized for Make, and ROM discovery checks the expected
+  target instead of accepting stale output; a successful make without a ROM
+  is reported as a compilation failure rather than starting Run Live.
+- Actor/player property-based coordinate expressions preserve pixel/tile units
+  and apply offsets correctly instead of forcing the editor field to pixels.
+- Scripted movement keeps the full actor within scene bounds, attempts an
+  obstacle jump once, and finishes when no traversable path remains.
+- Climbing animations reverse when descending and retain their current frame
+  while paused, including lateral movement on ladders.
+- Deleting an actor/trigger preserves scene edit mode instead of deselecting
+  the scene; Add Event clears its search every time it opens.
+- Panel heights update after project loading and restore, resize/collapse
+  persist consistently, and splitter movement no longer shifts adjacent titles.
+- Variable menus expose True/False with boolean prefixes, distinguish assignment
+  presets, restrict actor properties to the current scene, and match numeric
+  prefix colors to the shared input style.
+- Autotile hover highlights remain visible for the entire hover, and Slot Name
+  uses the tab name as its placeholder; mouse tile coordinates use the editor grid.
+- Selecting a smaller background preserves an existing painted scene's map
+  dimensions instead of shrinking the scene to the source image.
+- Scene UI and variable-text overlays follow Show Camera on View visibility.
+- Large graphics/script manager states remain in EWRAM to protect IWRAM stack
+  headroom; generated-build verification checks the actual ELF memory layout.
+- Regular-background dimension handling preserves logical scene coordinates,
+  palette indices, transparent padding, and source assets when fitting images
+  to the hardware-supported map dimensions.
+- Normalize persisted Game World zoom and pan values before passing them to
+  `react-zoom-pan-pinch`, reject invalid wheel coordinates before propagation,
+  and guard recenter/zoom callbacks against non-finite transform state to avoid
+  `No mouse or touch offset found` and `Detected NaN set state values` errors.
+- Use compiled instruction counts for trigger and actor programs, including
+  nested branches and commented events. Correct loop exits/state-slot mapping,
+  emit CONTINUE payloads, accept FOR schema v2 and diagnose loop-state overflow.
+  Generated-program native tests and the expanded ROM fixture cover these paths.
+- Correct scheduler tail-call returns, FOR iteration values and per-call loop
+  state; keep button branch boundaries local to their program and preserve
+  other scenes' input overrides during cancellation. A native test executes
+  the production scheduler, WAIT, variable manager and trigger manager.
+- Stop the game frame when a scene transition starts or loads, cancel stale
+  continuations on in-handler scene cancellation, reset trigger state on
+  same-ID reloads, and preserve target OnInit for the following frame. Native
+  scene-lifecycle coverage exercises OnInit, actor and trigger transitions.
+- Separate regular-background hardware `priority` from background-only
+  `z_order`; legacy layers default to priority 3 with distinct z-order values,
+  while explicit foreground values are preserved and clamped.
+- Added declarative regular-background tile animations to generated scenes:
+  destination tile, frame indices, duration, initial frame and loop policy,
+  with 4/8 bpp source stride handling and validation of the 32-animation,
+  32-frame and tile-index limits.
+- Connected the scene editor to the same `tileAnimations` schema used by the
+  ResourceBuilder, including bounded inputs, removal/addition, playback pause,
+  initial-frame handling, and a 60 Hz duration preview.
+- Tile-animation builds now inspect generated Butano regular-BG headers to
+  validate logical tile counts, 4/8 bpp stride, tile compression and map
+  compression before producing the registry.
+- Reject duplicate tile-animation destinations and show the same ambiguity in
+  the scene editor before build.
+- Separate regular-background hardware `priority` from background-only
+  `z_order`; legacy layers default to priority 3 with distinct z-order values,
+  while explicit foreground values are preserved and clamped.
+- Stop the game frame when a scene transition starts or loads, cancel stale
+  continuations on in-handler scene cancellation, reset trigger state on
+  same-ID reloads, and preserve target OnInit for the following frame. Native
+  scene-lifecycle coverage exercises OnInit, actor and trigger transitions.
+- Resume running trigger scripts every frame independently of once/cooldown
+  and activation conditions; ignore retriggers while running and release
+  completed scheduler slots. Covered by a native production-manager test with
+  a scheduler test double.
+- Removed the stale JavaScript event catalog; tests now execute the shared
+  TypeScript source. Catalog types cover array payloads and schema version 2.
+- Creation-menu coverage explicitly checks Show/Hide Actor as the supported
+  creation paths for the retained Visible Actor command, ignoring commented entries.
+- Validate scene and background references in trigger enter/leave and actor
+  interaction scripts, including nested branches, before generating the registry.
+- Use the tracked sample music asset for generated-template verification.
+- Corrected generated-template lifecycle, scene cleanup, script execution
+  budget, trigger handling, layer/palette changes, and audio reference checks.
+- Improved preview fidelity for indexed assets and mapped variable-width fonts.
+
+## [0.4.4] - 2026-09-07
+
+### Added
+
+- Core and layout improvements.
+- Change-layer event support.
+- Updated camera handling and Butano resource structures.
+
+### Fixed
+
+- Window content sizing, game-world scrolling, settings panels, and sample project behavior.
+
+## [0.4.2] - 2026-08-21
+
+### Added
+
+- Butano logging and functional example project flow.
+- Save without duplicate files.
+
+### Changed
+
+- Temporary build workflow, project transcoding, file watching, project naming, and sample project defaults.
+
+### Removed
+
+- Unused default `main.c` and obsolete Tiled/devkitPro dependencies.
+
+## [0.2.1] - 2025-11-25
+
+### Added
+
+- Preferences management for devkit, emulator, temporary builds, project switching, and single-instance handling.
+- Asset management, project generation, and ImageMagick integration.
+
+### Changed
+
+- Menu interactions, packaging configuration, and application versioning.
+
+## [2026-07 to 2026-08]
+
+### Added
+
+- Scene management, fade effects, internal emulator, Iodine GBA integration, tileset editing, multi-background scenes, HD backgrounds, bitmap scenes, and initial player/camera positioning.
+
+### Changed
+
+- Butano integration, build/transcoding pipeline, save-as behavior, setupMagick packaging, and toolchain configuration.
+
+## [2025-03 to 2026-03]
+
+### Added
+
+- Vite-based frontend/backend skeleton.
+- Scene icons, image synchronization, project settings contexts, backgrounds, scenes, and elements.
+- Backup tools, README documentation, vendor-to-tools migration, preferences, asset generation, tilesets, HD and bitmap background support.
+
+## Commit-Level History
+
+The complete commit-level trajectory through `HEAD 503bd9c` on `2026-09-10` is preserved below. Merge commits are included because they document branch integration points.
+
+- 2024-10-18 | f900cf5 | SaciGamer | Initial commit
+- 2024-10-18 | 63bd9eb | SaciGamer | project gba-studio started - initial commit
+- 2025-02-09 | e6c90e4 | SaciGamer | Dashboad completo e botões principais
+- 2025-02-09 | 49120bc | SaciGamer | Complemento do commit anterior
+- 2025-03-03 | 66e66c3 | SaciGamer | Add spalshwindow, launcher, splitters, window position
+- 2025-03-21 | e8f69bb | SaciGamer | fix: skeleton - restruct project with builder file [ - config package build and run - reorganize BE e FE - add Vite.js - add tsconfg.json and vite.config.ts ]
+- 2025-03-21 | a039722 | SaciGamer_Dev | Merge pull request #1 from SaciGamer/branch-skeleton
+- 2025-03-29 | 2ff9cf4 | SaciGamer | feat: scene icone in build, drop image copy to project, sync imagens to project
+- 2025-09-06 | fcbf576 | SaciGamer | feat: Add new interfaces and context providers for project settings, scenes, backgrounds, and elements
+- 2025-11-22 | 997f1e1 | SaciGamer | feat: backup tools, mGBA, tiled, butano, butano-tiled, devKitARM-Pro
+- 2025-11-22 | 5211b8a | SaciGamer | feat: add README.md
+- 2025-11-22 | 10daeed | SaciGamer | feat: change vendor to tools
+- 2025-11-22 | 803145f | SaciGamer | fix: variable name
+- 2025-11-25 | 52da0e9 | SaciGamer | feat: integrate preferences management with new paths for devkit, emulator, and temporary builds, ajust try catch new, open e switch project
+- 2025-11-25 | 5624929 | SaciGamer | fix: update PreferencesModal layout with Typography and remove Alert component
+- 2025-11-25 | 04c48cd | SaciGamer | feat: enhance menu interactions with content view changes
+- 2025-11-25 | d10cfe3 | SaciGamer | feat: update version to 0.2.1 and enable asar packaging; add project file handling for single instance
+- 2025-12-03 | f29b1b4 | SaciGamer | feat: Implement asset management and project structure generation and ImageMagick binaries
+- 2026-01-05 | eb02ca6 | SaciGamer | feat: Improves build output panel UX and updates docs link
+- 2026-01-05 | 92b45eb | SaciGamer | fix: update about website
+- 2026-02-12 | 87b286f | SaciGamer | feat: update butano version
+- 2026-02-12 | daaf92f | SaciGamer | feat: create tileset editor and config new scene with multi backgrounds
+- 2026-02-16 | 6f7fc1b | SaciGamer | feat: Adds HD background image support and selection logic
+- 2026-02-20 | 053e53c | SaciGamer | feat: support a bitmap scene
+- 2026-03-17 | 535117d | SaciGamer | feat: fix language and background selector, add favorities, pos initial player and camera, custom functions to change scene
+- 2026-07-07 | 2ade942 | SaciGamer | feat: Implement scene management and fade effects
+- 2026-07-09 | ada8f89 | SaciGamer | feat: Add iodine-gba dependency and implement bundling script for emulator
+- 2026-07-27 | ca2d57b | SaciGamer | feat: add emulator component
+- 2026-08-02 | 94f9ce4 | SaciGamer | feat: add internal emulator and creating setting to config
+- 2026-08-02 | 6439866 | SaciGamer | fix: Implement code changes to enhance functionality and improve performance
+- 2026-08-03 | fa2a8ad | SaciGamer | fixed: Remove Tiled Map Editor
+- 2026-08-14 | 5006c35 | SaciGamer | feat: change open project to temp build with limit and remove toolchain of frontend, ajust transcode to create pre-build with midia to initial build, new save to temp build actual, remove no use classes and files, apply save-as
+- 2026-08-17 | a4007d3 | SaciGamer | feat: new decompress setupMagick, remove dependence devkitPath external, config package to use engine, config package.json
+- 2025-03-29 | cd624b3 | SaciGamer | feat: scene icone in build, drop image copy to project, sync imagens to project
+- 2025-09-06 | 45c172c | SaciGamer | feat: Add new interfaces and context providers for project settings, scenes, backgrounds, and elements
+- 2025-11-22 | 6f11532 | SaciGamer | feat: backup tools, mGBA, tiled, butano, butano-tiled, devKitARM-Pro
+- 2025-11-22 | 8cc7b74 | SaciGamer | feat: add README.md
+- 2025-11-22 | eb42559 | SaciGamer | feat: change vendor to tools
+- 2025-11-22 | a7236b9 | SaciGamer | fix: variable name
+- 2025-11-25 | 389f597 | SaciGamer | feat: integrate preferences management with new paths for devkit, emulator, and temporary builds, ajust try catch new, open e switch project
+- 2025-11-25 | 0628627 | SaciGamer | fix: update PreferencesModal layout with Typography and remove Alert component
+- 2025-11-25 | 74300d5 | SaciGamer | feat: enhance menu interactions with content view changes
+- 2025-11-25 | 91b7e86 | SaciGamer | feat: update version to 0.2.1 and enable asar packaging; add project file handling for single instance
+- 2025-12-03 | 5e0ff32 | SaciGamer | feat: Implement asset management and project structure generation and ImageMagick binaries
+- 2026-01-05 | 3853334 | SaciGamer | feat: Improves build output panel UX and updates docs link
+- 2026-01-05 | 0f4990f | SaciGamer | fix: update about website
+- 2026-02-12 | d547315 | SaciGamer | feat: update butano version
+- 2026-02-12 | de7d592 | SaciGamer | feat: create tileset editor and config new scene with multi backgrounds
+- 2026-02-16 | d81f4a4 | SaciGamer | feat: Adds HD background image support and selection logic
+- 2026-02-20 | ffa82f8 | SaciGamer | feat: support a bitmap scene
+- 2026-03-17 | a167cd6 | SaciGamer | feat: fix language and background selector, add favorities, pos initial player and camera, custom functions to change scene
+- 2026-07-07 | b047771 | SaciGamer | feat: Implement scene management and fade effects
+- 2026-07-09 | 7c497e8 | SaciGamer | feat: Add iodine-gba dependency and implement bundling script for emulator
+- 2026-07-27 | 2c0cf48 | SaciGamer | feat: add emulator component
+- 2026-08-02 | 0dbf0dc | SaciGamer | feat: add internal emulator and creating setting to config
+- 2026-08-02 | b72e8d2 | SaciGamer | fix: Implement code changes to enhance functionality and improve performance
+- 2026-08-03 | e16953c | SaciGamer | fixed: Remove Tiled Map Editor
+- 2026-08-14 | 91da780 | SaciGamer | feat: change open project to temp build with limit and remove toolchain of frontend, ajust transcode to create pre-build with midia to initial build, new save to temp build actual, remove no use classes and files, apply save-as
+- 2026-08-17 | 7a10a53 | SaciGamer | feat: new decompress setupMagick, remove dependence devkitPath external, config package to use engine, config package.json
+- 2026-08-18 | aebdb39 | SaciGamer_Dev | Update README.md
+- 2026-08-19 | 5846c18 | SaciGamer | fix: save with rename scenes, start and stop folder watch
+- 2026-08-19 | 91dffaa | SaciGamer | fix: add foldersToWatch and remove lopping without scenes
+- 2026-08-21 | 3fea102 | SaciGamer | feat: add save without duplicate files
+- 2026-08-21 | ed1baca | SaciGamer | fix: functional example project, clear watch files when close or save, default files settings, sanitize name to use in butano, remove default main.c (don t use), ajust collapse scripts,
+- 2026-08-21 | 75447c5 | SaciGamer | feat: add log in butano
+- 2026-08-21 | ba362ca | SaciGamer | feat: new version 0.4.2
+- 2026-08-21 | c6c878a | SaciGamer | Merge branch 'develop' of https://github.com/SaciGamer/gba-studio into feature/gba-studio-butano-wip
+- 2026-08-21 | 74af5e6 | SaciGamer | fix: removendo cena do sample exemple
+- 2026-08-21 | 191e9c8 | SaciGamer_Dev | Merge pull request #12 from SaciGamer/feature/gba-studio-butano-wip
+- 2026-08-25 | 2fd8844 | SaciGamer | fix: remove devkiPro, ajust env on compile, change send notification to windows, unify code to transcode, wait on template, atualizado o readme.md
+- 2026-08-25 | a6c2fdb | SaciGamer | feat: update min version, update clean to remove dist
+- 2026-08-25 | 8bf9070 | SaciGamer | fix: remove devkitPro resources package
+- 2026-08-25 | f06298a | SaciGamer | Merge branch 'develop' of https://github.com/SaciGamer/gba-studio into feature/gba-studio-butano-wip
+- 2026-08-25 | 82b6206 | SaciGamer_Dev | Merge pull request #13 from SaciGamer/feature/gba-studio-butano-wip
+- 2026-09-07 | 45980bf | SaciGamer | feat: core and layout improvements [- Licensing   - Add actual license file - Graphics / Elements   - Adjust element resize using image min_size - Use real values for window content - Camera - Update camera view handling - Events - Support new event: change layer - Hide unused event features - Layout - Fix scroll issues in game world and settings panels - Sample Project - Increment example sample project - Core - Reconfigure objects and arrays to Butano]
+- 2026-09-07 | 01f6830 | SaciGamer | Merge branch 'develop' of https://github.com/SaciGamer/gba-studio into feature/gba-studio-butano-wip
+- 2026-09-07 | 83639c7 | SaciGamer_Dev | Merge pull request #14 from SaciGamer/feature/gba-studio-butano-wip
+- 2026-09-07 | ab24d85 | SaciGamer | fix: change version to 0.4.4
+- 2026-09-07 | 309a32e | SaciGamer | Merge branch 'develop' of https://github.com/SaciGamer/gba-studio into feature/gba-studio-butano-wip
+- 2026-09-09 | 6c2267d | SaciGamer | feat: implement drag-and-drop functionality for event management in CollapseEventManager
+- 2026-09-09 | b31dbc8 | SaciGamer | feat: add FlowEditorManager component and integrate flow editor button in SelectNewEvent
+- 2026-09-10 | 503bd9c | SaciGamer | feat: enhance event editor and project settings flow - FIXED: Corrige a persistência de preferências e configurações do projeto; ajusta o builder de recursos; corrige integração dos templates Butano; resolve estado e contextos do frontend. FEATURE: adiciona eventos condicionais e de variável; melhora painéis e seleção de eventos; implementa colapso e fluxo de execução; atualiza interfaces/contextos; expande templates Butano com registries, handlers, variáveis e gerenciamento de recursos.

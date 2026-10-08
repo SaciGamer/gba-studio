@@ -20,6 +20,7 @@ export default function ResourceEditorShell({ title, library, children, inspecto
     backgroundColor: token.colorBorder,
     borderRadius: 0,
     height: 40,
+    flex: '0 0 40px',
   };
 
   return (
@@ -51,7 +52,7 @@ export default function ResourceEditorShell({ title, library, children, inspecto
                 {libraryActions}
               </Flex>
             </Flex>
-            <div style={{ height: 'calc(100% - 40px)', overflow: 'auto', padding: 8 }}>{library}</div>
+            <div style={{ height: 'calc(100% - 40px)', overflow: 'auto', padding: '8px 16px' }}>{library}</div>
             </aside>
           </Splitter.Panel>
           <Splitter.Panel min={360}>

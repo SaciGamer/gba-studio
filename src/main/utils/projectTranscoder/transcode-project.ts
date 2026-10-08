@@ -32,12 +32,15 @@ export async function cancelActiveAssetGeneration(): Promise<boolean> {
   return true;
 }
 import { CppBuilder } from '../builders/CppBuilder';
-import { packageJson } from '@/main';
-import isDev from 'electron-is-dev';
 
 // Obter o caminho do diretório atual
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const isDev = process.env.ELECTRON_IS_DEV !== undefined
+  ? Number.parseInt(process.env.ELECTRON_IS_DEV, 10) === 1
+  : process.defaultApp === true;
+const packageJsonPath = path.resolve(__dirname, '..', '..', '..', '..', 'package.json');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
 /**
  * Transcode project resources into build directory using Butano template structure
@@ -47,7 +50,9 @@ const __dirname = path.dirname(__filename);
  * @returns Result indicating success/failure and paths to generated files
  */
 export async function transcodeProject(options: TranscodeOptions): Promise<TranscodeResult> {
+  const progress = (message: string, key: string, params?: Record<string, string | number>) => options.onProgress?.(`>> ${message}\n`, `compiler.${key}`, params);
   try {
+    progress('Validando projeto e preparando transcodificação...', 'validate');
     console.log('..: transcodeProject starting with options:', {
       projectDir: options.projectDir,
       outputDir: options.outputDir,
@@ -70,8 +75,9 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
     projectName = await extractProjectName(projectDir, projectName);
 
     // Locate template and tools
-    const toolsRoot = isDev 
-      ? path.resolve(__dirname, '..', '..', '..', '..', 'tools') 
+    const localToolsRoot = path.resolve(__dirname, '..', '..', '..', '..', 'tools');
+    const toolsRoot = isDev || fs.existsSync(localToolsRoot)
+      ? localToolsRoot
       : path.join(process.resourcesPath, "bin", 'tools');
     const templateDir = path.join(toolsRoot , 'butano', 'template');
 
@@ -83,6 +89,7 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
     console.log('..: Using template from:', templateDir);
     
     // Valid path and clean if same project
+    progress('Preparando diretório de build e template...', 'template');
     prepareBuildDir(options.markerProjectDir || projectDir, outputDir);
 
     // Initialize template builder
@@ -118,6 +125,7 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
 
     let resourceFiles: any[] = [];
     if (fs.existsSync(projectResourceDir)) {
+      progress('Lendo recursos e preparando headers de cenas, scripts e configurações...', 'resources');
       resourceFiles = await resourceBuilder.processResourceFiles(projectResourceDir);
       console.log('..: Processed', resourceFiles.length, 'resource files');
 
@@ -126,6 +134,7 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
     // Copy assets if enabled
     let assetStats = { copiedCount: 0, skippedCount: 0 };
     if (includeAssets) {
+      progress('Convertendo imagens e preparando assets de áudio...', 'assets');
       const assetBuilder = new AssetBuilder(path.resolve(__dirname, '..', '..', '..'), outputDir);
       const projectAssetsDir = path.join(projectDir, 'assets');
 
@@ -135,7 +144,11 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
       fs.mkdirSync(uiDir, { recursive: true });
       const projectRoot = path.resolve(__dirname, '..', '..', '..');
       const defaultUiDir = path.join(projectRoot, 'src', 'renderer', 'frontend', 'src', 'img');
-      const sampleUiDir = path.join(projectRoot, 'sample_project_example', 'assets', 'ui');
+      const migratedSampleRoot = path.join(projectRoot, 'templateEngineGame', 'sample_project_example');
+      const sampleRoot = fs.existsSync(migratedSampleRoot)
+        ? migratedSampleRoot
+        : path.join(projectRoot, 'sample_project_example');
+      const sampleUiDir = path.join(sampleRoot, 'assets', 'ui');
       for (const filename of ['cursor.png', 'frame.png']) {
         const destination = path.join(uiDir, filename);
         if (fs.existsSync(destination)) continue;
@@ -151,26 +164,31 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
             overwrite: true,
             preserveStructure: false, // Estrutura de pastas
             verbose: false,
+            onProgress: (message, key, name) => progress(message, key, { name }),
           }
         );
 
         console.log('..: Copied', assetStats.copiedCount, 'assets');
         const projectSettings = resourceFiles.find(file => file.jsonContent?._resourceType === 'settings')?.jsonContent;
+        progress('Gerando fontes e imagens de diálogo...', 'fonts');
         await assetBuilder.applyFontOverrides(projectAssetsDir, projectSettings);
         await assetBuilder.materializeDialogueFrame('frame.png');
-        const derivedResources = await assetBuilder.materializeTileLayerEdits(resourceFiles);
-        if (derivedResources.length) {
-          resourceFiles = [
-            ...resourceFiles.map(file => file.jsonContent ? resourceBuilder.processResourceObject(file.jsonContent) : file),
-            ...derivedResources.map(resource => resourceBuilder.processResourceObject(resource)),
-          ];
-          console.log('..: Materialized', derivedResources.length, 'edited background layer(s)');
-        }
+        progress('Gerando imagens das camadas e aplicando edições de tiles...', 'layers');
+        const derivedResources = await assetBuilder.materializeTileLayerEdits(resourceFiles, options.parallel);
+        // Sprite baking updates build-only frame indices even when there are
+        // no edited backgrounds. Regenerate headers before creating the registry.
+        progress('Atualizando headers com os frames e imagens gerados...', 'updateHeaders');
+        resourceFiles = [
+          ...resourceFiles.map(file => file.jsonContent ? resourceBuilder.processResourceObject(file.jsonContent) : file),
+          ...derivedResources.map(resource => resourceBuilder.processResourceObject(resource)),
+        ];
+        if (derivedResources.length) console.log('..: Materialized', derivedResources.length, 'edited background layer(s)');
       }
     }
 
     // The registry must be emitted after derived layer resources have been added.
     if (resourceFiles.length > 0) {
+      progress('Preparando headers de recursos e registro do projeto...', 'registry');
       await resourceBuilder.writeResourceHeader(resourceFiles);
       await resourceBuilder.generateResourceRegistryClass(resourceFiles, gameConfig);
     }
@@ -180,18 +198,23 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
     const outputBuildDir = templateBuilder.getOutputBuildDir();
 
     if (fs.existsSync(buildDir)) {
-      await generateButanoAssetHeaders(buildDir, outputBuildDir, toolsRoot);
+      progress('Gerando gráficos, áudio e headers do Butano...', 'butano');
+      await generateButanoAssetHeaders(buildDir, outputBuildDir, toolsRoot, options.onProgress);
     }
 
+    progress('Validando referências de animações e músicas...', 'references');
+    resourceBuilder.validateTileAnimationReferences(resourceFiles, outputBuildDir);
     resourceBuilder.validateMusicReferences(resourceFiles, outputBuildDir);
 
     let graphicHeaderGeneratedByButano: string[] = [];
     if (fs.existsSync(outputBuildDir)) {
+      progress('Preparando header de itens gráficos...', 'graphicsHeader');
       graphicHeaderGeneratedByButano = await resourceBuilder.writeGraphicsHeader(outputBuildDir);
     }
 
     // Generate C++ base project structure using CppBuilder
     const cppBuilder = new CppBuilder(outputDir, templateDir, graphicHeaderGeneratedByButano);
+    progress('Gerando código C++ e preparando compilação da ROM...', 'cpp');
     await cppBuilder.generateProjectStructure(gameConfig);
     console.log('..: Generated C++ project structure with base Game class and managers');
 
@@ -295,7 +318,7 @@ function resolveToolExecutable(toolName: string): string {
  * @param toolsRoot - The toolsRoot directory where have the butano tools
  * @returns 
  */
-async function generateButanoAssetHeaders(buildDir: string, outputBuildDir: string, toolsRoot: string): Promise<void> {
+async function generateButanoAssetHeaders(buildDir: string, outputBuildDir: string, toolsRoot: string, onProgress?: (message: string) => void): Promise<void> {
   const assetToolPath = path.join(toolsRoot, 'butano', 'butano', 'tools', 'butano_assets_tool.py');
   const graphicsDir = path.join(buildDir, 'graphics');
   const audioDir = path.join(buildDir, 'audio');
@@ -322,7 +345,7 @@ async function generateButanoAssetHeaders(buildDir: string, outputBuildDir: stri
   const pythonExecutable = process.env.PYTHON || 'python';
 
   const args = [
-    '-B', assetToolPath,
+    '-u', '-B', assetToolPath,
     '--grit', gritExecutable,
     '--audio', audioDir,
     '--audio_backend', 'maxmod',
@@ -342,8 +365,8 @@ async function generateButanoAssetHeaders(buildDir: string, outputBuildDir: stri
     });
     activeAssetProcess = proc;
     activeAssetDone = new Promise<void>((done) => { resolveActiveAssetDone = done; });
-    proc.stdout?.on('data', (data) => console.log(data.toString()));
-    proc.stderr?.on('data', (data) => console.warn(data.toString()));
+    proc.stdout?.on('data', (data) => { const message = data.toString(); console.log(message); onProgress?.(message); });
+    proc.stderr?.on('data', (data) => { const message = data.toString(); console.warn(message); onProgress?.(message); });
     proc.once('error', reject);
     proc.once('close', (code) => {
       activeAssetProcess = null;

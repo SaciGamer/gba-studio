@@ -1,0 +1,98 @@
+{
+  "_resourceType": "scene",
+  "id": "a636971f-85c6-4633-8636-971f85c6633f",
+  "_index": 3,
+  "_deleted": false,
+  "name": "Credits",
+  "backgroundId": "original_butano_background",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": "original_butano_background",
+      "name": "",
+      "path": ""
+    }
+  ],
+  "x": 686.1059602649007,
+  "y": 82,
+  "width": 256,
+  "height": 256,
+  "sceneType": "Top Down",
+  "showCamera": true,
+  "editorPosition": {
+    "x": 686.1059602649007,
+    "y": 82
+  },
+  "renderMode": "regular_tilemap",
+  "gridSize": 8,
+  "paletteIds": [],
+  "spritePaletteIds": [],
+  "spawnPoints": [],
+  "autoFadeSpeed": 2,
+  "interactionButton": "A",
+  "eventGraphs": {},
+  "script": [
+    {
+      "id": "528a86c2-1392-47bd-8d9d-98ac8c8fbba3",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 2,
+        "__automatic": true,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "5535bfef-ed7d-4ee7-8535-bfefed7dee7f",
+      "version": 1,
+      "command": "EVENT_PLAY_MUSIC",
+      "args": {
+        "musicId": "fruit",
+        "volume": 70,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "32d1c1e3-1947-4520-82d1-c1e319475203",
+      "version": 1,
+      "command": "EVENT_CREDITS_PLAY",
+      "args": {
+        "text": "BUTANO FIGHTER\\n\\nOriginal game and art\\nButano sample project\\n\\nReconstructed with GBA Studio events\\n\\nPress A after the credits to return.",
+        "dialogueFont": "fixed8x8",
+        "showFrame": false,
+        "horizontalAlign": "center",
+        "verticalAlign": "center",
+        "animate": true,
+        "animationSpeed": "slow",
+        "__collapse": false
+      }
+    },
+    {
+      "id": "3e36196d-e7e6-48c7-8e36-196de7e68c72",
+      "version": 1,
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "d2a84604-f664-42eb-82a8-4604f6642eb9",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "left",
+        "fadeSpeed": 2,
+        "__collapse": true
+      }
+    }
+  ],
+  "actors": [],
+  "collisions": [],
+  "triggers": [],
+  "tileAnimations": [],
+  "spawnerTimelines": [],
+  "cameraPosition": {
+    "x": 0,
+    "y": 0
+  }
+}

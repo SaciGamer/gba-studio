@@ -1,0 +1,103 @@
+{
+  "_resourceType": "scene",
+  "id": "efe61829-b7c5-4e0a-8fe6-1829b7c5e0a8",
+  "_index": 0,
+  "_deleted": false,
+  "name": "Intro",
+  "backgroundId": "original_butano_background",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": "original_butano_background",
+      "name": "",
+      "path": ""
+    }
+  ],
+  "x": 106,
+  "y": 82,
+  "width": 256,
+  "height": 256,
+  "sceneType": "Top Down",
+  "showCamera": true,
+  "editorPosition": {
+    "x": 106,
+    "y": 82
+  },
+  "renderMode": "regular_tilemap",
+  "gridSize": 8,
+  "paletteIds": [],
+  "spritePaletteIds": [],
+  "spawnPoints": [],
+  "autoFadeSpeed": 2,
+  "interactionButton": "A",
+  "eventGraphs": {},
+  "script": [
+    {
+      "id": "e128db99-beae-4798-8128-db99beae7987",
+      "version": 1,
+      "command": "EVENT_FADE_OPTIONS",
+      "args": {
+        "color": "black",
+        "__collapse": true
+      }
+    },
+    {
+      "id": "8668220d-087a-4071-8668-220d087a0714",
+      "version": 1,
+      "command": "EVENT_PLAY_MUSIC",
+      "args": {
+        "musicId": "battle_clean",
+        "volume": 60,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "e46dbf5e-698e-4586-846d-bf5e698e5864",
+      "version": 1,
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 1,
+        "__automatic": true,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "346b2016-ee60-4670-846b-2016ee60670c",
+      "version": 1,
+      "command": "EVENT_WAIT",
+      "args": {
+        "units": "frames",
+        "frames": 120,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "0ffa20d4-6d18-4a94-8ffa-20d46d18a94f",
+      "version": 1,
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "d2a84604-f664-42eb-82a8-4604f6642eb9",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "right",
+        "fadeSpeed": 2,
+        "__collapse": true
+      }
+    }
+  ],
+  "actors": [],
+  "collisions": [],
+  "triggers": [],
+  "tileAnimations": [],
+  "spawnerTimelines": [],
+  "cameraPosition": {
+    "x": 0,
+    "y": 0
+  }
+}

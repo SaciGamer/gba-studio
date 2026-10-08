@@ -18,8 +18,10 @@ export interface IMainSettings extends IBaseSettings {
     startDirection: 'up' | 'down' | 'left' | 'right';
     colorMode: string;
     fadeDirection: 0 | 1;
+    inputMap?: Record<string, string[]>;
     demoAudioVolume?: number;
     demoAudioMuted?: boolean;
+    demoJoystick?: { id: string; index: number };
     playerSpriteId?: string | null;
     uiCursorImage?: string | null;
     uiFrameImage?: string | null;
@@ -28,6 +30,7 @@ export interface IMainSettings extends IBaseSettings {
     font8x8VariablesImage?: string | null;
     font8x16VariablesImage?: string | null;
     font16x16VariablesImage?: string | null;
+    playerAnimationStripOrientation?: 'horizontal' | 'vertical';
     playerFrameWidth?: number;
     playerFrameHeight?: number;
     playerFramesPerDirection?: number;
@@ -81,6 +84,7 @@ export interface IProjectSettings extends IFileSettings {
     name: string | null;
     author: string;
     notes: string;
+    cartridgeImage?: string | null;
 }
 
 export interface IFileSettings extends IBaseSettings {

@@ -1,0 +1,367 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "original_enemy_explosion",
+  "name": "enemy_explosion",
+  "filename": "enemy_explosion.bmp",
+  "imageWidth": 64,
+  "imageHeight": 2048,
+  "playerFrameWidth": 64,
+  "playerFrameHeight": 64,
+  "playerFramesPerDirection": 8,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 32,
+  "playerCanvasOriginY": 32,
+  "playerCollisionX": -32,
+  "playerCollisionY": -32,
+  "playerCollisionWidth": 64,
+  "playerCollisionHeight": 64,
+  "playerAnimations": [
+    {
+      "id": "idle-down",
+      "name": "Idle Down",
+      "type": "idle",
+      "frames": [
+        0
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_enemy_explosion-idle-down",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_enemy_explosion-idle-down",
+              "sourceX": 0,
+              "sourceY": 0,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-down",
+      "name": "Moving Down",
+      "type": "movement",
+      "frames": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-left",
+      "name": "Idle Left",
+      "type": "idle",
+      "frames": [
+        8
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_enemy_explosion-idle-left",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_enemy_explosion-idle-left",
+              "sourceX": 0,
+              "sourceY": 512,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-left",
+      "name": "Moving Left",
+      "type": "movement",
+      "frames": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-right",
+      "name": "Idle Right",
+      "type": "idle",
+      "frames": [
+        16
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_enemy_explosion-idle-right",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_enemy_explosion-idle-right",
+              "sourceX": 0,
+              "sourceY": 1024,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-right",
+      "name": "Moving Right",
+      "type": "movement",
+      "frames": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-up",
+      "name": "Idle Up",
+      "type": "idle",
+      "frames": [
+        24
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_enemy_explosion-idle-up",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_enemy_explosion-idle-up",
+              "sourceX": 0,
+              "sourceY": 1536,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-up",
+      "name": "Moving Up",
+      "type": "movement",
+      "frames": [
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31
+      ],
+      "canvasFrames": []
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "default",
+      "name": "Default",
+      "type": "default",
+      "animations": [
+        {
+          "id": "idle-down",
+          "name": "Idle Down",
+          "type": "idle",
+          "frames": [
+            0
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_enemy_explosion-idle-down",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_enemy_explosion-idle-down",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-down",
+          "name": "Moving Down",
+          "type": "movement",
+          "frames": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-left",
+          "name": "Idle Left",
+          "type": "idle",
+          "frames": [
+            8
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_enemy_explosion-idle-left",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_enemy_explosion-idle-left",
+                  "sourceX": 0,
+                  "sourceY": 512,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-left",
+          "name": "Moving Left",
+          "type": "movement",
+          "frames": [
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-right",
+          "name": "Idle Right",
+          "type": "idle",
+          "frames": [
+            16
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_enemy_explosion-idle-right",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_enemy_explosion-idle-right",
+                  "sourceX": 0,
+                  "sourceY": 1024,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-right",
+          "name": "Moving Right",
+          "type": "movement",
+          "frames": [
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-up",
+          "name": "Idle Up",
+          "type": "idle",
+          "frames": [
+            24
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_enemy_explosion-idle-up",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_enemy_explosion-idle-up",
+                  "sourceX": 0,
+                  "sourceY": 1536,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-up",
+          "name": "Moving Up",
+          "type": "movement",
+          "frames": [
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "canvasFrames": []
+        }
+      ]
+    }
+  ]
+}

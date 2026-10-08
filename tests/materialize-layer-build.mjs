@@ -39,6 +39,18 @@ try {
   const secondPixel = execFileSync(magick, [derivedBmp, '-format', '%[pixel:p{8,0}]', 'info:'], { encoding: 'utf8' });
   assert.match(firstPixel, /0,255,0/, 'the Settings default palette must be applied to the painted tile');
   assert.match(secondPixel, /255,128,0/, 'a tile-specific palette must override the Settings default');
+  const invalidPaletteScene = {
+    ...scene,
+    id: 'scene-invalid-palette',
+    backgrounds: [{ ...scene.backgrounds[0], tilePaletteIds: [['missing-palette']] }],
+  };
+  await assert.rejects(
+    () => new AssetBuilder(path.join(root, 'dist'), tempDir, magick).materializeTileLayerEdits([
+      { resourceName: 'invalid_scene_res.h', resourceType: 'gbasres', headerContent: Buffer.from(''), jsonContent: invalidPaletteScene },
+      ...resources.slice(1),
+    ]),
+    /Unknown tile palette 'missing-palette'/,
+  );
   // Materialization must not destroy the source asset; derived output is a
   // separate build artifact and the original remains reusable by the project.
   assert.ok(fs.existsSync(path.join(graphicsDir, 'source.bmp')));

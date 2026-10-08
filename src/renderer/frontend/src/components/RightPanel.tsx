@@ -2,8 +2,8 @@ import useAppContexts from '@/providers/contexts/AppContexts';
 import { EImageType, ETypeScene, IBackgroundElement, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { EVariableType, IVariableDefinition, VariableValue } from '@/providers/contexts/interfaces/IVariablesElement';
 import { IScriptDefinition } from '@/providers/contexts/interfaces/IScriptElement';
-import { BgColorsOutlined, CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled, PictureOutlined } from '@ant-design/icons';
-import { Alert, Button, Checkbox, Divider, Flex, Form, Input, Layout, Radio, Segmented, Select, Space, Tabs, theme, Tooltip, Typography } from 'antd';
+import { BgColorsOutlined, CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled, DeleteOutlined, PictureOutlined, PlusOutlined, SettingOutlined } from '@ant-design/icons';
+import { Alert, Button, Checkbox, Divider, Flex, Form, Input, Layout, Radio, Segmented, Select, Space, Tabs, Tag, theme, Tooltip, Typography } from 'antd';
 import StepInputNumber, { InputNumber } from './StepInputNumber';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,13 +11,21 @@ import { BackgroundSelector } from './BackgroundSelector';
 import CollapseEventManager from './events/CollapseEventManager';
 import SelectNewEvent from './events/SelectNewEvent';
 import FlowEditorManager from './events/FlowEditorManager';
-import RightPanelGWSettings from './RightPanelGWSettings';
+import RightPanelGWSettings, { CombatConfigEditor, ShooterConfigEditor } from './RightPanelGWSettings';
 import FadeEvent from './events/FadeEvent';
 import { EEvents } from './events/interfaces/IEvents';
 import { loadPaletteLibrary } from './resourceEditors/paletteLibrary';
 import imgPlaceholder from '@/img/placeholder.png';
 import { joinLocalAssetPath } from '@/utils/localAssetUrl';
+import { loadPaletteTransparentImage } from '@/utils/paletteTransparency';
 import { collectReferenceLocations, ReferenceLocation } from '@/utils/referenceLocations';
+import TileAnimationEditor from './TileAnimationEditor';
+import { useI18n } from '@/i18n/I18n';
+import TilesetAutoTileView, { AutoTileSlot, AutoTileTilesetImage } from './TilesetAutoTileView';
+import { loadTilesetAssets } from '@/utils/tilesetAssets';
+import { AUTO_TILE_VIEW_KEY, loadAutoTileAssets, toAutoTileSourceKey } from '@/utils/autoTileAssets';
+import { BLOB47_MASK_INDEX, BLOB47_MASKS, getBlob47Mask } from '@/utils/blobAutoTile';
+import { getEventDepthColor } from './events/EventColors';
 
 const { useToken } = theme;
 const { Content } = Layout;
@@ -81,6 +89,29 @@ const ReferenceList: React.FC<{ locations: ReferenceLocation[]; onSelect: (locat
   </Space>
 );
 
+const useReferenceNavigation = () => {
+  const { scenes, scripts, setSettingUtils, setElementSelected } = useAppContexts();
+  return (location: ReferenceLocation) => {
+    const scene = scenes.find(item => !item._deleted && (location.sceneId
+      ? item.id === location.sceneId : (item.name || item.id) === location.scene));
+    const referencedScript = !scene && scripts.scripts.find(item => location.scriptId
+      ? item.id === location.scriptId : (item.name || item.id) === location.script);
+    const object = scene && location.sceneObject ? { sceneId: scene.id, ...location.sceneObject } : null;
+    setSettingUtils(previous => ({
+      ...previous,
+      selectedSceneIds: scene ? [scene.id] : [],
+      tileEditSceneId: object?.sceneId ?? null,
+      tileEditLayerId: object ? 4 : null,
+      activeSceneObject: object,
+      activeTriggerId: object?.type === 'trigger' ? object.id : null,
+      activeButton: 'select',
+      activeSubButton: '',
+    }));
+    setElementSelected(scene ? { ...scene, _recenter: true }
+      : referencedScript ? { ...referencedScript, script: referencedScript.events, _resourceType: 'script' } : null);
+  };
+};
+
 const VariableSettingsForm: React.FC<{ variable: IVariableDefinition }> = ({ variable }) => {
   const { variables, scripts, scenes, setVariables, setElementSelected, setSettingUtils } = useAppContexts();
   const [isEditingName, setIsEditingName] = useState(false);
@@ -103,18 +134,14 @@ const VariableSettingsForm: React.FC<{ variable: IVariableDefinition }> = ({ var
   };
 
   const locations = collectReferenceLocations(scenes, scripts.scripts, variable.id, 'variable');
-  const selectReference = (location: ReferenceLocation) => {
-    const scene = location.scene && scenes.find(item => (item.name || item.id) === location.scene);
-    const referencedScript = !scene && location.script && scripts.scripts.find(item => (item.name || item.id) === location.script);
-    setSettingUtils(previous => ({ ...previous, selectedSceneIds: scene ? [scene.id] : [], tileEditSceneId: null, tileEditLayerId: null, activeSceneObject: null, activeTriggerId: null }));
-    setElementSelected(scene || (referencedScript ? { ...referencedScript, script: referencedScript.events, _resourceType: 'script' } : null));
-  };
+  const selectReference = useReferenceNavigation();
 
   return (
     <Space direction="vertical" style={{ width: '100%' }}>
       {isEditingName ? (
         <Input
           autoFocus
+          variant="borderless"
           aria-label="Variable name"
           placeholder={defaultName}
           value={variable.name}
@@ -184,32 +211,23 @@ const VariableSettingsForm: React.FC<{ variable: IVariableDefinition }> = ({ var
 };
 
 const ScriptSettingsForm: React.FC<{ script: IScriptDefinition }> = ({ script }) => {
-  const { scripts, scenes, setScripts, setElementSelected, setSettingUtils, elementSelected } = useAppContexts();
+  const { t } = useI18n();
+  const { scripts, scenes, setScripts, setElementSelected, setSettingUtils } = useAppContexts();
   const [isEditingName, setIsEditingName] = useState(false);
   const scriptIndex = scripts.scripts.findIndex(item => item.id === script.id);
   const defaultName = `Script ${Math.max(0, scriptIndex)}`;
   const displayedName = script.name || defaultName;
   const updateScript = (patch: Partial<IScriptDefinition>) => {
-    const updated = { ...script, ...patch, _saved: false };
+    const updated = { ...script, ...patch, ...(patch.events ? { script: patch.events } : {}), _saved: false };
     setScripts(previous => ({ ...previous, scripts: previous.scripts.map(item => item.id === script.id ? updated : item), _saved: false }));
     setElementSelected({ ...updated, script: updated.events, _resourceType: 'script' });
   };
-  useEffect(() => {
-    if (elementSelected?.id === script.id && elementSelected.script !== script.events) {
-      setElementSelected({ ...script, script: script.events, _resourceType: 'script' });
-    }
-  }, [elementSelected?.id, script, setElementSelected]);
-  useEffect(() => {
-    if (elementSelected?._resourceType !== 'script' || elementSelected.id !== script.id || !Array.isArray(elementSelected.script) || elementSelected.script === script.events) return;
-    updateScript({ events: elementSelected.script });
-  }, [elementSelected, script]);
   const locations = collectReferenceLocations(scenes, scripts.scripts, script.id, 'script');
-  const selectReference = (location: ReferenceLocation) => {
-    const scene = location.scene && scenes.find(item => (item.name || item.id) === location.scene);
-    setSettingUtils(previous => ({ ...previous, selectedSceneIds: scene ? [scene.id] : [], tileEditSceneId: null, tileEditLayerId: null, activeSceneObject: null, activeTriggerId: null }));
-    setElementSelected(scene || null);
-  };
-  return <Content><Space direction="vertical" style={{ width: '100%' }}>{isEditingName ? <Input autoFocus placeholder={defaultName} value={script.name || ''} onChange={event => updateScript({ name: event.target.value })} onBlur={() => { if (!(script.name || '').trim()) updateScript({ name: defaultName }); setIsEditingName(false); }} onPressEnter={event => event.currentTarget.blur()} style={{ margin: 10, width: 'calc(100% - 20px)' }} /> : <Typography.Title level={5} onClick={() => setIsEditingName(true)} style={{ margin: 0, cursor: 'pointer', padding: 10 }}>{displayedName}</Typography.Title>}<Divider style={{ margin: 0 }} /><ReferenceList locations={locations} onSelect={selectReference} /><Tabs style={{ padding: 10 }} items={[{ key: 'script', label: 'Script', children: <Space direction="vertical" style={{ width: '100%' }}><CollapseEventManager scripts={script.events} /><SelectNewEvent tabIndex="1" /></Space> }]} /></Space></Content>;
+  const selectReference = useReferenceNavigation();
+  return <Content><Space direction="vertical" style={{ width: '100%' }}>{isEditingName ? <Input autoFocus variant="borderless" placeholder={defaultName} value={script.name || ''} onChange={event => updateScript({ name: event.target.value })} onBlur={() => { if (!(script.name || '').trim()) updateScript({ name: defaultName }); setIsEditingName(false); }} onPressEnter={event => event.currentTarget.blur()} style={{ margin: 10, width: 'calc(100% - 20px)' }} /> : <Typography.Title level={5} onClick={() => setIsEditingName(true)} style={{ margin: 0, cursor: 'pointer', padding: 10 }}>{displayedName}</Typography.Title>}<Divider style={{ margin: 0 }} /><Space direction="vertical" size={4} style={{ width: '100%', padding: '8px 10px', boxSizing: 'border-box' }}>
+    <Typography.Text type="secondary">{t('scripts.description')}</Typography.Text>
+    <Input.TextArea aria-label={t('scripts.description')} placeholder={t('scripts.descriptionPlaceholder')} value={script.description ?? ''} autoSize={{ minRows: 2, maxRows: 6 }} onChange={event => updateScript({ description: event.target.value })} />
+  </Space><ReferenceList locations={locations} onSelect={selectReference} /><Tabs style={{ padding: 10 }} items={[{ key: 'script', label: 'Script', children: <Space direction="vertical" style={{ width: '100%' }}><CollapseEventManager scripts={script.events} onScriptsChange={events => updateScript({ events })} /><SelectNewEvent tabIndex="1" onEventCreated={event => updateScript({ events: [...script.events, event] })} /></Space> }]} /></Space></Content>;
 };
 
 const SceneObjectSettingsForm: React.FC<{ sceneId: string; type: 'actor' | 'trigger'; objectId: string; availableSprites?: any[] }> = ({ sceneId, type, objectId, availableSprites = [] }) => {
@@ -250,13 +268,13 @@ const { scenes, setScenes, setElementSelected, spriteResources, settingUtils } =
     setIsEditingName(false);
   };
   return <Content style={{ padding: 10 }}>
-    {isEditingName ? <Input autoFocus value={object.name ?? ''} placeholder={defaultName} onChange={event => update({ name: event.target.value })} onBlur={restoreDefaultName} onPressEnter={restoreDefaultName} /> : <Typography.Title level={5} onClick={() => setIsEditingName(true)} style={{ marginTop: 0, cursor: 'text' }}>{object.name || defaultName}</Typography.Title>}
+    {isEditingName ? <Input autoFocus variant="borderless" value={object.name ?? ''} placeholder={defaultName} onChange={event => update({ name: event.target.value })} onBlur={restoreDefaultName} onPressEnter={restoreDefaultName} /> : <Typography.Title level={5} onClick={() => setIsEditingName(true)} style={{ marginTop: 0, cursor: 'text' }}>{object.name || defaultName}</Typography.Title>}
     <Divider style={{ margin: '8px 0' }} />
     <Space direction="vertical" style={{ width: '100%' }}>
       <Typography.Paragraph style={{ marginBottom: 8 }}>{type === 'actor' ? 'Start Position' : 'Position'}</Typography.Paragraph>
       <Flex gap={8}>
-        <InputNumber addonBefore="X" min={type === 'actor' ? 8 : 0} step={type === 'actor' ? 16 : 8} value={object.x} onChange={value => update({ x: positionX(value) })} style={{ width: '50%' }} />
-        <InputNumber addonBefore="Y" min={type === 'actor' ? 4 : 0} step={8} value={object.y} onChange={value => update({ y: positionY(value) })} style={{ width: '50%' }} />
+        <InputNumber addonBefore="X" min={type === 'actor' ? 8 : 0} step={type === 'actor' ? 16 : 8} value={object.x} onChange={value => update({ x: positionX(value) })} style={{ flex: 1, minWidth: 0 }} />
+        <InputNumber addonBefore="Y" min={type === 'actor' ? 4 : 0} step={8} value={object.y} onChange={value => update({ y: positionY(value) })} style={{ flex: 1, minWidth: 0 }} />
       </Flex>
       {type === 'actor' && <>
         <Space direction="vertical" size={6} style={{ width: '100%' }}>
@@ -269,7 +287,7 @@ const { scenes, setScenes, setElementSelected, spriteResources, settingUtils } =
           </Radio.Group>
         </Space>
         <Divider style={{ margin: '12px 0' }} />
-        <Space.Compact block style={{ width: '100%', gap: 10 }}>
+        <Flex gap={8} style={{ width: '100%' }}>
           <Space direction="vertical" size={2} style={{ flex: 1, minWidth: 0 }}>
             <Typography.Text>Movement Speed</Typography.Text>
             {actorMoveSpeedIsCustom ? <InputNumber min={0.01} max={10} step={0.0625} value={actorMoveSpeed} onChange={value => update({ moveSpeed: value ?? 1 })} style={{ width: '100%' }} /> : <Select showSearch optionFilterProp="label" value={actorMoveSpeed} onChange={value => update({ moveSpeed: value === -1 ? 1 : value })} style={{ width: '100%' }}>{actorMoveSpeedOptions.map(option => <Select.Option key={option.value} value={option.value} label={`${option.label} ${option.ppf}`}><span style={{ display: 'flex', justifyContent: 'space-between' }}>{option.label}<span style={{ opacity: 0.6, marginLeft: 8 }}>{option.ppf}</span></span></Select.Option>)}<Select.Option value={-1} label="Custom Speed">Custom Speed</Select.Option></Select>}
@@ -278,10 +296,24 @@ const { scenes, setScenes, setElementSelected, spriteResources, settingUtils } =
             <Typography.Text>Animation Speed</Typography.Text>
             <Select showSearch optionFilterProp="label" value={(object as any).animationSpeed ?? 6} onChange={animationSpeed => update({ animationSpeed })} style={{ width: '100%' }}>{actorAnimationSpeedOptions.map(option => <Select.Option key={option.value} value={option.value} label={`${option.label} ${option.fps}`}><span style={{ display: 'flex', justifyContent: 'space-between' }}>{option.label}<span style={{ opacity: 0.6, marginLeft: 8 }}>{option.fps}</span></span></Select.Option>)}</Select>
           </Space>
-        </Space.Compact>
+        </Flex>
         <Content>
           <Typography.Text>Sprite Sheet</Typography.Text>
-          <Select title="Select actor sprite sheet" placeholder="Select sprite" allowClear showSearch optionFilterProp="label" filterOption={(input, option) => String((option as any)?.searchText ?? '').toLowerCase().includes(input.toLowerCase())} style={{ width: '100%' }} value={(object as any).spriteId} options={spriteResources.map(sprite => { const file = availableSprites.find(item => item.id === sprite.id); const filename = sprite.filename ?? file?.name; const path = file?.path ?? joinLocalAssetPath(settingUtils.localImagePath, filename); return { value: sprite.id, label: <PlayerSpriteOption name={sprite.name} path={path} />, searchText: `${sprite.name} ${sprite.id} ${filename ?? ''}` }; })} onChange={spriteId => update({ spriteId })} />
+          <Select title="Select actor sprite sheet" placeholder="Select sprite" allowClear showSearch optionFilterProp="title" filterOption={(input, option) => {
+            const data = (option as any)?.data ?? option;
+            const searchableText = data?.title ?? data?.value ?? '';
+            return String(searchableText).toLowerCase().includes(input.trim().toLowerCase());
+          }} style={{ width: '100%' }} value={(object as any).spriteId} onChange={spriteId => update({ spriteId })}>
+            {spriteResources.map(sprite => {
+              const file = availableSprites.find(item => item.id === sprite.id);
+              const filename = sprite.filename ?? file?.name;
+              const imagePath = file?.path ?? '';
+              const searchText = `${sprite.name} ${sprite.id} ${filename ?? ''}`;
+              return <Select.Option key={sprite.id} value={sprite.id} title={searchText} label={searchText}>
+                <PlayerSpriteOption name={sprite.name} path={imagePath} />
+              </Select.Option>;
+            })}
+          </Select>
         </Content>
       </>}
       {type === 'actor' ? (
@@ -290,8 +322,8 @@ const { scenes, setScenes, setElementSelected, spriteResources, settingUtils } =
         <>
           <Typography.Paragraph style={{ margin: '8px 0' }}>Size</Typography.Paragraph>
           <Flex gap={8}>
-            <InputNumber addonBefore="W" min={8} max={triggerMaxWidth} step={8} value={object.width} onChange={value => update({ width: dimension(value, 8, triggerMaxWidth) })} style={{ width: '50%' }} />
-            <InputNumber addonBefore="H" min={8} max={triggerMaxHeight} step={8} value={object.height} onChange={value => update({ height: dimension(value, 8, triggerMaxHeight) })} style={{ width: '50%' }} />
+            <InputNumber addonBefore="W" min={8} max={triggerMaxWidth} step={8} value={object.width} onChange={value => update({ width: dimension(value, 8, triggerMaxWidth) })} style={{ flex: 1, minWidth: 0 }} />
+            <InputNumber addonBefore="H" min={8} max={triggerMaxHeight} step={8} value={object.height} onChange={value => update({ height: dimension(value, 8, triggerMaxHeight) })} style={{ flex: 1, minWidth: 0 }} />
           </Flex>
         </>
       )}
@@ -313,28 +345,100 @@ interface IRightPanelProps {
 }
 
 const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
+  const { t } = useI18n();
   const { token } = useToken();
-  const { scenes, setScenes, elementSelected, setElementSelected, settings, setSettings, settingUtils, setSettingUtils, palettes } = useAppContexts();
+  const { scenes, setScenes, elementSelected, setElementSelected, settings, setSettings, settingUtils, setSettingUtils, palettes, userSettings, setUserSettings } = useAppContexts();
   const isEditingTiles = Boolean(settingUtils.tileEditSceneId);
 
   const [isEditingTitle, setIsEditingTitle ] = useState(false);
   const [availableTilesets, setAvailableTilesets] = useState<any[]>([]);
+  const [availableAutoTiles, setAvailableAutoTiles] = useState<any[]>([]);
   const [availablePlayerSprites, setAvailablePlayerSprites] = useState<any[]>([]);
   const [selectedTiles, setSelectedTiles] = useState<number[]>(elementSelected?.selectedTiles || []);
   const [isSelecting, setIsSelecting] = useState(false);
+  const [isPanningTileset, setIsPanningTileset] = useState(false);
   const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 });
   const [selectionEnd, setSelectionEnd] = useState({ x: 0, y: 0 });
-  const [tilesetZoom, setTilesetZoom] = useState(100);
-  const [showTilesetGrid, setShowTilesetGrid] = useState(true);
+  const tilesetSelectionRef = useRef({ start: { x: 0, y: 0 }, end: { x: 0, y: 0 }, extend: false });
+  const tilesetViewportRef = useRef<HTMLDivElement>(null);
+  const tilesetPanStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
+  const [tilesetViewMode, setTilesetViewMode] = useState<'tileset' | 'autoTiles'>('tileset');
+  const [autoTileConfigSignal, setAutoTileConfigSignal] = useState(0);
+  const modifiedAutoTileSlotsRef = useRef(new Set<number>());
+  const [showSceneCombatConfig, setShowSceneCombatConfig] = useState(false);
+  const [showSceneShooterConfig, setShowSceneShooterConfig] = useState(false);
+
+  useEffect(() => {
+    setShowSceneCombatConfig(false);
+    setShowSceneShooterConfig(false);
+  }, [elementSelected?.id, elementSelected?.sceneType]);
 
   const TILE_SIZE = 8;
-  const [tileset, setTileset] = useState({
+  const editingTilesetLayerId = settingUtils.tileEditLayerId ?? elementSelected?.backgrounds?.[0]?.layerId ?? 0;
+  const hoveredAutoTileSceneId = elementSelected?.id;
+  const hoverSettingsSetterRef = useRef(setSettingUtils);
+  hoverSettingsSetterRef.current = setSettingUtils;
+  const handleHoverAutoTileSlot = useCallback((slotIndex: number | null) => {
+    hoverSettingsSetterRef.current(previous => {
+      if (slotIndex === null) return previous.autoTileSlotHover?.sceneId === hoveredAutoTileSceneId
+        ? { ...previous, autoTileSlotHover: null } : previous;
+      if (!hoveredAutoTileSceneId) return previous;
+      return { ...previous, autoTileSlotHover: { sceneId: hoveredAutoTileSceneId, layerId: editingTilesetLayerId, slotIndex } };
+    });
+  }, [hoveredAutoTileSceneId, editingTilesetLayerId]);
+  const activeTilesetLayer = elementSelected?.backgrounds?.find(layer => layer.layerId === editingTilesetLayerId);
+  const activeTilesetId = activeTilesetLayer?.selectedTilesetId ?? elementSelected?.selectedTilesetId ?? '';
+  const activeLayerTileMap = activeTilesetLayer?.tileMap ?? (editingTilesetLayerId === 0 ? elementSelected?.tileMap : undefined);
+  const usedTilesetIds = Array.from(new Set((activeLayerTileMap ?? []).flatMap((row: number[], rowIndex: number) => row.flatMap((tile: number, colIndex: number) => {
+    if (tile < 0) return [];
+    const tilesetId = activeTilesetLayer?.tileMapTilesetIds?.[rowIndex]?.[colIndex] ?? activeTilesetLayer?.selectedTilesetId ?? elementSelected?.selectedTilesetId;
+    return tilesetId && !tilesetId.startsWith('auto-tile:') ? [tilesetId] : [];
+  }))));
+  const tilesetViewById = userSettings.tilesetViews ?? {};
+  const activePickerViewId = tilesetViewMode === 'autoTiles' ? AUTO_TILE_VIEW_KEY : activeTilesetId;
+  const activeTilesetView = tilesetViewById[activePickerViewId] ?? { cellSize: tilesetViewMode === 'autoTiles' ? 16 as const : 8 as const, zoom: 100, showGrid: true };
+  const tilesetZoom = activeTilesetView.zoom;
+  const tilesetCellSize = activeTilesetView.cellSize;
+  const autoTileSlots = (settings?.autoTileSlots ?? []).map(slot => typeof slot.autoTileId === 'string'
+    ? slot
+    : { ...slot, parts: Array.from({ length: 47 }, () => null) });
+  const updateTilesetViewForId = (tilesetId: string, patch: Partial<{ cellSize: 8 | 16 | 32; zoom: number; showGrid: boolean }>) => {
+    if (!tilesetId) return;
+    setUserSettings(previous => ({
+      ...previous,
+      _saved: false,
+      tilesetViews: {
+        ...previous.tilesetViews,
+        [tilesetId]: { ...(previous.tilesetViews?.[tilesetId] ?? { cellSize: 8, zoom: 100, showGrid: true }), ...patch },
+      },
+    }));
+  };
+  const updateTilesetView = (patch: Partial<{ cellSize: 8 | 16 | 32; zoom: number; showGrid: boolean }>) => updateTilesetViewForId(activePickerViewId, patch);
+  const [tileset, setTileset] = useState<{
+    image: HTMLImageElement | HTMLCanvasElement;
+    tileWidth: number;
+    tileHeight: number;
+    columns: number;
+    rows: number;
+    source?: string;
+  }>({
     image: new Image(),
     tileWidth: TILE_SIZE,
     tileHeight: TILE_SIZE,
     columns: 0,
-    rows: 0
+    rows: 0,
   });
+  const tilesPerCell = tilesetCellSize / TILE_SIZE;
+  const tilesetDisplayColumns = Math.ceil(tileset.columns / tilesPerCell);
+  const tilesetDisplayRows = Math.ceil(tileset.rows / tilesPerCell);
+  const tilesetCanvasWidth = tileset.columns * TILE_SIZE;
+  const tilesetCanvasHeight = tileset.rows * TILE_SIZE;
+  const selectedTileIndexes = (elementSelected?.selectedTiles ?? []).filter((tileIndex: number) => tileIndex >= 0 && tileIndex < tileset.columns * tileset.rows);
+  const selectedTileBounds = selectedTileIndexes.length > 0 ? selectedTileIndexes.reduce((bounds: { minCol: number; minRow: number; maxCol: number; maxRow: number }, tileIndex: number) => {
+    const col = tileIndex % tileset.columns;
+    const row = Math.floor(tileIndex / tileset.columns);
+    return { minCol: Math.min(bounds.minCol, col), minRow: Math.min(bounds.minRow, row), maxCol: Math.max(bounds.maxCol, col), maxRow: Math.max(bounds.maxRow, row) };
+  }, { minCol: tileset.columns, minRow: tileset.rows, maxCol: 0, maxRow: 0 }) : null;
   const [mapWidth, setMapWidth] = useState(Math.ceil((elementSelected?.width || 240) / TILE_SIZE));
   const [mapHeight, setMapHeight] = useState(Math.ceil((elementSelected?.height || 160) / TILE_SIZE));
   const [imageType, setImageType] = useState<EImageType>(EImageType.PALETTE_BITMAP_BG);
@@ -395,6 +499,13 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
     },
   ];
   const [activeLayerKey, setActiveLayerKey] = useState("2");
+  const [assetReloadVersion, setAssetReloadVersion] = useState(0);
+
+  useEffect(() => {
+    const reload = () => setAssetReloadVersion(version => version + 1);
+    window.addEventListener('gba-studio:assets-reloaded', reload);
+    return () => window.removeEventListener('gba-studio:assets-reloaded', reload);
+  }, []);
 
   useEffect(() => {
     if (!elementSelected) return;
@@ -402,34 +513,63 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
     setMapHeight(Math.ceil((elementSelected.height || 160) / TILE_SIZE));
     if (isSingleLayerScene) {
       setActiveLayerKey('2');
-      setSettingUtils(previous => previous.tileEditLayerId === 2 ? previous : { ...previous, tileEditLayerId: 2 });
     }
   }, [elementSelected?.id, elementSelected?.width, elementSelected?.height, isSingleLayerScene, setSettingUtils]);
 
+  useEffect(() => {
+    if (!isSingleLayerScene || !elementSelected?.id || settingUtils.tileEditSceneId !== elementSelected.id
+      || settingUtils.tileEditLayerId === EVENTS_LAYER_ID) return;
+    setSettingUtils(previous => ({
+      ...previous,
+      tileEditLayerId: EVENTS_LAYER_ID,
+      ...(previous.activeButton === 'tiles' || previous.activeButton === 'colorize'
+        ? { activeButton: 'select', activeSubButton: '' } : {}),
+    }));
+  }, [elementSelected?.id, isSingleLayerScene, settingUtils.tileEditSceneId, settingUtils.tileEditLayerId, setSettingUtils]);
+
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const viewport = tilesetViewportRef.current;
+    if (!viewport || tilesetViewMode !== 'tileset') return;
+
+    const handleTilesetWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey || !viewport.contains(event.target as Node) || !activeTilesetId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setUserSettings(previous => {
+        const currentView = previous.tilesetViews?.[activeTilesetId] ?? { cellSize: 8 as const, zoom: 100, showGrid: true };
+        const zoom = Math.max(50, Math.min(400, currentView.zoom + (event.deltaY < 0 ? 25 : -25)));
+        return { ...previous, _saved: false, tilesetViews: { ...previous.tilesetViews, [activeTilesetId]: { ...currentView, zoom } } };
+      });
+    };
+
+    document.addEventListener('wheel', handleTilesetWheel, { capture: true, passive: false });
+    return () => document.removeEventListener('wheel', handleTilesetWheel, true);
+  }, [activeTilesetId, setUserSettings, tilesetViewMode]);
 
   // Load available tilesets
   useEffect(() => {
     const loadTilesets = async () => {
       try {
         if (window.electronAPI && window.electronAPI.fetchImages) {
-          const tilesetsData = await window.electronAPI.fetchImages('tilesets');
-          if (tilesetsData.status === 'success') {
-            // Convert file names to tileset objects
-            const tilesets = tilesetsData.fileImages?.map((filename: string, index: number) => ({
-              id: filename.replace(/\.[^/.]+$/, ''), // Remove extension for id
-              name: filename,
-              path: `${tilesetsData.localPath}/${filename}`
-            })) || [];
-            setAvailableTilesets(tilesets);
-          }
+          setAvailableTilesets(await loadTilesetAssets(settingUtils.projectPathFile ?? settingUtils.localImagePath));
         }
       } catch (error) {
         console.error('Error loading tilesets:', error);
         // A missing asset must remain an empty tileset. Do not invent tiles
         // here: painting without a real tileset is intentionally disabled.
         setAvailableTilesets([]);
+      }
+    };
+
+    const loadAutoTiles = async () => {
+      try {
+        setAvailableAutoTiles(await loadAutoTileAssets(settingUtils.projectPathFile ?? settingUtils.localImagePath));
+      } catch (error) {
+        console.error('Error loading autotile images:', error);
+        setAvailableAutoTiles([]);
       }
     };
 
@@ -445,7 +585,7 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
           const sprites = spritesData.fileImages?.filter((filename: string) => /\.(png|jpg|jpeg|gif|bmp)$/i.test(filename)).map((filename: string) => ({
             id: filename.replace(/\.[^/.]+$/, ''),
             name: filename,
-            path: `${spritesData.localPath}/${filename}`,
+            path: joinLocalAssetPath(spritesData.localPath, filename),
           })) || [];
           setAvailablePlayerSprites(sprites);
         } else {
@@ -458,8 +598,9 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
     };
 
     loadTilesets();
+    loadAutoTiles();
     loadPlayerSprites();
-  }, []);
+  }, [assetReloadVersion, settingUtils.localImagePath, settingUtils.projectPathFile]);
 
   useEffect(() => {
     if (elementSelected?.height && elementSelected?.width) {
@@ -578,7 +719,7 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
     { label: 'Top Down', value: ETypeScene.TOPDOWN },
     { label: 'Platformer', value: ETypeScene.PLATFORM },
     { label: 'Adventure', value: ETypeScene.ADVENTURE },
-    { label: 'Shoot Em\'Up', value: ETypeScene.SHMUP },
+    { label: 'Shooter', value: ETypeScene.SHOOTER },
     { label: 'Point Click', value: ETypeScene.POINTNCLICK },
     { label: 'Logo', value: ETypeScene.LOGO }
   ];
@@ -630,12 +771,22 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
   const handleTilesetChange = (value: string) => {
     if (elementSelected) {
       const editingLayerId = settingUtils.tileEditLayerId ?? elementSelected.backgrounds?.[0]?.layerId ?? 0;
+      const currentLayer = elementSelected.backgrounds?.find(layer => layer.layerId === editingLayerId);
+      const currentMap = currentLayer?.tileMap ?? (editingLayerId === 0 ? elementSelected.tileMap : undefined);
+      const previousTilesetId = currentLayer?.selectedTilesetId ?? elementSelected.selectedTilesetId ?? null;
+      const currentTilesetIds = currentMap?.map((row, rowIndex) => row.map((tile, colIndex) => currentLayer?.tileMapTilesetIds?.[rowIndex]?.[colIndex] ?? (tile >= 0 ? previousTilesetId : null)));
+      const layerChanges = {
+        selectedTilesetId: value,
+        selectedTiles: [],
+        ...(currentMap ? { tileMap: currentMap, tileMapTilesetIds: currentTilesetIds } : {}),
+      };
       const backgrounds = isEditingTiles
         ? (elementSelected.backgrounds?.some(layer => layer.layerId === editingLayerId)
-          ? elementSelected.backgrounds.map(layer => layer.layerId === editingLayerId ? { ...layer, selectedTilesetId: value } : layer)
-          : [...(elementSelected.backgrounds ?? []), { layerId: editingLayerId, selectedTilesetId: value }])
+          ? elementSelected.backgrounds.map(layer => layer.layerId === editingLayerId ? { ...layer, ...layerChanges } : layer)
+          : [...(elementSelected.backgrounds ?? []), { layerId: editingLayerId, ...layerChanges }])
         : elementSelected.backgrounds;
-      const updatedElement = { ...elementSelected, selectedTilesetId: value, backgrounds };
+      const updatedElement = { ...elementSelected, selectedTilesetId: value, selectedTiles: [], ...(isEditingTiles && currentMap ? { tileMap: undefined } : {}), backgrounds };
+      setSelectedTiles([]);
       setElementSelected(updatedElement);
       setScenes(prevScenes => prevScenes.map(scene => 
         scene.id === updatedElement.id 
@@ -643,6 +794,211 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
           : scene
       ));
     }
+  };
+
+  const handleRemoveLayerTileset = (tilesetId: string) => {
+    if (!elementSelected) return;
+    const layer = activeTilesetLayer ?? { layerId: editingTilesetLayerId, selectedTilesetId: elementSelected.selectedTilesetId };
+    const map = (layer.tileMap ?? (editingTilesetLayerId === 0 ? elementSelected.tileMap : undefined) ?? []).map(row => [...row]);
+    const tilesetIds = map.map((row, rowIndex) => row.map((tile, colIndex) => layer.tileMapTilesetIds?.[rowIndex]?.[colIndex] ?? (tile >= 0 ? layer.selectedTilesetId ?? elementSelected.selectedTilesetId ?? null : null)));
+    const paletteIds = map.map((row, rowIndex) => row.map((_, colIndex) => layer.tilePaletteIds?.[rowIndex]?.[colIndex] ?? null));
+    const removedIndices = new Set<number>();
+    const columns = map[0]?.length ?? 0;
+    map.forEach((row, rowIndex) => row.forEach((tile, colIndex) => {
+      if (tile < 0 || tilesetIds[rowIndex][colIndex] !== tilesetId) return;
+      row[colIndex] = -1;
+      tilesetIds[rowIndex][colIndex] = null;
+      paletteIds[rowIndex][colIndex] = null;
+      removedIndices.add(rowIndex * columns + colIndex);
+    }));
+    const remainingTilesetIds = usedTilesetIds.filter(id => id !== tilesetId);
+    const backgrounds = (elementSelected.backgrounds?.some(item => item.layerId === editingTilesetLayerId)
+      ? elementSelected.backgrounds.map(item => item.layerId === editingTilesetLayerId ? {
+      ...item,
+      ...layer,
+      tileMap: map,
+      tileMapTilesetIds: tilesetIds,
+      tilePaletteIds: paletteIds,
+      tileMapCellOverrides: (item.tileMapCellOverrides ?? []).filter(override => !removedIndices.has(override.index)),
+      selectedTilesetId: item.selectedTilesetId === tilesetId ? remainingTilesetIds[0] : item.selectedTilesetId,
+      ...(item.selectedTilesetId === tilesetId ? { selectedTiles: [] } : {}),
+    } : item)
+      : [...(elementSelected.backgrounds ?? []), { ...layer, tileMap: map, tileMapTilesetIds: tilesetIds, tilePaletteIds: paletteIds }]);
+    const updatedElement = {
+      ...elementSelected,
+      selectedTilesetId: elementSelected.selectedTilesetId === tilesetId ? remainingTilesetIds[0] : elementSelected.selectedTilesetId,
+      ...(elementSelected.selectedTilesetId === tilesetId ? { selectedTiles: [] } : {}),
+      backgrounds,
+      _saved: false,
+    };
+    setElementSelected(updatedElement);
+    setScenes(previous => previous.map(scene => scene.id === updatedElement.id ? updatedElement : scene));
+    setSettingUtils(previous => previous.tileSourceHover?.tilesetId === tilesetId ? { ...previous, tileSourceHover: null } : previous);
+  };
+
+  const handleAutoTileSlotsChange = (slots: AutoTileSlot[]) => {
+    slots.forEach((slot, index) => {
+      const previous = settings?.autoTileSlots?.[index];
+      if (slot.autoTileId !== previous?.autoTileId || slot.tileSize !== (previous?.tileSize ?? 16) || slot.parts.some((part, partIndex) => part !== previous?.parts?.[partIndex])) {
+        modifiedAutoTileSlotsRef.current.add(index);
+      }
+    });
+    setSettings(previous => ({ ...previous, autoTileSlots: slots, _saved: false }));
+  };
+
+  const handleAutoTileConfigurationClose = (slots: AutoTileSlot[], sourceImages: Record<string, AutoTileTilesetImage>) => {
+    const changedSlots = new Set(modifiedAutoTileSlotsRef.current);
+    modifiedAutoTileSlotsRef.current.clear();
+    if (!changedSlots.size) return;
+
+    const recomposeScenes = (images: Record<string, AutoTileTilesetImage>) => {
+      const updatedScenes = scenes.map(scene => {
+        let sceneChanged = false;
+        const backgrounds = scene.backgrounds?.map(layer => {
+          if (!layer.autoTileMap?.some(row => row.some(slotIndex => changedSlots.has(slotIndex)))) return layer;
+          const columns = Math.max(layer.tileMap?.[0]?.length ?? 0, Math.ceil(scene.width / 8));
+          const rows = Math.max(layer.tileMap?.length ?? 0, Math.ceil(scene.height / 8));
+          const tileMap = Array.from({ length: rows }, (_, rowIndex) => Array.from({ length: columns }, (_, colIndex) => layer.tileMap?.[rowIndex]?.[colIndex] ?? -1));
+          const tilesetIds = Array.from({ length: rows }, (_, rowIndex) => Array.from({ length: columns }, (_, colIndex) => layer.tileMapTilesetIds?.[rowIndex]?.[colIndex] ?? null));
+          const autoTileMap = layer.autoTileMap.map(row => [...row]);
+          const updatedIndices = new Set<number>();
+
+          autoTileMap.forEach((row, autoRow) => row.forEach((slotIndex, autoCol) => {
+            if (!changedSlots.has(slotIndex)) return;
+            const slot = slots[slotIndex];
+            const parts = slot?.parts ?? [];
+            const tileIndexFallback = parts.find(part => part != null) ?? null;
+            const imageData = slot?.autoTileId ? images[slot.autoTileId] : undefined;
+            const image = imageData?.image;
+            const imageWidth = image && 'naturalWidth' in image ? image.naturalWidth : image?.width ?? 0;
+            const factor = Math.max(1, (slot?.tileSize ?? 16) / 8);
+            const sourceColumns = Math.floor(imageWidth / (factor * 8));
+            const mapCol = autoCol;
+            const mapRow = autoRow;
+            for (let dy = 0; dy < factor; dy += 1) for (let dx = 0; dx < factor; dx += 1) {
+              const col = mapCol + dx;
+              const r = mapRow + dy;
+              if (col < columns && r < rows) updatedIndices.add(r * columns + col);
+            }
+            if (!parts.some(part => part != null) || !image || sourceColumns < 1) {
+              autoTileMap[autoRow][autoCol] = -1;
+              for (let dy = 0; dy < factor; dy += 1) for (let dx = 0; dx < factor; dx += 1) {
+                const col = mapCol + dx;
+                const r = mapRow + dy;
+                if (col < columns && r < rows) {
+                  tileMap[r][col] = -1;
+                  tilesetIds[r][col] = null;
+                }
+              }
+              return;
+            }
+            const mask = getBlob47Mask((dx, dy) => autoTileMap[autoRow + dy * factor]?.[autoCol + dx * factor] === slotIndex);
+            const partIndex = BLOB47_MASK_INDEX.get(mask) ?? BLOB47_MASKS.length - 1;
+            const tileIndex = parts[partIndex] ?? tileIndexFallback;
+            if (tileIndex == null) return;
+            const sourceCol = tileIndex % sourceColumns;
+            const sourceRow = Math.floor(tileIndex / sourceColumns);
+            const sourceKey = toAutoTileSourceKey(slot.autoTileId!);
+            for (let dy = 0; dy < factor; dy += 1) for (let dx = 0; dx < factor; dx += 1) {
+              const col = mapCol + dx;
+              const r = mapRow + dy;
+              if (col >= columns || r >= rows) continue;
+              tileMap[r][col] = (sourceRow * factor + dy) * Math.floor(imageWidth / 8) + sourceCol * factor + dx;
+              tilesetIds[r][col] = sourceKey;
+            }
+          }));
+
+          sceneChanged = true;
+          return {
+            ...layer,
+            tileMap,
+            tileMapTilesetIds: tilesetIds,
+            autoTileMap,
+            autoTileMapVersion: 1 as const,
+            tileMapCellOverrides: (layer.tileMapCellOverrides ?? []).filter(override => !updatedIndices.has(override.index)),
+          };
+        });
+        return sceneChanged ? { ...scene, backgrounds, _saved: false } : scene;
+      });
+      setScenes(updatedScenes);
+      const updatedSelection = elementSelected && updatedScenes.find(scene => scene.id === elementSelected.id);
+      if (updatedSelection && updatedSelection !== elementSelected) setElementSelected(updatedSelection);
+    };
+
+    const missingIds = [...changedSlots]
+      .map(index => slots[index]?.autoTileId)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0 && !sourceImages[id]);
+    if (!missingIds.length) {
+      recomposeScenes(sourceImages);
+      return;
+    }
+    const scope = settingUtils.projectPathFile ?? settingUtils.localImagePath;
+    void loadAutoTileAssets(scope).then(async assets => {
+      const loaded = { ...sourceImages };
+      await Promise.all([...new Set(missingIds)].map(async id => {
+        const asset = assets.find(item => item.id === id);
+        if (!asset) return;
+        const image = new Image();
+        await new Promise<void>((resolve, reject) => {
+          image.onload = () => resolve();
+          image.onerror = () => reject(new Error(`Unable to load autotile image ${id}`));
+          image.src = asset.path;
+        });
+        loaded[id] = { image, source: asset.path, width: image.naturalWidth, height: image.naturalHeight };
+      }));
+      recomposeScenes(loaded);
+    }).catch(error => console.error('Unable to refresh autotile cells after configuration:', error));
+  };
+
+  const handleAutoTileSlotRemoval = (removedIndex: number, slots: AutoTileSlot[]) => {
+    setSettings(previous => ({ ...previous, autoTileSlots: slots, _saved: false }));
+    setScenes(previous => previous.map(scene => {
+      if (!scene.backgrounds?.some(layer => layer.autoTileMap)) return scene;
+      return {
+        ...scene,
+        backgrounds: scene.backgrounds.map(layer => layer.autoTileMap
+          ? { ...layer, autoTileMap: layer.autoTileMap.map(row => row.map(slotIndex => slotIndex === removedIndex ? -1 : slotIndex > removedIndex ? slotIndex - 1 : slotIndex)) }
+          : layer),
+        _saved: false,
+      };
+    }));
+    setSettingUtils(previous => {
+      const selection = previous.selectedAutoTileSlot;
+      if (!selection) return previous;
+      if (selection.slotIndex === removedIndex) return { ...previous, selectedAutoTileSlot: null };
+      return selection.slotIndex > removedIndex
+        ? { ...previous, selectedAutoTileSlot: { ...selection, slotIndex: selection.slotIndex - 1 } }
+        : previous;
+    });
+  };
+
+  const handleSelectAutoTileSlot = (slotIndex: number) => {
+    if (!elementSelected) return;
+    setSelectedTiles([]);
+    const backgrounds = elementSelected.backgrounds?.map(layer =>
+      layer.layerId === editingTilesetLayerId ? { ...layer, selectedTiles: [] } : layer,
+    );
+    const updatedElement = { ...elementSelected, selectedTiles: [], backgrounds, _saved: false };
+    setElementSelected(updatedElement);
+    setScenes(previous => previous.map(scene => scene.id === updatedElement.id ? updatedElement : scene));
+    setSettingUtils(previous => ({
+      ...previous,
+      selectedAutoTileSlot: { sceneId: elementSelected.id, slotIndex },
+      activeButton: 'tiles',
+      activeSubButton: 'pencil',
+    }));
+  };
+
+  const handleTilesetCellSizeChange = (size: 8 | 16 | 32) => {
+    updateTilesetView({ cellSize: size });
+    if (tilesetViewMode !== 'autoTiles' || !elementSelected) return;
+    const currentIndex = settingUtils.selectedAutoTileSlot?.sceneId === elementSelected.id
+      ? settingUtils.selectedAutoTileSlot?.slotIndex : undefined;
+    const available = (slot: AutoTileSlot | undefined) => Boolean(slot && (slot.tileSize ?? 16) === size && slot.parts.some(part => part != null));
+    const nextIndex = currentIndex !== undefined && available(autoTileSlots[currentIndex])
+      ? currentIndex : autoTileSlots.findIndex(available);
+    if (nextIndex >= 0) handleSelectAutoTileSlot(nextIndex);
+    else setSettingUtils(previous => ({ ...previous, selectedAutoTileSlot: null }));
   };
 
   const handleSceneTypeChange = (value: string) => {
@@ -688,39 +1044,35 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
   useEffect(() => {
     const layerId = settingUtils.tileEditLayerId ?? elementSelected?.backgrounds?.[0]?.layerId ?? 0;
     const selectedTilesetId = elementSelected?.backgrounds?.find(layer => layer.layerId === layerId)?.selectedTilesetId ?? elementSelected?.selectedTilesetId;
+    let cancelled = false;
     const loadTilesetImage = async () => {
       if (selectedTilesetId) {
         try {
           // Load tileset image from project assets
-          const tilesetData = await window.electronAPI.fetchImages('tilesets');
-          if (tilesetData.status === 'success' && tilesetData.fileImages) {
-            const selectedTilesetFile = tilesetData.fileImages.find((filename: string) =>
-              filename.replace(/\.[^/.]+$/, '') === selectedTilesetId
-            );
-            if (selectedTilesetFile) {
-              const imagePath = `${tilesetData.localPath}/${selectedTilesetFile}`;
+          const selectedTilesetFile = (await loadTilesetAssets(settingUtils.projectPathFile ?? settingUtils.localImagePath)).find(asset => asset.id === selectedTilesetId);
+          if (selectedTilesetFile) {
+              const imagePath = selectedTilesetFile.path;
               const img = new Image();
-              img.onload = () => {
+              img.onload = async () => {
                 // Calculate tileset dimensions based on actual image size
                 const tileWidth = 8;
                 const tileHeight = 8;
                 const columns = Math.floor(img.naturalWidth / tileWidth);
                 const rows = Math.floor(img.naturalHeight / tileHeight);
-                
+                const previewImage = await loadPaletteTransparentImage(imagePath);
+                if (cancelled) return;
                 setTileset({
-                  image: img,
+                  image: previewImage ?? img,
                   tileWidth,
                   tileHeight,
                   columns,
-                  rows
+                  rows,
+                  source: imagePath,
                 });
                 // drawTileset();
               };
-              img.onerror = () => setTileset({ image: new Image(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE, columns: 0, rows: 0 });
+              img.onerror = () => setTileset({ image: new Image(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE, columns: 0, rows: 0, source: imagePath });
               img.src = imagePath;
-            } else {
-              setTileset({ image: new Image(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE, columns: 0, rows: 0 });
-            }
           } else {
             setTileset({ image: new Image(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE, columns: 0, rows: 0 });
           }
@@ -735,7 +1087,8 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
       setTileset({ image: new Image(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE, columns: 0, rows: 0 });
     }
     loadTilesetImage();
-  }, [elementSelected?.backgrounds, elementSelected?.selectedTilesetId, settingUtils.tileEditLayerId]);
+    return () => { cancelled = true; };
+  }, [elementSelected?.backgrounds, elementSelected?.selectedTilesetId, settingUtils.localImagePath, settingUtils.tileEditLayerId, assetReloadVersion]);
 
   const drawTileset = useCallback(() => {
     const canvas = canvasRef.current;
@@ -749,126 +1102,73 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
 
     if (!tileset.columns || !tileset.rows) return;
 
-    // Set canvas size based on tileset
-    canvas.width = tileset.columns * tileset.tileWidth;
-    canvas.height = tileset.rows * tileset.tileHeight;
+    canvas.width = tilesetCanvasWidth;
+    canvas.height = tilesetCanvasHeight;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = token.colorBgContainer;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // If tileset image is loaded, draw it
-    if (tileset.image.complete && tileset.image.naturalWidth > 0) {
-      ctx.drawImage(tileset.image, 0, 0);
-    }
-
-    if (showTilesetGrid) {
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
-      ctx.lineWidth = 1;
-      for (let x = 0; x <= canvas.width; x += tileset.tileWidth) {
-        ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, canvas.height); ctx.stroke();
+    const imageWidth = 'naturalWidth' in tileset.image ? tileset.image.naturalWidth : tileset.image.width;
+    const imageHeight = 'naturalHeight' in tileset.image ? tileset.image.naturalHeight : tileset.image.height;
+    const imageLoaded = !('complete' in tileset.image) || tileset.image.complete;
+    if (imageLoaded && imageWidth > 0) {
+      for (let cellRow = 0; cellRow < tilesetDisplayRows; cellRow++) {
+        for (let cellColumn = 0; cellColumn < tilesetDisplayColumns; cellColumn++) {
+          const sourceX = cellColumn * tilesetCellSize;
+          const sourceY = cellRow * tilesetCellSize;
+          const sourceWidth = Math.min(tilesetCellSize, imageWidth - sourceX);
+          const sourceHeight = Math.min(tilesetCellSize, imageHeight - sourceY);
+          if (sourceWidth <= 0 || sourceHeight <= 0) continue;
+          const destinationX = cellColumn * tilesetCellSize;
+          const destinationY = cellRow * tilesetCellSize;
+          ctx.drawImage(tileset.image, sourceX, sourceY, sourceWidth, sourceHeight, destinationX, destinationY, sourceWidth, sourceHeight);
+        }
       }
-      for (let y = 0; y <= canvas.height; y += tileset.tileHeight) {
-        ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(canvas.width, y + 0.5); ctx.stroke();
-      }
     }
 
-    // Highlight selected tiles
-    if (elementSelected?.selectedTiles && elementSelected.selectedTiles.length > 0) {
-      const cols = elementSelected.selectedTiles.map(
-        (tileIndex: number) => tileIndex % tileset.columns
-      );
-      const rows = elementSelected.selectedTiles.map(
-        (tileIndex: number) => Math.floor(tileIndex / tileset.columns)
-      );
-
-      const minCol = Math.min(...cols);
-      const maxCol = Math.max(...cols);
-      const minRow = Math.min(...rows);
-      const maxRow = Math.max(...rows);
-
-      const totalWidth = (maxCol - minCol + 1) * tileset.tileWidth;
-      const totalHeight = (maxRow - minRow + 1) * tileset.tileHeight;
-
-      // Overlay semi-transparente em cada tile (se quiser manter)
-      elementSelected.selectedTiles.forEach((tileIndex: number) => {
-        const col = tileIndex % tileset.columns;
-        const row = Math.floor(tileIndex / tileset.columns);
-        ctx.fillStyle = 'rgba(0, 123, 255, 0.2)';
-        ctx.fillRect(
-          col * tileset.tileWidth,
-          row * tileset.tileHeight,
-          tileset.tileWidth,
-          tileset.tileHeight
-        );
-      });
-
-      // Borda única em volta do bloco inteiro
-      ctx.strokeStyle = '#007bff';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(
-        minCol * tileset.tileWidth,
-        minRow * tileset.tileHeight,
-        totalWidth,
-        totalHeight
-      );
-    }
-
-  }, [tileset, elementSelected?.selectedTiles, showTilesetGrid]);
+  }, [tileset, tilesetCellSize, tilesetDisplayColumns, tilesetDisplayRows, tilesetCanvasWidth, tilesetCanvasHeight, token.colorBgContainer]);
 
   useEffect(() => {
-    drawTileset();
-  }, [drawTileset]);
+    if (tilesetViewMode === 'tileset') drawTileset();
+  }, [drawTileset, tilesetViewMode]);
 
-  const handleTilesetMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleTilesetPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.button === 1) {
+      const viewport = tilesetViewportRef.current;
+      if (!viewport) return;
+      e.preventDefault();
+      tilesetPanStartRef.current = { x: e.clientX, y: e.clientY, scrollLeft: viewport.scrollLeft, scrollTop: viewport.scrollTop };
+      setIsPanningTileset(true);
+      e.currentTarget.setPointerCapture(e.pointerId);
+      return;
+    }
+
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
 
     if (e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     const scale = tilesetZoom / 100;
     const x = (e.clientX - rect.left) / scale;
     const y = (e.clientY - rect.top) / scale;
+    const col = Math.max(0, Math.min(tilesetDisplayColumns - 1, Math.floor(x / tilesetCellSize)));
+    const row = Math.max(0, Math.min(tilesetDisplayRows - 1, Math.floor(y / tilesetCellSize)));
 
-    // If Ctrl is pressed, do individual tile selection
-    if (false) {
-      const col = Math.floor(x / tileset.tileWidth);
-      const row = Math.floor(y / tileset.tileHeight);
-      const tileIndex = row * tileset.columns + col;
-      
-      if (tileIndex < tileset.columns * tileset.rows) {
-        const currentSelected = elementSelected?.selectedTiles || [];
-        let newSelectedTiles: number[];
-        
-        if (currentSelected.includes(tileIndex)) {
-          // Remove tile from selection
-          newSelectedTiles = currentSelected.filter((t: number) => t !== tileIndex);
-        } else {
-          // Add tile to selection
-          newSelectedTiles = [...currentSelected, tileIndex];
-        }
-        
-        setSelectedTiles(newSelectedTiles);
-        
-        // Update elementSelected with selected tiles
-        if (elementSelected) {
-          const layerId = settingUtils.tileEditLayerId ?? elementSelected.backgrounds?.[0]?.layerId ?? 0;
-          const updatedElement = { ...elementSelected, selectedTiles: newSelectedTiles, backgrounds: elementSelected.backgrounds?.some(layer => layer.layerId === layerId) ? elementSelected.backgrounds.map(layer => layer.layerId === layerId ? { ...layer, selectedTiles: newSelectedTiles } : layer) : [...(elementSelected.backgrounds ?? []), { layerId, selectedTiles: newSelectedTiles }] };
-          setElementSelected(updatedElement);
-          setScenes(prevScenes => prevScenes.map(scene => 
-            scene.id === updatedElement.id 
-              ? { ...scene, ...updatedElement, _saved: false }
-              : scene
-          ));
-        }
-      }
-      return;
-    }
-
-    // Normal rectangular selection
-    setSelectionStart({ x, y });
-    setSelectionEnd({ x, y });
+    tilesetSelectionRef.current = { start: { x: col, y: row }, end: { x: col, y: row }, extend: e.shiftKey };
+    setSelectionStart({ x: col, y: row });
+    setSelectionEnd({ x: col, y: row });
     setIsSelecting(true);
   };
 
-  const handleTilesetMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleTilesetPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (tilesetPanStartRef.current) {
+      const viewport = tilesetViewportRef.current;
+      if (!viewport) return;
+      viewport.scrollLeft = tilesetPanStartRef.current.scrollLeft - (e.clientX - tilesetPanStartRef.current.x);
+      viewport.scrollTop = tilesetPanStartRef.current.scrollTop - (e.clientY - tilesetPanStartRef.current.y);
+      return;
+    }
     if (!isSelecting) return;
 
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -877,65 +1177,60 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
     const scale = tilesetZoom / 100;
     const x = (e.clientX - rect.left) / scale;
     const y = (e.clientY - rect.top) / scale;
+    const col = Math.max(0, Math.min(tilesetDisplayColumns - 1, Math.floor(x / tilesetCellSize)));
+    const row = Math.max(0, Math.min(tilesetDisplayRows - 1, Math.floor(y / tilesetCellSize)));
 
-    // If Ctrl is pressed, handle individual tile selection during drag
-    if (false) {
-      const col = Math.floor(x / tileset.tileWidth);
-      const row = Math.floor(y / tileset.tileHeight);
-      const tileIndex = row * tileset.columns + col;
-      
-      if (tileIndex < tileset.columns * tileset.rows) {
-        const currentSelected = elementSelected?.selectedTiles || [];
-        if (!currentSelected.includes(tileIndex)) {
-          // Add tile to selection
-          const newSelectedTiles = [...currentSelected, tileIndex];
-          setSelectedTiles(newSelectedTiles);
-          
-          // Update elementSelected with selected tiles
-          if (elementSelected) {
-            const layerId = settingUtils.tileEditLayerId ?? elementSelected.backgrounds?.[0]?.layerId ?? 0;
-            const updatedElement = { ...elementSelected, selectedTiles: newSelectedTiles, backgrounds: elementSelected.backgrounds?.some(layer => layer.layerId === layerId) ? elementSelected.backgrounds.map(layer => layer.layerId === layerId ? { ...layer, selectedTiles: newSelectedTiles } : layer) : [...(elementSelected.backgrounds ?? []), { layerId, selectedTiles: newSelectedTiles }] };
-            setElementSelected(updatedElement);
-            setScenes(prevScenes => prevScenes.map(scene => 
-              scene.id === updatedElement.id 
-                ? { ...scene, ...updatedElement, _saved: false }
-                : scene
-            ));
-          }
-        }
-      }
-      return;
-    }
-
-    setSelectionEnd({ x, y });
+    tilesetSelectionRef.current.end = { x: col, y: row };
+    setSelectionEnd({ x: col, y: row });
   };
 
-  const handleTilesetMouseUp = () => {
+  const handleTilesetPointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (tilesetPanStartRef.current) {
+      tilesetPanStartRef.current = null;
+      setIsPanningTileset(false);
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      return;
+    }
     if (!isSelecting) return;
 
     setIsSelecting(false);
 
-    // Calculate selected tiles for rectangular selection (only if not using Ctrl)
-    const startCol = Math.floor(Math.min(selectionStart.x, selectionEnd.x) / tileset.tileWidth);
-    const endCol = Math.floor(Math.max(selectionStart.x, selectionEnd.x) / tileset.tileWidth);
-    const startRow = Math.floor(Math.min(selectionStart.y, selectionEnd.y) / tileset.tileHeight);
-    const endRow = Math.floor(Math.max(selectionStart.y, selectionEnd.y) / tileset.tileHeight);
+    const layerId = editingTilesetLayerId;
+    const layerSelectedTiles = elementSelected?.backgrounds?.find(layer => layer.layerId === layerId)?.selectedTiles ?? elementSelected?.selectedTiles ?? [];
+    const gesture = tilesetSelectionRef.current;
+    const anchorTile = gesture.extend ? layerSelectedTiles[0] : undefined;
+    const anchorCell = anchorTile === undefined ? gesture.start : {
+      x: Math.floor((anchorTile % tileset.columns) / tilesPerCell),
+      y: Math.floor(Math.floor(anchorTile / tileset.columns) / tilesPerCell),
+    };
+    const startCol = Math.min(anchorCell.x, gesture.end.x);
+    const endCol = Math.max(anchorCell.x, gesture.end.x);
+    const startRow = Math.min(anchorCell.y, gesture.end.y);
+    const endRow = Math.max(anchorCell.y, gesture.end.y);
 
-    const newSelectedTiles: number[] = [];
+    const newlySelectedTiles: number[] = [];
     for (let row = startRow; row <= endRow; row++) {
       for (let col = startCol; col <= endCol; col++) {
-        const tileIndex = row * tileset.columns + col;
-        if (tileIndex < tileset.columns * tileset.rows) {
-          newSelectedTiles.push(tileIndex);
+        for (let tileRow = 0; tileRow < tilesPerCell; tileRow++) {
+          const baseRow = row * tilesPerCell + tileRow;
+          if (baseRow >= tileset.rows) continue;
+          for (let tileColumn = 0; tileColumn < tilesPerCell; tileColumn++) {
+            const baseCol = col * tilesPerCell + tileColumn;
+            if (baseCol >= tileset.columns) continue;
+            newlySelectedTiles.push(baseRow * tileset.columns + baseCol);
+          }
         }
       }
     }
 
+    const newSelectedTiles = gesture.extend
+      ? Array.from(new Set([...layerSelectedTiles, ...newlySelectedTiles]))
+      : newlySelectedTiles;
     setSelectedTiles(newSelectedTiles);
+    setSettingUtils(previous => ({ ...previous, selectedAutoTileSlot: null, activeButton: 'tiles', activeSubButton: 'pencil' }));
 
     // Update elementSelected with selected tiles
     if (elementSelected) {
-      const layerId = settingUtils.tileEditLayerId ?? elementSelected.backgrounds?.[0]?.layerId ?? 0;
       const updatedElement = { ...elementSelected, selectedTiles: newSelectedTiles, backgrounds: elementSelected.backgrounds?.some(layer => layer.layerId === layerId) ? elementSelected.backgrounds.map(layer => layer.layerId === layerId ? { ...layer, selectedTiles: newSelectedTiles } : layer) : [...(elementSelected.backgrounds ?? []), { layerId, selectedTiles: newSelectedTiles }] };
       setElementSelected(updatedElement);
       setScenes(prevScenes => prevScenes.map(scene => 
@@ -944,6 +1239,12 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
           : scene
       ));
     }
+  };
+
+  const handleTilesetPointerCancel = () => {
+    tilesetPanStartRef.current = null;
+    setIsPanningTileset(false);
+    setIsSelecting(false);
   };
   
   useEffect(() => {
@@ -1048,6 +1349,7 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
         {isEditingTitle ? (
           <Input
             autoFocus
+            variant="borderless"
             value={elementSelected.name}
             onChange={handleTitleChange}
             onBlur={handleTitleBlur}
@@ -1067,13 +1369,15 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
         {isEditingTiles ? (
           // Tiles Editor Mode - Scene properties + tileset selector
           <Space direction="vertical" style={{ width: '100%', padding: 10 }}>
-            <Segmented
-              block
-              value={settingUtils.tileEditLayerId ?? elementSelected.backgrounds?.[0]?.layerId ?? 0}
-              options={[...editableLayerIds.map(layerId => ({ value: layerId, label: `Layer ${layerId}` })), { value: EVENTS_LAYER_ID, label: 'Events' }]}
+            <Tabs
+              type="card"
+              size="small"
+              animated={false}
+              activeKey={String(settingUtils.tileEditLayerId ?? elementSelected.backgrounds?.[0]?.layerId ?? 0)}
+              items={[...editableLayerIds.map(layerId => ({ key: String(layerId), label: `Layer ${layerId}`, disabled: isSingleLayerScene })), { key: String(EVENTS_LAYER_ID), label: 'Events' }]}
               onChange={layerId => setSettingUtils(previous => ({
                 ...previous,
-                tileEditLayerId: layerId as number,
+                tileEditLayerId: Number(layerId),
                 ...(Number(layerId) === EVENTS_LAYER_ID && (previous.activeButton === 'tiles' || previous.activeButton === 'colorize')
                   ? { activeButton: 'select', activeSubButton: '' }
                   : {}),
@@ -1091,15 +1395,15 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
             <Content style={{ width: '100%', height: '100%' }}>
               <Space direction="vertical" >
                 <Space>
-                  <span>Selected tiles: {selectedTiles.length}</span>
+                  <span>{t('tiles.selectedCount', { count: selectedTiles.length })}</span>
                   <span>Map size: {mapWidth * TILE_SIZE} x {mapHeight * TILE_SIZE} px</span>
                 </Space>
                 <Space direction="vertical" size="small">
                   <span><strong>Map Size (in tiles):</strong></span>
                   <Space>
                     <div>
-                      <span>Width: </span>
                       <InputNumber
+                        addonBefore="W"
                         min={30}
                         max={128}
                         value={mapWidth}
@@ -1109,8 +1413,8 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
                       />
                     </div>
                     <div>
-                      <span>Height: </span>
                       <InputNumber
+                        addonBefore="H"
                         min={20}
                         max={128}
                         value={mapHeight}
@@ -1119,7 +1423,7 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
                         parser={(value) => parseInt(value?.replace(' tiles', '') || '20')}
                       />
                     </div>
-                    <Checkbox checked={showTilesetGrid} onChange={event => setShowTilesetGrid(event.target.checked)}>Grid</Checkbox>
+                    <Checkbox checked={tilesetViewById[activeTilesetId]?.showGrid ?? true} onChange={event => updateTilesetViewForId(activeTilesetId, { showGrid: event.target.checked })}>{t('tiles.grid')}</Checkbox>
                   </Space>
                   <span style={{ fontSize: '12px', color: '#666' }}>
                     Minimum: 240x160px (30x20 tiles) | Maximum: 1024x1024px (128x128 tiles)
@@ -1127,49 +1431,153 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
                 </Space>
               </Space>
             </Content>
-            <Content style={{ 
+            <div style={{ position: 'relative', width: '100%' }}>
+              <Segmented
+                block
+                size="small"
+                value={tilesetViewMode}
+                options={[{ value: 'tileset', label: t('tiles.viewTileset') }, { value: 'autoTiles', label: <span style={{ display: 'inline-block', paddingRight: 22 }}>{t('tiles.viewAutoTiles')}</span> }]}
+                onChange={value => setTilesetViewMode(value as 'tileset' | 'autoTiles')}
+              />
+              {tilesetViewMode === 'autoTiles' && <Tooltip title={t('tiles.autoTileSettings')}>
+                <Button
+                  type="text"
+                  size="small"
+                  aria-label={t('tiles.autoTileSettings')}
+                  icon={<SettingOutlined />}
+                  onPointerDown={event => event.stopPropagation()}
+                  onClick={event => { event.stopPropagation(); setAutoTileConfigSignal(signal => signal + 1); }}
+                  style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', zIndex: 2, paddingInline: 5, height: 22 }}
+                />
+              </Tooltip>}
+            </div>
+            <Content ref={tilesetViewportRef} style={{
               width: '100%', 
-              height: '100%',
-              border: '4px solid #ccc', 
-              backgroundColor: '#f5f5f5',
+              height: 280,
+              minHeight: 280,
+              maxHeight: 280,
+              flex: '0 0 280px',
+              boxSizing: 'border-box',
+              backgroundColor: token.colorBgContainer,
               overflow: 'auto',
               position: 'relative'
             }}>
+              {tilesetViewMode === 'tileset' ? <>
               {tileset.columns > 0 && tileset.rows > 0 ? <canvas
                   ref={canvasRef}
-                  width={tileset.columns * tileset.tileWidth}
-                  height={tileset.rows * tileset.tileHeight}
-                  onMouseDown={handleTilesetMouseDown}
-                  onMouseMove={handleTilesetMouseMove}
-                  onMouseUp={handleTilesetMouseUp}
-                  onWheel={event => { if (!event.ctrlKey) return; event.preventDefault(); setTilesetZoom(value => Math.max(50, Math.min(400, value + (event.deltaY < 0 ? 25 : -25)))); }}
-                  style={{ cursor: 'crosshair', display: 'block', width: `${tileset.columns * tileset.tileWidth * tilesetZoom / 100}px`, height: `${tileset.rows * tileset.tileHeight * tilesetZoom / 100}px` }}
+                  width={tilesetCanvasWidth}
+                  height={tilesetCanvasHeight}
+                  onPointerDown={handleTilesetPointerDown}
+                  onPointerMove={handleTilesetPointerMove}
+                  onPointerUp={handleTilesetPointerUp}
+                  onPointerCancel={handleTilesetPointerCancel}
+                  onContextMenu={event => event.preventDefault()}
+                  title="Segure o botão do meio e arraste para mover a visualização"
+                  style={{ cursor: isPanningTileset ? 'grabbing' : 'crosshair', display: 'block', imageRendering: 'pixelated', touchAction: 'none', width: `${tilesetCanvasWidth * tilesetZoom / 100}px`, height: `${tilesetCanvasHeight * tilesetZoom / 100}px` }}
                 /> : <div
                   role="img"
                   aria-label="No Data"
                   style={{ minHeight: 160, minWidth: 240, display: 'grid', placeItems: 'center', color: '#999', fontSize: 16, userSelect: 'none' }}
                 ><img src={imgPlaceholder} alt="No Data" style={{ width: 96, height: 96, objectFit: 'contain', opacity: .7 }} /></div>}
+              {tileset.columns > 0 && tileset.rows > 0 && (
+                <svg
+                  aria-hidden="true"
+                  viewBox={`0 0 ${tilesetCanvasWidth} ${tilesetCanvasHeight}`}
+                  style={{ position: 'absolute', left: 0, top: 0, width: `${tilesetCanvasWidth * tilesetZoom / 100}px`, height: `${tilesetCanvasHeight * tilesetZoom / 100}px`, pointerEvents: 'none', overflow: 'visible' }}
+                >
+                  {activeTilesetView.showGrid && Array.from({ length: tilesetDisplayColumns - 1 }, (_, index) => {
+                    const x = (index + 1) * tilesetCellSize;
+                    return <line key={`v-${x}`} x1={x} y1={0} x2={x} y2={tilesetCanvasHeight} stroke={token.colorBgContainer} strokeWidth={1} vectorEffect="non-scaling-stroke" />;
+                  })}
+                  {activeTilesetView.showGrid && Array.from({ length: tilesetDisplayRows - 1 }, (_, index) => {
+                    const y = (index + 1) * tilesetCellSize;
+                    return <line key={`h-${y}`} x1={0} y1={y} x2={tilesetCanvasWidth} y2={y} stroke={token.colorBgContainer} strokeWidth={1} vectorEffect="non-scaling-stroke" />;
+                  })}
+                  {selectedTileIndexes.map(tileIndex => {
+                    const col = tileIndex % tileset.columns;
+                    const row = Math.floor(tileIndex / tileset.columns);
+                    return <rect key={`selected-${tileIndex}`} x={col * TILE_SIZE} y={row * TILE_SIZE} width={TILE_SIZE} height={TILE_SIZE} fill={token.colorPrimary} fillOpacity={0.2} />;
+                  })}
+                  {selectedTileBounds && <rect
+                    x={selectedTileBounds.minCol * TILE_SIZE}
+                    y={selectedTileBounds.minRow * TILE_SIZE}
+                    width={(selectedTileBounds.maxCol - selectedTileBounds.minCol + 1) * TILE_SIZE}
+                    height={(selectedTileBounds.maxRow - selectedTileBounds.minRow + 1) * TILE_SIZE}
+                    fill="none"
+                    stroke={token.colorPrimary}
+                    strokeWidth={1}
+                    vectorEffect="non-scaling-stroke"
+                  />}
+                </svg>
+              )}
               {/* Selection overlay */}
               {isSelecting && (
                 <div
                   style={{
                     position: 'absolute',
-                    // Selection coordinates are stored in native tileset
-                    // pixels; scale the overlay to match the zoomed canvas.
-                    left: Math.min(selectionStart.x, selectionEnd.x) * tilesetZoom / 100,
-                    top: Math.min(selectionStart.y, selectionEnd.y) * tilesetZoom / 100,
-                    width: Math.abs(selectionEnd.x - selectionStart.x) * tilesetZoom / 100,
-                    height: Math.abs(selectionEnd.y - selectionStart.y) * tilesetZoom / 100,
-                    backgroundColor: 'rgba(0, 123, 255, 0.3)',
-                    border: '2px solid #007bff',
+                    // Selection coordinates refer to the configured tile groups.
+                    left: Math.min(selectionStart.x, selectionEnd.x) * tilesetCellSize * tilesetZoom / 100,
+                    top: Math.min(selectionStart.y, selectionEnd.y) * tilesetCellSize * tilesetZoom / 100,
+                    width: (Math.abs(selectionEnd.x - selectionStart.x) * tilesetCellSize + Math.min(tilesetCellSize, (tileset.columns - Math.max(selectionStart.x, selectionEnd.x) * tilesPerCell) * TILE_SIZE)) * tilesetZoom / 100,
+                    height: (Math.abs(selectionEnd.y - selectionStart.y) * tilesetCellSize + Math.min(tilesetCellSize, (tileset.rows - Math.max(selectionStart.y, selectionEnd.y) * tilesPerCell) * TILE_SIZE)) * tilesetZoom / 100,
+                    backgroundColor: `color-mix(in srgb, ${token.colorPrimary} 12%, transparent)`,
+                    border: `1px solid ${token.colorPrimary}`,
                     boxSizing: 'border-box',
                     pointerEvents: 'none'
                   }}
                 />
               )}
+              </> : <TilesetAutoTileView
+                slots={autoTileSlots}
+                autoTiles={availableAutoTiles.map((asset: any) => ({ id: asset.id, name: asset.name }))}
+                defaultAutoTileId={availableAutoTiles[0]?.id}
+                onChange={handleAutoTileSlotsChange}
+                onRemoveSlot={handleAutoTileSlotRemoval}
+                onConfigurationClose={handleAutoTileConfigurationClose}
+                selectedSlot={settingUtils.selectedAutoTileSlot?.sceneId === elementSelected.id ? settingUtils.selectedAutoTileSlot.slotIndex : null}
+                sceneTileSize={tilesetCellSize}
+                onSelectSlot={handleSelectAutoTileSlot}
+                onHoverSlot={handleHoverAutoTileSlot}
+                zoom={tilesetZoom}
+                tilesetViews={tilesetViewById}
+                onUpdateSourceView={updateTilesetViewForId}
+                assetReloadVersion={assetReloadVersion}
+                openConfigurationSignal={autoTileConfigSignal}
+              />}
             </Content>
+            {tilesetViewMode === 'tileset' && <Space direction="vertical" size={2} style={{ width: '100%', paddingInline: 4 }}>
+              <Typography.Text type="secondary" style={{ fontSize: 11 }}>{t('tiles.viewInstructionSelect')}</Typography.Text>
+              <Typography.Text type="secondary" style={{ fontSize: 11 }}>{t('tiles.viewInstructionExtend')}</Typography.Text>
+              <Typography.Text type="secondary" style={{ fontSize: 11 }}>{t('tiles.viewInstructionZoom')}</Typography.Text>
+            </Space>}
+            <Space align="center">
+              <span>{t('tiles.tileSize')}</span>
+              <Segmented
+                size="small"
+                value={tilesetCellSize}
+                options={[8, 16, 32].map(size => ({ value: size, label: `${size}×${size}` }))}
+                onChange={value => handleTilesetCellSizeChange(value as 8 | 16 | 32)}
+              />
+            </Space>
+            {usedTilesetIds.length > 0 && <Flex gap={6} wrap="wrap" aria-label={t('tiles.tilesetsUsed')}>
+              {usedTilesetIds.map((tilesetId, index) => {
+                const color = getEventDepthColor(index);
+                return <Tag
+                key={tilesetId}
+                style={{ backgroundColor: `color-mix(in srgb, ${color} 22%, ${token.colorBgContainer})`, borderColor: color, color: token.colorText }}
+                closable
+                onClick={event => {
+                  if ((event.target as HTMLElement).closest('.ant-tag-close-icon')) return;
+                  handleTilesetChange(tilesetId);
+                }}
+                onClose={event => { event.preventDefault(); event.stopPropagation(); handleRemoveLayerTileset(tilesetId); }}
+                onMouseEnter={() => setSettingUtils(previous => ({ ...previous, tileSourceHover: { sceneId: elementSelected.id, layerId: editingTilesetLayerId, tilesetId, color } }))}
+                onMouseLeave={() => setSettingUtils(previous => previous.tileSourceHover?.tilesetId === tilesetId ? { ...previous, tileSourceHover: null } : previous)}
+              >{availableTilesets.find(tileset => tileset.id === tilesetId)?.name ?? tilesetId}</Tag>;
+              })}
+            </Flex>}
             <Select
-              placeholder="Select Tileset"
+              placeholder={t('tiles.selectTileset')}
               value={elementSelected.backgrounds?.find(layer => layer.layerId === (settingUtils.tileEditLayerId ?? elementSelected.backgrounds?.[0]?.layerId ?? 0))?.selectedTilesetId ?? elementSelected.selectedTilesetId}
               onChange={handleTilesetChange}
               style={{ width: '100%' }}
@@ -1216,13 +1624,6 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
             >
               
             </Select>
-            <Divider style={{ margin: `${token.margin}px 0` }} />
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Typography.Text strong>Instructions:</Typography.Text>
-              <Typography.Text>1. Click and drag on tileset to select tiles</Typography.Text>
-              <Typography.Text>2. Click and drag on map to paint tiles</Typography.Text>
-              <Typography.Text>3. Selected tiles</Typography.Text>
-            </Space>
             </>}
           </Space>
         ) : (
@@ -1238,6 +1639,18 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
                 style={{ width: '100%' }}
                 options={sceneTypes.map(ts => ({ label: ts.label, value: ts.value }))}
               />
+              {elementSelected.sceneType === ETypeScene.SHOOTER && (
+                <>
+                  <Button block onClick={() => setShowSceneCombatConfig(value => !value)}>
+                    {showSceneCombatConfig ? 'Hide Combat Config' : 'Combat Config'}
+                  </Button>
+                  {showSceneCombatConfig && <CombatConfigEditor settings={settings} setSettings={setSettings} />}
+                  <Button block onClick={() => setShowSceneShooterConfig(value => !value)}>
+                    {showSceneShooterConfig ? 'Hide Shooter Config' : 'Shooter Config'}
+                  </Button>
+                  {showSceneShooterConfig && <ShooterConfigEditor settings={settings} setSettings={setSettings} />}
+                </>
+              )}
               <Typography.Text>Camera View</Typography.Text>
               <Checkbox 
                 defaultChecked={elementSelected.showCamera} 
@@ -1245,22 +1658,22 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
               >
                 Show Camera on View
               </Checkbox>
-              <Space.Compact block>
+              <Flex gap={8} style={{ width: '100%' }}>
                 <InputNumber
                   addonBefore="X"
-                  step={8}
+                  step={1}
                   value={elementSelected.cameraPosition?.x ?? 0}
                   onChange={value => handleChangeCameraPosition('x', value)}
-                  style={{ width: '50%' }}
+                  style={{ flex: 1, minWidth: 0 }}
                 />
                 <InputNumber
                   addonBefore="Y"
-                  step={8}
+                  step={1}
                   value={elementSelected.cameraPosition?.y ?? 0}
                   onChange={value => handleChangeCameraPosition('y', value)}
-                  style={{ width: '50%' }}
+                  style={{ flex: 1, minWidth: 0 }}
                 />
-              </Space.Compact>
+              </Flex>
               <Divider style={{ margin: `${token.margin}px 0` }} />
               <Typography.Text>Backgrounds</Typography.Text>
               <Tabs 
@@ -1282,6 +1695,21 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
                 }
               />
               <Divider variant="solid" style={{ margin: `${token.margin}px 0` }} />
+
+              <TileAnimationEditor
+                scene={elementSelected}
+                tileset={tileset}
+                paletteOptions={paletteOptions}
+                onSceneChange={updated => {
+                  setElementSelected(updated);
+                  setScenes(previous => previous.map(scene => scene.id === updated.id ? updated : scene));
+                }}
+                onChange={tileAnimations => {
+                  const updated = { ...elementSelected, tileAnimations, _saved: false };
+                  setElementSelected(updated);
+                  setScenes(previous => previous.map(scene => scene.id === updated.id ? updated : scene));
+                }}
+              />
 
               { (elementSelected.sceneType !== ETypeScene.LOGO) && (
                 <Content>

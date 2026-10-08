@@ -8,6 +8,8 @@ import useAppContexts from '@/providers/contexts/AppContexts';
 import { defaultPalettes, getDefaultPalette, loadPaletteLibrary, PaletteDefinition, sortPalettesByCreation } from './paletteLibrary';
 import { getNextZoomStep } from '@/utils/zoom';
 import ResourceDropSurface from './ResourceDropSurface';
+import TrackerModuleViewer from './TrackerModuleViewer';
+import { isTrackerExtension } from '@/utils/trackerModule';
 
 export type AssetEditorKind = 'images' | 'music' | 'sounds' | 'palettes';
 
@@ -17,7 +19,7 @@ const configs: Record<Exclude<AssetEditorKind, 'palettes'>, { titleKey: string; 
   sounds: { titleKey: 'editor.sounds', descriptionKey: 'resources.sounds.description', folder: 'sounds', media: 'audio' },
 };
 
-interface AssetItem { id: string; name: string; url: string; extension: string; group?: 'Backgrounds' | 'Backgrounds HD' }
+interface AssetItem { id: string; name: string; url: string; extension: string; group?: 'Backgrounds' | 'Backgrounds HD' | 'Autotiles' }
 
 const realAssetPath = (url: string) => url.replace(/^local:\/\/+/, '');
 
@@ -82,6 +84,7 @@ function PaletteEditor() {
   const [draft, setDraft] = useState<PaletteDefinition>(() => sortPalettesByCreation(paletteResource.palettes.length ? paletteResource.palettes : loadPaletteLibrary())[0] ?? defaultPalettes[0]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [isPaletteNameEditing, setIsPaletteNameEditing] = useState(false);
   const palettesRef = useRef(palettes);
   const draftRef = useRef(draft);
 
@@ -107,6 +110,7 @@ function PaletteEditor() {
     const palette = palettesRef.current.find(item => item.id === id);
     if (palette) {
       setSelectedId(id);
+      setIsPaletteNameEditing(false);
       const nextDraft = { ...palette, colors: [...palette.colors] };
       draftRef.current = nextDraft;
       setDraft(nextDraft);
@@ -116,6 +120,7 @@ function PaletteEditor() {
     const palette = emptyPalette();
     commitPalettes([...palettesRef.current, palette]);
     setSelectedId(palette.id);
+    setIsPaletteNameEditing(false);
     draftRef.current = palette;
     setDraft(palette);
   };
@@ -135,6 +140,7 @@ function PaletteEditor() {
     if (draftRef.current.id !== id) return;
     const first = next[0] ?? defaultPalettes[0];
     setSelectedId(first.id);
+    setIsPaletteNameEditing(false);
     const nextDraft = { ...first, colors: [...first.colors] };
     draftRef.current = nextDraft;
     setDraft(nextDraft);
@@ -146,9 +152,16 @@ function PaletteEditor() {
     commitPalettes(next);
     draftRef.current = original;
     setDraft(original);
+    setIsPaletteNameEditing(false);
     message.success('Palette restored to default');
   };
   const visiblePalettes = palettes.filter(palette => palette.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const defaultPaletteName = draft.custom ? 'New Palette' : (getDefaultPalette(draft.id)?.name ?? 'Palette');
+
+  const commitPaletteName = (value: string) => {
+    updateDraft({ name: value.trim() || defaultPaletteName });
+    setIsPaletteNameEditing(false);
+  };
 
   return (
     <ResourceEditorShell
@@ -156,11 +169,11 @@ function PaletteEditor() {
       searchOpen={searchOpen}
       onToggleSearch={() => { setSearchOpen(previous => !previous); if (searchOpen) setSearch(''); }}
       libraryActions={<><Tooltip title="Create 16-color palette"><Button aria-label="Create 16-color palette" icon={<PlusOutlined />} size="small" type="text" onClick={createPalette} /></Tooltip><Tooltip title="Reset selected palette to default"><Button aria-label="Reset selected palette to default" disabled={draft.custom} icon={<UndoOutlined />} size="small" type="text" onClick={resetPalette} /></Tooltip></>}
-      library={<>{searchOpen && <Input allowClear value={search} placeholder="Search..." onChange={event => setSearch(event.target.value)} style={{ marginBottom: 8 }} />}<List size="small" dataSource={visiblePalettes} renderItem={palette => <List.Item onClick={() => selectPalette(palette.id)} style={{ cursor: 'pointer', borderRadius: token.borderRadius, paddingInline: 8, background: palette.id === selectedId ? token.colorPrimaryBg : undefined }}><Flex align="center" justify="space-between" style={{ width: '100%', minWidth: 0 }}><Flex align="center" gap={8} style={{ minWidth: 0 }}><span aria-label={`${palette.name} palette preview`} style={{ width: 30, height: 30, flex: '0 0 30px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'repeat(4, 1fr)', overflow: 'hidden', border: '1px solid #888', borderRadius: 2 }}>{palette.colors.slice(0, 16).map((color, index) => <i key={index} style={{ background: color }} />)}</span><Typography.Text ellipsis>{palette.name}</Typography.Text></Flex>{palette.custom && <Popconfirm title={`Delete ${palette.name}?`} onConfirm={event => { event?.stopPropagation(); deletePalette(palette.id); }}><Button aria-label={`Delete ${palette.name}`} icon={<DeleteOutlined />} size="small" type="text" danger onClick={event => event.stopPropagation()} /></Popconfirm>}</Flex></List.Item>} /></>}
-      inspector={<Space direction="vertical" style={{ width: '100%' }}><Typography.Text strong>Palette name</Typography.Text><Input value={draft.name} onChange={event => updateDraft({ name: event.target.value })} /><Tag color="blue">Color 0 is transparent</Tag></Space>}
+      library={<>{searchOpen && <Input allowClear value={search} placeholder="Search..." onChange={event => setSearch(event.target.value)} style={{ marginBottom: 8, background: token.colorBgBase }} />}<List size="small" split={false} dataSource={visiblePalettes} renderItem={palette => <List.Item onClick={() => selectPalette(palette.id)} style={{ cursor: 'pointer', borderRadius: token.borderRadius, paddingInline: 8, background: palette.id === selectedId ? token.colorPrimaryBg : undefined }}><Flex align="center" justify="space-between" style={{ width: '100%', minWidth: 0 }}><Flex align="center" gap={8} style={{ minWidth: 0 }}><span aria-label={`${palette.name} palette preview`} style={{ width: 30, height: 30, flex: '0 0 30px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'repeat(4, 1fr)', overflow: 'hidden', border: '1px solid #888', borderRadius: 2 }}>{palette.colors.slice(0, 16).map((color, index) => <i key={index} style={{ background: color }} />)}</span><Typography.Text ellipsis>{palette.name}</Typography.Text></Flex>{palette.custom && <Popconfirm title={`Delete ${palette.name}?`} onConfirm={event => { event?.stopPropagation(); deletePalette(palette.id); }}><Button aria-label={`Delete ${palette.name}`} icon={<DeleteOutlined />} size="small" type="text" danger onClick={event => event.stopPropagation()} /></Popconfirm>}</Flex></List.Item>} /></>}
+      inspector={<Space direction="vertical" style={{ width: '100%' }}><Typography.Text strong>Palette name</Typography.Text>{isPaletteNameEditing ? <Input autoFocus variant="borderless" value={draft.name} placeholder={defaultPaletteName} onChange={event => updateDraft({ name: event.target.value })} onBlur={event => commitPaletteName(event.target.value)} onPressEnter={event => event.currentTarget.blur()} /> : <Typography.Text onClick={() => setIsPaletteNameEditing(true)} style={{ cursor: 'text' }}>{draft.name?.trim() || defaultPaletteName}</Typography.Text>}<Tag color="blue">Color 0 is transparent</Tag></Space>}
     >
       <Flex vertical align="center" gap={20}>
-        <Typography.Title level={4} style={{ margin: 0 }}>{draft.name}</Typography.Title>
+        <Typography.Title level={4} style={{ margin: 0 }}>{draft.name?.trim() || defaultPaletteName}</Typography.Title>
         <Typography.Text type="secondary">The first color is reserved for transparency and cannot be moved.</Typography.Text>
         <PaletteGrid colors={draft.colors} editable onChange={(index, color) => updateDraft(current => ({ colors: current.colors.map((value, position) => position === index ? color : value) }))} />
       </Flex>
@@ -184,7 +197,7 @@ function AssetLibraryAssetsEditor({ kind }: { kind: Exclude<AssetEditorKind, 'pa
     setLoading(true);
     try {
       const responses = kind === 'images'
-        ? await Promise.all([window.electronAPI.fetchImages('backgrounds'), window.electronAPI.fetchImages('backgrounds-hd')])
+        ? await Promise.all([window.electronAPI.fetchImages('backgrounds'), window.electronAPI.fetchImages('backgrounds-hd'), window.electronAPI.fetchImages('auto-tiles')])
         : [await window.electronAPI.fetchImages(config.folder)];
       const nextItems = responses.flatMap((response: any, responseIndex) => response?.status === 'success' && Array.isArray(response.fileImages)
         ? response.fileImages.map((name: string) => ({
@@ -192,7 +205,7 @@ function AssetLibraryAssetsEditor({ kind }: { kind: Exclude<AssetEditorKind, 'pa
             name,
             url: `${response.localPath}/${name}`,
             extension: name.includes('.') ? name.split('.').pop()!.toUpperCase() : '',
-            group: kind === 'images' ? (responseIndex === 0 ? 'Backgrounds' : 'Backgrounds HD') : undefined,
+            group: kind === 'images' ? (responseIndex === 0 ? 'Backgrounds' : responseIndex === 1 ? 'Backgrounds HD' : 'Autotiles') : undefined,
           })) : []);
       setItems(nextItems);
       setSelected(current => nextItems.some((item: AssetItem) => item.id === current) ? current : nextItems[0]?.id ?? null);
@@ -230,7 +243,8 @@ function AssetLibraryAssetsEditor({ kind }: { kind: Exclude<AssetEditorKind, 'pa
       return;
     }
     if (compatible.length !== filePaths.length) message.warning('Some incompatible files were ignored.');
-    void importDropped(kind === 'images' && targetId === 'backgrounds-hd' ? 'backgrounds-hd' : config.folder, compatible);
+    const destinationFolder = kind === 'images' && (targetId === 'backgrounds-hd' || targetId === 'auto-tiles') ? targetId : config.folder;
+    void importDropped(destinationFolder, compatible);
   };
 
   const filtered = useMemo(() => items.filter(item => item.name.toLowerCase().includes(search.toLowerCase())), [items, search]);
@@ -251,7 +265,7 @@ function AssetLibraryAssetsEditor({ kind }: { kind: Exclude<AssetEditorKind, 'pa
       title={t(config.titleKey)}
       searchOpen={searchOpen}
       onToggleSearch={() => { setSearchOpen(previous => !previous); if (searchOpen) setSearch(''); }}
-      library={<>{searchOpen && <Input.Search allowClear value={search} placeholder={t('common.search')} onChange={event => setSearch(event.target.value)} style={{ marginBottom: 8 }} />}{loading ? <Flex justify="center" style={{ padding: 24 }}><Spin /></Flex> : <List size="small" dataSource={filtered} locale={{ emptyText: t('common.noItems') }} renderItem={(item, index) => <React.Fragment key={item.id}>{kind === 'images' && (index === 0 || item.group !== filtered[index - 1]?.group) && <Divider orientation="left" plain style={{ margin: '8px 0' }}>{item.group}</Divider>}<List.Item onClick={() => setSelected(item.id)} style={{ cursor: 'pointer', borderRadius: token.borderRadius, paddingInline: 8, background: item.id === selected ? token.colorPrimaryBg : undefined }}><Typography.Text ellipsis>{item.name.replace(/\.[^/.]+$/, '')}</Typography.Text></List.Item></React.Fragment>} />}</>}
+      library={<>{searchOpen && <Input allowClear value={search} placeholder={t('common.search')} onChange={event => setSearch(event.target.value)} style={{ marginBottom: 8, background: token.colorBgBase }} />}{loading ? <Flex justify="center" style={{ padding: 24 }}><Spin /></Flex> : <List size="small" split={false} dataSource={filtered} locale={{ emptyText: t('common.noItems') }} renderItem={(item, index) => <React.Fragment key={item.id}>{kind === 'images' && (index === 0 || item.group !== filtered[index - 1]?.group) && <Divider orientation="left" plain style={{ margin: '8px 0' }}>{item.group}</Divider>}<List.Item onClick={() => setSelected(item.id)} style={{ cursor: 'pointer', borderRadius: token.borderRadius, padding: '4px 8px', background: item.id === selected ? token.colorPrimaryBg : undefined }}><Typography.Text ellipsis>{item.name.replace(/\.[^/.]+$/, '')}</Typography.Text></List.Item></React.Fragment>} />}</>}
       inspector={inspector}
     >
       <ResourceDropSurface
@@ -260,6 +274,7 @@ function AssetLibraryAssetsEditor({ kind }: { kind: Exclude<AssetEditorKind, 'pa
         dropTargets={kind === 'images' ? [
           { id: 'backgrounds', label: t('images.background') },
           { id: 'backgrounds-hd', label: t('images.backgroundHd') },
+          { id: 'auto-tiles', label: t('images.autoTiles') },
         ] : undefined}
       >
       {!selectedItem ? (
@@ -274,7 +289,16 @@ function AssetLibraryAssetsEditor({ kind }: { kind: Exclude<AssetEditorKind, 'pa
           setUserSettings(previous => ({ ...previous, zoom: 100, _saved: false }));
           setSettingUtils(previous => ({ ...previous, buttonZoomPressed: true }));
         }}>
-          <Image preview={false} src={selectedItem.url} style={{ maxHeight: '70vh', imageRendering: 'pixelated', transform: `scale(${(userSettings.zoom ?? 100) / 100})`, transformOrigin: 'center' }} />
+          <Image preview={false} src={selectedItem.url} draggable={false} style={{ maxHeight: '70vh', imageRendering: 'pixelated', transform: `scale(${(userSettings.zoom ?? 100) / 100})`, transformOrigin: 'center' }} />
+        </Flex>
+      ) : kind === 'music' && isTrackerExtension(selectedItem.extension) ? (
+        <Flex align="center" justify="center" style={{ height: '100%', padding: 24, overflow: 'auto' }}>
+          <TrackerModuleViewer
+            url={selectedItem.url}
+            extension={selectedItem.extension}
+            filename={selectedItem.name}
+            onSaved={() => { message.success('Edited tracker copy saved to the project.'); void load(); }}
+          />
         </Flex>
       ) : (
         <Flex align="center" justify="center" style={{ height: '100%' }}>

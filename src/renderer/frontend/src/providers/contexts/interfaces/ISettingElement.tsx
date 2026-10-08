@@ -22,6 +22,8 @@ export interface ISpriteFramePiece {
     height: number;
     x: number;
     y: number;
+    flipX?: boolean;
+    flipY?: boolean;
 }
 
 export interface ISpriteCanvasFrame {
@@ -57,11 +59,29 @@ export interface IMainSettings extends IBaseSettings {
     startDirection: 'up' | 'down' | 'left' | 'right';
     colorMode: EColorMode;
     fadeDirection: 0 | 1;
+    inputMap?: Record<string, string[]>;
+    combatConfig?: {
+        maxProjectiles?: number;
+        maxEnemies?: number;
+        maxPickups?: number;
+        playerHitPoints?: number;
+        defaultDamage?: number;
+        bossHitPoints?: number;
+        collisionRules?: Array<{ sourceGroup: string; targetGroup: string }>;
+    };
+    shooterConfig?: {
+        defaultWaveId?: string;
+        projectileSpriteId?: string;
+        playerHitPoints?: number;
+        defaultDamage?: number;
+        bossHitPoints?: number;
+    };
     controls?: Object[];
     demoShowFPS?: boolean;
     demoFilter?: string;
     demoAudioVolume?: number;
     demoAudioMuted?: boolean;
+    demoJoystick?: { id: string; index: number };
     playerSpriteId?: string | null;
     uiCursorImage?: string | null;
     uiFrameImage?: string | null;
@@ -70,6 +90,7 @@ export interface IMainSettings extends IBaseSettings {
     font8x8VariablesImage?: string | null;
     font8x16VariablesImage?: string | null;
     font16x16VariablesImage?: string | null;
+    playerAnimationStripOrientation?: 'horizontal' | 'vertical';
     playerFrameWidth?: number;
     playerFrameHeight?: number;
     playerFramesPerDirection?: number;
@@ -85,6 +106,10 @@ export interface IMainSettings extends IBaseSettings {
     playerAnimationStates?: ISpriteAnimationState[];
     palettes?: IPaletteDefinition[];
     paletteIds?: string[];
+    /** Project-wide auto-tile definitions shared by all scenes. */
+    autoTileSlots?: Array<{ autoTileId?: string; name?: string; tileSize?: 8 | 16 | 32; parts: Array<number | null> }>;
+    /** Blob mask index order used by saved auto-tile part arrays. */
+    autoTilePartOrderVersion?: 1;
 }
 
 export interface MainSettingsContextType {

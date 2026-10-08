@@ -3,7 +3,7 @@ import { ETypeScene, IScriptsElement } from '@/providers/contexts/interfaces/ISc
 import { Button, Col, Form, Row, Segmented, Select, Switch, Tooltip } from 'antd';
 import { EEvents } from './interfaces/IEvents';
 import { IChangePaletteBackgroundArgs, IVisibleBackgroundArgs } from './interfaces/ILayer';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { loadPaletteLibrary } from '../resourceEditors/paletteLibrary';
 
 interface BackgroundEventProps {
@@ -13,7 +13,44 @@ interface BackgroundEventProps {
 
 const getLayerOptions = (singleLayer: boolean) => (singleLayer ? [2] : [0, 1, 2, 3]).map(value => ({ value, label: `Layer ${value}` }));
 
-export function CurrentBackgroundThumbnail({ eventId, layerId }: { eventId?: string; layerId: number }) {
+function GreenSwapThumbnail({ src, width, height, alt }: { src: string; width: number; height: number; alt: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = canvasRef.current;
+      const context = canvas?.getContext('2d', { willReadFrequently: true });
+      if (!canvas || !context) return;
+      canvas.width = width;
+      canvas.height = height;
+      const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
+      const sourceWidth = width / scale;
+      const sourceHeight = height / scale;
+      const sourceX = (image.naturalWidth - sourceWidth) / 2;
+      const sourceY = (image.naturalHeight - sourceHeight) / 2;
+      context.imageSmoothingEnabled = false;
+      context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+      const pixels = context.getImageData(0, 0, width, height);
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x + 1 < width; x += 2) {
+          const first = (y * width + x) * 4;
+          const second = first + 4;
+          const firstGreen = pixels.data[first + 1] >> 3;
+          const secondGreen = pixels.data[second + 1] >> 3;
+          pixels.data[first + 1] = (secondGreen << 3) | (secondGreen >> 2);
+          pixels.data[second + 1] = (firstGreen << 3) | (firstGreen >> 2);
+        }
+      }
+      context.putImageData(pixels, 0, 0);
+    };
+    image.src = src;
+    return () => { image.onload = null; };
+  }, [src, width, height]);
+
+  return <canvas ref={canvasRef} aria-label={`${alt} with green swap`} style={{ display: 'block', boxSizing: 'border-box', width, height, imageRendering: 'pixelated', border: '1px solid rgba(127,127,127,.35)' }} />;
+}
+
+export function CurrentBackgroundThumbnail({ eventId, layerId, width = 64, height = 40, greenSwap = false }: { eventId?: string; layerId: number; width?: number; height?: number; greenSwap?: boolean }) {
   const { elementSelected, backgrounds, settingUtils } = useAppContexts();
   const scripts = elementSelected?.script ?? [];
   const eventIndex = scripts.findIndex((script: IScriptsElement) => script.id === eventId);
@@ -29,15 +66,17 @@ export function CurrentBackgroundThumbnail({ eventId, layerId }: { eventId?: str
     return <div
       aria-label="No background preview"
       title="No background"
-      style={{ boxSizing: 'border-box', width: 64, height: 40, border: '1px dashed rgba(127,127,127,.65)', background: 'repeating-conic-gradient(#ddd 0% 25%, #f5f5f5 0% 50%) 50% / 12px 12px', display: 'grid', placeItems: 'center', color: '#777', fontSize: 10 }}
+      style={{ boxSizing: 'border-box', width, height, border: '1px dashed rgba(127,127,127,.65)', background: 'repeating-conic-gradient(#ddd 0% 25%, #f5f5f5 0% 50%) 50% / 12px 12px', display: 'grid', placeItems: 'center', color: '#777', fontSize: 10 }}
     >Empty</div>;
   }
 
+  const imageSource = `${background.hd ? settingUtils.localImagePathHD : settingUtils.localImagePath}/${background.filename}`;
+  if (greenSwap) return <GreenSwapThumbnail src={imageSource} width={width} height={height} alt={background.name} />;
   return <img
-    src={`${background.hd ? settingUtils.localImagePathHD : settingUtils.localImagePath}/${background.filename}`}
+    src={imageSource}
     alt={background.name}
     title={previousBackgroundChange ? `${background.name} (changed earlier in this script)` : background.name}
-    style={{ display: 'block', boxSizing: 'border-box', width: 64, height: 40, objectFit: 'cover', imageRendering: 'pixelated', border: '1px solid rgba(127,127,127,.35)' }}
+    style={{ display: 'block', boxSizing: 'border-box', width, height, objectFit: 'cover', imageRendering: 'pixelated', border: '1px solid rgba(127,127,127,.35)' }}
   />;
 }
 
@@ -96,7 +135,7 @@ export function ChangePaletteBackgroundEvent({ event, onValueChange }: Backgroun
         const canvas = document.createElement('canvas');
         canvas.width = image.naturalWidth;
         canvas.height = image.naturalHeight;
-        const context = canvas.getContext('2d');
+        const context = canvas.getContext('2d', { willReadFrequently: true });
         if (!context) return;
         context.drawImage(image, 0, 0);
         const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;

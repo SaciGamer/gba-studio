@@ -6,7 +6,14 @@
 #include "resource_types.h"
 
 class ScriptTriggerManager {
-    struct State { bool inside = false; bool fired = false; int cooldown = 0; };
+    struct State {
+        bool inside = false;
+        bool fired = false;
+        int cooldown = 0;
+        const ScriptCommandData* running_program = nullptr;
+        int running_count = 0;
+    };
+    void advance(State& state);
     bn::string<64> scene_id;
     bn::array<State, 64> states;
     bool initialized = false;

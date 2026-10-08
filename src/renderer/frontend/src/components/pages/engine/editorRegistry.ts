@@ -7,7 +7,7 @@ export interface EditorDefinition {
 
 export const EDITORS: EditorDefinition[] = [
   { id: 1, labelKey: 'editor.world', supportsZoom: true, supportsSearch: true },
-  { id: 3, labelKey: 'editor.sprites', supportsZoom: true, supportsSearch: true },
+  { id: 3, labelKey: 'editor.sprites', supportsZoom: false, supportsSearch: true },
   { id: 4, labelKey: 'editor.images', supportsZoom: true, supportsSearch: true },
   { id: 5, labelKey: 'editor.music', supportsZoom: false, supportsSearch: true },
   { id: 6, labelKey: 'editor.sounds', supportsZoom: false, supportsSearch: true },

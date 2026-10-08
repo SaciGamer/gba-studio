@@ -20,6 +20,8 @@ struct ChangeScene {
     bn::fixed countFixed;
 };
 
+extern ChangeScene changeScene;
+
 bool run_change_scene(const void* args);
 bool run_change_scene(const SceneChangeEventData& data);
 

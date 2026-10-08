@@ -1,0 +1,311 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "original_gem",
+  "name": "gem",
+  "filename": "gem.bmp",
+  "imageWidth": 16,
+  "imageHeight": 64,
+  "playerFrameWidth": 16,
+  "playerFrameHeight": 16,
+  "playerFramesPerDirection": 1,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 8,
+  "playerCanvasOriginY": 8,
+  "playerCollisionX": -8,
+  "playerCollisionY": -8,
+  "playerCollisionWidth": 16,
+  "playerCollisionHeight": 16,
+  "playerAnimations": [
+    {
+      "id": "idle-down",
+      "name": "Idle Down",
+      "type": "idle",
+      "frames": [
+        0
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_gem-idle-down",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-original_gem-idle-down",
+              "sourceX": 0,
+              "sourceY": 0,
+              "width": 16,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-down",
+      "name": "Moving Down",
+      "type": "movement",
+      "frames": [
+        0
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-left",
+      "name": "Idle Left",
+      "type": "idle",
+      "frames": [
+        1
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_gem-idle-left",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-original_gem-idle-left",
+              "sourceX": 0,
+              "sourceY": 16,
+              "width": 16,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-left",
+      "name": "Moving Left",
+      "type": "movement",
+      "frames": [
+        1
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-right",
+      "name": "Idle Right",
+      "type": "idle",
+      "frames": [
+        2
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_gem-idle-right",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-original_gem-idle-right",
+              "sourceX": 0,
+              "sourceY": 32,
+              "width": 16,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-right",
+      "name": "Moving Right",
+      "type": "movement",
+      "frames": [
+        2
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-up",
+      "name": "Idle Up",
+      "type": "idle",
+      "frames": [
+        3
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_gem-idle-up",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-original_gem-idle-up",
+              "sourceX": 0,
+              "sourceY": 48,
+              "width": 16,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-up",
+      "name": "Moving Up",
+      "type": "movement",
+      "frames": [
+        3
+      ],
+      "canvasFrames": []
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "default",
+      "name": "Default",
+      "type": "default",
+      "animations": [
+        {
+          "id": "idle-down",
+          "name": "Idle Down",
+          "type": "idle",
+          "frames": [
+            0
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_gem-idle-down",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-original_gem-idle-down",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 16,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-down",
+          "name": "Moving Down",
+          "type": "movement",
+          "frames": [
+            0
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-left",
+          "name": "Idle Left",
+          "type": "idle",
+          "frames": [
+            1
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_gem-idle-left",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-original_gem-idle-left",
+                  "sourceX": 0,
+                  "sourceY": 16,
+                  "width": 16,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-left",
+          "name": "Moving Left",
+          "type": "movement",
+          "frames": [
+            1
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-right",
+          "name": "Idle Right",
+          "type": "idle",
+          "frames": [
+            2
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_gem-idle-right",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-original_gem-idle-right",
+                  "sourceX": 0,
+                  "sourceY": 32,
+                  "width": 16,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-right",
+          "name": "Moving Right",
+          "type": "movement",
+          "frames": [
+            2
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-up",
+          "name": "Idle Up",
+          "type": "idle",
+          "frames": [
+            3
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_gem-idle-up",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-original_gem-idle-up",
+                  "sourceX": 0,
+                  "sourceY": 48,
+                  "width": 16,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-up",
+          "name": "Moving Up",
+          "type": "movement",
+          "frames": [
+            3
+          ],
+          "canvasFrames": []
+        }
+      ]
+    }
+  ]
+}

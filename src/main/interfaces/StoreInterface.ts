@@ -5,11 +5,15 @@ export interface IPreferences {
     tempBuildPath?: string;
     tempProjectBackupLimit?: number;
     historyLimit?: number;
+    gameWorldPanInertia?: boolean;
+    gameWorldMovementMode?: 'free' | 'grid';
 }
 export interface IRecentProject {
     path: string;
-    name: string;
+    title: string;
     lastOpened: Date;
+    hasCartridgeImage?: boolean;
+    cartridgeImage?: string | null;
 }
 export interface IStoreData {
     preferences: IPreferences;

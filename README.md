@@ -179,7 +179,7 @@ Cada recurso tem um tipo (`ResourceType`) e campos correspondentes:
 Durante o build (ao clicar em `build` ou `play`:
 
 O `ResourceBuilder` (em `src/main/utils/builders/ResourceBuilder.ts`):
-1. Lê todos os arquivos `.gbasres` de `sample_project_example/project/`
+1. Lê todos os arquivos `.gbasres` de `templateEngineGame/sample_project_example/project/`
 2. Extrai tipo (`__RESOURCETYPE`) e constantes de cada arquivo
 3. Gera headers correspondentes em `include/`
 4. Constrói o array `RESOURCES[]` em `resource_registry.cpp`
@@ -229,3 +229,31 @@ auto bg_ptr = bn::regular_bg_ptr::create(bg_item);
 - EmulatoJs: https://emulatorjs.org/ 
 - Butano: https://github.com/GValiente/butano
 ---
+
+### Valores e expressões nos eventos
+
+Nos campos numéricos dos eventos, clique no prefixo `#` para escolher número,
+variável, constante, propriedade de actor/player, campo do motor, direção ou
+expressão. Os grupos Math, Boolean, Comparison e Bitwise oferecem as operações
+correspondentes. Operações binárias abrem dois inputs; cada input pode conter
+outra variação ou expressão. Operações unárias usam um input.
+
+Exemplo: X pode usar `(variável % 7) + 15`, enquanto Y usa outra variável.
+O menu também permite copiar e colar um valor completo, incluindo seus blocos.
+As expressões são salvas nos eventos e funcionam em scripts reutilizáveis.
+
+Property usa um seletor único agrupado por actor/player. Math mostra apenas
+os operandos e o operador entre eles, sem um seletor adicional. Expression
+usa o prefixo `∑` e um campo de uma linha, por exemplo `($LOCAL0 + 15) * 2`.
+Aceita parênteses, operadores e funções como `min`, `max`, `abs`, `sqrt` e
+`atan2`. Referências `$símbolo` são vinculadas ao ID da variável ao salvar;
+`$[ID]` também é aceito. Os prefixos ficam nos inputs; os menus reservam uma
+coluna uniforme para o check e separam as opções por títulos.
+
+Os cálculos usam inteiros de 32 bits, com resultados limitados ao intervalo do
+evento. Divisão descarta a parte fracionária; divisão/resto por zero retorna
+zero. Raiz quadrada retorna a parte inteira e `atan2` usa graus. Random inclui
+os dois limites. O limite é de oito níveis e 127 nós por expressão.
+Eventos que aguardam vários frames mantêm os valores calculados no início da
+execução, para que posições aleatórias ou propriedades não mudem o destino
+durante o movimento.

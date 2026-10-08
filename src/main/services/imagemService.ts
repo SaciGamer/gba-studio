@@ -7,8 +7,7 @@ import { directoryPathProject } from '@/main';
 // const targetDir = path.join(app.getAppPath(), 'project_user', 'user_assets');
 let targetDir: any;
 
-const eventCache: Record<string, boolean> = {}; // Cache para debouncing
-const debounceInterval = 100; // Intervalo em milissegundos para ignorar eventos repetidos
+const debounceInterval = 100;
 
 // Pegar caminho completo da imagem
 const getFullPathImages = (files: any, assetsPath: string) => {
@@ -34,15 +33,20 @@ const preparePathForFrontend = (filePath: string) => {
 // effects.  The old image-only filter made the audio screens always empty even
 // when assets existed in assets/musics or assets/sounds.
 const isAssetFile = (filename: string) => [
-  '.png', '.jpg', '.jpeg', '.gif', '.bmp',
+  '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp',
   '.wav', '.mp3', '.ogg', '.mod', '.xm', '.s3m', '.it',
 ].includes(path.extname(filename).toLowerCase());
 
 const syncImagesIncrementally = (monitoredDir: string, targetUserDir: string | null) => {
-  const sourceFiles = fs.readdirSync(monitoredDir).filter(isAssetFile);
+  if (!fs.existsSync(monitoredDir)) return [];
+  const sourceFiles = fs.readdirSync(monitoredDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && isAssetFile(entry.name))
+    .map((entry) => entry.name);
   const shouldSyncTarget = targetUserDir && path.resolve(monitoredDir) !== path.resolve(targetUserDir);
   const targetFiles = shouldSyncTarget && targetUserDir
-    ? (fs.mkdirSync(targetUserDir, { recursive: true }), fs.readdirSync(targetUserDir).filter(isAssetFile))
+    ? (fs.mkdirSync(targetUserDir, { recursive: true }), fs.readdirSync(targetUserDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && isAssetFile(entry.name))
+      .map((entry) => entry.name))
     : null;
 
   if (targetFiles && targetUserDir) {
@@ -72,10 +76,7 @@ const syncImagesIncrementally = (monitoredDir: string, targetUserDir: string | n
       if (targetFiles.includes(file)) {
         const source = path.join(monitoredDir, file);
         const destination = path.join(targetUserDir, file);
-        const sourceStat = fs.statSync(source);
-        const targetStat = fs.statSync(destination);
-
-        if (sourceStat.mtime > targetStat.mtime) {
+        if (!filesHaveSameContents(source, destination)) {
           fs.copyFileSync(source, destination);
           console.log(`..: syncImagesIncrementally file updated: ${file}`);
         }
@@ -87,53 +88,71 @@ const syncImagesIncrementally = (monitoredDir: string, targetUserDir: string | n
   return sourceFiles;
 };
 
-let watchers: any[] = [];
+type WatcherEntry = { watcher: fs.FSWatcher; timer: NodeJS.Timeout | null; win: BrowserWindow; monitoredDir: string; targetDir: string | null };
+const watchers = new Map<string, WatcherEntry>();
 
 // Para desligar todos os watchers
 export async function stopAllWatchers() {
-  watchers.forEach((watcher) => {
+  watchers.forEach(({ watcher, timer }) => {
+    if (timer) clearTimeout(timer);
     try {
       watcher.close()
     } catch (err) {
       console.error("Erro ao fechar watcher:", err);
     }
   });
+  watchers.clear();
   console.log('..: Todos os watchers foram desligados.');
 };
 
 export async function clearWatchers() {
   await stopAllWatchers();
-  watchers = [];
   console.log('..: Watchers limpos.');
 }
 
 // Monitorar alterações na pasta
 const watchImages = (win: any, monitoredDir: string, targetUserDir: string | null) => {
+  const key = path.resolve(monitoredDir);
+  const current = watchers.get(key);
+  if (current) {
+    current.win = win;
+    current.targetDir = targetUserDir;
+    return;
+  }
   const sandboxAssetsDir = targetUserDir ?? (directoryPathProject
     ? path.join(directoryPathProject, 'assets', path.basename(monitoredDir))
     : null);
   console.log(`..: Monitorando o diretório: ${monitoredDir}`);
 
-  const watch = fs.watch(monitoredDir, (eventType, filename) => {
-    if (filename) {
-      //   if (eventCache[monitoredDir]) {
-      //     // Ignora eventos repetidos dentro do intervalo
-      //     return;
-      //   }
+  const entry: WatcherEntry = { watcher: null as any, timer: null, win, monitoredDir, targetDir: sandboxAssetsDir };
+  let retryCount = 0;
+  const scheduleSync = () => {
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = setTimeout(() => {
+      entry.timer = null;
+      try {
+        const imagesNames = syncImagesIncrementally(entry.monitoredDir, entry.targetDir);
+        retryCount = 0;
+        if (!entry.win.isDestroyed() && !entry.win.webContents.isDestroyed()) {
+          entry.win.webContents.send('update-images', preparePathForFrontend(entry.monitoredDir), imagesNames);
+        }
+      } catch (error) {
+        console.warn(`Asset sync will retry for ${entry.monitoredDir}:`, error);
+        if (retryCount < 3) {
+          retryCount += 1;
+          scheduleSync();
+        }
+      }
+    }, debounceInterval);
+  };
 
-      //   eventCache[monitoredDir] = true;
-      //   setTimeout(() => {
-      //     delete eventCache[monitoredDir]; // Limpa o cache após o intervalo
-      //   }, debounceInterval);
-
-      console.log(`..: Alteração detectada: ${eventType} no arquivo ${filename}`);
-      const imagesNames = syncImagesIncrementally(monitoredDir, sandboxAssetsDir); // Atualiza sandbox e lista de arquivos
-      console.log('..: watchImages enviar para o FE:', monitoredDir, imagesNames);
-      win.webContents.send('update-images', preparePathForFrontend(monitoredDir), imagesNames); // Notifica o frontend
-    }
+  entry.watcher = fs.watch(monitoredDir, scheduleSync);
+  entry.watcher.on('error', (error) => {
+    console.error(`Asset watcher failed for ${monitoredDir}:`, error);
+    if (entry.timer) clearTimeout(entry.timer);
+    watchers.delete(key);
   });
-
-  watchers.push(watch);
+  watchers.set(key, entry);
 };
 
 // Iniciar o monitoramento
@@ -141,7 +160,7 @@ export function startWatch(win: BrowserWindow | null, originalProjectDirectory: 
   const projectPath = path.join(originalProjectDirectory || '', 'assets', monitoringFolderPath);
 
   if (!fs.existsSync(projectPath)) {
-    if (monitoringFolderPath === 'fonts') {
+    if (monitoringFolderPath === 'fonts' || monitoringFolderPath === 'auto-tiles') {
       fs.mkdirSync(projectPath, { recursive: true });
     } else {
       return { status: 'error', message: '>> Directory not found.' };
@@ -155,10 +174,23 @@ export function startWatch(win: BrowserWindow | null, originalProjectDirectory: 
     ? path.join(directoryPathProject, 'assets', monitoringFolderPath)
     : null;
   targetDir = directoryPathProject;
-  watchImages(win, projectPath, null/*, targetUserDir*/); // Chama a função passando a janela e o caminho do projeto
+  watchImages(win, projectPath, targetUserDir);
 
-  return { status: 'success', localPath: `${preparePathForFrontend(projectPath)}`, fileImages: syncImagesIncrementally(projectPath, targetUserDir) };
+  try {
+    return { status: 'success', localPath: `${preparePathForFrontend(projectPath)}`, fileImages: syncImagesIncrementally(projectPath, targetUserDir) };
+  } catch (error) {
+    console.error(`Unable to synchronize assets from ${projectPath}:`, error);
+    return { status: 'error', message: 'Unable to synchronize project assets.' };
+  }
 };
+
+function filesHaveSameContents(sourcePath: string, targetPath: string): boolean {
+  try {
+    return fs.existsSync(targetPath) && fs.statSync(targetPath).isFile() && fs.readFileSync(sourcePath).equals(fs.readFileSync(targetPath));
+  } catch {
+    return false;
+  }
+}
 
 // export function cleanAllTargetDir () {
 //   // Deleta pasta do usuario para recria-la

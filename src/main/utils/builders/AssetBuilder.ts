@@ -7,9 +7,19 @@ import fs from 'fs';
 import path from 'path';
 import { execFile } from "child_process";
 import { promisify } from "util";
+import { materializeSpriteCanvas } from './SpriteCanvasBuilder';
+import { fitRegularBgBmp, regularBgDimensions } from './regularBgDimensions';
+import { indexedTransparency, encodeSpriteBmp } from './spriteCanvasPixels';
 import { JsonResourceDefault, ResourceFile } from '../types/BuildTypes';
+import { runBuildJobs } from './runBuildJobs';
 
 const execFileAsync = promisify(execFile);
+const BUILTIN_TILE_PALETTES: Record<string, string[]> = {
+  'preset-gba': ['#000000', '#ffffff', '#b5d8a8', '#73a55c', '#3d6b3d', '#203c56', '#456b8c', '#8fb8d8', '#f4d35e', '#ee964b', '#f95738', '#9e2a2b', '#6a4c93', '#8e7dbe', '#2a9d8f', '#264653'],
+  'preset-gameboy': ['#0f380f', '#306230', '#8bac0f', '#9bbc0f', '#1b1b1b', '#3b4a2f', '#5f7c3b', '#cadc9f', '#283618', '#606c38', '#a3b18a', '#dad7cd', '#344e41', '#588157', '#a3b18a', '#fefae0'],
+  'preset-grayscale': ['#000000', '#111111', '#222222', '#333333', '#444444', '#555555', '#666666', '#777777', '#888888', '#999999', '#aaaaaa', '#bbbbbb', '#cccccc', '#dddddd', '#eeeeee', '#ffffff'],
+  'preset-sunset': ['#16001e', '#301934', '#512b58', '#7b2d5f', '#a44255', '#d05a4e', '#ef8354', '#f6bd60', '#f7ede2', '#84a59d', '#52796f', '#354f52', '#2f3e46', '#e07a5f', '#3d405b', '#81b29a'],
+};
 // AssetBuilder is also used by build verification outside Electron.  Its tool
 // lookup needs the same answer as electron-is-dev without requiring Electron
 // merely to load this file.
@@ -18,6 +28,7 @@ const isDev = process.env.ELECTRON_IS_DEV !== undefined
   : process.defaultApp === true;
 
 export interface AssetCopyOptions {
+  onProgress?: (message: string, key: string, name: string) => void;
   overwrite?: boolean;
   preserveStructure?: boolean;
   verbose?: boolean;
@@ -27,6 +38,7 @@ export class AssetBuilder {
   private buildDir: string;
   private __dirname: string;
   private readonly magickPath?: string;
+  private readonly tilesetSourcePaths = new Map<string, string>();
 
   constructor(dirname: string, buildDir: string, magickPath?: string) {
     this.__dirname = dirname;
@@ -48,8 +60,38 @@ export class AssetBuilder {
       return { copiedCount: 0, skippedCount: 0 };
     }
 
+    // Builds for the same project reuse their output directory. Remove legacy
+    // tileset graphics left by older builds so Butano cannot compile them.
+    this.removeLegacyTilesetGraphics();
+
     let copiedCount = 0;
     let skippedCount = 0;
+    this.tilesetSourcePaths.clear();
+    const spriteSources: Array<{ filename: string; path: string }> = [];
+    // Source sheets are editor inputs, like tilesets. Clear legacy copied
+    // sheets before rebuilding other categories that may share a basename.
+    const spriteDir = path.join(sourceAssetDir, 'sprites');
+    const staleNames = new Set<string>();
+    const scanSprites = (directory: string) => {
+      if (!fs.existsSync(directory)) return;
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const filename = path.join(directory, entry.name);
+        if (entry.isDirectory()) scanSprites(filename);
+        else if (entry.isFile() && /\.(png|bmp|gif|jpe?g)$/i.test(entry.name)) staleNames.add(path.parse(this.sanitizeFilename(entry.name)).name);
+      }
+    };
+    scanSprites(spriteDir);
+    const graphicsDir = path.join(this.buildDir, 'graphics');
+    if (fs.existsSync(graphicsDir)) for (const entry of fs.readdirSync(graphicsDir, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const stem = path.parse(entry.name).name;
+      if ((staleNames.has(stem) || stem.startsWith('gbas_canvas_')) && /\.(png|bmp|gif|jpe?g|json)$/i.test(entry.name)) fs.unlinkSync(path.join(graphicsDir, entry.name));
+    }
+    const generatedDir = path.join(this.buildDir, 'build');
+    if (fs.existsSync(generatedDir)) for (const entry of fs.readdirSync(generatedDir, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      if ([...staleNames].some(stem => entry.name === `bn_sprite_items_${stem}.h` || entry.name.startsWith(`${stem}_bn_gfx.`)) || /^(bn_sprite_items_)?gbas_canvas_/.test(entry.name)) fs.unlinkSync(path.join(generatedDir, entry.name));
+    }
 
     const walk = async (dir: string, relativeBase: string, resourceFiles: ResourceFile[]) => {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -59,6 +101,11 @@ export class AssetBuilder {
         const relativePath = path.join(relativeBase, entry.name);
 
         if (entry.isDirectory()) {
+          // Cartridge cover images are used only by the editor/launcher. They
+          // are not game graphics and must not be converted or sent to Butano.
+          if (!relativeBase && entry.name.toLowerCase() === 'cartridge') {
+            continue;
+          }
           // Recursively process subdirectories
           await walk(sourcePath, relativePath, resourceFiles);
         } else if (entry.isFile()) {
@@ -70,8 +117,25 @@ export class AssetBuilder {
           }
 
           // Determine destination based on asset type
+          if (['.mod', '.xm', '.s3m', '.it'].includes(ext)) {
+            this.validateTrackerModule(sourcePath, ext);
+          }
+          const assetCategory = relativeBase.toLowerCase().replace(/\\/g, '/').split('/')[0];
+          const isImage = ['.png', '.bmp', '.gif', '.jpg', '.jpeg'].includes(ext);
+          if (isImage && assetCategory === 'sprites') {
+            spriteSources.push({ filename: path.relative(spriteDir, sourcePath).replace(/\\/g, '/'), path: sourcePath });
+            continue;
+          }
+          if (isImage && (assetCategory === 'tilesets' || assetCategory === 'auto-tiles')) {
+            const tilesetKey = this.sanitizeFilename(filename).replace(/\.[^/.]+$/, '');
+            this.tilesetSourcePaths.set(assetCategory === 'auto-tiles' ? `auto-tile:${tilesetKey}` : tilesetKey, sourcePath);
+            continue;
+          }
+          // Palette graphics are editor sources. Build-time palette remapping
+          // uses the colors stored in palette resources and generated swatches.
+          if (isImage && assetCategory === 'palettes') continue;
           const relForDest = preserveStructure ? path.join(path.dirname(relativePath), filename) : filename;
-          const destPath = this.getAssetDestination(sourcePath, relForDest);
+          const destPath = this.getAssetDestination(sourcePath, relForDest, relativeBase);
 
           if (!fs.existsSync(path.dirname(destPath))) {
             fs.mkdirSync(path.dirname(destPath), { recursive: true });
@@ -80,7 +144,8 @@ export class AssetBuilder {
           if (!fs.existsSync(destPath) || overwrite) {
             fs.copyFileSync(sourcePath, destPath);
 
-            const resourceFile = resourceFiles.find(r => r.jsonContent?.filename && this.sanitizeFilename(r.jsonContent.filename) === filename);
+            const resourceFile = resourceFiles.find(r => r.jsonContent?._resourceType !== 'sprite' && r.jsonContent?.filename && this.sanitizeFilename(r.jsonContent.filename) === filename);
+            options.onProgress?.(`Preparando asset: ${relativePath}`, 'asset', relativePath);
             await this.processAssets(sourcePath, destPath, relativeBase, resourceFile);
             
             if (verbose) {
@@ -98,6 +163,17 @@ export class AssetBuilder {
     };
 
     await walk(sourceAssetDir, '', resourceFiles);
+    for (const file of resourceFiles) {
+      const resource = file.jsonContent;
+      if (resource?._resourceType !== 'sprite' || resource._deleted) continue;
+      const filename = String(resource.filename ?? '').replace(/\\/g, '/');
+      const exact = spriteSources.find(source => source.filename === filename);
+      const candidates = exact ? [exact] : spriteSources.filter(source => path.basename(source.filename) === path.basename(filename));
+      if (candidates.length !== 1) throw new Error(`Sprite ${resource.name ?? resource.id}: source image not found or ambiguous (${filename})`);
+      options.onProgress?.(`Gerando imagem do sprite: ${resource.name ?? filename}`, 'sprite', String(resource.name ?? filename));
+      await materializeSpriteCanvas(resource, candidates[0].path, graphicsDir, this.getMagickPath());
+      copiedCount++;
+    }
     return { copiedCount, skippedCount };
   }
 
@@ -137,15 +213,145 @@ export class AssetBuilder {
   }
 
   private async convertFontWithMagick(sourcePath: string, destinationPath: string): Promise<void> {
+    const indexedTransparency = path.extname(sourcePath).toLowerCase() === '.bmp'
+      ? this.readIndexedBmpTransparentPixels(sourcePath)
+      : null;
     await execFileAsync(this.getMagickPath(), [
       sourcePath,
       '-background', 'none',
       '-alpha', 'on',
       '-colors', '256',
+      '-depth', '8',
       '-compress', 'None',
       '-type', 'Palette',
       `BMP3:${destinationPath}`,
     ]);
+    if (indexedTransparency) this.applyBmpTransparentPixels(destinationPath, indexedTransparency);
+  }
+
+  /**
+   * Reads the indexed-color transparency convention used by Butano fonts:
+   * source palette index 0 is transparent. Rows are returned top-to-bottom so
+   * they can be applied after ImageMagick normalizes the bitmap for the build.
+   */
+  private readIndexedBmpTransparentPixels(filename: string): { width: number; height: number; transparent: boolean[] } | null {
+    const data = fs.readFileSync(filename);
+    if (data.length < 54 || data.toString('ascii', 0, 2) !== 'BM') return null;
+    const dibSize = data.readUInt32LE(14);
+    const width = data.readInt32LE(18);
+    const signedHeight = data.readInt32LE(22);
+    const bitDepth = data.readUInt16LE(28);
+    const compression = data.readUInt32LE(30);
+    if (bitDepth > 8) return null;
+    if (width <= 0 || signedHeight === 0 || ![1, 4, 8].includes(bitDepth) || compression !== 0) {
+      throw new Error(`Unsupported indexed BMP font format: ${filename}`);
+    }
+
+    const height = Math.abs(signedHeight);
+    const topDown = signedHeight < 0;
+    const pixelsOffset = data.readUInt32LE(10);
+    const paletteOffset = 14 + dibSize;
+    const colorsUsed = dibSize >= 40 ? data.readUInt32LE(46) : 0;
+    const paletteCount = colorsUsed || (1 << bitDepth);
+    const rowStride = Math.floor((width * bitDepth + 31) / 32) * 4;
+    if (paletteCount < 1 || paletteOffset + paletteCount * 4 > pixelsOffset || pixelsOffset + rowStride * height > data.length) {
+      throw new Error(`Invalid indexed BMP font data: ${filename}`);
+    }
+
+    const transparent = new Array<boolean>(width * height);
+    for (let y = 0; y < height; y += 1) {
+      const sourceY = topDown ? y : height - 1 - y;
+      const rowOffset = pixelsOffset + sourceY * rowStride;
+      for (let x = 0; x < width; x += 1) {
+        let index: number;
+        if (bitDepth === 8) index = data[rowOffset + x];
+        else if (bitDepth === 4) index = (data[rowOffset + (x >> 1)] >> ((x & 1) === 0 ? 4 : 0)) & 0x0f;
+        else index = (data[rowOffset + (x >> 3)] >> (7 - (x & 7))) & 1;
+        if (index >= paletteCount) throw new Error(`Invalid palette index in BMP font: ${filename}`);
+        transparent[y * width + x] = index === 0;
+      }
+    }
+    return { width, height, transparent };
+  }
+
+  /**
+   * Marks the source transparent pixels as palette index 0 in the build-only
+   * BMP. If ImageMagick assigned index 0 to a visible color, that color is
+   * moved to an unused palette slot first so visible glyph pixels stay opaque.
+   */
+  private applyBmpTransparentPixels(filename: string, source: { width: number; height: number; transparent: boolean[] }): void {
+    const data = fs.readFileSync(filename);
+    if (data.length < 54 || data.toString('ascii', 0, 2) !== 'BM') {
+      throw new Error(`ImageMagick did not produce a BMP font: ${filename}`);
+    }
+    const dibSize = data.readUInt32LE(14);
+    const width = data.readInt32LE(18);
+    const signedHeight = data.readInt32LE(22);
+    const bitDepth = data.readUInt16LE(28);
+    const compression = data.readUInt32LE(30);
+    const height = Math.abs(signedHeight);
+    if (width !== source.width || height !== source.height || ![1, 4, 8].includes(bitDepth) || compression !== 0) {
+      throw new Error(`ImageMagick produced an unsupported BMP font layout: ${filename}`);
+    }
+
+    const topDown = signedHeight < 0;
+    const pixelsOffset = data.readUInt32LE(10);
+    const paletteOffset = 14 + dibSize;
+    const colorsUsed = dibSize >= 40 ? data.readUInt32LE(46) : 0;
+    const paletteCount = colorsUsed || Math.floor((pixelsOffset - paletteOffset) / 4);
+    const rowStride = Math.floor((width * bitDepth + 31) / 32) * 4;
+    if (paletteCount < 2 || paletteOffset + paletteCount * 4 > pixelsOffset || pixelsOffset + rowStride * height > data.length) {
+      throw new Error(`Invalid converted BMP font data: ${filename}`);
+    }
+
+    const readPixelIndex = (rowOffset: number, x: number): number => {
+      if (bitDepth === 8) return data[rowOffset + x];
+      if (bitDepth === 4) return (data[rowOffset + (x >> 1)] >> ((x & 1) === 0 ? 4 : 0)) & 0x0f;
+      return (data[rowOffset + (x >> 3)] >> (7 - (x & 7))) & 1;
+    };
+    const writePixelIndex = (rowOffset: number, x: number, index: number): void => {
+      if (bitDepth === 8) {
+        data[rowOffset + x] = index;
+      } else if (bitDepth === 4) {
+        const byteOffset = rowOffset + (x >> 1);
+        const shift = (x & 1) === 0 ? 4 : 0;
+        data[byteOffset] = (data[byteOffset] & ~(0x0f << shift)) | ((index & 0x0f) << shift);
+      } else {
+        const byteOffset = rowOffset + (x >> 3);
+        const shift = 7 - (x & 7);
+        data[byteOffset] = (data[byteOffset] & ~(1 << shift)) | ((index & 1) << shift);
+      }
+    };
+
+    const usedByVisiblePixels = new Set<number>();
+    for (let y = 0; y < height; y += 1) {
+      const targetY = topDown ? y : height - 1 - y;
+      const rowOffset = pixelsOffset + targetY * rowStride;
+      for (let x = 0; x < width; x += 1) {
+        if (!source.transparent[y * width + x]) usedByVisiblePixels.add(readPixelIndex(rowOffset, x));
+      }
+    }
+
+    const replacementIndex = usedByVisiblePixels.has(0)
+      ? Array.from({ length: paletteCount - 1 }, (_, index) => index + 1).find(index => !usedByVisiblePixels.has(index))
+      : undefined;
+    if (usedByVisiblePixels.has(0) && replacementIndex === undefined) {
+      throw new Error(`Custom font uses all palette entries and has no transparent slot: ${filename}`);
+    }
+    if (replacementIndex !== undefined) {
+      data.copy(data, paletteOffset + replacementIndex * 4, paletteOffset, paletteOffset + 4);
+    }
+
+    for (let y = 0; y < height; y += 1) {
+      const targetY = topDown ? y : height - 1 - y;
+      const rowOffset = pixelsOffset + targetY * rowStride;
+      for (let x = 0; x < width; x += 1) {
+        const index = readPixelIndex(rowOffset, x);
+        if (source.transparent[y * width + x]) writePixelIndex(rowOffset, x, 0);
+        else if (replacementIndex !== undefined && index === 0) writePixelIndex(rowOffset, x, replacementIndex);
+      }
+    }
+    fs.writeFileSync(filename, data);
   }
 
   /**
@@ -153,9 +359,19 @@ export class AssetBuilder {
    * The source asset remains untouched and the generated background is exposed
    * as a new in-memory resource by the caller.
    */
-  public async materializeTileLayerEdits(resourceFiles: ResourceFile[]): Promise<JsonResourceDefault[]> {
+  public async materializeTileLayerEdits(resourceFiles: ResourceFile[], parallel = 1): Promise<JsonResourceDefault[]> {
     const graphicsDir = this.getGraphicsDir();
-    const derived: JsonResourceDefault[] = [];
+    if (fs.existsSync(graphicsDir)) {
+      // Older failed transcodes could leave transparent source BMPs behind.
+      // They are temporary composition inputs, not Butano graphics, and can
+      // otherwise make a later run request a nonexistent `_base.json`.
+      for (const entry of fs.readdirSync(graphicsDir, { withFileTypes: true })) {
+        if (entry.isFile() && /^derived_[a-z0-9_]+_layer_[a-z0-9_]+_base\.(?:bmp|json)$/i.test(entry.name)) {
+          fs.rmSync(path.join(graphicsDir, entry.name), { force: true });
+        }
+      }
+    }
+    const jobs: Array<() => Promise<JsonResourceDefault | undefined>> = [];
     const scenes = resourceFiles.filter(file => file.jsonContent?._resourceType === 'scene');
     const backgrounds = resourceFiles.filter(file => file.jsonContent?._resourceType === 'background');
     const paletteResources = resourceFiles.filter(file => file.jsonContent?._resourceType === 'palette');
@@ -163,14 +379,36 @@ export class AssetBuilder {
     const settings = resourceFiles.find(file => file.jsonContent?._resourceType === 'settings')?.jsonContent as any;
     const paletteDirectory = path.join(this.buildDir, '.tile-palettes');
     const palettePaths = new Map<string, string>();
+    if (fs.existsSync(paletteDirectory)) fs.rmSync(paletteDirectory, { recursive: true, force: true });
     const defaultPaletteId = Array.isArray(settings?.paletteIds) ? settings.paletteIds.find((id: unknown) => typeof id === 'string') : undefined;
     const paletteDefinitions = [
+      ...Object.entries(BUILTIN_TILE_PALETTES).map(([id, colors]) => ({ id, colors })),
       ...paletteResources.map(file => file.jsonContent),
       ...(Array.isArray(paletteSettings?.palettes) ? paletteSettings.palettes : []),
     ];
-    if (paletteDefinitions.length) fs.mkdirSync(paletteDirectory, { recursive: true });
+    const requiredPaletteIds = new Set<string>();
+    for (const sceneFile of scenes) {
+      const scene = sceneFile.jsonContent as any;
+      for (const layer of Array.isArray(scene.backgrounds) ? scene.backgrounds : []) {
+        const hasTileMap = Array.isArray(layer.tileMap) && layer.tileMap.some((row: unknown) => Array.isArray(row) && row.some(tile => Number(tile) >= 0));
+        const hasColorize = Array.isArray(layer.tilePaletteIds) && layer.tilePaletteIds.some((row: unknown) => Array.isArray(row) && row.some(paletteId => typeof paletteId === 'string' && paletteId !== '__original__'));
+        if (!hasTileMap && !hasColorize) continue;
+        for (const row of Array.isArray(layer.tilePaletteIds) ? layer.tilePaletteIds : []) {
+          for (const paletteId of Array.isArray(row) ? row : []) {
+            if (typeof paletteId === 'string' && paletteId !== '__original__') requiredPaletteIds.add(paletteId);
+          }
+        }
+        if (hasTileMap && typeof defaultPaletteId === 'string' && defaultPaletteId) {
+          const needsDefaultPalette = layer.tileMap.some((row: number[], rowIndex: number) => row.some((tile: number, colIndex: number) =>
+            Number(tile) >= 0 && layer.tilePaletteIds?.[rowIndex]?.[colIndex] == null,
+          ));
+          if (needsDefaultPalette) requiredPaletteIds.add(defaultPaletteId);
+        }
+      }
+    }
+    if (requiredPaletteIds.size) fs.mkdirSync(paletteDirectory, { recursive: true });
     for (const palette of paletteDefinitions) {
-      if (typeof palette?.id !== 'string' || !Array.isArray(palette.colors)) continue;
+      if (typeof palette?.id !== 'string' || !requiredPaletteIds.has(palette.id) || !Array.isArray(palette.colors)) continue;
       const palettePath = path.join(paletteDirectory, `${this.sanitizeFilename(palette.id)}.png`);
       await this.createPaletteImage(palettePath, palette.colors);
       palettePaths.set(palette.id, palettePath);
@@ -181,16 +419,39 @@ export class AssetBuilder {
       if (!Array.isArray(scene.backgrounds)) continue;
 
       for (const layer of scene.backgrounds) {
+        jobs.push(async () => {
         const hasTileMap = Array.isArray(layer.tileMap) && layer.tileMap.some((row: unknown) => Array.isArray(row) && row.some(tile => Number(tile) >= 0));
         const hasColorize = Array.isArray(layer.tilePaletteIds) && layer.tilePaletteIds.some((row: unknown) => Array.isArray(row) && row.some(paletteId => typeof paletteId === 'string' && paletteId !== '__original__'));
-        if (!hasTileMap && !hasColorize) continue;
+        if (!hasTileMap && !hasColorize) return;
+        const referencedPaletteIds = new Set<string>();
+        for (const row of Array.isArray(layer.tilePaletteIds) ? layer.tilePaletteIds : []) {
+          for (const paletteId of Array.isArray(row) ? row : []) {
+            if (typeof paletteId === 'string' && paletteId !== '__original__') referencedPaletteIds.add(paletteId);
+          }
+        }
+        if (typeof defaultPaletteId === 'string' && defaultPaletteId) referencedPaletteIds.add(defaultPaletteId);
+        const missingPalette = [...referencedPaletteIds].find(id => !palettePaths.has(id));
+        if (missingPalette) {
+          throw new Error(`Unknown tile palette '${missingPalette}' referenced by scene ${scene.id ?? '<scene>'} layer ${layer.layerId ?? 0}`);
+        }
         const source = backgrounds.find(file => file.jsonContent?.id === layer.backgroundId)?.jsonContent;
         const tilesetId = layer.selectedTilesetId ?? scene.selectedTilesetId;
-        if (hasTileMap && !tilesetId) {
+        const tilesetIds = new Set<string>();
+        if (hasTileMap) {
+          layer.tileMap.forEach((row: number[], rowIndex: number) => row.forEach((tile: number, colIndex: number) => {
+            if (Number(tile) < 0) return;
+            const id = layer.tileMapTilesetIds?.[rowIndex]?.[colIndex] ?? tilesetId;
+            if (typeof id === 'string' && id) tilesetIds.add(id);
+          }));
+        }
+        if (hasTileMap && !tilesetIds.size) {
           console.warn('..: Skipping tile layer without tileset:', scene.id, layer.layerId);
-          continue;
+          return;
         }
 
+        const logicalWidth = Math.round(Number(scene.width) || Number(source?.imageWidth) || 240);
+        const logicalHeight = Math.round(Number(scene.height) || Number(source?.imageHeight) || 160);
+        regularBgDimensions(logicalWidth, logicalHeight);
         const derivedId = `derived_${String(scene.id).replace(/[^a-zA-Z0-9_]/g, '_')}_layer_${layer.layerId}`;
         const derivedFilename = `${derivedId}.bmp`;
         const destination = path.join(graphicsDir, derivedFilename);
@@ -201,35 +462,68 @@ export class AssetBuilder {
           ? path.join(graphicsDir, this.toBmpFilename(source.filename))
           : path.join(graphicsDir, `${derivedId}_base.bmp`);
         if (!source) {
-          const width = Math.max(8, Number(scene.width) || 240);
-          const height = Math.max(8, Number(scene.height) || 160);
+          const width = logicalWidth;
+          const height = logicalHeight;
           await execFileAsync(this.getMagickPath(), ['-size', `${width}x${height}`, 'xc:none', '-compress', 'None', '-type', 'Palette', `BMP3:${sourceBmp}`]);
         }
-        const tilesetBmp = hasTileMap ? fs.readdirSync(graphicsDir).find(file => path.extname(file).toLowerCase() === '.bmp' && path.basename(file, '.bmp') === this.sanitizeFilename(String(tilesetId)).replace(/\.[^/.]+$/, '')) : undefined;
-        if (!fs.existsSync(sourceBmp) || (hasTileMap && !tilesetBmp)) {
+        const availableTilesetBmps = new Map<string, string>();
+        if (hasTileMap) {
+          for (const id of tilesetIds) {
+            const sourceKey = id.startsWith('auto-tile:')
+              ? `auto-tile:${this.sanitizeFilename(id.slice('auto-tile:'.length)).replace(/\.[^/.]+$/, '')}`
+              : this.sanitizeFilename(id).replace(/\.[^/.]+$/, '');
+            // Projects created before auto-tiles received their own asset
+            // folder may still keep those source images under `tilesets`.
+            // Use that location as a build-time fallback while continuing to
+            // exclude every source image from Graphics.
+            const legacyAutoTileKey = id.startsWith('auto-tile:')
+              ? this.sanitizeFilename(id.slice('auto-tile:'.length)).replace(/\.[^/.]+$/, '')
+              : null;
+            const sourcePath = this.tilesetSourcePaths.get(sourceKey)
+              ?? (legacyAutoTileKey ? this.tilesetSourcePaths.get(legacyAutoTileKey) : undefined);
+            if (sourcePath) availableTilesetBmps.set(id, sourcePath);
+          }
+        }
+        const missingTileSources = hasTileMap ? [...tilesetIds].filter(id => !availableTilesetBmps.has(id)) : [];
+        if (!fs.existsSync(sourceBmp) || missingTileSources.length) {
+          // A transparent base is temporary input only. Never leave it in
+          // Graphics: Butano treats every BMP there as a real asset and then
+          // asks for a matching JSON descriptor.
+          if (!source && fs.existsSync(sourceBmp)) fs.rmSync(sourceBmp, { force: true });
+          if (missingTileSources.length) {
+            throw new Error(`Missing tile source image(s) for scene ${scene.id ?? '<scene>'} layer ${layer.layerId ?? 0}: ${missingTileSources.join(', ')}. Add the image to assets/auto-tiles (or assets/tilesets for legacy projects).`);
+          }
           console.warn('..: Skipping tile layer because build graphics are unavailable:', scene.id, layer.layerId);
-          continue;
+          return;
         }
 
         const grid = Number(scene.gridSize) === 16 ? 16 : 8;
+        const sizedBase = path.join(graphicsDir, `${derivedId}_sized_base.bmp`);
+        fs.writeFileSync(sizedBase, fitRegularBgBmp(fs.readFileSync(sourceBmp), logicalWidth, logicalHeight).data);
         const colorizedBase = path.join(graphicsDir, `${derivedId}_colorized_base.bmp`);
-        const compositionBase = hasColorize ? colorizedBase : sourceBmp;
-        if (hasColorize) await this.composeColorizedBackground(sourceBmp, colorizedBase, layer.tilePaletteIds, grid, palettePaths);
+        const compositionBase = hasColorize ? colorizedBase : sizedBase;
+        if (hasColorize) await this.composeColorizedBackground(sizedBase, colorizedBase, layer.tilePaletteIds, grid, palettePaths);
         if (hasTileMap) {
-          await this.composeTileLayer(compositionBase, path.join(graphicsDir, tilesetBmp!), destination, layer.tileMap, grid, layer.tilePaletteIds, palettePaths, defaultPaletteId);
+          await this.composeTileLayer(compositionBase, availableTilesetBmps, destination, layer.tileMap, grid, layer.tileMapTilesetIds, tilesetId, layer.tilePaletteIds, palettePaths, defaultPaletteId);
         } else {
           fs.copyFileSync(compositionBase, destination);
         }
+        if (fs.existsSync(sizedBase)) fs.rmSync(sizedBase);
         if (hasColorize && fs.existsSync(colorizedBase)) fs.rmSync(colorizedBase);
         if (!source && fs.existsSync(sourceBmp)) fs.rmSync(sourceBmp);
+        const padded = fitRegularBgBmp(fs.readFileSync(destination), logicalWidth, logicalHeight);
+        fs.writeFileSync(destination, padded.data);
         fs.writeFileSync(path.join(graphicsDir, `${derivedId}.json`), JSON.stringify({ type: 'regular_bg' }, null, 2));
 
         layer.backgroundId = derivedId;
-        derived.push({
+        return {
           ...(source ?? { _resourceType: 'background', autoColor: true, tileColors: '', imageWidth: Number(scene.width) || 240, imageHeight: Number(scene.height) || 160 }),
+          imageWidth: padded.width,
+          imageHeight: padded.height,
           id: derivedId,
           name: derivedId,
           filename: derivedFilename,
+        };
         });
       }
     }
@@ -237,7 +531,12 @@ export class AssetBuilder {
     // Keep every original background available to runtime events such as
     // Change Background. A resource does not need to be assigned to a scene
     // layer in order to be selected later by an event.
-    return derived;
+    try {
+      const derived = await runBuildJobs(jobs, parallel);
+      return derived.filter((resource): resource is JsonResourceDefault => resource !== undefined);
+    } finally {
+      if (fs.existsSync(paletteDirectory)) fs.rmSync(paletteDirectory, { recursive: true, force: true });
+    }
   }
 
   /**
@@ -321,9 +620,17 @@ export class AssetBuilder {
 
   private getMagickPath(): string {
     if (this.magickPath) return this.magickPath;
+    const executable = process.platform === 'win32' ? 'magick.exe' : 'magick';
+    const localCandidates = [
+      path.resolve(this.__dirname, 'bin', 'image-magick', executable),
+      path.resolve(this.__dirname, '..', 'bin', 'image-magick', executable),
+      path.resolve(this.__dirname, '..', '..', '..', '..', 'bin', 'image-magick', executable),
+    ];
+    const localPath = localCandidates.find(candidate => fs.existsSync(candidate));
+    if (localPath) return localPath;
     return isDev
-      ? path.join(this.__dirname, '..', 'bin', 'image-magick', process.platform === 'win32' ? 'magick.exe' : 'magick')
-      : path.join(process.resourcesPath, 'bin', 'image-magick', process.platform === 'win32' ? 'magick.exe' : 'magick');
+      ? path.join(this.__dirname, '..', 'bin', 'image-magick', executable)
+      : path.join(process.resourcesPath ?? '', 'bin', 'image-magick', executable);
   }
 
   private async createPaletteImage(destination: string, colors: unknown[]): Promise<void> {
@@ -334,28 +641,101 @@ export class AssetBuilder {
     await execFileAsync(this.getMagickPath(), args);
   }
 
-  private async composeTileLayer(sourceBmp: string, tilesetBmp: string, destination: string, tileMap: number[][], grid: number, tilePaletteIds?: Array<Array<string | null>>, palettePaths: Map<string, string> = new Map(), defaultPaletteId?: string): Promise<void> {
+  private async readGraphicRgba(filename: string, indexed = false) {
+    const { stdout: dimensions } = await execFileAsync(this.getMagickPath(), ['identify', '-format', '%w %h', filename]);
+    const [width, height] = dimensions.trim().split(/\s+/).map(Number);
+    const { stdout } = await execFileAsync(this.getMagickPath(), [filename, '-alpha', 'on', '-depth', '8', 'RGBA:-'], { encoding: 'buffer', maxBuffer: width * height * 4 + 1024, windowsHide: true });
+    const rgba = new Uint8Array(stdout);
+    const mask = indexed ? indexedTransparency(fs.readFileSync(filename)) : null;
+    if (mask) for (let pixel = 0; pixel < mask.length; ++pixel) if (mask[pixel]) rgba[pixel * 4 + 3] = 0;
+    return { width, height, rgba };
+  }
+
+  private async indexedGraphicToPng(filename: string, destination: string): Promise<void> {
+    const { width, height, rgba } = await this.readGraphicRgba(filename, true);
+    const raw = destination + '.rgba';
+    fs.writeFileSync(raw, rgba);
+    try {
+      await execFileAsync(this.getMagickPath(), ['-size', `${width}x${height}`, '-depth', '8', `RGBA:${raw}`, `PNG32:${destination}`]);
+    } finally { fs.rmSync(raw, { force: true }); }
+  }
+
+  private async composeTileLayer(sourceBmp: string, tilesetBmps: Map<string, string>, destination: string, tileMap: number[][], grid: number, tileMapTilesetIds?: Array<Array<string | null>>, fallbackTilesetId?: string, tilePaletteIds?: Array<Array<string | null>>, palettePaths: Map<string, string> = new Map(), defaultPaletteId?: string): Promise<void> {
     const magickPath = this.getMagickPath();
-    const { stdout } = await execFileAsync(magickPath, ['identify', '-format', '%w', tilesetBmp]);
-    const tilesPerRow = Math.max(1, Math.floor(Number.parseInt(stdout, 10) / grid));
-    const args = [sourceBmp];
+    const normalizedInputs: string[] = [];
+    const originalSource = sourceBmp;
+    sourceBmp = destination + '.compose-base.png';
+    normalizedInputs.push(sourceBmp);
+    await this.indexedGraphicToPng(originalSource, sourceBmp);
+    const normalizedTiles = new Map<string, string>();
+    for (const [id, filename] of tilesetBmps) {
+      const png = destination + `.compose-tiles-${normalizedTiles.size}.png`;
+      normalizedInputs.push(png);
+      await this.indexedGraphicToPng(filename, png);
+      normalizedTiles.set(id, png);
+    }
+    tilesetBmps = normalizedTiles;
+    const tilesPerRowById = new Map<string, number>();
+    await Promise.all([...tilesetBmps.entries()].map(async ([id, filename]) => {
+      const { stdout } = await execFileAsync(magickPath, ['identify', '-format', '%w', filename]);
+      tilesPerRowById.set(id, Math.max(1, Math.floor(Number.parseInt(stdout, 10) / grid)));
+    }));
+    const compositeOperations: string[][] = [];
     for (let row = 0; row < tileMap.length; row++) {
       for (let col = 0; col < tileMap[row].length; col++) {
         const tile = Number(tileMap[row][col]);
         if (!Number.isInteger(tile) || tile < 0) continue;
+        const tilesetId = tileMapTilesetIds?.[row]?.[col] ?? fallbackTilesetId;
+        const tilesetBmp = tilesetId ? tilesetBmps.get(tilesetId) : undefined;
+        const tilesPerRow = tilesetId ? tilesPerRowById.get(tilesetId) : undefined;
+        if (!tilesetBmp || !tilesPerRow) continue;
         const sourceX = (tile % tilesPerRow) * grid;
         const sourceY = Math.floor(tile / tilesPerRow) * grid;
         const paletteId = tilePaletteIds?.[row]?.[col] ?? defaultPaletteId;
         const palettePath = paletteId ? palettePaths.get(paletteId) : undefined;
-        args.push('(', tilesetBmp, '-crop', `${grid}x${grid}+${sourceX}+${sourceY}`, '+repage');
-        if (palettePath) args.push('-remap', palettePath);
-        args.push(')', '-geometry', `+${col * grid}+${row * grid}`, '-composite');
+        const operation = ['(', tilesetBmp, '-crop', `${grid}x${grid}+${sourceX}+${sourceY}`, '+repage'];
+        if (palettePath) operation.push('-remap', palettePath);
+        operation.push(')', '-geometry', `+${col * grid}+${row * grid}`, '-composite');
+        compositeOperations.push(operation);
       }
     }
-    // Keep every tile colour here. Butano/grit decides the appropriate GBA
-    // palette banks instead of flattening the edited layer to just 16 colours.
-    args.push('-compress', 'None', '-type', 'Palette', `BMP3:${destination}`);
-    await execFileAsync(magickPath, args);
+
+    // Windows limits the total command-line length. Bound each Magick call and
+    // apply batches to successive PNGs so alpha survives and arguments stay bounded.
+    const maxCommandLength = 12000;
+    const operationBatches: string[][][] = [];
+    let batch: string[][] = [];
+    let batchLength = sourceBmp.length + 128;
+    for (const operation of compositeOperations) {
+      const operationLength = operation.reduce((length, argument) => length + argument.length + 4, 0);
+      if (batch.length && batchLength + operationLength > maxCommandLength) {
+        operationBatches.push(batch);
+        batch = [];
+        batchLength = 128;
+      }
+      batch.push(operation);
+      batchLength += operationLength;
+    }
+    if (batch.length || !operationBatches.length) operationBatches.push(batch);
+
+    const temporaryOutputs: string[] = [...normalizedInputs];
+    let input = sourceBmp;
+    try {
+      for (let index = 0; index < operationBatches.length; index += 1) {
+        const output = destination + `.compose-${index}.png`;
+        temporaryOutputs.push(output);
+        const args = [input, ...operationBatches[index].flat(), `PNG32:${output}`];
+        await execFileAsync(magickPath, args);
+        if (input !== sourceBmp && fs.existsSync(input)) fs.rmSync(input, { force: true });
+        input = output;
+      }
+      const image = await this.readGraphicRgba(input);
+      fs.writeFileSync(destination, encodeSpriteBmp(image.rgba, image.width, image.height));
+    } finally {
+      for (const temporaryOutput of temporaryOutputs) {
+        if (fs.existsSync(temporaryOutput)) fs.rmSync(temporaryOutput, { force: true });
+      }
+    }
   }
 
   /**
@@ -381,6 +761,19 @@ export class AssetBuilder {
 
   private async processAssets(sourcePath: string, actualPath: string, relativeBase: string, resourceFile?: ResourceFile) {
     const bmpPath = await this.convertToBmp(actualPath, relativeBase, resourceFile);
+    if (path.extname(bmpPath).toLowerCase() === '.bmp' && relativeBase.toLowerCase().replace(/\\/g, '/').split('/')[0] === 'backgrounds') {
+      let bytes = fs.readFileSync(bmpPath);
+      if (bytes.length < 54 || ![1, 4, 8].includes(bytes.readUInt16LE(28)) || bytes.readUInt32LE(30) !== 0) {
+        await this.convertWithMagick(bmpPath, bmpPath, 'backgrounds', resourceFile);
+        bytes = fs.readFileSync(bmpPath);
+      }
+      const padded = fitRegularBgBmp(bytes);
+      fs.writeFileSync(bmpPath, padded.data);
+      if (resourceFile?.jsonContent) {
+        resourceFile.jsonContent.imageWidth = padded.width;
+        resourceFile.jsonContent.imageHeight = padded.height;
+      }
+    }
     await this.createGraphicsJson(path.dirname(sourcePath), bmpPath, relativeBase, resourceFile);
   }
 
@@ -389,7 +782,8 @@ export class AssetBuilder {
    */
   private getAssetDestination(
     sourcePath: string,
-    relativePath: string
+    relativePath: string,
+    relativeBase = ''
   ): string {
     const ext = path.extname(sourcePath).toLowerCase();
     const baseDir = this.buildDir;
@@ -398,7 +792,7 @@ export class AssetBuilder {
     if (['.png', '.bmp', '.gif', '.jpg', '.jpeg'].includes(ext)) {
       // Graphics/images
       return path.join(baseDir, 'graphics', relativePath);
-    } else if (['.wav', '.mp3', '.ogg', '.mod', '.s3m'].includes(ext)) {
+    } else if (['.wav', '.mp3', '.ogg', '.mod', '.xm', '.s3m', '.it'].includes(ext)) {
       // Audio files
       return path.join(baseDir, 'audio', relativePath);
     } else if (['.dat', '.bin'].includes(ext)) {
@@ -407,6 +801,93 @@ export class AssetBuilder {
     } else {
       // Default to base assets directory
       return path.join(baseDir, 'assets', relativePath);
+    }
+  }
+
+  /**
+   * Reject obviously truncated tracker files before they reach the Butano
+   * converter. The converter remains the final authority for semantic
+   * compatibility; this check gives the editor/build an actionable source
+   * diagnostic and never rewrites the original module.
+   */
+  private validateTrackerModule(sourcePath: string, extension: string): void {
+    const bytes = fs.readFileSync(sourcePath);
+    const text = (offset: number, length: number) => bytes.subarray(offset, offset + length).toString('ascii');
+    const u16 = (offset: number) => offset + 2 <= bytes.length ? bytes.readUInt16LE(offset) : -1;
+    const u32 = (offset: number) => offset + 4 <= bytes.length ? bytes.readUInt32LE(offset) : -1;
+    const filename = path.basename(sourcePath);
+    const invalid = (reason: string): never => {
+      throw new Error(`Invalid tracker module ${filename}: ${reason}`);
+    };
+
+    if (extension === '.mod') {
+      // 15-sample MODs have a 600-byte minimum header; 31-sample variants
+      // add the signature at 1080, but both must contain at least the header.
+      if (bytes.length < 600) invalid('file is shorter than the minimum MOD header (600 bytes)');
+      return;
+    }
+    if (extension === '.xm') {
+      if (bytes.length < 80 || text(0, 17) !== 'Extended Module: ') invalid('missing the XM signature/header');
+      const headerSize = u32(60);
+      const patterns = u16(70);
+      const instruments = u16(72);
+      if (headerSize < 20 || 60 + headerSize > bytes.length) invalid('song header exceeds file size');
+      if (patterns > 256 || instruments > 128) invalid('header counts exceed editor limits');
+      let cursor = 60 + headerSize;
+      for (let pattern = 0; pattern < patterns; pattern += 1) {
+        if (cursor + 9 > bytes.length) invalid(`pattern ${pattern} header exceeds file size`);
+        const patternHeaderSize = u32(cursor);
+        const packedSize = u16(cursor + 7);
+        if (patternHeaderSize < 9 || cursor + patternHeaderSize + packedSize > bytes.length) {
+          invalid(`pattern ${pattern} data exceeds file size`);
+        }
+        cursor += patternHeaderSize + packedSize;
+      }
+      for (let instrument = 0; instrument < instruments; instrument += 1) {
+        if (cursor + 33 > bytes.length) invalid(`instrument ${instrument + 1} header exceeds file size`);
+        const instrumentHeaderSize = u32(cursor);
+        const sampleCount = u16(cursor + 27);
+        const sampleHeaderSize = u32(cursor + 29);
+        if (instrumentHeaderSize < 33 || cursor + instrumentHeaderSize > bytes.length) invalid(`instrument ${instrument + 1} header exceeds file size`);
+        if (sampleCount > 0 && (sampleHeaderSize < 40 || cursor + instrumentHeaderSize + sampleCount * sampleHeaderSize > bytes.length)) {
+          invalid(`instrument ${instrument + 1} sample headers exceed file size`);
+        }
+        const sampleHeaders = cursor + instrumentHeaderSize;
+        let sampleDataSize = 0;
+        for (let sample = 0; sample < sampleCount; sample += 1) sampleDataSize += u32(sampleHeaders + sample * sampleHeaderSize);
+        if (sampleHeaders + sampleCount * sampleHeaderSize + sampleDataSize > bytes.length) invalid(`instrument ${instrument + 1} sample data exceeds file size`);
+        cursor = sampleHeaders + sampleCount * sampleHeaderSize + sampleDataSize;
+      }
+      return;
+    }
+    if (extension === '.s3m') {
+      if (bytes.length < 96 || text(44, 4) !== 'SCRM') invalid('missing the S3M signature/header');
+      const orders = u16(32);
+      const instruments = u16(34);
+      const patterns = u16(36);
+      const tableEnd = 96 + orders + (instruments + patterns) * 2;
+      if (orders < 0 || instruments < 0 || patterns < 0 || tableEnd > bytes.length) invalid('parapointer tables exceed file size');
+      for (let index = 0; index < patterns; index++) {
+        const pointer = u16(96 + orders + (instruments + index) * 2);
+        if (pointer <= 0 || pointer * 16 >= bytes.length) invalid(`pattern ${index} parapointer is outside the file`);
+        const patternOffset = pointer * 16;
+        const packedLength = u16(patternOffset);
+        if (packedLength < 0 || patternOffset + 2 + packedLength > bytes.length) invalid(`pattern ${index} data exceeds file size`);
+      }
+      return;
+    }
+    if (bytes.length < 192 || text(0, 4) !== 'IMPM') invalid('missing the IT signature/header');
+    const orders = u16(0x20);
+    const instruments = u16(0x22);
+    const patterns = u16(0x26);
+    const tableEnd = 0xC0 + orders + instruments * 4 + patterns * 4;
+    if (orders < 0 || instruments < 0 || patterns < 0 || tableEnd > bytes.length) invalid('pointer tables exceed file size');
+    for (let index = 0; index < patterns; index++) {
+      const pointer = u32(0xC0 + orders + instruments * 4 + index * 4);
+      if (pointer <= 0 || pointer >= bytes.length) invalid(`pattern ${index} pointer is outside the file`);
+      const packedLength = u16(pointer);
+      const rows = u16(pointer + 2);
+      if (packedLength < 0 || rows < 1 || pointer + 8 + packedLength > bytes.length) invalid(`pattern ${index} data exceeds file size`);
     }
   }
 
@@ -492,6 +973,28 @@ export class AssetBuilder {
    */
   public getGraphicsDir(): string {
     return path.join(this.buildDir, 'graphics');
+  }
+
+  private removeLegacyTilesetGraphics(): void {
+    const legacyTileSourceDir = path.join(this.buildDir, '.tile-source');
+    if (fs.existsSync(legacyTileSourceDir)) fs.rmSync(legacyTileSourceDir, { recursive: true, force: true });
+
+    const graphicsDir = this.getGraphicsDir();
+    if (!fs.existsSync(graphicsDir)) return;
+
+    for (const entry of fs.readdirSync(graphicsDir, { withFileTypes: true })) {
+      if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== '.json') continue;
+      const descriptorPath = path.join(graphicsDir, entry.name);
+      try {
+        const descriptor = JSON.parse(fs.readFileSync(descriptorPath, 'utf8'));
+        if (descriptor.type !== 'palette_bitmap') continue;
+        const bitmapPath = path.join(graphicsDir, `${path.basename(entry.name, path.extname(entry.name))}.bmp`);
+        if (fs.existsSync(bitmapPath)) fs.rmSync(bitmapPath, { force: true });
+        fs.rmSync(descriptorPath, { force: true });
+      } catch {
+        // Leave unrelated or malformed graphics descriptors untouched.
+      }
+    }
   }
 
   /**
@@ -583,9 +1086,7 @@ export class AssetBuilder {
 
     let args: string[];
 
-    const magickPath = isDev 
-      ? path.join(this.__dirname, "..", "bin", "image-magick", process.platform === "win32" ? "magick.exe" : "magick") 
-      : path.join(process.resourcesPath, "bin", "image-magick", process.platform === "win32" ? "magick.exe" : "magick");
+    const magickPath = this.getMagickPath();
 
     switch (mode) {
       case "title":
@@ -594,7 +1095,7 @@ export class AssetBuilder {
           "-background", "none",
           customizedPalettePath ? "-remap" : "-colors",
           customizedPalettePath ? customizedPalettePath : "256",
-          // "-depth", "8",
+          "-depth", "8",
           "-compress", "None",
           "-type", "Palette",
           `BMP3:${destPath}`
@@ -605,34 +1106,19 @@ export class AssetBuilder {
           sourcePath,
           "-background", "none",
           "-colors", "16",
-          // "-depth", "4",
+          "-depth", "4",
           "-compress", "None",
           "-type", "Palette",
           `BMP3:${destPath}`
         ];
 
-        // se menor que 256x256, centraliza e cria uma imagem maior
-        if (resourceFile?.jsonContent?.imageWidth !== undefined && resourceFile?.jsonContent?.imageHeight !== undefined && 
-          (resourceFile.jsonContent.imageWidth < 256 || resourceFile.jsonContent.imageHeight < 256)) {
-          args = [
-            sourcePath,
-            // "-background", "#FF00FF", // cor de fundo magenta (transparente)
-            // "-flatten", // achata a imagem e usa a cor de fundo removendo transparência
-            "-background", "none",
-            "-gravity", "center",
-            "-extent", "256x256",
-            "-colors", "16",
-            "-compress", "None",
-            "-type", "Palette",
-            `BMP3:${destPath}`
-          ];
-        }
         break;
       case "sprites":
         args = [
           sourcePath,
           "-background", "none",
           "-colors", "256",
+          "-depth", "8",
           "-compress", "None",
           "-type", "Palette",
           `BMP3:${destPath}`
@@ -644,7 +1130,7 @@ export class AssetBuilder {
           "-background", "none",
           customizedPalettePath ? "-remap" : "-colors",
           customizedPalettePath ? customizedPalettePath : "256", // customizedPalettePath inserir customPalette.png
-          // "-depth", "8",
+          "-depth", "8",
           "-compress", "None",
           "-type", "Palette",
           `BMP3:${destPath}`

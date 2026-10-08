@@ -25,9 +25,18 @@ export interface ISettingUtils extends IBaseSettings, IActiveButtons, IImages, I
     tileEditSceneId?: string | null;
     /** Layer being painted inside the scene tile editor. */
     tileEditLayerId?: number | null;
+    /** Tile source hovered in the scene editor's per-layer tileset list. */
+    tileSourceHover?: { sceneId: string; layerId: number; tilesetId: string; color?: string } | null;
+    /** Auto-tile slot selected for placement in the active scene. */
+    selectedAutoTileSlot?: { sceneId: string; slotIndex: number } | null;
+    /** Auto-tile slot hovered in the view, highlighted on the edited layer. */
+    autoTileSlotHover?: { sceneId: string; layerId: number; slotIndex: number } | null;
+    /** Tile stamp flips stay independent from the selected paint brush. */
+    tileFlipHorizontal?: boolean;
+    tileFlipVertical?: boolean;
     /** Independent selections used by the Events-layer collision tool. */
     collisionBrushSize?: '8px' | 'bucket';
-    collisionSide?: 'solid' | 'top' | 'down' | 'left' | 'right';
+    collisionSide?: 'solid' | 'top' | 'down' | 'left' | 'right' | 'ladder';
     /** Runtime-only Colorize palette-bank accounting for the edited scene. */
     colorizePaletteUsage?: { sceneId: string; originalSlots: number; colorizePaletteIds: string[]; usedSlots: number } | null;
     /** Trigger selected while editing the active tile layout. */

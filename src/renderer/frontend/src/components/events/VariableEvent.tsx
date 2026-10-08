@@ -3,6 +3,8 @@ import { IVariableBooleanArgs, IVariableLiteral, IVariableSetValueArgs, IVariabl
 import { EVariableType, IVariableDefinition, VariableValue } from '@/providers/contexts/interfaces/IVariablesElement';
 import { Button, Cascader, Flex, Input, Select, Space, Typography } from 'antd';
 import StepInputNumber, { InputNumber } from '../StepInputNumber';
+import NumericEventInput from '../NumericEventInput';
+import type { NumericValue } from '../../../../../shared/numericValues';
 import { useEffect, useState } from 'react';
 import { EEvents } from './interfaces/IEvents';
 
@@ -132,7 +134,7 @@ function ValueEditor({
 export default function VariableEvent({ event, onValueChange }: VariableEventProps) {
   const { variables } = useAppContexts();
   const [variableId, setVariableId] = useState('');
-  const [value, setValue] = useState<IVariableValue>({ kind: 'literal', type: 'number', value: 0 });
+  const [value, setValue] = useState<IVariableValue | NumericValue>({ kind: 'literal', type: 'number', value: 0 });
   const [scope, setScope] = useState<'ALL' | 'GLOBAL' | 'LOCAL' | 'TEMP'>('ALL');
   const selectedVariable = variables.variables.find(variable => variable.id === variableId);
   const type = selectedVariable?.type || 'number';
@@ -154,7 +156,9 @@ export default function VariableEvent({ event, onValueChange }: VariableEventPro
   }
 
   const selectVariable = (variable: IVariableDefinition) => {
-    const nextValue = value.kind === 'literal' ? { kind: 'literal' as const, type: variable.type, value: valueForType(variable.type) } : value;
+    const nextValue = value.kind === 'literal'
+      ? value.type === variable.type || (value.type === 'boolean' && variable.type !== 'string') ? value : { kind: 'literal' as const, type: variable.type, value: valueForType(variable.type) }
+      : variable.type === 'string' ? { kind: 'literal' as const, type: variable.type, value: '' } : value;
     setVariableId(variable.id);
     setValue(nextValue);
     update({ variableId: variable.id, variableSymbol: variable.symbol, ...(event?.command === EEvents.VARIABLE ? { value: nextValue } : {}) });
@@ -169,7 +173,9 @@ export default function VariableEvent({ event, onValueChange }: VariableEventPro
       {event?.command === EEvents.VARIABLE && (
         <Flex align="center" gap={8} style={{ width: '100%' }}>
           <Typography.Text style={{ width: 56, flex: '0 0 56px' }}>Value</Typography.Text>
-          <ValueEditor value={value} variables={variables.variables} type={type} onChange={(next) => { setValue(next); update({ value: next }); }} />
+          {type !== 'string'
+            ? <NumericEventInput renderNumber={type === 'boolean' ? (number, onChange) => <Select value={number !== 0} style={{ flex: 1, minWidth: 0 }} options={[{ value: true, label: 'True' }, { value: false, label: 'False' }]} onChange={value => onChange(value ? 1 : 0)} /> : undefined} value={value} onChange={next => { const operand = typeof next === 'number' ? { kind: 'literal' as const, type, value: type === 'boolean' ? next !== 0 : next } : next; setValue(operand); update({ value: operand }); }} />
+            : <ValueEditor value={value as IVariableValue} variables={variables.variables} type={type} onChange={(next) => { setValue(next); update({ value: next }); }} />}
         </Flex>
       )}
     </Space>
