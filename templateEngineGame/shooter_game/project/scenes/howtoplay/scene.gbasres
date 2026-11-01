@@ -1,0 +1,309 @@
+{
+  "_resourceType": "scene",
+  "id": "39057e0e-71af-4b65-8905-7e0e71afb65c",
+  "_index": 2,
+  "_deleted": false,
+  "name": "How To Play",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": "original_butano_background",
+      "name": "",
+      "path": ""
+    }
+  ],
+  "x": 397.14285714285717,
+  "y": 82,
+  "width": 256,
+  "height": 256,
+  "sceneType": "Top Down",
+  "showCamera": true,
+  "editorPosition": {
+    "x": 397.14285714285717,
+    "y": 82
+  },
+  "renderMode": "regular_tilemap",
+  "gridSize": 8,
+  "paletteIds": [],
+  "spritePaletteIds": [],
+  "spawnPoints": [],
+  "autoFadeSpeed": 2,
+  "interactionButton": "A",
+  "eventGraphs": {},
+  "script": [
+    {
+      "id": "465cf8c3-761e-4e35-865c-f8c3761ee352",
+      "version": 1,
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 2,
+        "__automatic": true,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "7e7ae7c2-0728-4ccc-8e7a-e7c20728ccc4",
+      "version": 1,
+      "command": "EVENT_ACTOR_SET_VISIBLE",
+      "args": {
+        "actorId": "1f76f751-bbdc-4865-8f76-f751bbdc8654",
+        "visible": true,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "de53407c-ee94-408a-8e53-407cee9408a2",
+      "version": 1,
+      "command": "EVENT_DISPLAY_DIALOGUE",
+      "args": {
+        "text": "HOW TO PLAY\\nMove with the D-pad. Press A to fire and B to launch a bomb.",
+        "dialogueFont": "fixed8x8",
+        "showFrame": true,
+        "horizontalAlign": "center",
+        "verticalAlign": "center",
+        "animate": true,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "70ef6b6a-f449-40ee-80ef-6b6af4490ee1",
+      "version": 1,
+      "command": "EVENT_ACTOR_SET_VISIBLE",
+      "args": {
+        "actorId": "1f76f751-bbdc-4865-8f76-f751bbdc8654",
+        "visible": false,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "fadc8abf-7107-4df8-8adc-8abf7107df81",
+      "version": 1,
+      "command": "EVENT_ACTOR_SET_VISIBLE",
+      "args": {
+        "actorId": "adf8a17c-5368-4e7e-8df8-a17c5368e7e5",
+        "visible": true,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "5f5be127-2cef-4365-8f5b-e1272cef3653",
+      "version": 1,
+      "command": "EVENT_DISPLAY_DIALOGUE",
+      "args": {
+        "text": "Collect gems to gain experience and improve your weapon. Protect the hero from enemy fire.",
+        "dialogueFont": "fixed8x8",
+        "showFrame": true,
+        "horizontalAlign": "center",
+        "verticalAlign": "center",
+        "animate": true,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "592236f5-9a90-4507-8922-36f59a905072",
+      "version": 1,
+      "command": "EVENT_ACTOR_SET_VISIBLE",
+      "args": {
+        "actorId": "adf8a17c-5368-4e7e-8df8-a17c5368e7e5",
+        "visible": false,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "1d880a75-9e7b-48e8-8d88-0a759e7b8e80",
+      "version": 1,
+      "command": "EVENT_ACTOR_SET_VISIBLE",
+      "args": {
+        "actorId": "8527b9ee-4f12-4e62-8527-b9ee4f12e627",
+        "visible": true,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "aad2482f-6e36-4d20-8ad2-482f6e36d204",
+      "version": 1,
+      "command": "EVENT_DISPLAY_DIALOGUE",
+      "args": {
+        "text": "Each stage ends with a boss. Use movement, shots and bombs to survive the encounter.",
+        "dialogueFont": "fixed8x8",
+        "showFrame": true,
+        "horizontalAlign": "center",
+        "verticalAlign": "center",
+        "animate": true,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "c888a294-7418-43df-8888-a29474183dfe",
+      "version": 1,
+      "command": "EVENT_ACTOR_SET_VISIBLE",
+      "args": {
+        "actorId": "8527b9ee-4f12-4e62-8527-b9ee4f12e627",
+        "visible": false,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "4ab8fc77-6142-4801-8ab8-fc7761428016",
+      "version": 1,
+      "command": "EVENT_ACTOR_SET_VISIBLE",
+      "args": {
+        "actorId": "219b73b6-742c-4c12-819b-73b6742cc12b",
+        "visible": true,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "2649a6e0-0141-41bb-8649-a6e001411bba",
+      "version": 1,
+      "command": "EVENT_DISPLAY_DIALOGUE",
+      "args": {
+        "text": "Bombs clear enemy bullets and damage every enemy on screen. Save them for dangerous waves.",
+        "dialogueFont": "fixed8x8",
+        "showFrame": true,
+        "horizontalAlign": "center",
+        "verticalAlign": "center",
+        "animate": true,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "d17feff9-47ca-4640-817f-eff947ca6408",
+      "version": 1,
+      "command": "EVENT_ACTOR_SET_VISIBLE",
+      "args": {
+        "actorId": "219b73b6-742c-4c12-819b-73b6742cc12b",
+        "visible": false,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "4abbd61c-3fa8-46d0-8abb-d61c3fa86d06",
+      "version": 1,
+      "command": "EVENT_ACTOR_SET_VISIBLE",
+      "args": {
+        "actorId": "8d061423-545d-4809-8d06-1423545d809f",
+        "visible": true,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "2d9b2cae-0400-4206-8d9b-2cae0400206b",
+      "version": 1,
+      "command": "EVENT_DISPLAY_DIALOGUE",
+      "args": {
+        "text": "The experience bar shows your progress. Defeat enemies and collect gems to level up.",
+        "dialogueFont": "fixed8x8",
+        "showFrame": true,
+        "horizontalAlign": "center",
+        "verticalAlign": "center",
+        "animate": true,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "e6348a3b-f60d-4622-8634-8a3bf60d622e",
+      "version": 1,
+      "command": "EVENT_ACTOR_SET_VISIBLE",
+      "args": {
+        "actorId": "8d061423-545d-4809-8d06-1423545d809f",
+        "visible": false,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "53d3157a-7d4f-47ea-83d3-157a7d4f7eaf",
+      "version": 1,
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "d2a84604-f664-42eb-82a8-4604f6642eb9",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "left",
+        "fadeSpeed": 2,
+        "__collapse": true
+      }
+    }
+  ],
+  "actors": [
+    {
+      "id": "1f76f751-bbdc-4865-8f76-f751bbdc8654",
+      "actorId": "1f76f751-bbdc-4865-8f76-f751bbdc8654",
+      "name": "How To Play hero_bullets",
+      "x": 64,
+      "y": 92,
+      "width": 32,
+      "height": 32,
+      "anchor": "center",
+      "direction": "right",
+      "spriteId": "original_hero_bullets",
+      "visible": false
+    },
+    {
+      "id": "adf8a17c-5368-4e7e-8df8-a17c5368e7e5",
+      "actorId": "adf8a17c-5368-4e7e-8df8-a17c5368e7e5",
+      "name": "How To Play hero_weapons",
+      "x": 176,
+      "y": 92,
+      "width": 64,
+      "height": 32,
+      "anchor": "center",
+      "direction": "right",
+      "spriteId": "original_hero_weapons",
+      "visible": false
+    },
+    {
+      "id": "8527b9ee-4f12-4e62-8527-b9ee4f12e627",
+      "actorId": "8527b9ee-4f12-4e62-8527-b9ee4f12e627",
+      "name": "How To Play hero_shield",
+      "x": 64,
+      "y": 92,
+      "width": 32,
+      "height": 32,
+      "anchor": "center",
+      "direction": "right",
+      "spriteId": "original_hero_shield",
+      "visible": false
+    },
+    {
+      "id": "219b73b6-742c-4c12-819b-73b6742cc12b",
+      "actorId": "219b73b6-742c-4c12-819b-73b6742cc12b",
+      "name": "How To Play hero_bomb_icon",
+      "x": 176,
+      "y": 92,
+      "width": 32,
+      "height": 32,
+      "anchor": "center",
+      "direction": "right",
+      "spriteId": "original_hero_bomb_icon",
+      "visible": false
+    },
+    {
+      "id": "8d061423-545d-4809-8d06-1423545d809f",
+      "actorId": "8d061423-545d-4809-8d06-1423545d809f",
+      "name": "How To Play experience_bar",
+      "x": 120,
+      "y": 116,
+      "width": 64,
+      "height": 16,
+      "anchor": "center",
+      "direction": "right",
+      "spriteId": "original_experience_bar",
+      "visible": false
+    }
+  ],
+  "collisions": [],
+  "triggers": [],
+  "tileAnimations": [],
+  "spawnerTimelines": [],
+  "cameraPosition": {
+    "x": 0,
+    "y": 0
+  }
+}

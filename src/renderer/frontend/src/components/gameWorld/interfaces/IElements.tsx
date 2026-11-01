@@ -11,7 +11,6 @@ export interface IElement {
   _index: number;
   id: string;
   name: string;
-  backgroundId: string;
   background: string;
   x: number;
   y: number;

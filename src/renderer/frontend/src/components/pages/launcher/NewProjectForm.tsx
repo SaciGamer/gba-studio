@@ -3,11 +3,15 @@ import { Form, Input, Button, Space, message, Image } from 'antd';
 import { AntdToken } from '../../common/AntDToken';
 import { Content } from 'antd/es/layout/layout';
 import blanckGBA from '@/img/blankGBA_Studio.jpg';
-import samplekGBA from '@/img/sampleProjectGBA_Studio.jpg';
+import samplekGBA from '@/img/Casa_do_Terror_sample_project_example.png';
+// TODO(restore-shooter-game): restore this asset import when the Shooter Game template is exposed again.
+// import shooterGameGBA from '@/img/shooterGameGBA_Studio.jpg';
 
 const templates = [
-  { value: 'Blank Project', imgSrc: blanckGBA, description: 'A completely blank canvas', templateId: 'blank' },
   { value: 'Sample Project', imgSrc: samplekGBA, description: 'A GBA template containing examples', templateId: 'sample_project_example' },
+  { value: 'Blank Project', imgSrc: blanckGBA, description: 'A completely blank canvas', templateId: 'blank' },
+  // TODO(restore-shooter-game): uncomment this card and its import to restore the Shooter Game launcher choice.
+  // { value: 'Shooter Game', imgSrc: shooterGameGBA, description: 'A data-driven shooter using the reusable Butano kit', templateId: 'shooter_game' },
 ];
 
 const NewProjectForm = () => {
@@ -45,7 +49,7 @@ const NewProjectForm = () => {
       setPathForm(lastPath);
       form.setFieldsValue({ path: lastPath });
 
-      handleTemplateSelect('Blank Project'); // Sempre Selecionado o primeiro
+      handleTemplateSelect('Sample Project'); // Seleciona o primeiro template da lista.
     });
   }, []);
 

@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+
+const result = await build({ entryPoints: ['src/renderer/frontend/src/utils/editorAttention.ts'], bundle: true, write: false, platform: 'node', format: 'esm' });
+const { getEditorAttention, getSettingsSectionAttention } = await import('data:text/javascript;base64,' + Buffer.from(result.outputFiles[0].text).toString('base64'));
+const library = [{ id: 'preset-nintendo' }];
+const context = { settings: { colorPaletteIds: ['missing'] } };
+assert.equal(getSettingsSectionAttention(context.settings, library)['color-options'], 1);
+assert.equal(getEditorAttention(context, library)[9], 1, 'Closed Settings keeps its field warning in navigation');
+context.settings.colorPaletteIds = ['preset-nintendo'];
+assert.equal(getEditorAttention(context, library)[9], 0, 'Choosing an available palette clears navigation');
+context.settings.colorPaletteIds = [null];
+assert.equal(getEditorAttention(context, library)[9], 0, 'Empty optional slots are valid');
+context.scenes = [{ id: 'scene', actors: [{ onInitScript: [{ command: 'EVENT_CALL_SCRIPT', args: { scriptId: '' } }] }] }];
+assert.equal(getEditorAttention(context, library)[1], 1, 'Nested actor warnings reach the World menu');
+context.scenes[0]._deleted = true;
+assert.equal(getEditorAttention(context, library)[1], 0, 'Deleted scenes do not leave navigation warnings');
+context.scripts = { scripts: [{ events: [{ command: 'EVENT_CALL_SCRIPT', args: { scriptId: '' } }] }] };
+assert.equal(getEditorAttention(context, library)[1], 1, 'Reusable script warnings reach navigation');
+context.scripts.scripts[0].events[0].args.scriptId = 'replacement';
+assert.equal(getEditorAttention(context, library)[1], 0);
+context.prefabs = { prefabs: [{ type: 'actor', actor: { onInitScript: [{ command: 'EVENT_CALL_SCRIPT', args: { scriptId: '' } }] } }] };
+assert.equal(getEditorAttention(context, library)[1], 1, 'Prefab hierarchy warnings reach navigation');
+console.log('Editor and Settings section attention passed.');

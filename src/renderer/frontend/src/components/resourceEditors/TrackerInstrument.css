@@ -1,0 +1,7 @@
+.gba-instrument-card{border:1px solid transparent;border-radius:5px;overflow:hidden}
+.gba-instrument-card.selected{border-color:#365b51;background:#1a2625}
+.gba-beat-list .gba-instrument-card>button{width:100%;border:0;border-radius:0}
+.gba-instrument-sample{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:0 8px 9px;color:#aebdbc;font-size:10px}
+.gba-instrument-sample label{display:flex;flex-direction:column;gap:3px}
+.gba-instrument-sample label:first-child{grid-column:span 2}
+.gba-instrument-sample .ant-input-number{width:100%}

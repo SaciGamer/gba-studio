@@ -1,0 +1,111 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "enemy_bullets",
+  "name": "enemy_bullets",
+  "filename": "enemy_bullets.bmp",
+  "imageWidth": 16,
+  "imageHeight": 32,
+  "playerFrameWidth": 16,
+  "playerFrameHeight": 16,
+  "playerFramesPerDirection": 4,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 0,
+  "playerCanvasOriginY": 8,
+  "playerCollisionX": 0,
+  "playerCollisionY": 0,
+  "playerCollisionWidth": 16,
+  "playerCollisionHeight": 8,
+  "playerAnimations": [
+    {
+      "id": "idle",
+      "name": "Idle",
+      "type": "idle",
+      "frames": [],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-1790882924269",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-1790882927389",
+              "sourceX": 0,
+              "sourceY": 0,
+              "width": 16,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-1790882928483",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-1790882931393",
+              "sourceX": 0,
+              "sourceY": 16,
+              "width": 16,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "player",
+      "name": "Player",
+      "type": "fixed-direction",
+      "animations": [
+        {
+          "id": "idle",
+          "name": "Idle",
+          "type": "idle",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-1790882924269",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-1790882927389",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 16,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-1790882928483",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-1790882931393",
+                  "sourceX": 0,
+                  "sourceY": 16,
+                  "width": 16,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

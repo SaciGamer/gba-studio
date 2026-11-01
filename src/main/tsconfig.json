@@ -2,14 +2,14 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "moduleResolution": "bundler",
-    "rootDir": ".",
-    "baseUrl": ".",
-    "outDir": "../../dist/main",
+    "rootDir": "..",
+    "baseUrl": "..",
+    "outDir": "../../dist",
     "noEmit": false,
     "allowJs": true,
     "resolveJsonModule": true,
     "paths": {
-      "@/*": ["./*"] 
+      "@/*": ["main/*"] 
     }
   },
   "include": [

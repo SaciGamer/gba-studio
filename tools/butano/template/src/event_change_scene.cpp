@@ -1,51 +1,53 @@
-/**
- * {{PROJECT_NAME}} - GBA Game
- * Author: {{AUTHOR}}
- * Version: {{VERSION}}
- * 
- * Built with GBA Studio engine for Butano
- */
-
 #include "event_change_scene.h"
 
 #include "bn_log.h"
 #include "bn_core.h"
-#include "bn_string.h"
-
 #include "event_fade.h"
 #include "graphics_manager.h"
 #include "script_command_manager.h"
-#include "resource_types.h"
 
 ChangeScene changeScene;
 
-bool run_change_scene(const void* args) {
-    if (changeScene.active) {
-        if(run_fade(changeScene.fadeSpeed, FadeType::OUT, true)) {
-            changeScene.active = false;
+bool run_change_scene(const void* args)
+{
+    if(!args) return true;
+    return run_change_scene(*static_cast<const SceneChangeEventData*>(args));
+}
 
-            // aqui troca a cena de fato
+bool run_change_scene(const SceneChangeEventData& data)
+{
+    if(changeScene.active)
+    {
+        if(run_fade(changeScene.fadeSpeed, FadeType::OUT, true))
+        {
+            if(const Scenes* currentScene = GraphicsManager::instance().getScene())
+            {
+                ScriptCommand::instance().cancel_scene(currentScene->id);
+            }
             const Scenes* nextScene = GraphicsManager::instance().load_next_scene_by_id(changeScene.next_scene_id);
-            // bn::blending::set_fade_alpha(bn::blending_fade_alpha(0)); // totalmente claro, reset
-            
-            BN_LOG("runChangeScene sceneName: ", nextScene->name);
+            if(nextScene)
+            {
+                GraphicsManager::instance().spawn_player(*nextScene, changeScene.x, changeScene.y,
+                                                          changeScene.direction.data(), true);
+                BN_LOG("runChangeScene sceneName: ", nextScene->name);
+            }
+            else
+            {
+                BN_LOG("runChangeScene: scene not found");
+            }
+            changeScene.active = false;
             return true;
         }
-    } else {
-        BN_LOG("runChangeScene intancia nova");
-        const void* const* strArgs = static_cast<const void* const*>(args);
-        
-        const char* next_scene_id = reinterpret_cast<const char*>(strArgs[0]);
-        const char* direction = reinterpret_cast<const char*>(strArgs[3]);
-        const int* fadeSpeed = reinterpret_cast<const int*>(strArgs[4]);
-
-        changeScene.next_scene_id = next_scene_id;                              // id da próxima cena   
-        changeScene.direction = direction;                                      // direção
-        changeScene.fadeSpeed = *fadeSpeed;                                     // velocidade do fade
-        
-        changeScene.countFixed = bn::fixed(0);                                  // contador
-        changeScene.active = true;                                              // ativador
     }
-
+    else
+    {
+        changeScene.next_scene_id = data.scene_id ? data.scene_id : "";
+        changeScene.x = data.x;
+        changeScene.y = data.y;
+        changeScene.direction = data.direction ? data.direction : "right";
+        changeScene.fadeSpeed = data.fade_speed < 1 ? 1 : data.fade_speed;
+        changeScene.countFixed = bn::fixed(0);
+        changeScene.active = true;
+    }
     return false;
 }

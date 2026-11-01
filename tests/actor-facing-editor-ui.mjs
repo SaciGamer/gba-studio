@@ -1,0 +1,80 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { chromium, expect } from '@playwright/test';
+import path from 'node:path';
+import os from 'node:os';
+const frontend = path.resolve('src/renderer/frontend/src');
+const bundle = await build({ stdin: { resolveDir: frontend, loader: 'tsx', contents: `
+import React,{useState} from 'react';import {createRoot} from 'react-dom/client';import {App,ConfigProvider} from 'antd';
+import {I18nProvider} from './i18n/I18n';import SelectNewEvent from './components/events/SelectNewEvent';import PanelEvents from './components/events/PanelEvents';
+window.electronAPI={fetchImages:async()=>({status:'success',fileImages:[]}),listTrackerProjects:async()=>({status:'success',projects:[]}),listProjectSfx:async()=>({status:'success',projects:[]}),getCommonFontImages:async()=>({})};
+function Harness(){const [open,setOpen]=useState(true),[event,setEvent]=useState(null),[language,setLanguage]=useState('en_US');window.selectedEvent=event;window.setPreviewEvent=setEvent;window.openEvents=()=>setOpen(true);window.setLanguage=setLanguage;
+ window.eventContext={elementSelected:{id:'scene',_resourceType:'scene',sceneType:'Platformer',width:240,height:160,backgrounds:[{layerId:0,backgroundId:'bg',x:0,y:0}],actors:[{id:'other',name:'NPC',x:32,y:32,direction:'right'}],triggers:[]},scenes:[{id:'scene'}],variables:{variables:[]},scripts:{scripts:[]},settings:{inputMap:{},startSceneId:'scene',startX:5,startY:0,startDirection:'left'},settingUtils:{activeSceneObject:{sceneId:'scene',type:'actor',id:'other'},localImagePath:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160"><rect x="80" y="50" width="80" height="60" fill="red"/></svg>')+'#'},userSettings:{favoriteEvents:[]},spriteResources:[],palettes:{palettes:[]},backgrounds:[{id:'bg',filename:'fixture.svg',name:'Fixture'}],setScenes:()=>{},setSettingUtils:()=>{},setElementSelected:()=>{},setUserSettings:()=>{}};
+ return <ConfigProvider theme={{token:{motion:false}}}><App><I18nProvider language={language}><SelectNewEvent tabIndex={0} subTabIndex={0} open={open} onOpenChange={setOpen} hideTrigger showFlowButton={false} onEventCreated={setEvent}/>
+ <div id="fields" style={{width:380,padding:16,marginLeft:400}}>{event&&<PanelEvents event={event} onValueChange={(id,args)=>setEvent(previous=>({...previous,args}))}/>}</div></I18nProvider></App></ConfigProvider>;
+}createRoot(document.getElementById('root')).render(<Harness/>);
+` }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', alias: { '@': frontend }, define: { 'process.env.NODE_ENV': '"production"' }, loader: { '.css': 'empty', '.png': 'dataurl', '.jpg': 'dataurl' }, plugins: [{ name: 'event-test-context', setup(bundler) {
+  bundler.onResolve({ filter: /AppContexts$/ }, () => ({ path: 'context', namespace: 'fixture' }));
+  bundler.onResolve({ filter: /^\.\/FlowEditorManager$/ }, () => ({ path: 'flow', namespace: 'fixture' }));
+  bundler.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ loader: 'tsx', contents: args.path === 'context' ? 'export default function useAppContexts(){return window.eventContext;}' : 'export default function Flow(){return null;}' }));
+} }] });
+const browser = await chromium.launch({ headless: true });
+try {
+  const page = await browser.newPage();const errors=[];page.on('pageerror', error=>errors.push(error.message));
+  await page.setContent('<div id="root"></div>');await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.getByRole('menu').getByText('Actor', {exact:true}).click();
+  await page.getByText('If Actor Is Facing Target', {exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>window.selectedEvent?.command)).toBe('EVENT_IF_ACTOR_FACING');
+  const fields=page.locator('#fields');
+  await expect(fields.getByRole('combobox',{name:'Actor looking',exact:true})).toBeVisible();
+  await expect(fields.getByRole('combobox',{name:'Target actor or player',exact:true})).toBeVisible();
+  assert.deepEqual(await page.evaluate(()=>window.selectedEvent.children),{then:[],else:[]});
+  await fields.locator('.ant-select').first().hover();
+  const preview = page.getByRole('region', { name: 'Facing target preview', exact: true });
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute('data-result', 'matches');
+  await expect(preview.getByTestId('facing-preview-area')).toBeVisible();
+  await expect(preview.getByTestId('facing-preview-target')).toBeVisible();
+  const lookX = fields.getByRole('switch', { name: 'Look in X', exact: true });
+  const lookY = fields.getByRole('switch', { name: 'Look in Y', exact: true });
+  await expect(lookX).toBeChecked(); await expect(lookY).toBeChecked();
+  await fields.getByRole('spinbutton').first().fill('4'); await fields.getByRole('spinbutton').first().press('Tab');
+  await expect(preview).toHaveAttribute('data-result', 'misses');
+  await fields.getByRole('button', { name: 'Unit for X' }).click();
+  assert.equal(await page.evaluate(()=>window.selectedEvent.args.distanceXUnit), 'tiles');
+  await expect(preview).toHaveAttribute('data-result', 'matches');
+  assert.equal(await page.evaluate(()=>window.selectedEvent.args.distanceX), 4);
+  await lookY.click(); await expect(lookY).not.toBeChecked();
+  await page.screenshot({path:path.join(os.tmpdir(),'gba-facing-target-preview.png')});
+  await expect(fields.getByRole('spinbutton').nth(1)).toBeDisabled();
+  await expect(fields.getByRole('button', { name: 'Unit for Y' })).toBeDisabled();
+  await page.evaluate(()=>window.setPreviewEvent(JSON.parse(JSON.stringify(window.selectedEvent))));
+  await expect(lookY).not.toBeChecked();
+  assert.equal(await page.evaluate(()=>window.selectedEvent.args.distanceX), 4);
+  await lookY.click(); await expect(fields.getByRole('spinbutton').nth(1)).toBeEnabled();
+
+  await fields.getByRole('combobox',{name:'Actor looking',exact:true}).press('ArrowDown');
+  await page.locator('.ant-select-dropdown:visible').getByText('NPC',{exact:true}).click();
+  assert.equal(await page.evaluate(()=>window.selectedEvent.args.actorId),'other');
+  await page.evaluate(()=>window.setLanguage('pt_BR'));
+  await expect(fields.getByRole('combobox',{name:'Ator que est\u00e1 olhando',exact:true})).toBeVisible();
+  await expect(fields.getByRole('switch',{name:'Olhar em X',exact:true})).toBeVisible();
+  await expect(fields.getByRole('switch',{name:'Olhar em Y',exact:true})).toBeVisible();
+  await fields.getByRole('switch',{name:'Olhar em X',exact:true}).hover();
+  await expect(page.getByRole('region',{name:'Prévia de olhar para o alvo',exact:true})).toBeVisible();
+  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('gba-studio:event-preview-open',{detail:{eventId:'another-preview'}})));
+  await expect(page.getByTestId('facing-preview')).toHaveCount(0);
+  await page.mouse.move(1100,650);
+  await fields.getByRole('switch',{name:'Olhar em X',exact:true}).focus();
+  await expect(page.getByTestId('facing-preview')).toBeVisible();
+  await page.evaluate(()=>window.setPreviewEvent(old=>({...old,args:{...old.args,distanceX:{kind:'variable',variableId:'54520591-68f7-486d-9248-871ee0a27681'}}})));
+  await expect(page.getByTestId('facing-preview')).toHaveAttribute('data-result','dynamic');
+  await expect(page.getByTestId('facing-preview-area')).toHaveCount(0);
+
+  await page.evaluate(()=>window.openEvents());
+  await page.getByRole('textbox').fill('Se o ator estiver olhando');
+  await page.getByRole('menuitem', {name:'Se o ator estiver olhando'}).click();
+  await expect(fields.getByRole('combobox',{name:'Ator ou player alvo',exact:true})).toBeVisible();
+  assert.deepEqual(errors,[]);
+  console.log('Facing event: Actor menu, localized search, registered form, selectors and branches passed.');
+} finally {await browser.close();}

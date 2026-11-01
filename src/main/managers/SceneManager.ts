@@ -1,15 +1,16 @@
 import { BaseManager } from './BaseManager';
 import { ETypeScene, ISceneSettings } from '@/interfaces/SceneInterface';
+import { normalizeSceneResource } from '../../shared/sceneResource';
 
 let sceneDefault: ISceneSettings = {
     _resourceType: 'scene',
     _index: 0,
     id: '', // UUID
     name: '',
-    backgroundId: '', // UUID
     tileseId: '',
     width: 240,
     height: 160,
+    cameraPosition: { x: 0, y: 0 },
     type: ETypeScene.TOPDOWN,
     paletteIds: [],
     spritePaletteIds: [],
@@ -44,11 +45,11 @@ export class SceneManager extends BaseManager<ISceneSettings> {
 
     // Criar uma nova cena
     public createScene(scene: ISceneSettings | Partial<ISceneSettings>): ISceneSettings {
-        const newScene: ISceneSettings = {
+        const newScene: ISceneSettings = normalizeSceneResource({
             ...sceneDefault,
             ...scene, 
             type: ETypeScene.TOPDOWN,
-        };
+        });
         this.scenes.push(newScene);
         return newScene;
     }
@@ -63,7 +64,7 @@ export class SceneManager extends BaseManager<ISceneSettings> {
         const sceneIndex = this.scenes.findIndex(scene => scene.id === id);
         if (sceneIndex === -1) return false;
 
-        this.scenes[sceneIndex] = { ...this.scenes[sceneIndex], ...updatedScene };
+        this.scenes[sceneIndex] = normalizeSceneResource({ ...this.scenes[sceneIndex], ...updatedScene });
         return true;
     }
 

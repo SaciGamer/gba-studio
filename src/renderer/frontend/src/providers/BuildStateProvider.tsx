@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 interface BuildState {
   isBuilding: boolean;
@@ -44,11 +44,12 @@ export const BuildStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, []);
 
-  const setBuilding = (v: boolean) => setIsBuilding(v);
-  const setRunning = (v: boolean) => setIsRunning(v);
+  const setBuilding = useCallback((v: boolean) => setIsBuilding(v), []);
+  const setRunning = useCallback((v: boolean) => setIsRunning(v), []);
+  const contextValue = useMemo(() => ({ isBuilding, isRunning, setBuilding, setRunning }), [isBuilding, isRunning, setBuilding, setRunning]);
 
   return (
-    <BuildStateContext.Provider value={{ isBuilding, isRunning, setBuilding, setRunning }}>
+    <BuildStateContext.Provider value={contextValue}>
       {children}
     </BuildStateContext.Provider>
   );

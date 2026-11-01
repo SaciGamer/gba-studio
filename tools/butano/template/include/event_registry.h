@@ -1,5 +1,5 @@
-#ifndef RESOURCE_REGISTRY_H
-#define RESOURCE_REGISTRY_H
+#ifndef EVENT_REGISTRY_H
+#define EVENT_REGISTRY_H
 
 #include "bn_string.h"
 
@@ -12,6 +12,7 @@
 #include "event_change_scene.h"
 // FUNCTION TO CHANGE LAYER
 #include "event_change_layer.h"
+#include "config_variables.h"
 // CUSTOM FUNCTIONS END --------
 
-#endif // RESOURCE_REGISTRY_H
+#endif // EVENT_REGISTRY_H

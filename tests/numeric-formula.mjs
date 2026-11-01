@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';import {pathToFileURL}from'node:url';import path from'node:path';
+const {parseNumericFormula:parse}=await import(pathToFileURL(path.resolve('dist/shared/numericFormula.js')));
+const {numericInstructions,validateNumericValue}=await import(pathToFileURL(path.resolve('dist/shared/numericValues.js')));
+const bindings={LOCAL0:'local-0',variable_x:'x-id','uuid-with-hyphens':'other'};
+const source='($LOCAL0 + 15) * 2';const value={kind:'formula',source,variables:bindings};
+assert.deepEqual(numericInstructions(value).map(item=>item.operation),['variable','number','add','number','multiply']);
+assert.equal(parse(source,bindings).left.left.variableId,'local-0');
+assert.equal(parse('$variable_x + $[uuid-with-hyphens]',bindings).right.variableId,'other');
+assert.equal(parse('$local0',bindings).variableId,'local-0');
+assert.equal(parse('1 + 2 * 3').right.operation,'multiply');assert.equal(parse('(1 + 2) * 3').left.operation,'add');
+assert.equal(parse('8 - 3 - 1').left.operation,'subtract');assert.equal(parse('sqrt(25) + max(2, 3)').right.operation,'max');
+assert.equal(parse('-2147483648').value,-2147483648);assert.equal(parse('!(1 == 0) && (3 << 2)').operation,'and');
+for(const source of ['', '(', '$missing + 1','1.5','process.exit()','1 +','1; 2','2 ** 3','min(1)','sqrt(1,2)','2147483648'])assert.throws(()=>parse(source,bindings),source);
+assert.throws(()=>parse('('.repeat(13)+'1'+')'.repeat(13)));
+assert.throws(()=>parse(Array(70).fill('1').join('+')));
+validateNumericValue({kind:'formula',source:'(',variables:bindings},{allowIncompleteFormula:true});assert.throws(()=>validateNumericValue({kind:'formula',source:'(',variables:bindings}));
+assert.deepEqual(numericInstructions(JSON.parse(JSON.stringify(value))),numericInstructions(value),'Saved formulas retain variable-ID bindings');
+console.log('Single-line formula parser passed: parentheses, precedence, functions, $ symbols/IDs, save/reload, incomplete editing, invalid tokens and complexity limits.');

@@ -4,6 +4,7 @@
 #include "bn_fixed.h"
 #include "bn_blending.h"
 #include "bn_blending_fade_alpha.h"
+#include "resource_types.h"
 
 /**
  * Event Wait Manager for {{PROJECT_NAME}}
@@ -12,7 +13,7 @@
 enum class WaitType { TIME, FRAMES };
 
 struct Wait {
-    bn::fixed time;
+    int seconds;
     int frames;
     WaitType type;
 
@@ -21,6 +22,10 @@ struct Wait {
     int countInt;
 };
 
+EventStatus run_wait_status(const WaitEventData& data, Wait& state);
+bool run_wait(const WaitEventData& data, Wait& state);
+bool run_wait(const void* args, Wait& state);
+// Compatibilidade para callers legados; novos scripts devem fornecer estado.
 bool run_wait(const void* args);
 
 #endif // EVENT_WAIT_H

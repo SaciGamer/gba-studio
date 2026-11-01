@@ -1,0 +1,25 @@
+{
+  "id": "preset-master-system",
+  "name": "Master System",
+  "custom": false,
+  "colors": [
+    "#000000",
+    "#ffffff",
+    "#d8d8d8",
+    "#888888",
+    "#d82820",
+    "#f87858",
+    "#2050d8",
+    "#5890f8",
+    "#208820",
+    "#58c858",
+    "#d8a020",
+    "#f8d858",
+    "#782878",
+    "#b858b8",
+    "#205858",
+    "#58a8a8"
+  ],
+  "_resourceType": "palette",
+  "_saved": true
+}

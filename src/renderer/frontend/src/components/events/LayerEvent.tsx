@@ -1,12 +1,12 @@
-import { Button, Dropdown, Flex, Form, InputNumber, Select, Space, Switch, Tabs, Typography } from "antd";
-import { ILayerOptions, ILayerMovement, LayerMultiProps, MultiLayers } from "./interfaces/ILayer";
-import { ETypeScene, IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
+import { Dropdown, Flex, Form, Segmented, Select, Space, Switch, Tabs, Typography } from "antd";
+import StepInputNumber, { InputNumber } from '../StepInputNumber';
+import { IChangeBackgroundArgs, ILayerOptions, ILayerMovement, LayerMultiProps, MultiLayers } from "./interfaces/ILayer";
+import { ETypeScene, IArgs, IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
 import { Content } from "antd/es/layout/layout";
 import Title from "antd/lib/typography/Title";
-import { AntdToken } from "../common/AntDToken";
-import { BackgroundSelector } from "../BackgroundSelector";
 import useAppContexts from "@/providers/contexts/AppContexts";
-import { useEffect, useState } from "react";
+import { CurrentBackgroundThumbnail } from './BackgroundEvents';
+import { useEffect } from 'react';
 
 function changeLayer(layerId: number, options: ILayerOptions) {
   console.log(`Changing Layer ${layerId}`, options);
@@ -21,106 +21,47 @@ function moveLayer(layerId: number, movement: ILayerMovement) {
 
 interface LayerEventProps {
   event: IScriptsElement | undefined;
-  onValueChange: (eventId: string, eventArgs: MultiLayers) => void;
+  onValueChange: (eventId: string, eventArgs: IArgs) => void;
 }
 
 export function ChangeLayerEvent({ event, onValueChange }: LayerEventProps) {
-	let args = event?.args as MultiLayers;
-	const { elementSelected } = useAppContexts();
-	const [backgroundLayers, setBackgroundLayers] = useState<LayerMultiProps[]>(ChangeLayerEvent.defaultValue);
-	const [activeLayerKey, setActiveLayerKey] = useState("2");
+	const { elementSelected, backgrounds, settingUtils } = useAppContexts();
+	const args = event?.args as IChangeBackgroundArgs;
+	const isHDScene = elementSelected?.sceneType === ETypeScene.LOGO || elementSelected?.sceneType === ETypeScene.POINTNCLICK;
+	const layerId = isHDScene ? 2 : args?.layerId ?? 0;
+	const selectableBackgrounds = backgrounds.filter(background => !background._deleted && background.hd === isHDScene);
+	const update = (changes: Partial<IChangeBackgroundArgs>) => onValueChange(event?.id!, { ...args, layerId, backgroundId: args?.backgroundId ?? null, ...changes });
 
-	if (!args.layers) {
-		args.layers = backgroundLayers;
-	} else {
-		// setBackgroundLayers(args.layers);
-	}
+	useEffect(() => {
+		if (!event?.id || typeof args?.backgroundId !== 'string' || selectableBackgrounds.some(background => background.id === args.backgroundId)) return;
+		onValueChange(event.id, { ...args, layerId, backgroundId: null } as IArgs);
+	}, [args, event?.id, layerId, onValueChange, selectableBackgrounds]);
 
-	const handleUpdateBackground  = (layerId: number, newBackgroundId: string | null) => {
-		console.log(`handleUpdateBackground Layer ${layerId}`, newBackgroundId);
-
-		setBackgroundLayers(prev =>
-			prev.map(layer => layer.layerId === layerId ? { ...layer, backgroundId: newBackgroundId } : layer)
-		);
-
-		const updatedLayers: MultiLayers = { layers: args.layers.map(layer =>
-			layer.layerId === layerId ? { ...layer, backgroundId: newBackgroundId } : layer
-		)};
-
-		onValueChange(event?.id!, { ...event?.args, ...updatedLayers })
-	}
-
-	const visibiliteLayer = (layerId: number, options: ILayerOptions) => {
-		console.log(`visibiliteLayer ${layerId}`, options);
-		
-		setBackgroundLayers(prev =>
-			prev.map(layer => layer.layerId === layerId ? { ...layer, ...options } : layer)
-		);
-
-		const updatedLayers: MultiLayers = { layers: args.layers.map(layer =>
-			layer.layerId === layerId ? { ...layer, ...options } : layer
-		)};
-
-		onValueChange(event?.id!, { ...event?.args, ...updatedLayers })
-	}
-
-  return (
-    <Space direction="vertical" style={{ display: "flex" }}>
-			<Typography.Text>
-				Layer Show
-      </Typography.Text>
-	  
-      {/* Change Layer */}
-	  	<Tabs
-				activeKey={activeLayerKey}
-				onChange={setActiveLayerKey}
-				type="card"
-				size={'small'}
-				items={args.layers.map(bk => ({
-					key: String(bk.layerId),
-					label: `Layer ${bk.layerId}`,
-					children: (
-						<Flex style={{ flex: 1, textAlign: 'left' }}>
-							  <Content>
-									<Space style={{ marginBottom: 10 }}>
-										<Content>Visible:</Content>
-										<Switch
-											title={'Visible'}
-											// checkedChildren="Visible"
-											// unCheckedChildren="Hidden"
-											checked={bk.visible}
-											onChange={(visible) => visibiliteLayer(bk.layerId, { visible })}
-										/>
-										</Space>
-									<BackgroundSelector
-										selectedElementId={elementSelected.id}
-										layerKey={bk.layerId}
-										backgroundId={bk.backgroundId}
-										onUpdateBackground={handleUpdateBackground}
-									/>
-							 </Content>
-						</Flex>
-					),
-					disabled: bk.layerId != 2 && elementSelected.sceneType === ETypeScene.LOGO || elementSelected.sceneType === ETypeScene.POINTNCLICK
-				}))}
+	return <Form layout="vertical">
+		<Form.Item label="Current background">
+			<Segmented
+				value={layerId}
+				onChange={(value) => update({ layerId: value as number })}
+				options={(isHDScene ? [2] : [0, 1, 2, 3]).map(value => ({ value, label: `Layer ${value}` }))}
 			/>
-		
-			
-    </Space>
-  );
+		</Form.Item>
+		<CurrentBackgroundThumbnail eventId={event?.id} layerId={layerId} />
+		<Form.Item label="Change to">
+			<Select
+				placeholder="No Background"
+				value={args?.backgroundId ?? null}
+				onChange={(backgroundId) => update({ backgroundId: backgroundId ?? null })}
+				style={{ height: 40 }}
+				options={[{ value: null, label: 'No Background' }, ...selectableBackgrounds.map(background => ({
+					value: background.id,
+					label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 36, lineHeight: 1 }}><img src={`${background.hd ? settingUtils.localImagePathHD : settingUtils.localImagePath}/${background.filename}`} alt="" style={{ display: 'block', flex: '0 0 36px', width: 36, height: 24, objectFit: 'cover', imageRendering: 'pixelated' }} />{background.name}</span>,
+				}))]}
+			/>
+		</Form.Item>
+	</Form>;
 }
 
-ChangeLayerEvent.defaultValue = (): LayerMultiProps[] => (
-	[
-		{ layerId: 0, backgroundId: null, visible: true },
-		{ layerId: 1, backgroundId: null, visible: true },
-		{ layerId: 2, backgroundId: null, visible: true },
-		{ layerId: 3, backgroundId: null, visible: true }
-	]
-);
-
 export function MoveLayerEvent({ event, onValueChange }: LayerEventProps) {
-	const { token } = AntdToken();
 	const args = event?.args as LayerMultiProps;
     
   return (
@@ -132,55 +73,45 @@ export function MoveLayerEvent({ event, onValueChange }: LayerEventProps) {
       {/* Move Layer */}
       <Flex style={{ flex: 1, textAlign: 'left' }}>
         <Form.Item label="X" style={{ flex: 1 }}>
-					<Space.Compact block>
-						<Button icon={'#'} style={{ backgroundColor: token.colorBgBase }}/>
-						<InputNumber
+					<InputNumber
+						addonBefore="X"
 							defaultValue={0}
 							placeholder="X"
-							style={{ flex: 1, textAlign: 'left' }} 
-							onChange={(x) => moveLayer(args.layerId, { x })}
+							style={{ width: '100%', textAlign: 'left' }}
+        onChange={(x) => moveLayer(args.layerId, { x: x ?? undefined })}
 						/>
-					</Space.Compact>
 				</Form.Item>
 
 				<Form.Item label="Y" style={{ flex: 1, marginLeft: "10px"  }}>
-					<Space.Compact block>
-						
-						<Button icon={'#'} style={{ backgroundColor: token.colorBgBase }}/>
-						<InputNumber
+					<InputNumber
+							addonBefore="Y"
 							defaultValue={0}
 							placeholder="Y"
-							style={{ flex: 1, textAlign: 'left' }} 
-							onChange={(y) => moveLayer(args.layerId, { y })}
+							style={{ width: '100%', textAlign: 'left' }}
+        onChange={(y) => moveLayer(args.layerId, { y: y ?? undefined })}
 						/>
-					</Space.Compact>
 				</Form.Item>
       </Flex>
 
 			<Flex>
 				<Form.Item label="SpeedX" style={{ flex: 1 }}>
-					<Space.Compact block>
-						<Button icon={'#'} style={{ backgroundColor: token.colorBgBase }}/>
-						<InputNumber
+					<InputNumber
+							addonBefore="Speed X"
 							defaultValue={0}
 							placeholder="SpeedX"
-							style={{ flex: 1, textAlign: 'left' }} 
-							onChange={(speedX) => moveLayer(args.layerId, { speedX })}
+							style={{ width: '100%', textAlign: 'left' }}
+        onChange={(speedX) => moveLayer(args.layerId, { speedX: speedX ?? undefined })}
 						/>
-					</Space.Compact>
 				</Form.Item>
 
 				<Form.Item label="SpeedY" style={{ flex: 1, marginLeft: "10px"  }}>
-					<Space.Compact block>
-						
-						<Button icon={'#'} style={{ backgroundColor: token.colorBgBase }}/>
-						<InputNumber
+					<InputNumber
+							addonBefore="Speed Y"
 							defaultValue={0}
 							placeholder="SpeedY"
-							style={{ flex: 1, textAlign: 'left' }} 
-							onChange={(speedY) => moveLayer(args.layerId, { speedY })}
+							style={{ width: '100%', textAlign: 'left' }}
+        onChange={(speedY) => moveLayer(args.layerId, { speedY: speedY ?? undefined })}
 						/>
-					</Space.Compact>
 				</Form.Item>
 			</Flex>
 

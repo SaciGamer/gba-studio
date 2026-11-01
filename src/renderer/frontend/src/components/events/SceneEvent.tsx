@@ -1,11 +1,17 @@
+import DirectionRadioGroup from '../DirectionRadioGroup';
 import imgPlaceholder from '@/img/placeholder.png';
+import { joinLocalAssetPath } from '@/utils/localAssetUrl';
 import useAppContexts from "@/providers/contexts/AppContexts";
 import { ISceneSettings, IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
 import { CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled } from "@ant-design/icons";
-import { Button, Flex, Form, InputNumber, Radio, Select, Space } from "antd";
+import { Button, Flex, Form, Radio, Select, Space, Typography } from "antd";
+import { useI18n } from '@/i18n/I18n';
+import useActorSelf from './useActorSelf';
+import StepInputNumber, { InputNumber } from '../StepInputNumber';
+import NumericEventInput from '../NumericEventInput';
+import { normalizeNumericValue, formatNumericValue } from '../../../../../shared/numericValues';
 import { Content } from 'antd/es/layout/layout';
-import { useMemo } from 'react';
-import { AntdToken } from '../common/AntDToken';
+import { useEffect, useMemo } from 'react';
 import { IChangeScene } from './interfaces/IScene';
 
 interface ChangeSceneEventProps {
@@ -15,11 +21,12 @@ interface ChangeSceneEventProps {
 }
 
 export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEventProps) {
-  const { token } = AntdToken();
   // const {scenes} = useSceneContext();
   // const {backgrounds} = useSceneContext();
   // const {settingUtils} = useSettingsUtilsContext();
   const { scenes, backgrounds, settingUtils } = useAppContexts();
+  const { t } = useI18n();
+  const self = useActorSelf();
   const args = event?.args as IChangeScene;
 
   const optSpeed = [
@@ -40,20 +47,24 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
     if (!scene.backgrounds) return imgPlaceholder;
 
     const response = getFileNameByBackgroundId(scene);
-    if (scene.sceneType != "Logo" && scene.sceneType != "Point Click" && scene.backgrounds?.length > 1) {
-      return response ? settingUtils.localImagePath + '/' + response : imgPlaceholder;
-    }
+    const background = backgrounds.find(
+      item => !item._deleted && item.filename === response,
+    );
+    const imagePath = background?.hd
+      ? settingUtils.localImagePathHD
+      : settingUtils.localImagePath;
 
-    return response ? settingUtils.localImagePathHD + '/' + response : imgPlaceholder;
+    return response
+      ? joinLocalAssetPath(imagePath, response)
+      : imgPlaceholder;
   };
 
   const defaultValues = useMemo(() => {
     const initValue = SceneEvent.defaultValue(scenes);
-    const scene = scenes.find(s => s.id === (args?.sceneId || s.id === initValue.sceneId) && s._deleted !== true);
+    const scene = scenes.find(s => s.id === args?.sceneId && s._deleted !== true)
+      ?? scenes.find(s => s.id === initValue.sceneId && s._deleted !== true);
     // const imagePath = getImagePath(scene!);
     const sceneName = scene?.name || 'Unknown Scene';
-
-    customTitle(` To ${sceneName} At {${args?.x?.value ?? initValue.x?.value},${args?.y?.value ?? initValue.y?.value}}`);
 
     return {
       sceneId: args?.sceneId ?? initValue.sceneId,
@@ -61,86 +72,94 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
       // imagePath: imagePath,
       x: args?.x ?? initValue.x,
       y: args?.y ?? initValue.y,
+      sceneWidth: scene?.width ?? 256,
+      sceneHeight: scene?.height ?? 256,
       direction: args?.direction ?? initValue.direction,
       fadeSpeed: args?.fadeSpeed ?? initValue.fadeSpeed,
     };
   }, [event?.args, scenes]);
 
+  const clampDestination = (value: number | null | undefined, limit: number) =>
+    Math.max(0, Math.min(Math.max(0, Math.trunc(limit) - 1), Math.trunc(Number(value ?? 0))));
+  const axisLimit = (axis: 'x' | 'y', dimension: number) => args?.[axis === 'x' ? 'xUnit' : 'yUnit'] === 'pixels' ? dimension : Math.ceil(dimension / 16);
+
+  const updateDestination = (field: 'x' | 'y', value: any) => {
+    const limit = axisLimit(field, field === 'x' ? defaultValues.sceneWidth : defaultValues.sceneHeight);
+    onValueChange(event?.id!, { ...event?.args as IChangeScene, [field]: value && typeof value === 'object' ? value : { type: 'number', value: clampDestination(value, limit) } });
+  };
+
+  const selectDestinationScene = (sceneId: string) => {
+    const destination = scenes.find(scene => scene.id === sceneId && !scene._deleted);
+    const width = destination?.width ?? 256;
+    const height = destination?.height ?? 256;
+    onValueChange(event?.id!, {
+      ...event?.args as IChangeScene,
+      sceneId,
+      x: normalizeNumericValue(defaultValues.x).kind === 'number' ? { type: 'number', value: clampDestination((normalizeNumericValue(defaultValues.x) as { value: number }).value, axisLimit('x', width)) } : defaultValues.x,
+      y: normalizeNumericValue(defaultValues.y).kind === 'number' ? { type: 'number', value: clampDestination((normalizeNumericValue(defaultValues.y) as { value: number }).value, axisLimit('y', height)) } : defaultValues.y,
+    });
+  };
+
+  useEffect(() => {
+    const nameForId = (id: string) => id === '__SELF__' ? self.options[0]?.label ?? 'Self' : id?.slice(0, 8) || '?';
+    customTitle(` To ${defaultValues.sceneName} At {${formatNumericValue(defaultValues.x, nameForId)},${formatNumericValue(defaultValues.y, nameForId)}}`);
+  }, [defaultValues.sceneName, defaultValues.x, defaultValues.y, self.options[0]?.label]);
+
 	return (
     <Form layout="vertical">
-      <Form.Item name="scene" label={ "Change Scene" } style={{ flex: 1, textAlign: 'center' }}>
+      <Form.Item label={ "Change Scene" } style={{ flex: 1, textAlign: 'center' }}>
         <Select
           showSearch
           optionFilterProp="label"
-          defaultValue={defaultValues.sceneId}
+          style={{ height: 40 }}
           options={scenes.filter(sf => !sf._deleted).map(scene => ({
             value: scene.id, // ID único da cena
+            sceneName: scene.name || scene.id,
             label: (
-              <Content style={{ display: 'flex', alignItems: 'center' }}>
-                  {/* <Image
-                    preview={false}
-                    src={getImagePath(scene)} // Caminho da imagem da miniatura
-                    alt={scene.name} 
-                    style={{ display: 'flex', alignItems: 'center', width: 24, height: 24, marginRight: 8 }}
-                  /> */}
-                  {scene.name} {/* Nome da cena */}
+              <Content style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8, minHeight: 36, lineHeight: 1 }}>
+                <img
+                  src={getImagePath(scene)}
+                  alt=""
+                  style={{ display: 'block', flex: '0 0 36px', width: 36, height: 24, objectFit: 'cover', imageRendering: 'pixelated' }}
+                />
+                <span>{scene.name}</span>
               </Content>
             ),
           }))}
-          onChange={(value) => onValueChange(event?.id!, { ...event?.args as IChangeScene, sceneId: value })}
+          filterOption={(input, option) => String((option as { sceneName?: string } | undefined)?.sceneName ?? '').toLowerCase().includes(input.trim().toLowerCase())}
+          value={defaultValues.sceneId}
+          onChange={selectDestinationScene}
         >
         </Select>
       </Form.Item>
 
-      <Flex style={{ flex: 1, textAlign: 'center' }}>
-        <Form.Item label="X" style={{ flex: 1 }}>
-          <Space.Compact block>
-            <Button icon={'#'} style={{ backgroundColor: token.colorBgBase }}/>
-            {defaultValues.x?.type === 'number' && (
-              <InputNumber 
-                min={0} 
-                defaultValue={defaultValues.x.value as number} 
-                style={{ flex: 1, textAlign: 'center' }} 
-                onChange={(value) => onValueChange(event?.id!, { ...event?.args as IChangeScene, x: { type: 'number', value: value! } })}
-              />
-            )}
-          </Space.Compact>
-        </Form.Item>
-        <Form.Item label="Y" style={{ flex: 1, marginLeft: "10px"  }}>
-          <Space.Compact block>
-            <Button icon={'#'} style={{ backgroundColor: token.colorBgBase }}/>
-            {defaultValues.x?.type === 'number' && (
-              <InputNumber 
-                min={0} 
-                defaultValue={defaultValues.y?.value as number} 
-                style={{ flex: 1 }}
-                onChange={(value) => onValueChange(event?.id!, { ...event?.args as IChangeScene, y: { type: 'number', value: value! } })}
-              />
-            )}
-          </Space.Compact>
-        </Form.Item>
+      <Flex gap={8} style={{ width: '100%' }}>
+        {(['x', 'y'] as const).map(axis => <Form.Item key={axis} style={{ flex: 1, minWidth: 0 }}>
+          <Flex align="center" gap={4}><Typography.Text style={{ fontSize: 12 }}>{axis.toUpperCase()}</Typography.Text>
+            <Button type="text" size="small" aria-label={t('events.actor.coordinateUnit', { axis: axis.toUpperCase() })} title={t('events.actor.tileUnitHint')} style={{ height: 20, paddingInline: 4, fontSize: 11 }} onClick={() => onValueChange(event?.id!, { ...event?.args as IChangeScene, [axis + 'Unit']: args?.[axis === 'x' ? 'xUnit' : 'yUnit'] === 'pixels' ? 'tiles' : 'pixels' })}>{args?.[axis === 'x' ? 'xUnit' : 'yUnit'] === 'pixels' ? 'px' : t('events.actor.tiles')}</Button>
+          </Flex>
+          <NumericEventInput value={defaultValues[axis]} min={0} max={Math.max(0, axisLimit(axis, axis === 'x' ? defaultValues.sceneWidth : defaultValues.sceneHeight) - 1)} onChange={value => updateDestination(axis, value)} />
+        </Form.Item>)}
       </Flex>
 
       <Flex>
-        <Form.Item label="Direction" >
-          <Radio.Group 
+        <Form.Item label="Direction" style={{ flex: 1, minWidth: 0 }}>
+          <DirectionRadioGroup
             optionType="button" 
             buttonStyle="solid" 
-            defaultValue={defaultValues.direction} 
+            value={defaultValues.direction}
             onChange={(e) => onValueChange(event?.id!, { ...event?.args as IChangeScene, direction: e.target.value })}
           >
               <Radio value="left" ><CaretLeftFilled /></Radio>
               <Radio value="right" ><CaretRightFilled /></Radio>
               <Radio value="up" ><CaretUpFilled /></Radio>
               <Radio value="down"><CaretDownFilled /></Radio>
-          </Radio.Group>
+          </DirectionRadioGroup>
         </Form.Item>
         <Form.Item label="Fade Speed"  style={{flex: 1, marginLeft: '10px' }}>
-          <Select
-            showSearch
-            defaultValue={defaultValues.fadeSpeed} 
-            onChange={(value) => onValueChange(event?.id!, { ...event?.args as IChangeScene, fadeSpeed: Number(value) })}
-            options={optSpeed}
+          <NumericEventInput value={defaultValues.fadeSpeed} min={1} max={6}
+            onChange={fadeSpeed => onValueChange(event?.id!, { ...event?.args as IChangeScene, fadeSpeed })}
+            renderNumber={(speed, onChange) => <Select showSearch value={speed} options={optSpeed} style={{ flex: 1, minWidth: 0 }} onChange={onChange} />}
           />
         </Form.Item>
       </Flex>
@@ -153,6 +172,8 @@ SceneEvent.defaultValue = (scenes: ISceneSettings[]): IChangeScene => ({
   sceneId: scenes[0]?.id || null,
   x: { type: 'number', value: 0 },
   y: { type: 'number', value: 0 },
+  xUnit: 'tiles',
+  yUnit: 'tiles',
   direction: 'right',
   fadeSpeed: 2,
 });

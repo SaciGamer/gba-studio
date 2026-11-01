@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const root = path.resolve(import.meta.dirname, '..');
+const source = fs.readFileSync(path.join(root, 'tools', 'butano', 'template', 'src', 'dialogue_manager.cpp'), 'utf8').replaceAll('\r\n', '\n');
+const header = fs.readFileSync(path.join(root, 'tools', 'butano', 'template', 'include', 'dialogue_manager.h'), 'utf8');
+const handlers = fs.readFileSync(path.join(root, 'tools', 'butano', 'template', 'src', 'script_event_handlers.cpp'), 'utf8');
+assert.match(source, /if\(visible \|\| !value \|\| !value\[0\]\) return false/);
+assert.match(source, /acknowledged/);
+assert.match(header, /current_page/);
+assert.match(header, /total_pages/);
+assert.match(source, /page_size = 255/);
+assert.match(source, /sprite_text_generator/);
+assert.match(source, /interpolate\(/);
+assert.match(source, /option_a/);
+assert.match(source, /page_index \+ 1 < page_count/);
+assert.match(source, /bool DialogueManager::acknowledge/);
+assert.match(source, /visible = false;\n    acknowledged = false/);
+assert.match(handlers, /DialogueManager::instance\(\)\.show/);
+assert.match(source, /generate_top_left_optional/);
+assert.doesNotMatch(source, /generator\.generate_top_left\(/);
+assert.match(source, /if\(!rendered_sprites\.full\(\)\) rendered_sprites\.push_back/);
+console.log('Dialogue blocking contract guard passed.');

@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const editor = fs.readFileSync('src/renderer/frontend/src/components/TileAnimationEditor.tsx', 'utf8');
+const panel = fs.readFileSync('src/renderer/frontend/src/components/RightPanel.tsx', 'utf8');
+const sceneTypes = fs.readFileSync('src/renderer/frontend/src/providers/contexts/interfaces/ISceneElement.tsx', 'utf8');
+
+assert.match(editor, /targetTileIndex/);
+assert.match(editor, /from '\.\/StepInputNumber'/);
+assert.match(editor, /frameTileIndices/);
+assert.match(editor, /durationFrames/);
+assert.match(editor, /initialFrame/);
+assert.match(editor, /checked=\{animation\.loop\}/);
+assert.match(editor, /setInterval/);
+assert.match(editor, /drawImage/);
+assert.match(editor, /TilePreview/);
+assert.match(editor, /HTMLCanvasElement/);
+assert.match(editor, /TileMapPreview/);
+assert.match(editor, /layer\?\.tileMap/);
+assert.match(editor, /authoredTile === targetTileIndex \? frameTileIndex : authoredTile/);
+assert.match(editor, /tileAnimations\.mapPreview/);
+assert.match(editor, /tilePaletteIds/);
+assert.match(editor, /paletteImages/);
+assert.match(editor, /paletteSignature/);
+assert.match(editor, /loadPaletteTransparentImage/);
+assert.match(editor, /paletteImage \?\? tileset\.image/);
+assert.match(editor, /slice\(0, 16\)/);
+assert.match(editor, /tileAnimations\.paletteMetadata/);
+assert.match(editor, /MapCellOverrideEditor/);
+assert.match(editor, /layerId: number/);
+assert.doesNotMatch(editor, /<Select aria-label=\{t\('tileAnimations\.layer'\)/);
+assert.match(editor, /MapCellOverrideEditor scene=\{scene\} layerId=\{layerId\}/);
+assert.match(editor, /tileAnimations\.cellIndex/);
+assert.match(editor, /Flip X/);
+assert.match(editor, /Flip Y/);
+assert.match(editor, /onSceneChange/);
+assert.match(panel, /paletteOptions=\{paletteOptions\}/);
+assert.match(panel, /loadPaletteTransparentImage/);
+assert.match(panel, /source: imagePath/);
+assert.match(editor, /animations\.length >= 32/);
+assert.match(editor, /duplicateTargets/);
+assert.match(editor, /tileAnimations\.duplicate/);
+assert.match(panel, /<TileAnimationEditor/);
+assert.match(sceneTypes, /tileAnimations\?: ITileAnimation\[\]/);
+assert.match(sceneTypes, /export interface ITileAnimation/);
+
+console.log('Tile animation editor contract passed.');

@@ -1,0 +1,47 @@
+.gba-event-list .ant-collapse-header {
+  position: relative;
+  overflow: visible;
+}
+
+.gba-event-list .ant-collapse-extra {
+  position: static;
+}
+
+/* Branch counters belong to their own header, outside the clipped title text. */
+.gba-event-list .ant-collapse-header-text > .gba-attention-label {
+  position: static !important;
+}
+
+.gba-event-list .ant-collapse-header-text > .gba-attention-label > .gba-attention-anchor {
+  top: 0 !important;
+  right: 0 !important;
+}
+
+.gba-event-list .ant-collapse > .ant-collapse-item > .ant-collapse-header > .ant-collapse-header-text {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.gba-event-list .ant-collapse > .ant-collapse-item > .ant-collapse-header > .ant-collapse-extra {
+  flex: 0 0 auto;
+}
+
+.gba-event-header {
+  width: 100%;
+  min-width: 0;
+}
+
+.gba-event-header > button,
+.gba-event-header > .anticon {
+  flex-shrink: 0;
+}
+
+.gba-event-title {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

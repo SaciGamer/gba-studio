@@ -1,3 +1,4 @@
+import { normalizeSceneResource } from '../../shared/sceneResource';
 import path from 'path';
 import fs from 'fs';
 
@@ -9,7 +10,7 @@ export function createGenericSettingsStruct(basePath: string, nameFile: string, 
         filePath = path.join(basePath, `${nameFile}.gbasres`);
 
     if (filePath != null && !fs.existsSync(filePath)) {
-        fs.writeFileSync(filePath, structSettings ? JSON.stringify(structSettings, null, 2) : stringSettings ? `${stringSettings}` : '');
+        fs.writeFileSync(filePath, structSettings ? JSON.stringify(normalizeSceneResource(structSettings), null, 2) : stringSettings ? `${stringSettings}` : '');
         console.log(`..: Arquivo de configurações criado: ${filePath}`);
     }
 }

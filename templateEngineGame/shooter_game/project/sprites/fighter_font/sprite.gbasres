@@ -1,0 +1,311 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "original_fighter_font",
+  "name": "fighter_font",
+  "filename": "fighter_font.bmp",
+  "imageWidth": 32,
+  "imageHeight": 224,
+  "playerFrameWidth": 32,
+  "playerFrameHeight": 32,
+  "playerFramesPerDirection": 1,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 16,
+  "playerCanvasOriginY": 16,
+  "playerCollisionX": -16,
+  "playerCollisionY": -16,
+  "playerCollisionWidth": 32,
+  "playerCollisionHeight": 32,
+  "playerAnimations": [
+    {
+      "id": "idle-down",
+      "name": "Idle Down",
+      "type": "idle",
+      "frames": [
+        0
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_fighter_font-idle-down",
+          "width": 32,
+          "height": 32,
+          "pieces": [
+            {
+              "id": "piece-original_fighter_font-idle-down",
+              "sourceX": 0,
+              "sourceY": 0,
+              "width": 32,
+              "height": 32,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-down",
+      "name": "Moving Down",
+      "type": "movement",
+      "frames": [
+        0
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-left",
+      "name": "Idle Left",
+      "type": "idle",
+      "frames": [
+        1
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_fighter_font-idle-left",
+          "width": 32,
+          "height": 32,
+          "pieces": [
+            {
+              "id": "piece-original_fighter_font-idle-left",
+              "sourceX": 0,
+              "sourceY": 32,
+              "width": 32,
+              "height": 32,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-left",
+      "name": "Moving Left",
+      "type": "movement",
+      "frames": [
+        1
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-right",
+      "name": "Idle Right",
+      "type": "idle",
+      "frames": [
+        2
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_fighter_font-idle-right",
+          "width": 32,
+          "height": 32,
+          "pieces": [
+            {
+              "id": "piece-original_fighter_font-idle-right",
+              "sourceX": 0,
+              "sourceY": 64,
+              "width": 32,
+              "height": 32,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-right",
+      "name": "Moving Right",
+      "type": "movement",
+      "frames": [
+        2
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-up",
+      "name": "Idle Up",
+      "type": "idle",
+      "frames": [
+        3
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_fighter_font-idle-up",
+          "width": 32,
+          "height": 32,
+          "pieces": [
+            {
+              "id": "piece-original_fighter_font-idle-up",
+              "sourceX": 0,
+              "sourceY": 96,
+              "width": 32,
+              "height": 32,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-up",
+      "name": "Moving Up",
+      "type": "movement",
+      "frames": [
+        3
+      ],
+      "canvasFrames": []
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "default",
+      "name": "Default",
+      "type": "default",
+      "animations": [
+        {
+          "id": "idle-down",
+          "name": "Idle Down",
+          "type": "idle",
+          "frames": [
+            0
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_fighter_font-idle-down",
+              "width": 32,
+              "height": 32,
+              "pieces": [
+                {
+                  "id": "piece-original_fighter_font-idle-down",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 32,
+                  "height": 32,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-down",
+          "name": "Moving Down",
+          "type": "movement",
+          "frames": [
+            0
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-left",
+          "name": "Idle Left",
+          "type": "idle",
+          "frames": [
+            1
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_fighter_font-idle-left",
+              "width": 32,
+              "height": 32,
+              "pieces": [
+                {
+                  "id": "piece-original_fighter_font-idle-left",
+                  "sourceX": 0,
+                  "sourceY": 32,
+                  "width": 32,
+                  "height": 32,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-left",
+          "name": "Moving Left",
+          "type": "movement",
+          "frames": [
+            1
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-right",
+          "name": "Idle Right",
+          "type": "idle",
+          "frames": [
+            2
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_fighter_font-idle-right",
+              "width": 32,
+              "height": 32,
+              "pieces": [
+                {
+                  "id": "piece-original_fighter_font-idle-right",
+                  "sourceX": 0,
+                  "sourceY": 64,
+                  "width": 32,
+                  "height": 32,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-right",
+          "name": "Moving Right",
+          "type": "movement",
+          "frames": [
+            2
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-up",
+          "name": "Idle Up",
+          "type": "idle",
+          "frames": [
+            3
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_fighter_font-idle-up",
+              "width": 32,
+              "height": 32,
+              "pieces": [
+                {
+                  "id": "piece-original_fighter_font-idle-up",
+                  "sourceX": 0,
+                  "sourceY": 96,
+                  "width": 32,
+                  "height": 32,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-up",
+          "name": "Moving Up",
+          "type": "movement",
+          "frames": [
+            3
+          ],
+          "canvasFrames": []
+        }
+      ]
+    }
+  ]
+}

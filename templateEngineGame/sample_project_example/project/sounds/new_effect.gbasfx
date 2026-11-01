@@ -1,0 +1,1 @@
+{"schema":"gba-studio/sfx","version":1,"name":"new_effect","parameters":{"waveform":"square","frequency":440,"durationMs":300,"fadeInMs":8,"fadeOutMs":120,"volume":100,"sampleRate":22050,"seed":4866625}}

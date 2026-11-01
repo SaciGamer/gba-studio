@@ -1,0 +1,11 @@
+{
+  "_resourceType": "background",
+  "id": "original_mountain_clouds",
+  "name": "mountain_clouds",
+  "filename": "mountain_clouds.bmp",
+  "imageWidth": 512,
+  "imageHeight": 256,
+  "hd": false,
+  "tileColors": "",
+  "_deleted": false
+}

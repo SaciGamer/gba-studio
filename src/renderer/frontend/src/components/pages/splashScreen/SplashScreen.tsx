@@ -2,8 +2,10 @@ import { Content } from 'antd/es/layout/layout';
 import { Image, Typography } from 'antd';
 
 import imageGBA from '@/img/defaultImgIcon.png';
+import { useI18n } from '@/i18n/I18n';
 
 const SplashScreen = () => {
+  const { t } = useI18n();
   return (
     <Content className="splash-screen" style={{
       display: 'flex',
@@ -29,7 +31,7 @@ const SplashScreen = () => {
         fontSize: '20px',
         color: '#808080',
       }}>
-        Bem-vindo ao GBA-Studio!
+        {t('launcher.welcome')}
       </Typography>
     </Content>
   );

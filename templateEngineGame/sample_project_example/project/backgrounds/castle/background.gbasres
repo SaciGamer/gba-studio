@@ -1,0 +1,12 @@
+{
+  "_resourceType": "background",
+  "id": "453161fd-8ff3-4489-9834-e2a84f863f5a",
+  "autoColor": false,
+  "name": "castle",
+  "filename": "castle.png",
+  "imageWidth": 256,
+  "imageHeight": 256,
+  "hd": false,
+  "tileColors": "",
+  "_deleted": false
+}

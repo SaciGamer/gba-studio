@@ -13,5 +13,6 @@
       "vite.config.ts",
       "global.d.ts",
       "./src/**/*",
+      "../../shared/**/*",
     ],
   }

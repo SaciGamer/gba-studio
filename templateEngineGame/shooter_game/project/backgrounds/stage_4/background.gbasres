@@ -1,0 +1,11 @@
+{
+  "_resourceType": "background",
+  "id": "original_stage_4",
+  "name": "stage_4",
+  "filename": "stage_4.bmp",
+  "imageWidth": 512,
+  "imageHeight": 512,
+  "hd": false,
+  "tileColors": "",
+  "_deleted": false
+}

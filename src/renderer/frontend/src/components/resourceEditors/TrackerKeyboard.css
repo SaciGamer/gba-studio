@@ -1,0 +1,9 @@
+.gba-playing-keyboard{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:30px;background:radial-gradient(ellipse at 50% 40%,#233936,#12191b 70%)}
+.gba-keyboard-help{display:flex;align-items:center;gap:18px}
+.gba-keyboard-keys{height:210px;display:flex;justify-content:center;padding:0 12px;position:relative;max-width:100%;overflow:auto}
+.gba-keyboard-keys button{width:42px;min-width:42px;height:190px;border:1px solid #849491;border-radius:0 0 5px 5px;background:linear-gradient(#f2f4ef,#c9d0cb);color:#293333;box-shadow:0 5px 8px #0006;z-index:1;font-size:10px;display:flex;align-items:flex-end;justify-content:center;padding:0 0 9px;cursor:pointer}
+.gba-keyboard-keys button.black{position:relative;height:125px;width:28px;min-width:28px;margin:0 -14px;background:linear-gradient(#465352,#172020 80%);color:#eef4f0;border-color:#11191a;z-index:2}
+.gba-keyboard-keys button.active{background:#71d5b6;box-shadow:0 0 18px #67e6c0aa}
+.gba-keyboard-readout{display:flex;gap:6px;max-width:100%;overflow:auto}
+.gba-keyboard-readout button{border:1px solid #3a514c;background:#1c2928;color:#cce9df;border-radius:4px;padding:5px 8px;white-space:nowrap;cursor:pointer}
+.gba-keyboard-readout button.selected{background:#287764;border-color:#72d7b7}

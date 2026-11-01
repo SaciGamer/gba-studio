@@ -1,11 +1,38 @@
-import { spawn } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import os from 'os';
 import isDev from 'electron-is-dev';
 import { CompileOptions, CompileResult } from '../types/BuildTypes';
-import { windows } from '@/main';
+import { sendMainWindowMessage } from '@/main';
+import { locateCompiledOutput } from './compiledOutput';
+
+let activeCompileProcess: ChildProcess | null = null;
+let activeCompileDone: Promise<void> | null = null;
+let resolveActiveCompileDone: (() => void) | null = null;
+let activeCompileCancelled = false;
+
+/** Stops the active make process tree and waits for it to exit. */
+export async function cancelActiveCompile(): Promise<boolean> {
+  const proc = activeCompileProcess;
+  if (!proc || !proc.pid) return false;
+  const compileDone = activeCompileDone;
+
+  activeCompileCancelled = true;
+  if (process.platform === 'win32') {
+    await new Promise<void>((resolve) => {
+      const taskkill = spawn('taskkill', ['/pid', String(proc.pid), '/t', '/f'], { windowsHide: true });
+      taskkill.once('close', () => resolve());
+      taskkill.once('error', () => resolve());
+    });
+  } else {
+    proc.kill('SIGTERM');
+  }
+
+  await compileDone;
+  return true;
+}
 
 // Obter o caminho do diretório atual
 const __filename = fileURLToPath(import.meta.url);
@@ -48,14 +75,13 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
     }
 
     // Helper to broadcast progress/errors to all renderer windows
-    const broadcast = (channel: string, payload: any) => {
-      windows.main?.webContents.send(channel, payload);
-    };
+    const broadcast = (channel: string, payload: any) => sendMainWindowMessage(channel, payload);
 
     // Notify renderer that compilation started
     broadcast('compile-progress', {
       status: 'started',
       message: '>> Iniciando compilação...',
+      messageKey: 'compiler.started',
     });
 
     try {
@@ -77,9 +103,15 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
       let fullStderr = '';
 
       const proc = spawn('make', makeArgs, {
+        windowsHide: true,
         cwd: compileOptions.buildDir,
         env: envForMake,
         shell: true,
+      });
+      activeCompileProcess = proc;
+      activeCompileCancelled = false;
+      activeCompileDone = new Promise<void>((resolve) => {
+        resolveActiveCompileDone = resolve;
       });
 
       let stdout = '';
@@ -106,6 +138,19 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
       });
 
       proc.on('close', (code) => {
+        const wasCancelled = activeCompileCancelled;
+        activeCompileProcess = null;
+        resolveActiveCompileDone?.();
+        resolveActiveCompileDone = null;
+        activeCompileDone = null;
+
+        if (wasCancelled) {
+          const message = 'Compilação cancelada pelo usuário';
+          broadcast('compile-error', { message, cancelled: true });
+          reject(new Error(message));
+          return;
+        }
+
         if (code !== 0) {
           const errMsg = `make exited with code ${code}`;
           console.error('..: ' + errMsg);
@@ -119,12 +164,23 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
           return;
         }
 
+        const outputResult = locateCompiledOutput(compileOptions.buildDir);
+        if (!outputResult.gbaPath) {
+          const message = 'make terminou sem gerar uma ROM .gba. Verifique o TARGET e o log da compilação.';
+          const logsDir = path.join(compileOptions.buildDir, 'build-logs');
+          fs.mkdirSync(logsDir, { recursive: true });
+          const logPath = path.join(logsDir, 'make.log');
+          fs.writeFileSync(logPath, `=== STDOUT ===\n${fullStdout}\n\n=== STDERR ===\n${fullStderr}\n`, 'utf8');
+          broadcast('compile-error', { message, stdout: fullStdout, stderr: fullStderr, logPath });
+          reject(new Error(`${message}\nSee log: ${logPath}`));
+          return;
+        }
         broadcast('compile-progress', {
           status: 'finished',
           message: '>> Compilação finalizada',
+          messageKey: 'compiler.finished',
         });
 
-        const outputResult = locateCompiledOutput(compileOptions.buildDir);
         console.log('..: Compilação completa. Arquivos encontrados:', outputResult);
         resolve({
           success: true,
@@ -176,10 +232,10 @@ function setupEnvironmentWithDevkitPro(): Record<string, string> {
  */
 function buildMakeArgs(options: CompileOptions): string[] {
   const args: string[] = [];
-  // Determine parallel jobs: use provided value if valid, otherwise half of CPU cores
+  // Builds are single-threaded unless parallelism was explicitly enabled in Preferences.
   const parallelJobs: number = (typeof options.parallel === 'number' && options.parallel > 0)
     ? options.parallel
-    : Math.max(1, Math.floor(os.cpus().length / 2));
+    : 1;
 
   args.push(`-j${parallelJobs}`);
 
@@ -205,67 +261,5 @@ function buildMakeArgs(options: CompileOptions): string[] {
  * @param buildDir - The directory where the build output is located
  * @returns - Object containing paths to gba, elf, and map files (or null if not found)
  */
-function locateCompiledOutput(buildDir: string): {
-  gbaPath: string | null;
-  elfPath: string | null;
-  mapPath: string | null;
-} {
-  const result = {
-    gbaPath: null as string | null,
-    elfPath: null as string | null,
-    mapPath: null as string | null,
-  };
-
-  // lista de diretórios a procurar: buildDir e buildDir/build
-  const searchDirs = [
-    buildDir,
-    path.join(buildDir, 'build')
-  ];
-
-  try {
-    const walk = (dir: string) => {
-      if (!fs.existsSync(dir)) {
-        return;
-      }
-
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-
-        if (entry.isDirectory()) {
-          walk(fullPath);
-        } else if (entry.isFile()) {
-          const ext = path.extname(fullPath).toLowerCase();
-
-          if (ext === '.gba' && !result.gbaPath) {
-            result.gbaPath = fullPath;
-          } else if (ext === '.elf' && !result.elfPath) {
-            result.elfPath = fullPath;
-          } else if (ext === '.map' && !result.mapPath) {
-            result.mapPath = fullPath;
-          }
-        }
-
-        // Stop if all files found
-        if (result.gbaPath && result.elfPath && result.mapPath) {
-          return;
-        }
-      }
-    };
-
-    // percorre cada diretório da lista
-    for (const dir of searchDirs) {
-      walk(dir);
-      if (result.gbaPath && result.elfPath && result.mapPath) {
-        break;
-      }
-    }
-  } catch (err) {
-    console.warn('..: Error searching for compiled output:', err);
-  }
-
-  return result;
-}
 
 export default compileGBA;

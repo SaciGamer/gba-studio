@@ -1,0 +1,363 @@
+{
+  "id": "prefabs",
+  "_resourceType": "prefabs",
+  "_version": "1.0",
+  "_deleted": false,
+  "folders": [
+    {
+      "id": "prefab-folder-actors",
+      "name": "Actors"
+    },
+    {
+      "id": "prefab-folder-triggers",
+      "name": "Triggers"
+    }
+  ],
+  "prefabs": [
+    {
+      "id": "34d8fec9-9845-4439-9304-ba0ffef7002e",
+      "name": "a_door",
+      "type": "actor",
+      "folderId": "prefab-folder-actors",
+      "actor": {
+        "spriteId": "door",
+        "moveSpeed": 0.25,
+        "animationSpeed": 0,
+        "onInteractScript": [
+          {
+            "id": "55117deb-708d-4156-a9ad-2fabfbf9c9c8",
+            "version": 1,
+            "command": "EVENT_INPUT_DISABLE",
+            "args": {
+              "group": "gameplay",
+              "__collapse": false
+            }
+          },
+          {
+            "id": "019bb219-792c-453a-a1db-6f1648f47c42",
+            "version": 1,
+            "command": "EVENT_ACTOR_SET_ANIMATION",
+            "args": {
+              "actorId": "__SELF__",
+              "action": "once",
+              "stateId": "player",
+              "animationId": "idle",
+              "speed": 4,
+              "frame": 0,
+              "__collapse": false
+            }
+          },
+          {
+            "id": "8c23a35b-4caa-4a4a-aa13-7d1f367c9bcf",
+            "version": 1,
+            "command": "EVENT_WAIT",
+            "args": {
+              "units": "time",
+              "time": 1,
+              "frames": 0,
+              "__collapse": false
+            }
+          },
+          {
+            "id": "231ab3a7-232e-46c6-a624-a3e269addcfe",
+            "version": 1,
+            "command": "EVENT_MOVE_ACTOR",
+            "args": {
+              "actorId": "__PLAYER__",
+              "x": {
+                "kind": "property",
+                "actorId": "__SELF__",
+                "property": "xTiles"
+              },
+              "y": {
+                "kind": "property",
+                "actorId": "__SELF__",
+                "property": "yTiles"
+              },
+              "xUnit": "tiles",
+              "yUnit": "tiles",
+              "__collapse": true,
+              "animated": true,
+              "speed": 1,
+              "animationSpeed": 4
+            }
+          },
+          {
+            "id": "c0c72778-70ec-47c2-bc0e-944cef12e57b",
+            "version": 1,
+            "command": "EVENT_HIDE_ACTOR",
+            "args": {
+              "actorId": "__PLAYER__",
+              "__collapse": false
+            }
+          },
+          {
+            "id": "304152b5-cbe4-4261-8feb-452c08b44d48",
+            "version": 1,
+            "command": "EVENT_ACTOR_SET_ANIMATION",
+            "args": {
+              "actorId": "__SELF__",
+              "action": "once",
+              "stateId": "player",
+              "animationId": "idle",
+              "speed": 4,
+              "frame": 0,
+              "__collapse": false,
+              "reverse": true
+            }
+          },
+          {
+            "id": "08e6f991-0ff5-4ce5-8e17-551eb4d39a18",
+            "version": 1,
+            "command": "EVENT_CALL_SCRIPT",
+            "args": {
+              "scriptId": "ce738717-d102-4bf5-9254-63af2eeefb45",
+              "arguments": [
+                {
+                  "parameterId": "__PARAM__:A",
+                  "value": {
+                    "kind": "variable",
+                    "variableId": "50944154-9406-4b71-bb85-ce08e53d85be"
+                  }
+                }
+              ],
+              "__collapse": false,
+              "__comment": true
+            }
+          },
+          {
+            "id": "2f4904b4-0407-444c-8296-41e56653caba",
+            "version": 1,
+            "command": "EVENT_IF",
+            "args": {
+              "left": {
+                "kind": "variable",
+                "variableId": "9db5457b-93c3-4f4d-abb4-6f14dfdf7e02",
+                "symbol": "variable_17",
+                "type": "number"
+              },
+              "operator": "==",
+              "right": {
+                "kind": "literal",
+                "type": "number",
+                "value": 0
+              },
+              "__collapse": false
+            },
+            "children": {
+              "then": [
+                {
+                  "id": "cb45fecd-80f8-4452-aae5-0f0ef96b8f42",
+                  "version": 1,
+                  "command": "EVENT_CHANGE_SCENE",
+                  "args": {
+                    "sceneId": "abad4acb-f49c-4c4f-bb65-9bd2eec66aab",
+                    "x": {
+                      "type": "number",
+                      "value": 2
+                    },
+                    "y": {
+                      "type": "number",
+                      "value": 10
+                    },
+                    "direction": "right",
+                    "fadeSpeed": 2,
+                    "__collapse": true,
+                    "__comment": false
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "id": "2a6c081e-362b-4b69-be5f-bcde39c03f5f",
+                  "version": 1,
+                  "command": "EVENT_CHANGE_SCENE",
+                  "args": {
+                    "sceneId": "b35ba84c-8c98-4555-9da3-916925209810",
+                    "x": {
+                      "type": "number",
+                      "value": 2
+                    },
+                    "y": {
+                      "type": "number",
+                      "value": 10
+                    },
+                    "direction": "right",
+                    "fadeSpeed": 2,
+                    "__collapse": true,
+                    "__comment": false
+                  }
+                }
+              ],
+              "thenCollapsed": true
+            }
+          }
+        ],
+        "onInitScript": [
+          {
+            "id": "2c539066-a3a3-4239-a5e5-b99fbdab6b56",
+            "version": 1,
+            "command": "EVENT_ACTOR_SET_ANIMATION",
+            "args": {
+              "actorId": "__SELF__",
+              "action": "stop",
+              "stateId": "player",
+              "animationId": "idle",
+              "speed": 6,
+              "frame": 0,
+              "reverse": false,
+              "__collapse": true
+            }
+          },
+          {
+            "id": "40ce6619-e72f-406d-9ba8-a5721bf0eaa2",
+            "version": 1,
+            "command": "EVENT_SET_ACTOR_PRIORITY",
+            "args": {
+              "actorId": "__SELF__",
+              "priority": 3,
+              "__collapse": true
+            }
+          }
+        ],
+        "onUpdateScript": []
+      },
+      "_resourceType": "prefab"
+    },
+    {
+      "id": "6a6797b5-577c-4296-a50a-f2786756cb60",
+      "name": "t_emote_button_a",
+      "type": "trigger",
+      "folderId": "prefab-folder-triggers",
+      "trigger": {
+        "onEnterScript": [
+          {
+            "id": "308d7612-0b1b-4363-a3cd-ec12ffb4a6fe",
+            "version": 1,
+            "command": "EVENT_SHOW_EMOTE",
+            "args": {
+              "emoteId": "a_action",
+              "actorId": "__PLAYER__",
+              "__collapse": true
+            }
+          }
+        ],
+        "onLeaveScript": [],
+        "onInteractScript": [],
+        "onInitScript": [],
+        "onUpdateScript": []
+      },
+      "_resourceType": "prefab"
+    },
+    {
+      "id": "1cf4005e-af3c-4ffc-887c-8a2bce9e049c",
+      "name": "t_change_ground",
+      "type": "trigger",
+      "folderId": "prefab-folder-triggers",
+      "trigger": {
+        "onEnterScript": [
+          {
+            "id": "d788e562-dee5-4507-9409-dd6e9010b9fe",
+            "version": 1,
+            "command": "EVENT_CALL_SCRIPT",
+            "args": {
+              "scriptId": "332e1565-1699-46c0-8857-ff500d16a721",
+              "__collapse": true,
+              "arguments": []
+            }
+          }
+        ],
+        "onLeaveScript": [],
+        "onInteractScript": [],
+        "onInitScript": [],
+        "onUpdateScript": []
+      },
+      "_resourceType": "prefab"
+    },
+    {
+      "id": "2fb65473-90e0-4753-a5e1-6e2ab7e97a3f",
+      "name": "t_dead_zone",
+      "type": "trigger",
+      "folderId": "prefab-folder-triggers",
+      "trigger": {
+        "onEnterScript": [
+          {
+            "id": "9b2e8ea8-11ae-4c8b-a925-72c90af4f09b",
+            "version": 1,
+            "command": "EVENT_CALL_SCRIPT",
+            "args": {
+              "scriptId": "89a8648c-818e-4c13-b7b5-535a2c3ddacc",
+              "__collapse": true,
+              "arguments": [
+                {
+                  "parameterId": "__PARAM__:A",
+                  "value": {
+                    "kind": "number",
+                    "value": 1
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "onLeaveScript": [],
+        "onInteractScript": [],
+        "onInitScript": [],
+        "onUpdateScript": []
+      },
+      "_resourceType": "prefab"
+    },
+    {
+      "id": "5b4b1084-051f-4300-b4c4-0d14e61f0db2",
+      "name": "dead_effect",
+      "type": "actor",
+      "folderId": "prefab-folder-actors",
+      "actor": {
+        "spriteId": "dead_puff",
+        "onInteractScript": [],
+        "onInitScript": [
+          {
+            "id": "18eb3391-b09b-48e7-9934-6ef015224932",
+            "version": 1,
+            "command": "EVENT_ACTOR_SET_ANIMATION",
+            "args": {
+              "actorId": "__SELF__",
+              "action": "once",
+              "stateId": "player",
+              "animationId": "idle",
+              "speed": 6,
+              "frame": 0,
+              "reverse": false,
+              "__collapse": true
+            }
+          },
+          {
+            "id": "29dfbc21-29f9-4789-bad4-cf09ab7ed539",
+            "version": 1,
+            "command": "EVENT_WAIT",
+            "args": {
+              "units": "time",
+              "time": 2,
+              "frames": 0,
+              "__collapse": true
+            }
+          },
+          {
+            "id": "c3f1c112-6c5f-4e21-832d-514f504a7f7e",
+            "version": 1,
+            "command": "EVENT_REMOVE_ACTOR",
+            "args": {
+              "source": "actor",
+              "actorId": "__SELF__",
+              "prefabId": "",
+              "__collapse": false,
+              "__comment": false
+            }
+          }
+        ],
+        "onUpdateScript": []
+      },
+      "_resourceType": "prefab"
+    }
+  ]
+}

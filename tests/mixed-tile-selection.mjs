@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+const bundle=await build({entryPoints:['src/renderer/frontend/src/utils/mixedTileSelection.ts'],bundle:true,write:false,format:'esm',platform:'node'});
+const {expandMixedTileSelection:expand,copyMixedTileSelection:copy,clearMixedTileSelection:clear,pasteMixedTileSelection:paste,mixedTilePasteOrigin:origin}=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const blank=()=>({map:Array.from({length:12},()=>Array(16).fill(-1)),tilesetIds:Array.from({length:12},()=>Array(16).fill(null)),paletteIds:Array.from({length:12},()=>Array(16).fill(null)),autoTileMap:Array.from({length:12},()=>Array(16).fill(-1)),overrides:[]});
+const factors=slot=>[2,4,1][slot];
+function unit(data,col,row,slot){data.autoTileMap[row][col]=slot;for(let dy=0;dy<factors(slot);dy++)for(let dx=0;dx<factors(slot);dx++){data.map[row+dy][col+dx]=10+dy*factors(slot)+dx;data.tilesetIds[row+dy][col+dx]='auto-tile:terrain-'+slot;data.paletteIds[row+dy][col+dx]='terrain-palette';}}
+const source=blank();unit(source,2,2,0);unit(source,4,4,1);unit(source,0,0,2);source.map[2][1]=42;source.tilesetIds[2][1]='tileset-main';source.paletteIds[2][1]='normal-palette';source.overrides=[{index:33,tileIndex:42,horizontalFlip:true,verticalFlip:true,paletteId:3}];
+const original=JSON.stringify(source),selection=expand(source,[{col:1,row:2},{col:3,row:3}],factors);
+assert.equal(selection.length,5,'selecting a part of an autotile expands to the whole 16px unit');
+const clipboard=copy(source,selection,8,factors);assert.equal(clipboard.autoUnits.length,1);assert.deepEqual(clipboard.phase,{col:1,row:0});
+assert.equal(clipboard.cells.find(cell=>cell.tile===42).override.horizontalFlip,true);
+const position=origin(clipboard,{col:6,row:0},16,12);assert.deepEqual(position,{col:7,row:0},'align autotile anchors while preserving the tileset offset');
+const destination=blank();unit(destination,8,0,1);destination.overrides=[{index:10,tileIndex:12,horizontalFlip:true}];
+const pasted=paste(destination,clipboard,position,factors);
+assert.equal(pasted.autoTileMap[0][8],0);assert.equal(pasted.map[0][7],42);assert.equal(pasted.tilesetIds[0][7],'tileset-main');assert.equal(pasted.paletteIds[0][7],'normal-palette');
+assert.deepEqual(pasted.overrides,[{index:7,tileIndex:42,horizontalFlip:true,verticalFlip:true,paletteId:3}]);
+assert.equal(pasted.map[3][11],-1,'overwritten 32px autotile must not leave orphan pieces');assert.equal(pasted.paletteIds[3][11],null);
+assert.equal(JSON.stringify(source),original,'copy and paste do not mutate their input');
+const cut=clear(source,selection,factors);assert.equal(cut.autoTileMap[2][2],-1);assert.equal(cut.map[3][3],-1);assert.equal(cut.map[2][1],-1);assert.equal(cut.autoTileMap[4][4],1);assert.equal(cut.overrides.length,0);
+const moved=paste(cut,clipboard,{col:3,row:2},factors);assert.equal(moved.autoTileMap[2][4],0);assert.equal(moved.map[2][3],42);assert.equal(moved.autoTileMap[2][2],-1);assert.equal(moved.overrides[0].index,35);
+const larger=copy(source,[{col:1,row:2},{col:3,row:3},{col:5,row:5},{col:0,row:0}],8,factors);assert.equal(larger.autoUnits.length,3);assert.equal(larger.alignment,4);assert.equal(larger.cells.length,22);
+const edge=origin(larger,{col:99,row:99},16,12);assert.deepEqual(edge,{col:8,row:4});assert.equal(origin(larger,{col:0,row:0},4,4),null);
+const otherScene=paste(blank(),larger,edge,factors);assert.equal(otherScene.autoTileMap[4][8],2);assert.equal(otherScene.autoTileMap[6][10],0);assert.equal(otherScene.autoTileMap[8][12],1);
+const plain=blank();plain.map[1][1]=0;plain.tilesetIds[1][1]='plain';const plainCopy=copy(plain,[{col:1,row:1}],8,factors);assert.equal(plainCopy.alignment,1);assert.deepEqual(origin(plainCopy,{col:2,row:3},16,12),{col:2,row:3});
+console.log('Mixed tile selection passed: complete 8/16/32px autotiles, tilesets, copy/cut/paste/move, overlap, palette/flip metadata, alignment, edge bounds and input immutability.');

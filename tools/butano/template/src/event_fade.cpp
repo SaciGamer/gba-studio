@@ -14,8 +14,8 @@
 Fade fade;
 
 // Funções auxiliares privadas (não expostas no .h)
-bool run_fade(const int fadeSpeed, FadeType fadeType, bool active) {
-    if(active) {
+bool run_fade(const int fadeSpeed, FadeType fadeType, Fade& state) {
+    if(state.active) {
         int skipped = bn::core::skip_frames();
         int fps = 60 / (skipped + 1);   // se skip=0 → 60, se skip=1 → 30, etc.
 
@@ -28,7 +28,7 @@ bool run_fade(const int fadeSpeed, FadeType fadeType, bool active) {
                 // BN_LOG("runFade: fade processando: ", std::max(alpha - step, bn::fixed(0)));
                 return false; // continua rodando
             } else {
-                fade.active = false;
+                state.active = false;
                 bn::blending::set_fade_alpha(bn::blending_fade_alpha(0)); // totalmente claro
                 BN_LOG("runFade: fade end");
                 return true; // terminou, pode prosseguir
@@ -39,7 +39,7 @@ bool run_fade(const int fadeSpeed, FadeType fadeType, bool active) {
                 // BN_LOG("runFade: fade processando: ", std::min(alpha + step, bn::fixed(1)));
                 return false; // continua rodando
             } else {
-                fade.active = false;
+                state.active = false;
                 bn::blending::set_fade_alpha(bn::blending_fade_alpha(1)); // totalmente escuro
                 BN_LOG("runFade: fade end");
                 return true; // terminou, pode prosseguir
@@ -50,23 +50,38 @@ bool run_fade(const int fadeSpeed, FadeType fadeType, bool active) {
     return false;
 }
 
-bool run_fade(const void* args, FadeType fadeType) {
-    if (!fade.active) {
-        // converte o ponteiro genérico para array de strings
-        const int* const* strArgs = static_cast<const int* const*>(args);
-
-        // pega o tempo do fade (em frames)
-        fade.speed = *strArgs[0];
-        BN_LOG("runFade: fadeTime = ", fade.speed);
-        fade.active = true;
-
-        // bn::blending::set_fade_color(bn::color(0,0,0));
-        if (fadeType == FadeType::IN) {         // FADE-IN
-            bn::blending::set_fade_alpha(bn::blending_fade_alpha(1));
-        } else if (fadeType == FadeType::OUT) { // FADE-OUT
-            bn::blending::set_fade_alpha(bn::blending_fade_alpha(0));
-        }
+EventStatus run_fade_status(const FadeEventData& data, FadeType fadeType, Fade& state)
+{
+    if(!state.active)
+    {
+        bn::blending::set_transparency_alpha(bn::fixed(1));
+        state.speed = data.speed < 1 ? 1 : data.speed;
+        state.active = true;
+        if(fadeType == FadeType::IN) bn::blending::set_fade_alpha(bn::blending_fade_alpha(1));
+        else bn::blending::set_fade_alpha(bn::blending_fade_alpha(0));
     }
+    return run_fade(state.speed, fadeType, state)
+        ? EventStatus::completed : EventStatus::running;
+}
 
-    return run_fade(fade.speed, fadeType, fade.active);
+bool run_fade(const FadeEventData& data, FadeType fadeType, Fade& state)
+{
+    return run_fade_status(data, fadeType, state) == EventStatus::completed;
+}
+
+bool run_fade(const void* args, FadeType fadeType, Fade& state) {
+    if(!args) return true;
+    return run_fade(*static_cast<const FadeEventData*>(args), fadeType, state);
+}
+
+bool run_fade(const int fadeSpeed, FadeType fadeType, bool active)
+{
+    fade.speed = fadeSpeed;
+    fade.active = active;
+    return run_fade(fadeSpeed, fadeType, fade);
+}
+
+bool run_fade(const void* args, FadeType fadeType)
+{
+    return run_fade(args, fadeType, fade);
 }

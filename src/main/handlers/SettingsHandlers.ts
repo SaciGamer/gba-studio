@@ -39,7 +39,7 @@ export const settingsHandlers = () => {
 
     
     ipcMain.handle('send-data', (event, dataToSave) => {
-        responseSaveChanges(dataToSave);
+        return responseSaveChanges(dataToSave);
     });
 
     // Receive serialized project fallback (JSON + base64 assets)

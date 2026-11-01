@@ -1,0 +1,299 @@
+.gba-music-dial {
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  --dial-accent: var(--music-accent, #69d5d0);
+  width: 42px;
+  height: 42px;
+  padding: 5px;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--music-surface-raised, #202a33) 45%, #000);
+  outline: 2px solid color-mix(in srgb, var(--music-surface-raised, #202a33) 45%, #000);
+  box-shadow: none;
+  cursor: move;
+  touch-action: none;
+  transition: box-shadow 140ms ease, border-color 140ms ease, filter 140ms ease;
+}
+.gba-instrument-color-trigger:focus,
+.gba-instrument-color-trigger[data-picker-open="true"] {
+  position: relative;
+  border-color: var(--input-focus-border) !important;
+  box-shadow: var(--input-focus-shadow);
+  outline: none !important;
+  z-index: 3 !important;
+}
+.gba-music-dial::before,
+.gba-music-dial::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: 50%;
+  mask: radial-gradient(circle, transparent 62%, #000 65%);
+  pointer-events: none;
+}
+.gba-music-dial::before {
+  background: conic-gradient(from 225deg, var(--music-border, #52606b) 0deg 270deg, transparent 270deg);
+}
+.gba-music-dial::after {
+  background: conic-gradient(from 225deg, transparent 0deg var(--dial-fill-start), var(--dial-accent) var(--dial-fill-start) var(--dial-fill-end), transparent var(--dial-fill-end) 360deg);
+}
+.gba-music-dial:hover,
+.gba-music-dial:focus-visible {
+  box-shadow: none;
+  outline: 2px solid color-mix(in srgb, var(--music-surface-raised, #202a33) 45%, #000);
+}
+.gba-music-dial:active { filter: brightness(1.12); }
+.gba-music-dial-face {
+  position: relative;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 1px solid color-mix(in srgb, var(--music-border, #52606b) 70%, transparent);
+  border-radius: 50%;
+  background: var(--music-surface-raised, #202a33);
+  box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.38), inset 0 1px 2px rgba(255, 255, 255, 0.08), 0 1px 2px rgba(255, 255, 255, 0.08);
+}
+.gba-music-dial-indicator {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--dial-angle));
+  transform-origin: center;
+  pointer-events: none;
+}
+.gba-music-dial-indicator::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  width: 5px;
+  height: 5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--dial-accent);
+  box-shadow: none;
+}
+.gba-music-dial.is-zero .gba-music-dial-indicator::after {
+  background: var(--music-border, #52606b);
+  opacity: 0.5;
+}
+.gba-music-dial-pan-scale { position: relative; display: inline-block; width: 80px; height: 80px; flex: none; }
+.gba-music-dial-pan-scale > svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.gba-music-dial-pan-scale > .gba-music-dial { position: absolute; left: 19px; top: 19px; }
+.gba-sfx-knob-control {
+  display: flex;
+  flex: 1 1 110px;
+  min-width: 100px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--music-border, #52606b) 62%, transparent);
+  border-radius: 9px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--music-surface-raised, #202a33) 96%, white 2%), color-mix(in srgb, var(--music-surface-raised, #202a33) 82%, transparent));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 5%, transparent), 0 2px 5px rgba(0, 0, 0, 0.16);
+}
+.gba-sfx-design-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--music-border, #52606b) 62%, transparent);
+  border-radius: 9px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--music-surface-raised, #202a33) 96%, white 2%), color-mix(in srgb, var(--music-surface-raised, #202a33) 82%, transparent));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 5%, transparent), 0 2px 5px rgba(0, 0, 0, 0.16);
+}
+.gba-sfx-knob-control > span { min-width: 0; }
+.gba-sfx-knob-control > small {
+  color: var(--music-muted, #9baab5);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.gba-music-pan-control {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 10px;
+  min-width: 104px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--music-border, #52606b) 60%, transparent);
+  border-radius: 9px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--music-surface-raised, #202a33) 94%, white 2%), color-mix(in srgb, var(--music-surface-raised, #202a33) 84%, transparent));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 5%, transparent), 0 2px 5px rgba(0, 0, 0, 0.16);
+}
+.gba-music-pan-control > span { align-self: end; }
+.gba-music-pan-control > small {
+  grid-column: 1 / -1;
+  color: var(--music-muted, #9baab5);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.gba-music-control-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.gba-music-control-row > .ant-slider { flex: 1; min-width: 0; margin-inline: 4px; }
+.gba-music-control-row > .gba-music-dial { flex: 0 0 38px; width: 38px; height: 38px; }
+.gba-music-dial:disabled { cursor: not-allowed; filter: grayscale(0.65); opacity: 0.45; box-shadow: none; }
+.gba-music-fader .ant-slider-rail,
+.gba-beat-inspector .ant-slider-rail {
+  height: 5px;
+  border: 1px solid color-mix(in srgb, var(--music-border, #52606b) 65%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--music-border, #52606b) 52%, var(--music-surface-raised, #202a33));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.gba-music-fader .ant-slider-track,
+.gba-beat-inspector .ant-slider-track {
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--music-accent, var(--music-primary, #69d5d0)) 75%, white), var(--music-accent, var(--music-primary, #69d5d0)));
+  box-shadow: 0 0 7px color-mix(in srgb, var(--music-accent, var(--music-primary, #69d5d0)) 45%, transparent), inset 0 1px 0 color-mix(in srgb, white 35%, transparent);
+}
+.gba-music-fader .ant-slider-track { transition: background 140ms ease, box-shadow 140ms ease; }
+.gba-music-fader:hover .ant-slider-track { box-shadow: 0 0 10px color-mix(in srgb, var(--music-accent, var(--music-primary, #69d5d0)) 58%, transparent); }
+.gba-music-fader .ant-slider-handle,
+.gba-beat-inspector .ant-slider-handle { width: 16px; height: 16px; margin-top: -6px; }
+.gba-music-fader.ant-slider-vertical .ant-slider-rail,
+.gba-music-fader.ant-slider-vertical .ant-slider-track { width: 5px; }
+.gba-music-fader.ant-slider-vertical .ant-slider-rail { height: 100%; }
+.gba-music-fader.ant-slider-vertical .ant-slider-handle { margin-top: 0; }
+.gba-music-fader .ant-slider-handle::after,
+.gba-beat-inspector .ant-slider-handle::after {
+  inset: 0;
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in srgb, var(--music-accent, var(--music-primary, #69d5d0)) 75%, white);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, white 0 8%, var(--music-accent, var(--music-primary, #69d5d0)) 18%, color-mix(in srgb, var(--music-accent, var(--music-primary, #69d5d0)) 58%, #16212a) 74%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--music-surface-raised, #202a33) 90%, transparent), 0 0 9px color-mix(in srgb, var(--music-accent, var(--music-primary, #69d5d0)) 58%, transparent);
+  transition: box-shadow 140ms ease, transform 140ms ease;
+}
+.gba-music-fader .ant-slider-handle::before,
+.gba-beat-inspector .ant-slider-handle::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 4px;
+  left: 7px;
+  width: 2px;
+  height: 6px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--music-surface-raised, #202a33) 72%, #071013);
+  box-shadow: 0 0 1px rgba(255, 255, 255, 0.75);
+  pointer-events: none;
+}
+.gba-music-fader .ant-slider-handle:hover::after,
+.gba-beat-inspector .ant-slider-handle:hover::after,
+.gba-music-fader .ant-slider-handle:focus-visible::after,
+.gba-beat-inspector .ant-slider-handle:focus-visible::after {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--music-surface-raised, #202a33) 90%, transparent), 0 0 13px color-mix(in srgb, var(--music-accent, var(--music-primary, #69d5d0)) 75%, transparent);
+  transform: scale(1.08);
+}
+.gba-sample-volume-control { min-height: 32px; }
+.gba-sample-volume-control > .ant-slider { align-self: center; }
+.ant-descriptions-row:has(.gba-sample-volume-control) > .ant-descriptions-item-label,
+.ant-descriptions-row:has(.gba-sample-volume-control) > .ant-descriptions-item-content { vertical-align: middle; }
+.gba-music-fader.gba-sample-volume-fader .ant-slider-handle {
+  width: 18px;
+  height: 24px;
+  margin-top: 0;
+  inset-block-start: calc((var(--ant-slider-rail-size, 4px) * 3 - 24px) / 2);
+}
+.gba-music-fader.gba-sample-volume-fader .ant-slider-handle::after,
+.gba-music-fader.gba-sample-volume-fader .ant-slider-handle:hover::after,
+.gba-music-fader.gba-sample-volume-fader .ant-slider-handle:focus::after,
+.gba-music-fader.gba-sample-volume-fader .ant-slider-handle:active::after {
+  inset: 0;
+  width: 18px;
+  height: 24px;
+  border: 1px solid #000;
+  border-radius: 4px;
+  background: var(--music-surface-raised, #202a33);
+  box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.38), inset 0 1px 2px rgba(255, 255, 255, 0.08);
+  transform: none;
+}
+.gba-music-fader.gba-sample-volume-fader .ant-slider-handle:hover::after,
+.gba-music-fader.gba-sample-volume-fader .ant-slider-handle:focus::after,
+.gba-music-fader.gba-sample-volume-fader .ant-slider-handle:focus-visible::after,
+.gba-music-fader.gba-sample-volume-fader .ant-slider-handle:active::after,
+.gba-music-fader.gba-sample-volume-fader .ant-slider-handle-dragging::after {
+  border-color: var(--music-accent, var(--music-primary, #69d5d0));
+  box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.38), inset 0 1px 2px rgba(255, 255, 255, 0.08) !important;
+  outline: none !important;
+  transform: none !important;
+}
+.gba-music-fader.gba-sample-volume-fader .ant-slider-handle {
+  outline: none;
+  box-shadow: none;
+}
+.gba-music-fader.gba-sample-volume-fader:hover .ant-slider-track {
+  box-shadow: none;
+}
+.gba-music-fader.gba-sample-volume-fader .ant-slider-handle::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  width: 2px;
+  height: 8px;
+  border-radius: 1px;
+  background: var(--music-accent, var(--music-primary, #69d5d0));
+  box-shadow: none;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.gba-music-fader.gba-sample-volume-fader .ant-slider-handle[aria-valuenow="0"]::before {
+  background: var(--music-border, #52606b);
+  opacity: 0.5;
+}
+.gba-music-fader.ant-slider-vertical .ant-slider-rail,
+.gba-music-fader.ant-slider-vertical .ant-slider-track { width: 5px; height: auto; }
+.gba-music-fader.ant-slider-vertical .ant-slider-track {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--music-accent, var(--music-primary, #69d5d0)) 75%, white), var(--music-accent, var(--music-primary, #69d5d0)));
+}
+.gba-music-fader.ant-slider-vertical.gba-sample-volume-fader .ant-slider-rail {
+  width: 5px;
+  height: 100%;
+  border: 1px solid color-mix(in srgb, var(--music-border, #52606b) 65%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--music-border, #52606b) 52%, var(--music-surface-raised, #202a33));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.gba-music-fader.ant-slider-vertical.gba-sample-volume-fader .ant-slider-handle {
+  inset-block-start: auto;
+  inset-inline-start: calc((var(--ant-slider-rail-size, 4px) * 3 - 24px) / 2);
+  width: 24px;
+  height: 18px;
+  margin-top: 0;
+}
+.gba-music-fader.ant-slider-vertical.gba-sample-volume-fader .ant-slider-handle::after {
+  width: 24px;
+  height: 18px;
+}
+.gba-music-fader.ant-slider-vertical.gba-sample-volume-fader .ant-slider-handle::before {
+  width: 8px;
+  height: 2px;
+}
+.gba-beat-inspector .ant-slider-mark-text { font-size: 10px; white-space: nowrap; }
+.gba-note-pan-slider .ant-slider-mark { transform: translateY(5px); }
+.gba-note-pan-slider-wrap{position:relative;display:block;padding-inline:8px}
+.gba-note-pan-slider-wrap .gba-note-pan-slider{position:relative;z-index:2}
+.gba-note-pan-slider-wrap .gba-note-pan-slider .ant-slider-rail,.gba-note-pan-slider-wrap .gba-note-pan-slider .ant-slider-track{background:transparent;box-shadow:none}
+.gba-note-pan-fill{position:absolute;z-index:1;top:15px;height:5px;transform:translateY(-50%);border-radius:999px;background:var(--music-accent,var(--music-primary,#69d5d0));box-shadow:0 0 7px color-mix(in srgb,var(--music-accent,var(--music-primary,#69d5d0)) 45%,transparent);pointer-events:none}
+.gba-piano-roll-grid-track{display:flex;flex:0 0 auto;min-height:0}
+.gba-piano-roll-grid-track>.gba-beat-grid{flex:0 0 auto}
+@media (prefers-reduced-motion: reduce) {
+  .gba-music-dial,
+  .gba-music-fader .ant-slider-handle::after,
+  .gba-beat-inspector .ant-slider-handle::after { transition: none; }
+}

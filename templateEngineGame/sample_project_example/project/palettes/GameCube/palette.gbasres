@@ -1,0 +1,25 @@
+{
+  "id": "preset-gamecube",
+  "name": "GameCube",
+  "custom": false,
+  "colors": [
+    "#101820",
+    "#ffffff",
+    "#4b2e83",
+    "#8064a2",
+    "#2e75b6",
+    "#6fa8dc",
+    "#38761d",
+    "#93c47d",
+    "#bf9000",
+    "#ffd966",
+    "#cc0000",
+    "#e06666",
+    "#134f5c",
+    "#76a5af",
+    "#351c75",
+    "#b4a7d6"
+  ],
+  "_resourceType": "palette",
+  "_saved": true
+}

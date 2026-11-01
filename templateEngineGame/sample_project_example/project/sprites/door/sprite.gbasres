@@ -1,0 +1,197 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "door",
+  "name": "door",
+  "filename": "door.bmp",
+  "imageWidth": 16,
+  "imageHeight": 48,
+  "playerFrameWidth": 16,
+  "playerFrameHeight": 16,
+  "playerFramesPerDirection": 4,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 8,
+  "playerCanvasOriginY": 12,
+  "playerCollisionX": -15,
+  "playerCollisionY": -4,
+  "playerCollisionWidth": 30,
+  "playerCollisionHeight": 8,
+  "playerAnimations": [
+    {
+      "id": "idle",
+      "name": "Idle",
+      "type": "idle",
+      "frames": [],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-autogen-1791566941714-0",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791566941714-0-0-0",
+              "sourceX": 0,
+              "sourceY": 0,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791566941714-0-8-0",
+              "sourceX": 8,
+              "sourceY": 0,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791566941714-1",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791566941714-1-0-0",
+              "sourceX": 0,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791566941714-1-8-0",
+              "sourceX": 8,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791566941714-2",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791566941714-2-0-0",
+              "sourceX": 0,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791566941714-2-8-0",
+              "sourceX": 8,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "player",
+      "name": "open/close",
+      "type": "fixed-direction",
+      "animations": [
+        {
+          "id": "idle",
+          "name": "Idle",
+          "type": "idle",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-autogen-1791566941714-0",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566941714-0-0-0",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791566941714-0-8-0",
+                  "sourceX": 8,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566941714-1",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566941714-1-0-0",
+                  "sourceX": 0,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791566941714-1-8-0",
+                  "sourceX": 8,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566941714-2",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566941714-2-0-0",
+                  "sourceX": 0,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791566941714-2-8-0",
+                  "sourceX": 8,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,359 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "original_gigabat",
+  "name": "gigabat",
+  "filename": "gigabat.bmp",
+  "imageWidth": 64,
+  "imageHeight": 1920,
+  "playerFrameWidth": 64,
+  "playerFrameHeight": 64,
+  "playerFramesPerDirection": 7,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 32,
+  "playerCanvasOriginY": 32,
+  "playerCollisionX": -32,
+  "playerCollisionY": -32,
+  "playerCollisionWidth": 64,
+  "playerCollisionHeight": 64,
+  "playerAnimations": [
+    {
+      "id": "idle-down",
+      "name": "Idle Down",
+      "type": "idle",
+      "frames": [
+        0
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_gigabat-idle-down",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_gigabat-idle-down",
+              "sourceX": 0,
+              "sourceY": 0,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-down",
+      "name": "Moving Down",
+      "type": "movement",
+      "frames": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-left",
+      "name": "Idle Left",
+      "type": "idle",
+      "frames": [
+        7
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_gigabat-idle-left",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_gigabat-idle-left",
+              "sourceX": 0,
+              "sourceY": 448,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-left",
+      "name": "Moving Left",
+      "type": "movement",
+      "frames": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-right",
+      "name": "Idle Right",
+      "type": "idle",
+      "frames": [
+        14
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_gigabat-idle-right",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_gigabat-idle-right",
+              "sourceX": 0,
+              "sourceY": 896,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-right",
+      "name": "Moving Right",
+      "type": "movement",
+      "frames": [
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-up",
+      "name": "Idle Up",
+      "type": "idle",
+      "frames": [
+        21
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_gigabat-idle-up",
+          "width": 64,
+          "height": 64,
+          "pieces": [
+            {
+              "id": "piece-original_gigabat-idle-up",
+              "sourceX": 0,
+              "sourceY": 1344,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-up",
+      "name": "Moving Up",
+      "type": "movement",
+      "frames": [
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      "canvasFrames": []
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "default",
+      "name": "Default",
+      "type": "default",
+      "animations": [
+        {
+          "id": "idle-down",
+          "name": "Idle Down",
+          "type": "idle",
+          "frames": [
+            0
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_gigabat-idle-down",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_gigabat-idle-down",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-down",
+          "name": "Moving Down",
+          "type": "movement",
+          "frames": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-left",
+          "name": "Idle Left",
+          "type": "idle",
+          "frames": [
+            7
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_gigabat-idle-left",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_gigabat-idle-left",
+                  "sourceX": 0,
+                  "sourceY": 448,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-left",
+          "name": "Moving Left",
+          "type": "movement",
+          "frames": [
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-right",
+          "name": "Idle Right",
+          "type": "idle",
+          "frames": [
+            14
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_gigabat-idle-right",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_gigabat-idle-right",
+                  "sourceX": 0,
+                  "sourceY": 896,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-right",
+          "name": "Moving Right",
+          "type": "movement",
+          "frames": [
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-up",
+          "name": "Idle Up",
+          "type": "idle",
+          "frames": [
+            21
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_gigabat-idle-up",
+              "width": 64,
+              "height": 64,
+              "pieces": [
+                {
+                  "id": "piece-original_gigabat-idle-up",
+                  "sourceX": 0,
+                  "sourceY": 1344,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-up",
+          "name": "Moving Up",
+          "type": "movement",
+          "frames": [
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27
+          ],
+          "canvasFrames": []
+        }
+      ]
+    }
+  ]
+}

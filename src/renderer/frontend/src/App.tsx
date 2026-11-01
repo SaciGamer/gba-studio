@@ -14,10 +14,15 @@ import Engine from './components/pages/engine/Engine';
 import Launcher from './components/pages/launcher/Launcher';
 import SplashScreen from './components/pages/splashScreen/SplashScreen';
 import Emulator from './components/pages/emulator/Emulator';
+import RuntimeMonitor from './components/pages/emulator/RuntimeMonitor';
 import PreferencesModal from './components/PreferencesModal';
 import './components/themes/globalStyles.css'; // Importe o arquivo CSS global
 import Themes from './components/themes/Themes';
 import AppProvider from './providers/AppProviders';
+import { AppLanguage, I18nProvider, resolveLanguage } from './i18n/I18n';
+import { clearImageCache } from './utils/imageCache';
+import { clearPaletteTransparentImageCache } from './utils/paletteTransparency';
+import { shareInFlightRequest } from './utils/inFlightRequest';
 
 interface Preferences {
   theme: string;
@@ -33,17 +38,66 @@ interface RecentProject {
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<any>();
+  const [themeName, setThemeName] = useState('light');
+  const [themePreference, setThemePreference] = useState('systemDefault');
   const [locale, setLocale] = useState<Locale>(en_US);
+  const [language, setLanguage] = useState<AppLanguage>('en_US');
 
   const [isLoading, setIsLoading] = useState(true);
   const [prefsOpen, setPrefsOpen] = useState(false);
+
+  useEffect(() => {
+    const hideButtonFocusRing = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') document.documentElement.setAttribute('data-hide-button-focus-ring', 'true');
+    };
+    const restoreButtonFocusRing = () => document.documentElement.removeAttribute('data-hide-button-focus-ring');
+    const handleFormTabNavigation = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') restoreButtonFocusRing();
+      if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (/^#\/engine(?:\/|$)/.test(window.location.hash)) return;
+      const active = document.activeElement as HTMLElement | null;
+      const scope = active?.closest<HTMLElement>('[role="dialog"], .ant-modal, .ant-drawer-content-wrapper') ?? document;
+      const controls = Array.from(scope.querySelectorAll<HTMLElement>(
+        'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not(:disabled), textarea:not(:disabled), select:not(:disabled), [contenteditable="true"], [role="combobox"], [role="checkbox"], [role="radio"], [role="switch"], [role="slider"]',
+      )).filter(control => control.tabIndex >= 0
+        && control.getAttribute('aria-disabled') !== 'true'
+        && !control.closest('[aria-hidden="true"], [inert]')
+        && control.getClientRects().length > 0);
+      event.preventDefault();
+      if (!controls.length) return;
+      const activeIndex = controls.findIndex(control => control === active || control.contains(active));
+      const nextIndex = activeIndex < 0
+        ? event.shiftKey ? controls.length - 1 : 0
+        : (activeIndex + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
+      controls[nextIndex].focus();
+    };
+    document.addEventListener('keydown', hideButtonFocusRing, true);
+    document.addEventListener('pointerdown', restoreButtonFocusRing, true);
+    document.addEventListener('keydown', handleFormTabNavigation, true);
+    return () => {
+      document.removeEventListener('keydown', hideButtonFocusRing, true);
+      document.removeEventListener('pointerdown', restoreButtonFocusRing, true);
+      document.removeEventListener('keydown', handleFormTabNavigation, true);
+      restoreButtonFocusRing();
+    };
+  }, []);
+
+  const applyThemePreference = (preference: string) => {
+    const resolvedTheme = preference === 'systemDefault'
+      ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : Themes[preference] ? preference : 'light';
+    setThemePreference(preference);
+    setTheme(Themes[resolvedTheme]);
+    setThemeName(resolvedTheme);
+  };
 
   // Carregar preferências iniciais --------------------------------
   // Função auxiliar para carregar o locale
   const loadLocale = async (language: string) => {
     try {
+      const resolvedLanguage = resolveLanguage(language);
       let localeModule;
-      switch (language) {
+      switch (resolvedLanguage) {
         case 'pt_BR':
           localeModule = pt_BR;
           break;
@@ -57,7 +111,8 @@ const App: React.FC = () => {
         default:
           localeModule = en_US;
       }
-      console.log('..: Carregando idioma: ', language);
+      console.log('..: Carregando idioma: ', resolvedLanguage);
+      setLanguage(resolvedLanguage);
       setLocale(localeModule);
     } catch (error) {
       console.error('Erro ao carregar idioma:', error);
@@ -74,18 +129,14 @@ const App: React.FC = () => {
     }
 
     const loadPreferences = async () => {
-      await window.electronAPI.loadPreferences().then((preferencias: Preferences) => {
+      await shareInFlightRequest('app:initial-preferences', async () => {
+        const preferencias: Preferences = await window.electronAPI.loadPreferences();
         // Carrega tema
         console.log('..: Carregando Tema: ', preferencias.theme);
-        if (Themes[preferencias.theme]) {
-          setTheme(Themes[preferencias.theme]);
-        } else {
-          console.error(`Theme ${preferencias.theme} not found, falling back to default.`);
-          setTheme(Themes.light);
-        }
+        applyThemePreference(preferencias.theme || 'systemDefault');
 
         // Carrega idioma
-        const language = preferencias.language || 'en_US';
+        const language = preferencias.language || 'systemDefault';
         loadLocale(language);
         setIsLoading(false);
       });
@@ -100,13 +151,42 @@ const App: React.FC = () => {
     if (!window.electronAPI) return;
 
     const themeChangeHandler = (event: any, newTheme: string) => {
-      setTheme(Themes[newTheme]);
+      applyThemePreference(newTheme);
     };
 
     window.electronAPI.on('change-theme', themeChangeHandler);
     return () => window.electronAPI.removeListener('change-theme', themeChangeHandler);
   }, []);
   // Evento para CHANGE THEME END ----------------------------------
+
+  useEffect(() => {
+    const systemTheme = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!systemTheme) return;
+    const handleSystemThemeChange = () => {
+      if (themePreference === 'systemDefault') applyThemePreference('systemDefault');
+    };
+    systemTheme.addEventListener('change', handleSystemThemeChange);
+    return () => systemTheme.removeEventListener('change', handleSystemThemeChange);
+  }, [themePreference]);
+
+  // Assets are cached across navigation so returning to Game World is instant.
+  // Reload Assets is the explicit escape hatch that invalidates those caches.
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    const notifyAssetsReloaded = () => {
+      clearImageCache();
+      clearPaletteTransparentImageCache();
+      window.dispatchEvent(new Event('gba-studio:assets-reloaded'));
+    };
+    const reloadAssets = () => notifyAssetsReloaded();
+    const handleWatchedAssets = () => notifyAssetsReloaded();
+    window.electronAPI.on('reload-assets', reloadAssets);
+    window.electronAPI.on('update-images', handleWatchedAssets);
+    return () => {
+      window.electronAPI.removeListener('reload-assets', reloadAssets);
+      window.electronAPI.removeListener('update-images', handleWatchedAssets);
+    };
+  }, []);
 
   // Evento para CHANGE LANGUAGE 
   useEffect(() => {
@@ -186,7 +266,7 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <ConfigProvider theme={theme} locale={locale}>
+      <ConfigProvider theme={theme} locale={locale} select={{ showSearch: true }}>
         <Layout style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <Spin size="large" percent={'auto'} indicator={<LayoutOutlined spin />} />
         </Layout>
@@ -198,6 +278,7 @@ const App: React.FC = () => {
     <ConfigProvider
       theme={theme}
       locale={locale}
+      select={{ showSearch: true }}
     // wave={{
     //   disabled: false, // Desabilitar o efeito de onda
     //   showEffect: (node, { event, component }) => {
@@ -228,21 +309,24 @@ const App: React.FC = () => {
     // }}
     // floatButtonGroup={{ size: 'large' }}
     >
-      <AppProvider>
-        <HashRouter>
-          <Content style={{ height: '100vh', filter: isWindowActive ? 'none' : 'grayscale(100%)' }}>
-            <Routes>
-              <Route path="/launcher" element={<Launcher />} />
-              <Route path="/engine" element={<Engine />} />
-              <Route path="/splash" element={<SplashScreen />} />
-              <Route path="/emulator" element={<Emulator />} />
-              <Route path="/about" element={<About />} />
-              <Route path="*" element={<Navigate to="/launcher" replace />} />
-            </Routes>
-          </Content>
-        </HashRouter>
-      </AppProvider>
-      <PreferencesModal open={prefsOpen} onClose={() => setPrefsOpen(false)} />
+      <I18nProvider language={language}>
+        <AppProvider>
+          <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Content className={`gba-theme gba-theme-${themeName}`} data-theme={themeName} style={{ height: '100vh', filter: isWindowActive ? 'none' : 'grayscale(100%)' }}>
+              <Routes>
+                <Route path="/launcher" element={<Launcher />} />
+                <Route path="/engine" element={<Engine />} />
+                <Route path="/splash" element={<SplashScreen />} />
+                <Route path="/emulator" element={<Emulator />} />
+                <Route path="/runtime-monitor" element={<RuntimeMonitor />} />
+                <Route path="/about" element={<About />} />
+                <Route path="*" element={<Navigate to="/launcher" replace />} />
+              </Routes>
+            </Content>
+          </HashRouter>
+        </AppProvider>
+        <PreferencesModal open={prefsOpen} onClose={() => setPrefsOpen(false)} />
+      </I18nProvider>
     </ConfigProvider>
   );
 }

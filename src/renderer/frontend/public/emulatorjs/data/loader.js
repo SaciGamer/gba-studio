@@ -159,6 +159,7 @@ const config = {
     VirtualGamepadSettings: window.EJS_VirtualGamepadSettings,
     buttonOpts: window.EJS_Buttons,
     volume: window.EJS_volume,
+    muted: window.EJS_muted,
     defaultControllers: window.EJS_defaultControls,
     startOnLoad: window.EJS_startOnLoaded,
     fullscreenOnLoad: window.EJS_fullscreenOnLoaded,
@@ -198,6 +199,7 @@ const config = {
     disableBatchBootup: window.EJS_disableBatchBootup,
     askBeforeExit: window.EJS_askBeforeExit,
     showBottomMenu: window.EJS_showBottomMenu,
+    gbaStudioGamepad: window.EJS_gbaStudioGamepad,
 };
 
 async function prepareLanguage() {

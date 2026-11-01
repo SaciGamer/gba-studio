@@ -108,15 +108,11 @@ async function example4_ResourceBuilder() {
 
   console.log(`Processados ${resourceFiles.length} recursos`);
 
-  // Gerar header com declarações
-  if (resourceFiles.length > 0) {
-    await builder.writeResourceHeader(resourceFiles);
-
-    // Gerar registro de recursos
-    await builder.generateResourceRegistryClass(resourceFiles, config);
-
-    console.log('Arquivos de recurso criados');
-  }
+  // A leitura retorna cópias de preparação e não emite headers. O pipeline
+  // materializa assets, converte DTOs e só então escreve C++ final.
+  const result = await transcodeProject({ projectDir: '/path/to/project',
+    outputDir: '/path/to/build', projectName: config.projectName, includeAssets: true });
+  console.log('Resultado do pipeline completo:', result.success);
 }
 
 /**

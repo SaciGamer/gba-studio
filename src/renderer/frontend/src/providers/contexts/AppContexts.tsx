@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { BackgroundContext, ElementContext, ProjectContext, SceneContext, SettingsContext, SettingsUtilsContext, UserSettingsContext } from "../Providers";
+import { BackgroundContext, ElementContext, PalettesContext, PrefabsContext, ProjectContext, SceneContext, ScriptsContext, SettingsContext, SettingsUtilsContext, SpriteContext, UserSettingsContext, VariablesContext } from "../Providers";
 
 const useSettingsUtilsContext = () =>  {
     const context = useContext(SettingsUtilsContext);
@@ -57,6 +57,25 @@ const useBackgroundContext = () =>  {
     return context;
 }
 
+const useVariablesContext = () =>  {
+    const context = useContext(VariablesContext);
+    if (!context) {
+        throw new Error('useVariablesContext must be used within a VariablesProvider');
+    }
+    return context;
+}
+
+const useSpriteContext = () => {
+    const context = useContext(SpriteContext);
+    if (!context) {
+        throw new Error('useSpriteContext must be used within a SpriteProvider');
+    }
+    return context;
+}
+const useScriptsContext = () => { const context = useContext(ScriptsContext); if (!context) throw new Error('useScriptsContext must be used within a ScriptsProvider'); return context; };
+const usePalettesContext = () => { const context = useContext(PalettesContext); if (!context) throw new Error('usePalettesContext must be used within a PalettesProvider'); return context; };
+const usePrefabsContext = () => { const context = useContext(PrefabsContext); if (!context) throw new Error('usePrefabsContext must be used within a PrefabsProvider'); return context; };
+
 export const useAppContexts = () => {
   const sceneCtx = useSceneContext();
   const projectCtx = useProjectContext();
@@ -65,6 +84,11 @@ export const useAppContexts = () => {
   const backgroundCtx = useBackgroundContext();
   const settingUtilsCtx = useSettingsUtilsContext();
   const elementCtx = useElementContext();
+    const variablesCtx = useVariablesContext();
+    const spriteCtx = useSpriteContext();
+    const scriptsCtx = useScriptsContext();
+    const palettesCtx = usePalettesContext();
+    const prefabsCtx = usePrefabsContext();
 
   return {
     scenes: sceneCtx.scenes,
@@ -91,6 +115,29 @@ export const useAppContexts = () => {
     setBackgrounds: backgroundCtx.setBackgrounds,
     backgroundsRef: backgroundCtx.backgroundsRef,
     ignoredFieldsBackgrounds: backgroundCtx.ignoredFields,
+
+    variables: variablesCtx.variables,
+    setVariables: variablesCtx.setVariables,
+    variablesRef: variablesCtx.variablesRef,
+    ignoredFieldsVariables: variablesCtx.ignoredFields,
+
+    spriteResources: spriteCtx.spriteResources,
+    setSpriteResources: spriteCtx.setSpriteResources,
+    spriteResourcesRef: spriteCtx.spriteResourcesRef,
+    ignoredFieldsSpriteResources: spriteCtx.ignoredFields,
+
+    scripts: scriptsCtx.scripts,
+    setScripts: scriptsCtx.setScripts,
+    scriptsRef: scriptsCtx.scriptsRef,
+    ignoredFieldsScripts: scriptsCtx.ignoredFields,
+    palettes: palettesCtx.palettes,
+    setPalettes: palettesCtx.setPalettes,
+    palettesRef: palettesCtx.palettesRef,
+    ignoredFieldsPalettes: palettesCtx.ignoredFields,
+    prefabs: prefabsCtx.prefabs,
+    setPrefabs: prefabsCtx.setPrefabs,
+    prefabsRef: prefabsCtx.prefabsRef,
+    ignoredFieldsPrefabs: prefabsCtx.ignoredFields,
 
     settingUtils: settingUtilsCtx.settingUtils,
     setSettingUtils: settingUtilsCtx.setSettingUtils,

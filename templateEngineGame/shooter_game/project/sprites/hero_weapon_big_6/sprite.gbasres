@@ -1,0 +1,311 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "original_hero_weapon_big_6",
+  "name": "hero_weapon_big_6",
+  "filename": "hero_weapon_big_6.bmp",
+  "imageWidth": 32,
+  "imageHeight": 16,
+  "playerFrameWidth": 32,
+  "playerFrameHeight": 16,
+  "playerFramesPerDirection": 1,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 16,
+  "playerCanvasOriginY": 8,
+  "playerCollisionX": -16,
+  "playerCollisionY": -8,
+  "playerCollisionWidth": 32,
+  "playerCollisionHeight": 16,
+  "playerAnimations": [
+    {
+      "id": "idle-down",
+      "name": "Idle Down",
+      "type": "idle",
+      "frames": [
+        0
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_hero_weapon_big_6-idle-down",
+          "width": 32,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-original_hero_weapon_big_6-idle-down",
+              "sourceX": 0,
+              "sourceY": 0,
+              "width": 32,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-down",
+      "name": "Moving Down",
+      "type": "movement",
+      "frames": [
+        0
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-left",
+      "name": "Idle Left",
+      "type": "idle",
+      "frames": [
+        1
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_hero_weapon_big_6-idle-left",
+          "width": 32,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-original_hero_weapon_big_6-idle-left",
+              "sourceX": 0,
+              "sourceY": 16,
+              "width": 32,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-left",
+      "name": "Moving Left",
+      "type": "movement",
+      "frames": [
+        1
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-right",
+      "name": "Idle Right",
+      "type": "idle",
+      "frames": [
+        2
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_hero_weapon_big_6-idle-right",
+          "width": 32,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-original_hero_weapon_big_6-idle-right",
+              "sourceX": 0,
+              "sourceY": 32,
+              "width": 32,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-right",
+      "name": "Moving Right",
+      "type": "movement",
+      "frames": [
+        2
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-up",
+      "name": "Idle Up",
+      "type": "idle",
+      "frames": [
+        3
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_hero_weapon_big_6-idle-up",
+          "width": 32,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-original_hero_weapon_big_6-idle-up",
+              "sourceX": 0,
+              "sourceY": 48,
+              "width": 32,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-up",
+      "name": "Moving Up",
+      "type": "movement",
+      "frames": [
+        3
+      ],
+      "canvasFrames": []
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "default",
+      "name": "Default",
+      "type": "default",
+      "animations": [
+        {
+          "id": "idle-down",
+          "name": "Idle Down",
+          "type": "idle",
+          "frames": [
+            0
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_hero_weapon_big_6-idle-down",
+              "width": 32,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-original_hero_weapon_big_6-idle-down",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 32,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-down",
+          "name": "Moving Down",
+          "type": "movement",
+          "frames": [
+            0
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-left",
+          "name": "Idle Left",
+          "type": "idle",
+          "frames": [
+            1
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_hero_weapon_big_6-idle-left",
+              "width": 32,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-original_hero_weapon_big_6-idle-left",
+                  "sourceX": 0,
+                  "sourceY": 16,
+                  "width": 32,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-left",
+          "name": "Moving Left",
+          "type": "movement",
+          "frames": [
+            1
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-right",
+          "name": "Idle Right",
+          "type": "idle",
+          "frames": [
+            2
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_hero_weapon_big_6-idle-right",
+              "width": 32,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-original_hero_weapon_big_6-idle-right",
+                  "sourceX": 0,
+                  "sourceY": 32,
+                  "width": 32,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-right",
+          "name": "Moving Right",
+          "type": "movement",
+          "frames": [
+            2
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-up",
+          "name": "Idle Up",
+          "type": "idle",
+          "frames": [
+            3
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_hero_weapon_big_6-idle-up",
+              "width": 32,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-original_hero_weapon_big_6-idle-up",
+                  "sourceX": 0,
+                  "sourceY": 48,
+                  "width": 32,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-up",
+          "name": "Moving Up",
+          "type": "movement",
+          "frames": [
+            3
+          ],
+          "canvasFrames": []
+        }
+      ]
+    }
+  ]
+}

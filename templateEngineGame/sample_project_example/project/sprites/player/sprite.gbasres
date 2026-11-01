@@ -1,0 +1,1169 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "player",
+  "name": "player",
+  "filename": "player.bmp",
+  "imageWidth": 16,
+  "imageHeight": 256,
+  "playerFrameWidth": 16,
+  "playerFrameHeight": 16,
+  "playerFramesPerDirection": 4,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 8,
+  "playerCanvasOriginY": 12,
+  "playerCollisionX": -7,
+  "playerCollisionY": -10,
+  "playerCollisionWidth": 14,
+  "playerCollisionHeight": 14,
+  "playerAnimations": [
+    {
+      "id": "idle-right",
+      "name": "Idle Right",
+      "type": "idle",
+      "frames": [],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-autogen-1791567009104-12",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791567009104-12-0-0",
+              "sourceX": 0,
+              "sourceY": 192,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791567009104-12-8-0",
+              "sourceX": 8,
+              "sourceY": 192,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "idle-up",
+      "name": "Idle Up",
+      "type": "idle",
+      "frames": [],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-1791567026906",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-1791567029072-0-0-c1g7a",
+              "sourceX": 0,
+              "sourceY": 64,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-1791567029072-0-8-x4mvy",
+              "sourceX": 8,
+              "sourceY": 64,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "idle-down",
+      "name": "Idle Down",
+      "type": "idle",
+      "frames": [],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-1791567033152",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-1791567036694-0-0-sk4h4",
+              "sourceX": 0,
+              "sourceY": 0,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-1791567036694-0-8-k1br4",
+              "sourceX": 8,
+              "sourceY": 0,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-right",
+      "name": "Moving Right",
+      "type": "movement",
+      "frames": [],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-autogen-1791567039178-12",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791567039178-12-0-0",
+              "sourceX": 0,
+              "sourceY": 192,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791567039178-12-8-0",
+              "sourceX": 8,
+              "sourceY": 192,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791567039178-13",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791567039178-13-0-0",
+              "sourceX": 0,
+              "sourceY": 208,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791567039178-13-8-0",
+              "sourceX": 8,
+              "sourceY": 208,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791567039178-14",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791567039178-14-0-0",
+              "sourceX": 0,
+              "sourceY": 224,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791567039178-14-8-0",
+              "sourceX": 8,
+              "sourceY": 224,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791567039178-15",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791567039178-15-0-0",
+              "sourceX": 0,
+              "sourceY": 240,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791567039178-15-8-0",
+              "sourceX": 8,
+              "sourceY": 240,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-up",
+      "name": "Moving Up",
+      "type": "movement",
+      "frames": [],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-autogen-1791567047384-4",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791567047384-4-0-0",
+              "sourceX": 0,
+              "sourceY": 64,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791567047384-4-8-0",
+              "sourceX": 8,
+              "sourceY": 64,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791567047384-5",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791567047384-5-0-0",
+              "sourceX": 0,
+              "sourceY": 80,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791567047384-5-8-0",
+              "sourceX": 8,
+              "sourceY": 80,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791567047384-6",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791567047384-6-0-0",
+              "sourceX": 0,
+              "sourceY": 96,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791567047384-6-8-0",
+              "sourceX": 8,
+              "sourceY": 96,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791567047384-7",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791567047384-7-0-0",
+              "sourceX": 0,
+              "sourceY": 112,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791567047384-7-8-0",
+              "sourceX": 8,
+              "sourceY": 112,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-down",
+      "name": "Moving Down",
+      "type": "movement",
+      "frames": [],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-autogen-1791567057516-0",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791567057516-0-0-0",
+              "sourceX": 0,
+              "sourceY": 0,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791567057516-0-8-0",
+              "sourceX": 8,
+              "sourceY": 0,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791567057516-1",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791567057516-1-0-0",
+              "sourceX": 0,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791567057516-1-8-0",
+              "sourceX": 8,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791567057516-2",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791567057516-2-0-0",
+              "sourceX": 0,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791567057516-2-8-0",
+              "sourceX": 8,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791567057516-3",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791567057516-3-0-0",
+              "sourceX": 0,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791567057516-3-8-0",
+              "sourceX": 8,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "player",
+      "name": "Player_Platform",
+      "type": "platformer-player",
+      "animations": [
+        {
+          "id": "idle",
+          "name": "Idle",
+          "type": "idle",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-autogen-1791566951687-0",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566951687-0-0-0",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791566951687-0-8-0",
+                  "sourceX": 8,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "running",
+          "name": "Running",
+          "type": "movement",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-autogen-1791566963569-12",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566963569-12-0-0",
+                  "sourceX": 0,
+                  "sourceY": 192,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791566963569-12-8-0",
+                  "sourceX": 8,
+                  "sourceY": 192,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566963569-13",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566963569-13-0-0",
+                  "sourceX": 0,
+                  "sourceY": 208,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791566963569-13-8-0",
+                  "sourceX": 8,
+                  "sourceY": 208,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566963569-14",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566963569-14-0-0",
+                  "sourceX": 0,
+                  "sourceY": 224,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791566963569-14-8-0",
+                  "sourceX": 8,
+                  "sourceY": 224,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566963569-15",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566963569-15-0-0",
+                  "sourceX": 0,
+                  "sourceY": 240,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791566963569-15-8-0",
+                  "sourceX": 8,
+                  "sourceY": 240,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "jumping",
+          "name": "Jumping",
+          "type": "jump",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-autogen-1791566970647-0",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566970647-0-0-0",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791566970647-0-8-0",
+                  "sourceX": 8,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "climbing",
+          "name": "Climbing",
+          "type": "climb",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-autogen-1791566992489-4",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566992489-4-0-0",
+                  "sourceX": 0,
+                  "sourceY": 64,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791566992489-4-8-0",
+                  "sourceX": 8,
+                  "sourceY": 64,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566992489-5",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566992489-5-0-0",
+                  "sourceX": 0,
+                  "sourceY": 80,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791566992489-5-8-0",
+                  "sourceX": 8,
+                  "sourceY": 80,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566992489-6",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566992489-6-0-0",
+                  "sourceX": 0,
+                  "sourceY": 96,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791566992489-6-8-0",
+                  "sourceX": 8,
+                  "sourceY": 96,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566992489-7",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566992489-7-0-0",
+                  "sourceX": 0,
+                  "sourceY": 112,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791566992489-7-8-0",
+                  "sourceX": 8,
+                  "sourceY": 112,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "flipRightToCreateLeftFacingFrames": true
+    },
+    {
+      "id": "state-1791400556442",
+      "name": "Player_RPG",
+      "type": "four-directions-movement",
+      "flipRightToCreateLeftFacingFrames": true,
+      "animations": [
+        {
+          "id": "idle-right",
+          "name": "Idle Right",
+          "type": "idle",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-autogen-1791567009104-12",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791567009104-12-0-0",
+                  "sourceX": 0,
+                  "sourceY": 192,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791567009104-12-8-0",
+                  "sourceX": 8,
+                  "sourceY": 192,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "idle-up",
+          "name": "Idle Up",
+          "type": "idle",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-1791567026906",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-1791567029072-0-0-c1g7a",
+                  "sourceX": 0,
+                  "sourceY": 64,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-1791567029072-0-8-x4mvy",
+                  "sourceX": 8,
+                  "sourceY": 64,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "idle-down",
+          "name": "Idle Down",
+          "type": "idle",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-1791567033152",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-1791567036694-0-0-sk4h4",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-1791567036694-0-8-k1br4",
+                  "sourceX": 8,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-right",
+          "name": "Moving Right",
+          "type": "movement",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-autogen-1791567039178-12",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791567039178-12-0-0",
+                  "sourceX": 0,
+                  "sourceY": 192,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791567039178-12-8-0",
+                  "sourceX": 8,
+                  "sourceY": 192,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791567039178-13",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791567039178-13-0-0",
+                  "sourceX": 0,
+                  "sourceY": 208,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791567039178-13-8-0",
+                  "sourceX": 8,
+                  "sourceY": 208,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791567039178-14",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791567039178-14-0-0",
+                  "sourceX": 0,
+                  "sourceY": 224,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791567039178-14-8-0",
+                  "sourceX": 8,
+                  "sourceY": 224,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791567039178-15",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791567039178-15-0-0",
+                  "sourceX": 0,
+                  "sourceY": 240,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791567039178-15-8-0",
+                  "sourceX": 8,
+                  "sourceY": 240,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-up",
+          "name": "Moving Up",
+          "type": "movement",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-autogen-1791567047384-4",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791567047384-4-0-0",
+                  "sourceX": 0,
+                  "sourceY": 64,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791567047384-4-8-0",
+                  "sourceX": 8,
+                  "sourceY": 64,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791567047384-5",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791567047384-5-0-0",
+                  "sourceX": 0,
+                  "sourceY": 80,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791567047384-5-8-0",
+                  "sourceX": 8,
+                  "sourceY": 80,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791567047384-6",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791567047384-6-0-0",
+                  "sourceX": 0,
+                  "sourceY": 96,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791567047384-6-8-0",
+                  "sourceX": 8,
+                  "sourceY": 96,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791567047384-7",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791567047384-7-0-0",
+                  "sourceX": 0,
+                  "sourceY": 112,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791567047384-7-8-0",
+                  "sourceX": 8,
+                  "sourceY": 112,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-down",
+          "name": "Moving Down",
+          "type": "movement",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-autogen-1791567057516-0",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791567057516-0-0-0",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791567057516-0-8-0",
+                  "sourceX": 8,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791567057516-1",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791567057516-1-0-0",
+                  "sourceX": 0,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791567057516-1-8-0",
+                  "sourceX": 8,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791567057516-2",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791567057516-2-0-0",
+                  "sourceX": 0,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791567057516-2-8-0",
+                  "sourceX": 8,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791567057516-3",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791567057516-3-0-0",
+                  "sourceX": 0,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791567057516-3-8-0",
+                  "sourceX": 8,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "playerAnimationStripOrientation": "horizontal"
+}

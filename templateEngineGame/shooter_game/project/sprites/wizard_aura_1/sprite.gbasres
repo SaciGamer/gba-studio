@@ -1,0 +1,219 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "wizard_aura",
+  "name": "wizard_aura",
+  "filename": "wizard_aura.bmp",
+  "imageWidth": 64,
+  "imageHeight": 1024,
+  "playerFrameWidth": 64,
+  "playerFrameHeight": 64,
+  "playerFramesPerDirection": 4,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 0,
+  "playerCanvasOriginY": 8,
+  "playerCollisionX": 0,
+  "playerCollisionY": 0,
+  "playerCollisionWidth": 16,
+  "playerCollisionHeight": 8,
+  "playerAnimations": [
+    {
+      "id": "idle-right",
+      "name": "Idle Right",
+      "type": "idle",
+      "frames": [],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-1790876064804",
+          "width": 128,
+          "height": 128,
+          "pieces": [
+            {
+              "id": "piece-1790876151383",
+              "sourceX": 0,
+              "sourceY": 256,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-1790876158891",
+              "sourceX": 0,
+              "sourceY": 320,
+              "width": 64,
+              "height": 64,
+              "x": 64,
+              "y": 0
+            },
+            {
+              "id": "piece-1790876196243",
+              "sourceX": 0,
+              "sourceY": 384,
+              "width": 64,
+              "height": 64,
+              "x": 0,
+              "y": 64
+            },
+            {
+              "id": "piece-1790876200857",
+              "sourceX": 0,
+              "sourceY": 448,
+              "width": 64,
+              "height": 64,
+              "x": 64,
+              "y": 64
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "idle-up",
+      "name": "Idle Up",
+      "type": "idle",
+      "frames": [
+        0
+      ]
+    },
+    {
+      "id": "idle-down",
+      "name": "Idle Down",
+      "type": "idle",
+      "frames": [
+        0
+      ]
+    },
+    {
+      "id": "moving-right",
+      "name": "Moving Right",
+      "type": "movement",
+      "frames": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "moving-up",
+      "name": "Moving Up",
+      "type": "movement",
+      "frames": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "moving-down",
+      "name": "Moving Down",
+      "type": "movement",
+      "frames": [
+        0,
+        1
+      ]
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "player",
+      "name": "Player",
+      "type": "four-directions-movement",
+      "animations": [
+        {
+          "id": "idle-right",
+          "name": "Idle Right",
+          "type": "idle",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-1790876064804",
+              "width": 128,
+              "height": 128,
+              "pieces": [
+                {
+                  "id": "piece-1790876151383",
+                  "sourceX": 0,
+                  "sourceY": 256,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-1790876158891",
+                  "sourceX": 0,
+                  "sourceY": 320,
+                  "width": 64,
+                  "height": 64,
+                  "x": 64,
+                  "y": 0
+                },
+                {
+                  "id": "piece-1790876196243",
+                  "sourceX": 0,
+                  "sourceY": 384,
+                  "width": 64,
+                  "height": 64,
+                  "x": 0,
+                  "y": 64
+                },
+                {
+                  "id": "piece-1790876200857",
+                  "sourceX": 0,
+                  "sourceY": 448,
+                  "width": 64,
+                  "height": 64,
+                  "x": 64,
+                  "y": 64
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "idle-up",
+          "name": "Idle Up",
+          "type": "idle",
+          "frames": [
+            0
+          ]
+        },
+        {
+          "id": "idle-down",
+          "name": "Idle Down",
+          "type": "idle",
+          "frames": [
+            0
+          ]
+        },
+        {
+          "id": "moving-right",
+          "name": "Moving Right",
+          "type": "movement",
+          "frames": [
+            0,
+            1
+          ]
+        },
+        {
+          "id": "moving-up",
+          "name": "Moving Up",
+          "type": "movement",
+          "frames": [
+            0,
+            1
+          ]
+        },
+        {
+          "id": "moving-down",
+          "name": "Moving Down",
+          "type": "movement",
+          "frames": [
+            0,
+            1
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -14,7 +14,7 @@ export async function loadSettings(filePath: string): Promise<any[]>{
   const resources: any[] = [];
 
   try {
-    const allResources = loadAllResourcesRecursively(directory);
+    const allResources = await loadAllResourcesRecursively(directory);
     resources.push(...allResources);
 
     console.log('..: All settings loaded to FE:', resources);    
@@ -28,39 +28,21 @@ export async function loadSettings(filePath: string): Promise<any[]>{
   }
 }
 
-function loadAllResourcesRecursively(dirPath: string): any[] {
-  const resources: any[] = [];
-
-  function walkDir(currentPath: string) {
-    const files = fs.readdirSync(currentPath);
-
-    files.forEach(file => {
-      const filePath = path.join(currentPath, file);
-      const stat = fs.statSync(filePath);
-
-      if (stat.isDirectory()) {
-        walkDir(filePath);
-      } else if (file.endsWith('.gbasres') || file.endsWith('.gbaproj')) {
-        try {
-          const data = loadSettingsFile(filePath);
-          if (data) {
-            resources.push(data);
-            // settingsController.addNewItem(JSON.parse(data));
-          }
-        } catch (error) {
-          console.error(`..: Erro ao carregar arquivo ${filePath}:`, error);
-        }
-      }
-    });
-  }
-
-  walkDir(dirPath);
-  return resources;
+async function loadAllResourcesRecursively(dirPath: string): Promise<any[]> {
+  const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+  const nested = await Promise.all(entries.map(async entry => {
+    const filePath = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) return loadAllResourcesRecursively(filePath);
+    if (!entry.isFile() || (!entry.name.endsWith('.gbasres') && !entry.name.endsWith('.gbaproj'))) return [];
+    const data = await loadSettingsFile(filePath);
+    return data ? [data] : [];
+  }));
+  return nested.flat();
 }
 
-function loadSettingsFile(filePath: string): any | null {
+async function loadSettingsFile(filePath: string): Promise<any | null> {
   try {
-    const fileContent = fs.readFileSync(filePath, 'utf8');
+    const fileContent = await fs.promises.readFile(filePath, 'utf8');
     return fileContent;
   } catch (error) {
     console.error(`..: Erro ao ler arquivo ${filePath}:`, error);

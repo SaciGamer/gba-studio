@@ -45,6 +45,224 @@
   /* --border-radius: 4px; */
 }
 
+/* Shared alignment for searchable select inputs across the editor. */
+.ant-select-single .ant-select-selector {
+  align-items: center !important;
+  text-align: left !important;
+}
+
+.ant-select-single .ant-select-selection-item,
+.ant-select-single .ant-select-selection-placeholder {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+/* Ant Design message toasts use compact default padding; give app-wide status
+   messages enough room while keeping their content and placement unchanged. */
+.ant-message .ant-message-notice-wrapper .ant-message-notice-content {
+  padding: 12px 20px !important;
+}
+
+.ant-message .ant-message-custom-content {
+  gap: 8px !important;
+}
+
+.ant-btn-dangerous {
+  box-shadow: none !important;
+}
+
+html[data-hide-button-focus-ring='true'] button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.gba-theme-glass {
+  background: #dce7f0;
+}
+
+.gba-theme-glass .ant-card,
+.gba-theme-glass .ant-modal-content,
+.gba-theme-glass .ant-dropdown,
+.gba-theme-glass .ant-select-dropdown,
+.gba-theme-glass .ant-popover-inner,
+.gba-theme-glass .ant-input,
+.gba-theme-glass .ant-input-number,
+.gba-theme-glass .ant-select-selector {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.gba-theme-glass .ant-card,
+.gba-theme-glass .ant-modal-content,
+.gba-theme-glass .ant-dropdown,
+.gba-theme-glass .ant-select-dropdown,
+.gba-theme-glass .ant-popover-inner {
+  box-shadow: 0 8px 24px rgba(85, 85, 85, 0.1), inset 0 0 5px 2px rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.52);
+}
+
+.gba-theme-glass .ant-btn-default {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(85, 85, 85, 0.1), inset 0 0 5px 2px rgba(255, 255, 255, 0.22);
+}
+
+.gba-theme-bootstrap .ant-btn {
+  background-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.2));
+  border-color: rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.2);
+}
+
+.gba-theme-bootstrap .ant-btn-default {
+  background-image: none;
+  color: inherit;
+  text-shadow: none;
+}
+
+.gba-theme-bootstrap .ant-modal-header,
+.gba-theme-bootstrap .ant-modal-footer {
+  padding: 16px 24px;
+}
+
+.gba-theme-bootstrap .ant-modal-header {
+  border-bottom: 1px solid var(--ant-color-split);
+}
+
+.gba-theme-bootstrap .ant-modal-footer {
+  border-top: 1px solid var(--ant-color-split);
+  background: var(--ant-color-bg-container-disabled);
+}
+
+.gba-theme-cartoon .ant-card,
+.gba-theme-cartoon .ant-modal-content,
+.gba-theme-cartoon .ant-popover-inner,
+.gba-theme-cartoon .ant-notification-notice,
+.gba-theme-cartoon .ant-progress-bg,
+.gba-theme-cartoon .ant-progress-inner {
+  border: 2px solid var(--ant-color-border);
+  box-shadow: none;
+}
+
+/* The navigator trees use inline backgrounds, so the themed states live here. */
+.gba-theme-glass .custom-tree,
+.gba-theme-glass .ant-collapse-content,
+.gba-theme-glass .ant-collapse-content-box {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: var(--ant-color-text);
+}
+
+.gba-theme-glass .custom-tree .ant-tree-node-content-wrapper:hover,
+.gba-theme-glass .custom-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background: rgba(255, 255, 255, 0.42) !important;
+  color: var(--ant-color-text) !important;
+}
+
+.gba-theme-bootstrap .custom-tree,
+.gba-theme-bootstrap .ant-collapse-content,
+.gba-theme-bootstrap .ant-collapse-content-box {
+  background: #ffffff !important;
+  color: #212529;
+}
+
+.gba-theme-bootstrap .custom-tree .ant-tree-node-content-wrapper:hover {
+  background: #e9ecef !important;
+}
+
+.gba-theme-bootstrap .custom-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background: #337ab7 !important;
+  color: #ffffff !important;
+}
+
+.gba-theme-cartoon .custom-tree,
+.gba-theme-cartoon .ant-collapse-content,
+.gba-theme-cartoon .ant-collapse-content-box {
+  background: #fffdf3 !important;
+  color: #51463B;
+}
+
+.gba-theme-cartoon .custom-tree .ant-tree-node-content-wrapper:hover {
+  background: #e8d29a !important;
+}
+
+.gba-theme-cartoon .custom-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background: #9CD3D3 !important;
+  color: #51463B !important;
+}
+
+/* FloatButton is the button itself in Ant Design 6; keep group layout neutral. */
+.gba-theme-glass .ant-float-btn-group,
+.gba-theme-bootstrap .ant-float-btn-group,
+.gba-theme-cartoon .ant-float-btn-group {
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.gba-theme-glass .ant-float-btn,
+.gba-theme-bootstrap .ant-float-btn,
+.gba-theme-cartoon .ant-float-btn {
+  inset: auto !important;
+  position: relative;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  min-height: 50px;
+  height: 50px;
+  padding: 0;
+}
+
+.gba-theme-glass .ant-float-btn .ant-float-btn-icon,
+.gba-theme-bootstrap .ant-float-btn .ant-float-btn-icon,
+.gba-theme-cartoon .ant-float-btn .ant-float-btn-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  transform: translate(-50%, -50%);
+}
+
+.gba-theme-glass .ant-float-btn {
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  box-shadow: 0 8px 24px rgba(85, 85, 85, 0.1), inset 0 0 5px 2px rgba(255, 255, 255, 0.24);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.gba-theme-glass .ant-float-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.gba-theme-bootstrap .ant-float-btn {
+  border-color: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  background-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.gba-theme-bootstrap .ant-float-btn:hover,
+.gba-theme-bootstrap .ant-float-btn:active {
+  background-image: linear-gradient(rgba(0, 0, 0, 0.15) 100%);
+}
+
+.gba-theme-cartoon .ant-float-btn {
+  border: 2px solid #225555;
+  box-shadow: none;
+  background: #fffdf3;
+}
+
+.gba-theme-cartoon .ant-float-btn:hover {
+  background: #E8D29A;
+}
+
+.gba-theme-cartoon .ant-float-btn-group .ant-float-btn + .ant-float-btn {
+  border-top-width: 0;
+}
+
 body, html {
   /* background-color: var(--background-color); */
   /* color: var(--text-color); */
@@ -74,6 +292,11 @@ body, html {
   color: var(--search-button-text) !important;
 }
 
+/* Ant Design 5 can lose the generated palette min-height inside Electron popovers. */
+.gba-palette-color-picker .ant-color-picker-palette {
+  min-height: 160px !important;
+}
+
 /* .ant-float-btn-square {
   height: var(--ant-control-height-lg);
   width: var(--ant-control-height-lg);
@@ -97,6 +320,85 @@ body, html {
   display: none !important;
 }
 
+/* CaretRight starts pointing right; prevent Ant Design's default closed rotation. */
+.custom-tree.ant-tree .ant-tree-switcher_close .left-panel-switcher svg {
+  transform: rotate(0deg);
+}
+
+.left-navigation-section.ant-collapse > .ant-collapse-item > .ant-collapse-header {
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 16px;
+  align-items: center;
+}
+
+.project-hierarchy .left-navigation-section > .ant-collapse-item > .ant-collapse-header {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.project-hierarchy .left-navigation-section > .ant-collapse-item > .ant-collapse-header > .ant-collapse-header-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.project-hierarchy .left-navigation-section > .ant-collapse-item > .ant-collapse-header > .ant-collapse-extra {
+  flex: 0 0 auto;
+}
+
+.project-hierarchy .custom-tree .ant-tree-node-content-wrapper {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.project-hierarchy .custom-tree .ant-tree-title {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.project-hierarchy .custom-tree .ant-tree-title > .ant-flex {
+  box-sizing: border-box;
+  flex-wrap: nowrap;
+}
+
+.project-hierarchy .custom-tree .ant-tree-title .ant-typography {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.music-left-navigation.ant-collapse {
+  display: flex;
+  flex-direction: column;
+}
+
+.music-left-navigation.ant-collapse > .ant-collapse-item {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 40px;
+}
+
+.music-left-navigation.ant-collapse > .ant-collapse-item > .ant-collapse-content-active {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.music-left-navigation.ant-collapse > .ant-collapse-item > .ant-collapse-content-active > .ant-collapse-content-box {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
 /* .ant-collapse-content-box {
   background-color: #1aeb2ca3;
 } */
@@ -104,3 +406,66 @@ body, html {
 /* .ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
   background-color: #1aeb2ca3;
 } */
+/* Application-wide Ant Design scrollbar treatment. Keep the track transparent and
+   use the theme's tertiary text color for the rounded thumb. */
+.ant-app * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ant-color-text-tertiary, rgba(0, 0, 0, 0.45)) transparent;
+}
+
+.ant-app *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+
+.ant-app *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ant-app *::-webkit-scrollbar-thumb {
+  background: var(--ant-color-text-tertiary, rgba(0, 0, 0, 0.45));
+  border-radius: var(--ant-border-radius-sm, 4px);
+}
+
+.ant-app *::-webkit-scrollbar-button {
+  display: none;
+}
+.event-attention-tree .ant-tree-title {
+  display: block;
+  width: 100%;
+}
+
+.event-attention-tree .ant-tree-node-selected .gba-hierarchy-warning {
+  color: inherit !important;
+}
+
+/* Keep layer notifications on the tab corner, with room above the scroll clip. */
+.gba-background-tabs > .ant-tabs-nav > .ant-tabs-nav-wrap {
+  padding-top: 8px;
+  margin-top: -8px;
+}
+
+.gba-background-tabs > .ant-tabs-nav .ant-tabs-nav-list {
+  padding-right: 8px;
+}
+
+.gba-background-tabs > .ant-tabs-nav .ant-tabs-tab-btn,
+.gba-background-tabs > .ant-tabs-nav .gba-attention-label {
+  position: static !important;
+}
+
+.gba-background-tabs > .ant-tabs-nav .gba-attention-anchor {
+  top: 0 !important;
+  right: 0 !important;
+}
+.palette-slot-select .ant-select-selector {
+  padding: 0 !important;
+  overflow: hidden;
+}
+.palette-slot-select .ant-select-selection-item { padding: 0 !important; height: 46px !important; display: flex; align-items: stretch; }
+.palette-slot-select .ant-select-selection-item > span { width: 100% !important; height: 46px !important; border: 0 !important; border-radius: 0 !important; }
+.palette-slot-default .ant-select-selection-item { opacity: .35; filter: grayscale(1); }
+.palette-slot-select .ant-select-selection-placeholder {
+  opacity: 1;
+}

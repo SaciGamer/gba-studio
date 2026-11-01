@@ -27,6 +27,7 @@ bin/
 
 # Testes
 coverage/
+test-results/
 
 # Ambiente
 .env
@@ -54,3 +55,17 @@ package-lock.json
 frontend/build/
 frontend/node_modules/
 gba-project/build/
+
+# Generated caches and project backups
+*.tsbuildinfo
+*.bak
+
+# Local AI workflow, reference material and workspace projects
+/.tmp/
+/tools-ai/
+/docs/
+/arquivo_referencia/
+/arquivos_referencia/
+/projeto_exemplo/
+AGENTS.md
+PLANO*

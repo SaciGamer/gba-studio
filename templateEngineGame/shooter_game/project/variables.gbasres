@@ -1,0 +1,20 @@
+{
+  "_resourceType": "variables",
+  "_version": "1.0",
+  "variables": [
+    {
+      "id": "6f332904-a503-416f-8f33-2904a50316f1",
+      "name": "score",
+      "symbol": "variable_score",
+      "type": "number",
+      "initialValue": 0
+    },
+    {
+      "id": "a0a7f9a0-002f-43b2-80a7-f9a0002f3b2d",
+      "name": "Menu result",
+      "symbol": "menu_result",
+      "type": "number",
+      "initialValue": 0
+    }
+  ]
+}

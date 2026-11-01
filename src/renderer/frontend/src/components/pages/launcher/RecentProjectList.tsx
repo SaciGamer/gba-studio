@@ -1,21 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { CloseOutlined } from '@ant-design/icons';
-import { Button, message, Layout, Image, List, Typography } from 'antd';
+import { CloseOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Button, message, Layout, List, Typography } from 'antd';
 import cartuchoGBA from '@/img/cartuchoGBA.png';
+import cartridgeShell from '@/img/CartuchoGBASemFundo.png';
 import { AntdToken } from '../../common/AntDToken';
+import { useI18n } from '@/i18n/I18n';
 
 const { Content } = Layout;
 
 interface Project {
   title: string;
   path: string;
+  hasCartridgeImage?: boolean;
+  cartridgeImage?: string | null;
 }
 
 interface RecentProjectListProps {
   projects: Project[];
   handleRemoveProject: (title: string, path: string) => void;
   handleSelectProject: (path: string) => void;
+  handleClearRecentProjects: () => void;
 }
+
+// Keep covers in renderer memory while the launcher switches tabs. The stored
+// filename is the cover revision: changing a project's cover selects a new file.
+const cartridgeImageCache = new Map<string, { filename: string; source: string }>();
+
+const projectKey = (project: Project) => `${project.path.toLowerCase()}\\${project.title.toLowerCase()}`;
 
 function joinPaths(...segments: string[]): string {
   return segments
@@ -24,10 +35,48 @@ function joinPaths(...segments: string[]): string {
     .replace(/\//g, '\\');
 }
 
-const RecentProjectList: React.FC<RecentProjectListProps> = ({ projects, handleRemoveProject, handleSelectProject }) => {
+const RecentProjectList: React.FC<RecentProjectListProps> = ({ projects, handleRemoveProject, handleSelectProject, handleClearRecentProjects }) => {
   const { token } = AntdToken();
+  const { t } = useI18n();
 
   const [listHoveredItem, setlistHoveredItem] = useState<number | null>(null);
+  const [cartridgeImages, setCartridgeImages] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let mounted = true;
+    const cached: Record<string, string> = {};
+    const pending = projects.flatMap(project => {
+      const key = projectKey(project);
+      const filename = project.cartridgeImage;
+      if (!filename) {
+        cartridgeImageCache.delete(key);
+        return [];
+      }
+
+      const existing = cartridgeImageCache.get(key);
+      if (existing?.filename === filename) {
+        cached[key] = existing.source;
+        return [];
+      }
+
+      return [window.electronAPI.getCartridgeImage(project.path, filename)
+        .then((source: string | null) => {
+          if (!mounted) return;
+          if (!source) {
+            cartridgeImageCache.delete(key);
+            return;
+          }
+          cartridgeImageCache.set(key, { filename, source });
+          cached[key] = source;
+        })
+        .catch(() => { cartridgeImageCache.delete(key); })];
+    });
+    setCartridgeImages(cached);
+    void Promise.all(pending).then(() => {
+      if (mounted) setCartridgeImages({ ...cached });
+    });
+    return () => { mounted = false; };
+  }, [projects]);
 
   const handleProjectClick = async (index: number) => {
     const projectPath = joinPaths(projects[index].path, projects[index].title);
@@ -35,7 +84,6 @@ const RecentProjectList: React.FC<RecentProjectListProps> = ({ projects, handleR
     const exists = await window.electronAPI.checkProjectFile(projectPath);
     if (exists) {
       handleSelectProject(projectPath);
-      message.info(`Arquivo ${projects[index].title} está carregando...`);
     } else {
       message.error(`Arquivo ${projects[index].title} não foi encontrado.`);
     }
@@ -48,10 +96,27 @@ const RecentProjectList: React.FC<RecentProjectListProps> = ({ projects, handleR
 
   return (
     <Content style={{ height: 'calc(100vh - 10px)', overflowY: 'auto' }}>
+      {projects.length > 0 && <style>{`
+        .launcher-clear-recents-list .ant-list-footer { padding: 0; }
+        .launcher-clear-recents-row { width: 100%; height: 70px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+        .launcher-clear-recents-button { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; opacity: 0; transform: translateY(4px); transition: opacity 220ms ease, transform 220ms ease; pointer-events: none; }
+        .launcher-clear-recents-row:hover .launcher-clear-recents-button, .launcher-clear-recents-row:focus-within .launcher-clear-recents-button { opacity: 1; transform: translateY(0); pointer-events: auto; }
+        @media (prefers-reduced-motion: reduce) { .launcher-clear-recents-button { transition: none; transform: none; } }
+      `}</style>}
       <List
+        className="launcher-clear-recents-list"
         itemLayout="vertical"
         size="small"
         dataSource={projects}
+        footer={projects.length > 0 ? <div className="launcher-clear-recents-row" data-testid="launcher-clear-recents-row">
+          <Button
+            className="launcher-clear-recents-button"
+            danger
+            icon={<DeleteOutlined />}
+            aria-label={t('launcher.clearRecents')}
+            onClick={handleClearRecentProjects}
+          >{t('launcher.clearRecents')}</Button>
+        </div> : null}
         renderItem={(item: Project, index) => (
           <List.Item
             onMouseEnter={(e) => {
@@ -76,12 +141,13 @@ const RecentProjectList: React.FC<RecentProjectListProps> = ({ projects, handleR
                 handleProjectClick(index)
             }}
           >
-            <Image
-              preview={false}
-              width={'15%'}
-              src={cartuchoGBA}
-            // fallback={cartuchoGBA}
-            />
+            <div style={{ position: 'relative', width: '15%', aspectRatio: '236 / 138', flexShrink: 0, overflow: 'hidden' }}>
+              <img src={cartuchoGBA} alt='' draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
+              {cartridgeImages[projectKey(item)] && (
+                <img src={cartridgeImages[projectKey(item)]} alt='' draggable={false} style={{ position: 'absolute', left: '14.41%', top: '23.91%', width: '72.03%', height: '63.04%', borderRadius: 3, objectFit: 'cover', objectPosition: 'center' }} />
+              )}
+              <img src={cartridgeShell} alt='' draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
+            </div>
             <List.Item.Meta
               style={{ marginLeft: '10px' }}
               title={

@@ -1,3 +1,5 @@
+import { normalizeSceneResource } from '../../shared/sceneResource';
+import { pruneDeletedProjectEntries } from '../../shared/projectCollectionEntries';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
@@ -5,14 +7,18 @@ import { EventEmitter } from 'events';
 import { SettingsController } from '@/controllers/SettingsController';
 import { createGenericSettingsStruct } from '@/structs/projectSettingsStruct';
 import { getPreferences } from '@/handlers/preferenceHandlers';
+import { updatePreferences } from '@/handlers/preferenceHandlers';
 import { windows, directoryPathProject, originalProjectDirectory } from '@/main';
 import { setCurrentActiveSandboxDirectory } from '@/states/tempProjectState';
-import { startWatch, stopAllWatchers } from './imagemService';
+import { formatMainWindowTitle } from '@/mainI18n';
 
 //Controllers
 const settingsController = SettingsController.getInstance();
 let processingToSaved = false;
 let pendingSaveOptions: SaveOptions | null = null;
+let saveInProgress = false;
+let lastWindowBaseTitle = '';
+let lastProjectTitle = '';
 // Event emitter to signal save completion so other modules (eg. build) can wait
 export const saveEvents = new EventEmitter();
 
@@ -24,11 +30,21 @@ export interface SaveOptions {
 }
 
 export function updateWindowTitle(baseTitle: string, projectName: string, isSaved: boolean): void {
+    lastWindowBaseTitle = baseTitle;
+    lastProjectTitle = projectName;
     if (windows.main) {
-        const title = `${baseTitle ? baseTitle : ''} - ${projectName ? projectName : ''}`;
-        windows.main.setTitle(`${title}${!isSaved ? ' (Modified)' : ''}`);
+        windows.main.setTitle(formatMainWindowTitle(baseTitle, projectName, isSaved, saveInProgress, getPreferences().language));
         settingsController.setIsSaved(isSaved);
     }
+}
+
+export function refreshWindowTitle(): void {
+    if (lastWindowBaseTitle || lastProjectTitle) updateWindowTitle(lastWindowBaseTitle, lastProjectTitle, settingsController.isSaved());
+}
+
+function updateSaveProgress(isInProgress: boolean): void {
+    saveInProgress = isInProgress;
+    updateWindowTitle(lastWindowBaseTitle, lastProjectTitle, settingsController.isSaved());
 }
 
 // Default project path
@@ -40,7 +56,7 @@ export function setProjectFile(file: string): string | null {
     return settingsController.setProjectFile(file);
 }
 
-export function changesPending<T>(type: 'main' | 'project' | 'settings' | 'scene', newData: Partial<T>) {
+export function changesPending<T>(type: 'main' | 'project' | 'settings' | 'scene' | 'variables', newData: Partial<T>) {
     settingsController.setIsSaved(false);
     settingsController.updateSettings(newData);
 }
@@ -62,9 +78,18 @@ export function prepareProjectSandbox(projectFilePath: string): { sandboxDirecto
 export function requestSaveChanges(options: SaveOptions = {}) {
     const mergedOptions: SaveOptions = { source: 'save', ...options };
     console.log('..: requestSaveChanges processingToSaved:', processingToSaved, 'source:', mergedOptions.source);
+    if (windows.main && processingToSaved) {
+        // A close request can arrive while another save is being prepared.
+        // Upgrade that pending save so it also persists to the original
+        // project instead of letting the close race with a sandbox-only save.
+        pendingSaveOptions = { ...(pendingSaveOptions || {}), ...mergedOptions };
+        return;
+    }
+
     if (windows.main && !processingToSaved) {
         processingToSaved = true;
         pendingSaveOptions = mergedOptions;
+        updateSaveProgress(true);
         windows.main.webContents.send('get-data', { type: 'SAVE_DATA', ...mergedOptions });
     }
 }
@@ -76,8 +101,12 @@ export function waitForSaveComplete(timeoutMs = 10000): Promise<void> {
             reject(new Error('Save timeout'));
         }, timeoutMs);
 
-        const onSaved = () => {
+        const onSaved = (result?: { success?: boolean }) => {
             clearTimeout(timeout);
+            if (result?.success === false) {
+                reject(new Error('Save failed'));
+                return;
+            }
             resolve();
         };
 
@@ -86,14 +115,13 @@ export function waitForSaveComplete(timeoutMs = 10000): Promise<void> {
 }
 
 // Response FE para salvar nos arquivos
-export function responseSaveChanges(dataToSave: any) {
+export function responseSaveChanges(dataToSave: any): boolean {
     console.log('..: DATA response to save:', dataToSave);
-    stopAllWatchers();
-    processingToSaved = saveChanges(dataToSave, pendingSaveOptions || {});
-
-    var foldersToWatch = ["backgrounds", "backgrounds-hd", "tilesets"];
-    foldersToWatch.forEach((folder) => startWatch(windows.main, originalProjectDirectory, folder));
+    const saveSucceeded = saveChanges(dataToSave, pendingSaveOptions || {});
+    processingToSaved = false;
     pendingSaveOptions = null;
+    updateSaveProgress(false);
+    return saveSucceeded;
 }
 
 // Function to save changes
@@ -102,7 +130,7 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
     try {
         if (!Array.isArray(dataToSave)) {
             console.warn('..: Dados de save inválidos, ignorando');
-            emitSaveComplete(options);
+            emitSaveComplete(options, false);
             return false;
         }
 
@@ -119,7 +147,7 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
 
         if (options.persistToOriginal === false && !activeProjectDirectory) {
             console.warn('..: Skip project write for implicit build/run-live save because no sandbox directory is active');
-            emitSaveComplete(options);
+            emitSaveComplete(options, false);
             return false;
         }
 
@@ -127,7 +155,7 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
             if (fileData && Array.isArray(fileData)) {
                 fileData.forEach((subFile: any) => {
                     const projectPath = path.join(activeProjectDirectory, 'project', subFile._resourceType + 's');
-                    const filenameFormatted = subFile.name.toLowerCase().replace(/ /g, '');
+                    const filenameFormatted = resourceFolderName(subFile.name);
 
                     if (subFile._deleted === true) {
                         return deleteSettings(projectPath, filenameFormatted!, subFile);
@@ -140,7 +168,17 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
             }
 
             if (fileData && fileData._resourceType === 'project') {
-                saveSettingsToStore(activeProjectDirectory, '', path.basename(settingsUtils.projectPathFile || 'project.gbaproj'), fileData);
+                const projectFilename = path.basename(settingsUtils.projectPathFile || 'project.gbaproj');
+                saveSettingsToStore(activeProjectDirectory, '', projectFilename, fileData);
+                updatePreferences('recentProjects', {
+                    title: projectFilename,
+                    path: originalProjectDirectory || activeProjectDirectory,
+                    hasCartridgeImage: typeof fileData.cartridgeImage === 'string' && Boolean(fileData.cartridgeImage),
+                    cartridgeImage: typeof fileData.cartridgeImage === 'string' ? fileData.cartridgeImage : null,
+                });
+            } else if (fileData && fileData._resourceType === 'palettes') {
+                const palettePath = path.join(activeProjectDirectory, 'project', 'palettes');
+                fileData.palettes.forEach((palette: any) => saveWithFolders(palettePath, palette.name, { ...palette, _resourceType: 'palette' }));
             } else {
                 saveSettingsToStore(activeProjectDirectory, 'project', fileData._resourceType, fileData);
             }
@@ -155,17 +193,17 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
             settingsController.setIsSaved(true);
         }
         emitSaveComplete(options);
-        return false;
+        return true;
     } catch (error) {
         console.error('..: Erro ao salvar configurações:', error);
-        emitSaveComplete(options);
+        emitSaveComplete(options, false);
         return false;
     }
 }
 
-function emitSaveComplete(options: SaveOptions) {
+function emitSaveComplete(options: SaveOptions, success = true) {
     try {
-        saveEvents.emit('saved', { success: true, options });
+        saveEvents.emit('saved', { success, options });
     } catch (e) {
         console.warn('saveEvents emit failed', e);
     }
@@ -206,7 +244,7 @@ function createProjectSandboxDirectory(originalDirectory: string): string {
 }
 
 function copySandboxToOriginalProject(activeProjectDirectory: string) {
-    console.log('..: Copying sandbox project back to original project directory');
+    console.log('..: Synchronizing changed sandbox files with original project directory');
     if (!originalProjectDirectory || !activeProjectDirectory) {
         return;
     }
@@ -218,11 +256,69 @@ function copySandboxToOriginalProject(activeProjectDirectory: string) {
         return;
     }
 
-    if (fs.existsSync(normalizedOriginalDir)) {
-        fs.rmSync(normalizedOriginalDir, { recursive: true, force: true });
+    syncDirectoryChanges(normalizedActiveDir, normalizedOriginalDir);
+}
+
+/**
+ * Synchronizes a sandbox without replacing the whole project directory.
+ * Files are copied only when their contents changed. Asset files are always
+ * preserved in the original project when they are missing from the sandbox;
+ * a save must never turn a temporary/incomplete asset view into data loss.
+ */
+function syncDirectoryChanges(sourceDir: string, targetDir: string, preserveAssets = false): void {
+    if (!fs.existsSync(sourceDir)) {
+        return;
     }
-    fs.mkdirSync(normalizedOriginalDir, { recursive: true });
-    copyDirectoryContents(normalizedActiveDir, normalizedOriginalDir);
+
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const sourceEntries = fs.readdirSync(sourceDir, { withFileTypes: true });
+    const sourceNames = new Set(sourceEntries.map((entry) => entry.name));
+    const preserveAssetEntries = preserveAssets || path.basename(sourceDir).toLowerCase() === 'assets';
+
+    for (const entry of sourceEntries) {
+        const sourcePath = path.join(sourceDir, entry.name);
+        const targetPath = path.join(targetDir, entry.name);
+
+        if (entry.isDirectory()) {
+            if (fs.existsSync(targetPath) && !fs.statSync(targetPath).isDirectory()) {
+                fs.rmSync(targetPath, { force: true });
+            }
+            syncDirectoryChanges(sourcePath, targetPath, preserveAssetEntries);
+            continue;
+        }
+
+        if (fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory()) {
+            fs.rmSync(targetPath, { recursive: true, force: true });
+        }
+
+        if (!filesHaveSameContents(sourcePath, targetPath)) {
+            fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+            fs.copyFileSync(sourcePath, targetPath);
+        }
+    }
+
+    if (!fs.existsSync(targetDir)) {
+        return;
+    }
+
+    if (!preserveAssetEntries) {
+        for (const entry of fs.readdirSync(targetDir, { withFileTypes: true })) {
+            if (!sourceNames.has(entry.name)) {
+                fs.rmSync(path.join(targetDir, entry.name), { recursive: true, force: true });
+            }
+        }
+    }
+}
+
+function filesHaveSameContents(sourcePath: string, targetPath: string): boolean {
+    if (!fs.existsSync(targetPath) || !fs.statSync(targetPath).isFile()) {
+        return false;
+    }
+
+    const source = fs.readFileSync(sourcePath);
+    const target = fs.readFileSync(targetPath);
+    return source.equals(target);
 }
 
 export function copyDirectoryContents(sourceDir: string, targetDir: string) {
@@ -247,6 +343,7 @@ export function copyDirectoryContents(sourceDir: string, targetDir: string) {
 
 // Função para atualizar configurações
 function saveSettingsToStore<T>(basePath: any, folder: string, filename: string, newSettings: Partial<T>): T {
+    newSettings = normalizeSceneResource(pruneDeletedProjectEntries(newSettings));
     const pathFileToSave = path.join(basePath, folder ? path.join(`${folder}`, `${filename}.gbasres`) : filename);
     console.log('..: caminho para salvar a configuração: ', pathFileToSave);
     try {
@@ -291,7 +388,8 @@ function saveSettingsToStore<T>(basePath: any, folder: string, filename: string,
 // }
 
 function saveWithFolders(basePath: string, name: string, newSettings: any) {
-  const folderBase = path.join(basePath, name.replace(/\s+/g, ""));
+  newSettings = normalizeSceneResource(newSettings);
+  const folderBase = path.join(basePath, resourceFolderName(name));
   const fileName = newSettings._resourceType + ".gbasres";
   let targetFolder = folderBase;
   let counter = 1;
@@ -342,7 +440,7 @@ function cleanupDuplicateScenes(basePath: string, id: string, keepFolder: string
 
 function deleteSettings(basePath: string, folder: string, newSettings: any): void {
   // pasta alvo (ex: basePath/MyScene)
-  const targetFolder = path.join(basePath, folder.replace(/\s+/g, ""));
+  const targetFolder = path.join(basePath, resourceFolderName(folder));
   const fileName = newSettings._resourceType + ".gbasres";
   const filePath = path.join(targetFolder, fileName);
 
@@ -378,5 +476,14 @@ function deleteSettings(basePath: string, folder: string, newSettings: any): voi
   } catch (error) {
     console.error("..: Erro ao deletar configurações:", error);
   }
+}
+
+/** Create a filesystem-safe folder key without changing the resource's display name. */
+function resourceFolderName(name: unknown): string {
+  const normalized = String(name ?? '').toLowerCase().replace(/\s+/g, '');
+  const safeName = normalized
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    .replace(/[. ]+$/g, '');
+  return safeName || 'unnamed';
 }
 

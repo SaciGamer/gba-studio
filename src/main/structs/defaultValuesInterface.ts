@@ -1,3 +1,4 @@
+import { withDefaultInputMap } from '../../shared/inputMap';
 import { IMainSettings, IProjectSettings, ISettingsUtils, IUserSettings } from "@/interfaces/MainSettingsInterface";
 import os from 'os';
 
@@ -17,7 +18,21 @@ export const defaultMainSettings: IMainSettings = {
     startMoveSpeed: 1,
     startAnimSpeed: 4,
     startDirection: 'right',
-    colorMode: 'mono'
+    fadeDirection: 0,
+    inputMap: withDefaultInputMap(),
+    playerSpriteId: null,
+    uiCursorImage: null,
+    uiFrameImage: null,
+    font8x8Image: null,
+    font8x16Image: null,
+    font8x8VariablesImage: null,
+    font8x16VariablesImage: null,
+    font16x16VariablesImage: null,
+    playerFrameWidth: 16,
+    playerFrameHeight: 16,
+    playerFramesPerDirection: 4,
+    playerAnimSpeed: 4,
+    playerIdleFrame: 0
 };
 
 export const defaultUserSettings: IUserSettings = {

@@ -19,7 +19,7 @@ export function createProjectStruct(basePath: string, template?: string): void {
   console.log('..: Criando estrutura de pastas :..');
   // Estrutura de pastas
   const folders = ['assets', 'plugins', 'project'];
-  const assets = ['avatars', 'backgrounds', 'backgrounds-hd', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui'];
+  const assets = ['avatars', 'auto-tiles', 'backgrounds', 'backgrounds-hd', 'cartridge', 'emotes', 'fonts', 'musics', 'sounds', 'sprites', 'tilesets', 'ui'];
   const projects = ['backgrounds', 'emotes', 'fonts', 'musics', 'palettes', 'sprites'];
   const files = ['.gitignore', `${projectSettings.name}.gbaproj`];
 
@@ -100,14 +100,15 @@ function createProjectByTemplate(basePath: string, template: string): void {
     };
 
     // When the renderer requests the sample project, copy the prepared sample_project_example folder
-    if (template === 'sample_project_example') {
-      const templateDir = path.resolve(repoRoot, template);
-      console.log('..: Copying sample_project_example from', templateDir);
+    if (template === 'sample_project_example' || template === 'shooter_game') {
+      const migratedTemplateDir = path.resolve(repoRoot, 'templateEngineGame', template);
+      const templateDir = fs.existsSync(migratedTemplateDir) ? migratedTemplateDir : path.resolve(repoRoot, template);
+      console.log('..: Copying template-engine game from', templateDir);
       if (fs.existsSync(templateDir)) {
         copyRecursive(templateDir, basePath);
-        console.log('..: sample_project_example template copied.');
+        console.log('..: template-engine game template copied.');
       } else {
-        console.warn('..: sample_project_example template not found at', templateDir);
+        console.warn('..: template-engine game template not found at', templateDir);
       }
     }
   } catch (err) {

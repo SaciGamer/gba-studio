@@ -1,0 +1,12 @@
+{
+  "_resourceType": "background",
+  "id": "d373456f-3e5a-443b-b10c-67883785b470",
+  "autoColor": false,
+  "name": "sky",
+  "filename": "sky.bmp",
+  "imageWidth": 512,
+  "imageHeight": 256,
+  "hd": false,
+  "tileColors": "",
+  "_deleted": false
+}

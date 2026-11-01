@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+const result = await build({ entryPoints: ['src/renderer/frontend/src/utils/sceneSearch.ts'], bundle: true, write: false, platform: 'node', format: 'esm' });
+const { matchesSceneSearch, sceneSearchAfterSelection } = await import('data:text/javascript;base64,' + Buffer.from(result.outputFiles[0].text).toString('base64'));
+const forest = { id: 'forest', name: 'Forest Entrance' }, castle = { id: 'castle', name: 'Castle' };
+assert.equal(matchesSceneSearch(forest, 'FoReSt'), true);
+assert.equal(matchesSceneSearch(forest, 'rest'), true);
+assert.equal(matchesSceneSearch(castle, 'forest'), false);
+assert.equal(matchesSceneSearch(castle, ''), true);
+assert.equal(matchesSceneSearch(forest, ' forest'), false, 'Use the same exact substring rule as Scenes');
+assert.equal(sceneSearchAfterSelection('forest', forest), 'forest');
+assert.equal(sceneSearchAfterSelection('forest', castle), '');
+assert.equal(sceneSearchAfterSelection('forest', null), 'forest');
+assert.deepEqual(forest, { id: 'forest', name: 'Forest Entrance' }, 'Filtering must not mutate selection or scenes');
+console.log('Scene matching and selection filter rules: passed');

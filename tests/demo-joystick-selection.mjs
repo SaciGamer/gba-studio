@@ -1,0 +1,32 @@
+﻿import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import express from 'express';
+import { build } from 'esbuild';
+import { chromium } from '@playwright/test';
+const frontend=path.resolve('src/renderer/frontend/src');
+const bundle=await build({stdin:{contents:`import React,{useState} from 'react';import {createRoot} from 'react-dom/client';import {ConfigProvider} from 'antd';import {I18nProvider} from './i18n/I18n';import DemoControlsEditor from './components/pages/engine/DemoControlsEditor';function Fixture(){const [settings,setSettings]=useState({});window.settings=settings;return <ConfigProvider><I18nProvider language="en_US"><DemoControlsEditor controls={settings.controls} joystick={settings.joystick} onChange={controls=>setSettings(previous=>({...previous,controls}))} onJoystickChange={joystick=>setSettings(previous=>({...previous,joystick}))}/></I18nProvider></ConfigProvider>}createRoot(document.getElementById('root')).render(<Fixture/>);`,resolveDir:frontend,loader:'tsx'},bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',alias:{'@':frontend},define:{'process.env.NODE_ENV':'"production"'}});
+const app=express();app.get('/test.js',(_,response)=>response.type('js').send(bundle.outputFiles[0].text));app.get('/',(_,response)=>response.type('html').send(`<html><body><div id="root"></div><script>window.pads=[];Object.defineProperty(navigator,'getGamepads',{value:()=>window.pads});window.pad=(id,index)=>({id,index,connected:true,buttons:Array.from({length:16},()=>({pressed:false})),axes:[0,0,0,0]});window.connect=(id,index)=>{const pad=window.pad(id,index);window.pads[index]=pad;const e=new Event('gamepadconnected');e.gamepad=pad;dispatchEvent(e);};</script><script src="/test.js"></script></body></html>`));
+const server=await new Promise(resolve=>{const listener=app.listen(0,'127.0.0.1',()=>resolve(listener));});const browser=await chromium.launch({headless:true});
+try{
+ const page=await browser.newPage({viewport:{width:1120,height:1000}});await page.goto(`http://127.0.0.1:${server.address().port}`);
+ const action=page.getByRole('textbox',{name:'Joystick Control A',exact:true});await action.waitFor();assert.equal(await action.isDisabled(),true);
+ const selector=page.getByRole('combobox',{name:'Connected joystick',exact:true});
+ const selectRoot=selector.locator('xpath=ancestor::div[contains(@class,"ant-select")][last()]');
+ await selectRoot.hover();await page.getByRole('tooltip').filter({hasText:'Connect a joystick and press a button to detect it.'}).waitFor();
+ await page.mouse.move(0,0);await page.getByRole('tooltip').waitFor({state:'hidden'});
+ await page.evaluate(()=>window.connect('First controller',0));await page.waitForFunction(()=>window.settings.joystick?.index===0);
+ assert.equal(await action.isDisabled(),false);
+ await page.evaluate(()=>window.connect('Second controller',1));
+ await selectRoot.click();await page.getByTitle('Second controller (2)',{exact:true}).click();await page.waitForFunction(()=>window.settings.joystick?.index===1);
+ await action.click();await page.evaluate(()=>window.pads[0].buttons[3].pressed=true);
+ await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='Joystick Control A');
+ assert.equal(await page.evaluate(()=>window.settings.controls),undefined);
+ await page.evaluate(()=>window.pads[1].buttons[3].pressed=true);
+ await page.waitForFunction(()=>window.settings.controls?.[0]?.[8]?.value2==='BUTTON_4');
+ assert.equal(await page.getByRole('textbox',{name:'Joystick Control B',exact:true}).evaluate(element=>element===document.activeElement),true);
+ await page.keyboard.press('Escape');
+ await page.evaluate(()=>{window.pads=[];const e=new Event('gamepaddisconnected');e.gamepad={index:1};dispatchEvent(e);});
+ await page.waitForFunction(()=>document.querySelector('input[aria-label="Joystick Control A"]').disabled);
+ console.log('Joystick selector verified: detection tooltip, auto-selection, two-device selection, selected-only capture, auto-advance and disconnect guard.');
+}finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

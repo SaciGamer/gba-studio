@@ -1,0 +1,25 @@
+{
+  "id": "preset-grayscale",
+  "name": "Grayscale",
+  "custom": false,
+  "colors": [
+    "#000000",
+    "#000000",
+    "#242424",
+    "#242424",
+    "#494949",
+    "#494949",
+    "#6d6d6d",
+    "#6d6d6d",
+    "#929292",
+    "#929292",
+    "#b6b6b6",
+    "#b6b6b6",
+    "#dbdbdb",
+    "#dbdbdb",
+    "#ffffff",
+    "#ffffff"
+  ],
+  "_resourceType": "palette",
+  "_saved": true
+}

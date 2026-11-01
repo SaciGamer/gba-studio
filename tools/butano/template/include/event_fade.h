@@ -3,6 +3,7 @@
 
 #include "bn_blending.h"
 #include "bn_blending_fade_alpha.h"
+#include "resource_types.h"
 
 /**
  * Event Fade Manager for {{PROJECT_NAME}}
@@ -16,6 +17,11 @@ struct Fade {
     FadeType type;
 };
 
+EventStatus run_fade_status(const FadeEventData& data, FadeType fadeType, Fade& state);
+bool run_fade(const FadeEventData& data, FadeType fadeType, Fade& state);
+bool run_fade(const int fadeSpeed, FadeType fadeType, Fade& state);
+bool run_fade(const void* args, FadeType fadeType, Fade& state);
+// Compatibilidade para callers legados; novos scripts devem fornecer estado.
 bool run_fade(const int fadeSpeed, FadeType fadeType, bool active);
 bool run_fade(const void* args, FadeType fadeType);
 

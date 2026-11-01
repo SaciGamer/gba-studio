@@ -1,0 +1,12 @@
+{
+  "_resourceType": "background",
+  "id": "e0aec5a4-432f-4fa6-9de3-361854e64e68",
+  "autoColor": false,
+  "name": "title_game_over",
+  "filename": "title_game_over.bmp",
+  "imageWidth": 256,
+  "imageHeight": 256,
+  "hd": false,
+  "tileColors": "",
+  "_deleted": false
+}

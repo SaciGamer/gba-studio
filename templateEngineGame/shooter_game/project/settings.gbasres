@@ -1,0 +1,23 @@
+{
+  "_resourceType": "settings",
+  "startSceneId": "efe61829-b7c5-4e0a-8fe6-1829b7c5e0a8",
+  "startX": 0,
+  "startY": 0,
+  "startMoveSpeed": 2,
+  "startAnimSpeed": 4,
+  "startDirection": "up",
+  "colorMode": false,
+  "playerSpriteId": "hero_body_flying",
+  "demoAudioMuted": false,
+  "demoAudioVolume": 0.8,
+  "demoShowMenu": true,
+  "shooterConfig": {
+    "defaultWaveId": "wave_stage_1",
+    "projectileSpriteId": "original_hero_bullets",
+    "playerHitPoints": 3,
+    "defaultDamage": 1,
+    "bossHitPoints": 48
+  },
+  "font8x16Image": "big_font.bmp",
+  "font8x8Image": "small_font.bmp"
+}

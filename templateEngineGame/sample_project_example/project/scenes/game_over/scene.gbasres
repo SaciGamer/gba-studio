@@ -1,0 +1,190 @@
+{
+  "id": "1155b235-5e58-4d07-a457-e90bbddf967e",
+  "_resourceType": "scene",
+  "_index": 8,
+  "_deleted": false,
+  "name": "Game_Over",
+  "background": "local://E:/VisualStudio/GBAStudioProject/gba-studio/templateEngineGame/sample_project_example/assets/backgrounds\\background.png",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": "1523219e-e9a3-4c6b-b2df-bab18ecd93f7",
+      "name": "",
+      "path": "",
+      "y": 0,
+      "__referenceWarnings": {
+        "backgroundId": "Resource reference was removed. Select a replacement."
+      }
+    },
+    {
+      "layerId": 1,
+      "backgroundId": "e0aec5a4-432f-4fa6-9de3-361854e64e68",
+      "name": "",
+      "path": "",
+      "__referenceWarnings": {
+        "backgroundId": "Resource reference was removed. Select a replacement."
+      }
+    },
+    {
+      "layerId": 2,
+      "backgroundId": null,
+      "name": "",
+      "path": "",
+      "x": 0
+    }
+  ],
+  "x": 2682,
+  "y": 114,
+  "width": 256,
+  "height": 256,
+  "cameraPosition": {
+    "x": 8,
+    "y": 48
+  },
+  "sceneType": "Top Down",
+  "editorPosition": {
+    "x": 2682,
+    "y": 114
+  },
+  "script": [
+    {
+      "id": "3554e8f3-0bb8-43f4-b2fc-d715c3800a6a",
+      "version": 1,
+      "command": "EVENT_STOP_MUSIC",
+      "args": {
+        "__collapse": false
+      }
+    },
+    {
+      "id": "359ebcb5-cb58-4e11-a353-a62be63a8748",
+      "version": 1,
+      "command": "EVENT_VARIABLE",
+      "args": {
+        "variableId": "aa7333a7-5485-42bb-9951-321e569a3063",
+        "variableSymbol": "variable_0",
+        "value": {
+          "kind": "literal",
+          "type": "boolean",
+          "value": false
+        },
+        "__collapse": false
+      }
+    },
+    {
+      "id": "e994a749-f584-452e-ae6d-0ada4476b2a4",
+      "version": 1,
+      "command": "EVENT_FADE_OPTIONS",
+      "args": {
+        "color": "black",
+        "__collapse": true
+      }
+    },
+    {
+      "id": "1866f38e-1a52-4694-a19a-fbe0e5747234",
+      "version": 1,
+      "command": "EVENT_HIDE_ALL_SPRITES",
+      "args": {
+        "__collapse": false
+      }
+    },
+    {
+      "id": "3a2a0de3-4a57-4db5-adf1-1f0c81fed598",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 2,
+        "__collapse": false,
+        "__comment": false,
+        "__automatic": true
+      },
+      "version": 1
+    },
+    {
+      "id": "d749dcb3-03be-44d8-b2e3-52a8ed279fdf",
+      "version": 1,
+      "command": "EVENT_FOR",
+      "args": {
+        "variableId": "f9bb5b28-5973-4192-9053-7b974a8ee7a2",
+        "start": 0,
+        "end": {
+          "kind": "variable",
+          "variableId": "50388943-fb13-4b80-8ee8-564162326266"
+        },
+        "step": -1,
+        "__collapse": false,
+        "__comment": true
+      },
+      "children": {
+        "then": [
+          {
+            "id": "dae9752a-c096-4afe-af02-f408ed81fe55",
+            "version": 1,
+            "command": "EVENT_BACKGROUND_SCROLL",
+            "args": {
+              "layerId": 0,
+              "x": 0,
+              "y": -1,
+              "__collapse": true
+            }
+          },
+          {
+            "id": "5dc70876-2bf5-4092-b617-dc2e87972c2b",
+            "version": 1,
+            "command": "EVENT_WAIT",
+            "args": {
+              "units": "frames",
+              "time": 1,
+              "frames": 8,
+              "__collapse": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "a2e60b0f-4f8a-45ee-a040-6aee11b4b15c",
+      "version": 1,
+      "command": "EVENT_VARIABLES_SAVE",
+      "args": {
+        "slot": 7,
+        "allVariables": false,
+        "variableIds": [
+          "4a1e1435-d1c2-497d-b677-5799af71b940"
+        ],
+        "__collapse": false
+      }
+    },
+    {
+      "id": "ebfdbe41-e786-4927-ab11-96bb7f79fe01",
+      "version": 1,
+      "command": "EVENT_WAIT",
+      "args": {
+        "units": "frames",
+        "time": 0,
+        "frames": 120,
+        "__collapse": false
+      }
+    },
+    {
+      "id": "2cc0fca8-da3e-4e30-b0a1-e72b883b52ff",
+      "version": 1,
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "738ec3e3-374f-44a8-8bda-8a027cce1d08",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "direction": "right",
+        "fadeSpeed": 2,
+        "__collapse": false
+      }
+    }
+  ],
+  "_recenter": true,
+  "showCamera": true,
+  "actors": []
+}

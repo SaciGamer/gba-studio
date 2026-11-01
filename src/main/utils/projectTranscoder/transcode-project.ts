@@ -1,19 +1,53 @@
+import { prepareBackgroundAnimationSheets } from '../builders/BackgroundAnimationAssets';
 import fs from 'fs';
+import { prepareAffineBackgrounds, materializeAffineBackgrounds } from '../builders/AffineBackgroundAssets';
 import path from 'path';
 import os from 'os';
-import { spawnSync } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import { fileURLToPath } from 'url';
-import { GameConfig, TranscodeOptions, TranscodeResult } from '../types/BuildTypes';
+import { GameConfig, ResourceFile, TranscodeOptions, TranscodeResult } from '../types/BuildTypes';
 import TemplateBuilder from '../builders/TemplateBuilder';
 import ResourceBuilder from '../builders/ResourceBuilder';
 import AssetBuilder from '../builders/AssetBuilder';
+import { toRuntimeResource, validateRuntimeReferences, type RuntimeResource } from '../types/RuntimeResources';
+import { preparePrefabSpawns } from '../builders/PrefabSpawns';
+import { createRuntimeFeatureManifest, selectNativeRuntime } from '../builders/RuntimeFeatureManifest';
+
+let activeAssetProcess: ChildProcess | null = null;
+let activeAssetDone: Promise<void> | null = null;
+let resolveActiveAssetDone: (() => void) | null = null;
+let activeAssetCancelled = false;
+
+/** Stops the asynchronous Butano asset-generation process, if one is running. */
+export async function cancelActiveAssetGeneration(): Promise<boolean> {
+  const proc = activeAssetProcess;
+  const done = activeAssetDone;
+  if (!proc || !proc.pid) return false;
+  activeAssetCancelled = true;
+
+  if (process.platform === 'win32') {
+    await new Promise<void>((resolve) => {
+      const taskkill = spawn('taskkill', ['/pid', String(proc.pid), '/t', '/f'], { windowsHide: true });
+      taskkill.once('close', () => resolve());
+      taskkill.once('error', () => resolve());
+    });
+  } else {
+    proc.kill('SIGTERM');
+  }
+
+  await done;
+  return true;
+}
 import { CppBuilder } from '../builders/CppBuilder';
-import { packageJson } from '@/main';
-import isDev from 'electron-is-dev';
 
 // Obter o caminho do diretório atual
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const isDev = process.env.ELECTRON_IS_DEV !== undefined
+  ? Number.parseInt(process.env.ELECTRON_IS_DEV, 10) === 1
+  : process.defaultApp === true;
+const packageJsonPath = path.resolve(__dirname, '..', '..', '..', '..', 'package.json');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
 /**
  * Transcode project resources into build directory using Butano template structure
@@ -23,7 +57,10 @@ const __dirname = path.dirname(__filename);
  * @returns Result indicating success/failure and paths to generated files
  */
 export async function transcodeProject(options: TranscodeOptions): Promise<TranscodeResult> {
+  let describeFailure = (error: unknown) => String(error);
+  const progress = (message: string, key: string, params?: Record<string, string | number>) => options.onProgress?.(`>> ${message}\n`, `compiler.${key}`, params);
   try {
+    progress('Validando projeto e preparando transcodificação...', 'validate');
     console.log('..: transcodeProject starting with options:', {
       projectDir: options.projectDir,
       outputDir: options.outputDir,
@@ -46,8 +83,9 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
     projectName = await extractProjectName(projectDir, projectName);
 
     // Locate template and tools
-    const toolsRoot = isDev 
-      ? path.resolve(__dirname, '..', '..', '..', '..', 'tools') 
+    const localToolsRoot = path.resolve(__dirname, '..', '..', '..', '..', 'tools');
+    const toolsRoot = isDev || fs.existsSync(localToolsRoot)
+      ? localToolsRoot
       : path.join(process.resourcesPath, "bin", 'tools');
     const templateDir = path.join(toolsRoot , 'butano', 'template');
 
@@ -59,7 +97,8 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
     console.log('..: Using template from:', templateDir);
     
     // Valid path and clean if same project
-    prepareBuildDir(projectDir, outputDir);
+    progress('Preparando diretório de build e template...', 'template');
+    prepareBuildDir(options.markerProjectDir || projectDir, outputDir);
 
     // Initialize template builder
     const templateBuilder = new TemplateBuilder({
@@ -76,12 +115,13 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
       targetDir: outputDir,
       romTitle: projectName.toUpperCase().slice(0, 12),
       romCode: 'GBAS',
-    });
+    }, { deferNativeFiles: true });
 
     console.log('..: Template build directory initialized');
 
     // Process resources (.gbasres files)
     const resourceBuilder = new ResourceBuilder(outputDir, templateDir);
+    describeFailure = error => resourceBuilder.describeEventFailure(error);
     const projectResourceDir = path.join(projectDir, 'project');
     const gameConfig: GameConfig = {
       projectName: projectName,
@@ -92,23 +132,32 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
       useGraphics: true,  // Include graphics support by default
     };
 
-    let resourceFiles: any[] = [];
+    let resourceFiles: ResourceFile[] = [];
     if (fs.existsSync(projectResourceDir)) {
+      progress('Lendo recursos e preparando headers de cenas, scripts e configurações...', 'resources');
       resourceFiles = await resourceBuilder.processResourceFiles(projectResourceDir);
       console.log('..: Processed', resourceFiles.length, 'resource files');
 
-      // Generate resource header and registry
-      if (resourceFiles.length > 0) {
-        await resourceBuilder.writeResourceHeader(resourceFiles);
-        await resourceBuilder.generateResourceRegistryClass(resourceFiles, gameConfig);
-      }
     }
+
+    preparePrefabSpawns(resourceFiles);
+    prepareBackgroundAnimationSheets(resourceFiles);
 
     // Copy assets if enabled
     let assetStats = { copiedCount: 0, skippedCount: 0 };
+    const assetBuilder = new AssetBuilder(path.resolve(__dirname, '..', '..', '..'), outputDir);
     if (includeAssets) {
-      const assetBuilder = new AssetBuilder(path.resolve(__dirname, '..', '..', '..'), outputDir);
+      progress('Convertendo imagens e preparando assets de áudio...', 'assets');
       const projectAssetsDir = path.join(projectDir, 'assets');
+
+      // Missing defaults belong to preparation, never to the saved project.
+      const projectRoot = path.resolve(__dirname, '..', '..', '..', '..');
+      const defaultUiDir = path.join(projectRoot, 'src', 'renderer', 'frontend', 'src', 'img');
+      const migratedSampleRoot = path.join(projectRoot, 'templateEngineGame', 'sample_project_example');
+      const sampleRoot = fs.existsSync(migratedSampleRoot)
+        ? migratedSampleRoot
+        : path.join(projectRoot, 'sample_project_example');
+      const sampleUiDir = path.join(sampleRoot, 'assets', 'ui');
 
       if (fs.existsSync(projectAssetsDir)) {
         assetStats = await assetBuilder.copyAssets(projectAssetsDir, resourceFiles,
@@ -116,34 +165,110 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
             overwrite: true,
             preserveStructure: false, // Estrutura de pastas
             verbose: false,
+            onProgress: (message, key, name) => progress(message, key, { name }),
           }
         );
 
         console.log('..: Copied', assetStats.copiedCount, 'assets');
       }
+      const trackerProjects = assetBuilder.materializeTrackerProjects(path.join(projectDir, 'project', 'musics'));
+      assetStats.copiedCount += trackerProjects;
+      if (trackerProjects) progress(`Preparando ${trackerProjects} música(s) .gbatracker para Butano...`, 'assets');
+      // Game defaults have GBA sprite dimensions; editor icons can be 24x24.
+      await assetBuilder.prepareUiDefaults(projectAssetsDir, [sampleUiDir, defaultUiDir]);
+      const projectSettings = resourceFiles.find(file => file.jsonContent?._resourceType === 'settings')?.jsonContent;
+      progress('Gerando fontes e imagens de diálogo...', 'fonts');
+      await assetBuilder.applyFontOverrides(projectAssetsDir, projectSettings);
+      await assetBuilder.materializeDialogueFrame(projectSettings?.uiFrameImage || 'frame.png');
+      progress('Gerando imagens das camadas e aplicando edições de tiles...', 'layers');
+      const derivedResources = await assetBuilder.materializeTileLayerEdits(resourceFiles, options.parallel);
+      resourceFiles.push(...derivedResources.map(jsonContent => ({ resourceName: '', resourceType: 'gbasres', headerContent: Buffer.alloc(0), jsonContent })));
+      if (derivedResources.length) console.log('..: Materialized', derivedResources.length, 'edited background layer(s)');
     }
 
-    // Generate Butano assets before reading generated graphic headers.
+    // Event generated effects are static, build-time PCM assets: Maxmod loads
+    // them from the soundbank just like authored WAV files.
+    const generatedSoundCount = resourceBuilder.prepareGeneratedEventSounds(
+      resourceFiles,
+      path.join(templateBuilder.getProjectBuildDir(), 'audio'),
+    );
+    if (generatedSoundCount) progress(`Gerando ${generatedSoundCount} efeito(s) sonoro(s) dos eventos...`, 'audio');
+    const projectSfxCount = resourceBuilder.prepareProjectSfxSounds(
+      resourceFiles,
+      path.join(projectDir, 'project', 'sounds'),
+      path.join(templateBuilder.getProjectBuildDir(), 'audio'),
+    );
+    if (projectSfxCount) progress(`Preparando ${projectSfxCount} projeto(s) .gbasfx para Butano...`, 'audio');
+
+    const animationSheets = await assetBuilder.materializeBackgroundAnimations(resourceFiles, path.join(projectDir, 'assets'));
+    resourceFiles.push(...animationSheets.map(jsonContent => ({ resourceName: '', resourceType: 'gbasres', headerContent: Buffer.alloc(0), jsonContent })));
+
+    const affineBackgroundPlans = prepareAffineBackgrounds(resourceFiles, path.join(outputDir, 'graphics'));
+    const preparedResources = resourceFiles.map(file => toRuntimeResource(file.jsonContent)).filter((resource): resource is RuntimeResource => resource !== null);
+    validateRuntimeReferences(preparedResources);
+    for (const resource of preparedResources) {
+      if (resource._resourceType !== 'background' && resource._resourceType !== 'sprite') continue;
+      const graphic = path.join(outputDir, 'graphics', resource.graphicsName);
+      if (!assetBuilder.hasPreparedGraphic(resource.graphicsName) || !fs.existsSync(graphic + '.bmp') || !fs.existsSync(graphic + '.json')) {
+        throw new Error(`${resource._resourceType} ${resource.id}: materialized graphic not found (${resource.graphicsName}.bmp)`);
+      }
+    }
+
+    // Resolve composed image cells against Butano's optimized tile table before
+    // projecting editor recipes to runtime resources and emitting their headers.
     const buildDir = templateBuilder.getProjectBuildDir();
     const outputBuildDir = templateBuilder.getOutputBuildDir();
-
     if (fs.existsSync(buildDir)) {
-      await generateButanoAssetHeaders(buildDir, outputBuildDir, toolsRoot);
+      progress('Gerando gráficos, áudio e headers do Butano...', 'butano');
+      await generateButanoAssetHeaders(buildDir, outputBuildDir, toolsRoot, options.onProgress);
+      assetBuilder.finalizeTileAnimations(resourceFiles, outputBuildDir);
+      materializeAffineBackgrounds(affineBackgroundPlans, outputBuildDir);
     }
+
+    // Preparation (including all parallel layer jobs) is complete. Emit once.
+    progress('Atualizando headers com os frames e imagens gerados...', 'updateHeaders');
+    for (const file of resourceFiles) {
+      const scene = file.jsonContent as any;
+      if (scene?._resourceType !== 'scene' || !Array.isArray(scene.tileAnimations)) continue;
+      for (const [index, animation] of scene.tileAnimations.entries()) {
+        const layerId = Number.isInteger(Number(animation?.layerId)) ? Math.max(0, Math.min(3, Math.trunc(Number(animation.layerId)))) : 0;
+        const layer = (Array.isArray(scene.backgrounds) ? scene.backgrounds : []).find((candidate: any) => Number(candidate?.layerId) === layerId);
+        if (!layer?.backgroundId) console.warn(`..: Ignoring tile animation ${animation?.name || animation?.id || index} in scene ${scene.name || scene.id}: layer ${layerId} has no background`);
+      }
+    }
+    const runtimeResources = resourceFiles.map(file => toRuntimeResource(file.jsonContent)).filter((resource): resource is RuntimeResource => resource !== null);
+    validateRuntimeReferences(runtimeResources);
+    const selection = selectNativeRuntime(createRuntimeFeatureManifest(runtimeResources, options.runtimeMode));
+    templateBuilder.copyNativeRuntime(selection.manifest, selection.featureHeader);
+    fs.writeFileSync(path.join(outputDir, 'runtime-feature-manifest.json'), JSON.stringify(selection.manifest, null, 2) + '\n');
+    const runtimeFiles = runtimeResources.map(resource => resourceBuilder.processRuntimeResource(resource));
+    resourceFiles = runtimeFiles;
+    await resourceBuilder.writeScriptSourceMap();
+    // The registry must be emitted after derived layer resources have been added.
+    progress('Preparando headers de recursos e registro do projeto...', 'registry');
+    await resourceBuilder.writeResourceHeader(runtimeFiles);
+    await resourceBuilder.generateResourceRegistryClass(runtimeFiles, gameConfig);
+
+    progress('Validando referências de animações e músicas...', 'references');
+    resourceBuilder.validateTileAnimationReferences(resourceFiles, outputBuildDir);
+    resourceBuilder.validateMusicReferences(resourceFiles, outputBuildDir);
 
     let graphicHeaderGeneratedByButano: string[] = [];
     if (fs.existsSync(outputBuildDir)) {
+      progress('Preparando header de itens gráficos...', 'graphicsHeader');
       graphicHeaderGeneratedByButano = await resourceBuilder.writeGraphicsHeader(outputBuildDir);
     }
 
     // Generate C++ base project structure using CppBuilder
     const cppBuilder = new CppBuilder(outputDir, templateDir, graphicHeaderGeneratedByButano);
-    await cppBuilder.generateProjectStructure(gameConfig);
+    progress('Gerando código C++ e preparando compilação da ROM...', 'cpp');
+    await cppBuilder.generateProjectStructure(gameConfig, selection.manifest.sourceFiles);
     console.log('..: Generated C++ project structure with base Game class and managers');
 
     console.log('..: Transcode completed successfully');
     console.log('  - Output directory:', outputDir);
-    console.log('  - Source files:', resourceFiles.length + 1); // resources + main.c
+    console.log('  - Native source files:', selection.manifest.sourceFiles.length);
+    console.log('  - Resource headers:', resourceFiles.length);
     console.log('  - Assets copied:', assetStats.copiedCount);
 
     return {
@@ -151,13 +276,13 @@ export async function transcodeProject(options: TranscodeOptions): Promise<Trans
       message: '>> Transcode complete',
       outputDir: outputDir,
       buildDir: outputDir,
-      sourceFiles: resourceFiles.map((f) => f.filename),
+      sourceFiles: selection.manifest.sourceFiles.map(file => path.join(outputDir, file)),
     };
   } catch (err) {
     console.error('..: transcodeProject error:', err);
     return {
       success: false,
-      message: String(err),
+      message: describeFailure(err),
       outputDir: options.outputDir,
     };
   }
@@ -241,7 +366,7 @@ function resolveToolExecutable(toolName: string): string {
  * @param toolsRoot - The toolsRoot directory where have the butano tools
  * @returns 
  */
-async function generateButanoAssetHeaders(buildDir: string, outputBuildDir: string, toolsRoot: string): Promise<void> {
+async function generateButanoAssetHeaders(buildDir: string, outputBuildDir: string, toolsRoot: string, onProgress?: (message: string) => void): Promise<void> {
   const assetToolPath = path.join(toolsRoot, 'butano', 'butano', 'tools', 'butano_assets_tool.py');
   const graphicsDir = path.join(buildDir, 'graphics');
   const audioDir = path.join(buildDir, 'audio');
@@ -251,6 +376,11 @@ async function generateButanoAssetHeaders(buildDir: string, outputBuildDir: stri
     console.warn('..: Butano asset tool not found, skipping asset generation:', assetToolPath);
     return;
   }
+
+  // The output directory contains both project artifacts and Butano library
+  // objects. Clean only artifacts owned by the project so unchanged library
+  // objects remain incremental between builds.
+  cleanProjectBuildArtifacts(outputBuildDir);
 
   for (const dir of [outputBuildDir, buildDir, graphicsDir, audioDir, dmgAudioDir]) {
     if (!fs.existsSync(dir)) {
@@ -262,37 +392,59 @@ async function generateButanoAssetHeaders(buildDir: string, outputBuildDir: stri
   const audioToolExecutable = resolveToolExecutable('mmutil');
   const pythonExecutable = process.env.PYTHON || 'python';
 
-  const result = spawnSync(
-    pythonExecutable,
-    [
-      '-B',
-      assetToolPath,
-      '--grit', gritExecutable,
-      '--audio', audioDir,
-      '--audio_backend', 'maxmod',
-      '--audio_tool', audioToolExecutable,
-      '--dmg_audio', dmgAudioDir,
-      '--dmg_audio_backend', 'default',
-      '--graphics', graphicsDir,
-      '--build', outputBuildDir,
-    ],
-    {
+  const args = [
+    '-u', '-B', assetToolPath,
+    '--grit', gritExecutable,
+    '--audio', audioDir,
+    '--audio_backend', 'maxmod',
+    '--audio_tool', audioToolExecutable,
+    '--dmg_audio', dmgAudioDir,
+    '--dmg_audio_backend', 'default',
+    '--graphics', graphicsDir,
+    '--build', outputBuildDir,
+  ];
+
+  const exitCode = await new Promise<number>((resolve, reject) => {
+    const proc = spawn(pythonExecutable, args, {
       cwd: buildDir,
       env: process.env,
       windowsHide: true,
       stdio: 'pipe',
-    }
-  );
+    });
+    activeAssetProcess = proc;
+    activeAssetCancelled = false;
+    activeAssetDone = new Promise<void>((done) => { resolveActiveAssetDone = done; });
+    proc.stdout?.on('data', (data) => { const message = data.toString(); console.log(message); onProgress?.(message); });
+    proc.stderr?.on('data', (data) => { const message = data.toString(); console.warn(message); onProgress?.(message); });
+    proc.once('error', reject);
+    proc.once('close', (code) => {
+      activeAssetProcess = null;
+      resolveActiveAssetDone?.();
+      resolveActiveAssetDone = null;
+      activeAssetDone = null;
+      resolve(code ?? 1);
+    });
+  });
 
-  if (result.error) {
-    throw result.error;
-  }
-
-  if (result.status !== 0) {
-    throw new Error(`Butano asset generation failed with exit code ${result.status}.`);
+  if (activeAssetCancelled) throw new Error('Butano asset generation cancelled.');
+  if (exitCode !== 0) {
+    throw new Error(`Butano asset generation failed with exit code ${exitCode}.`);
   }
 
   console.log('..: Butano asset generation completed for:', buildDir);
+}
+
+function cleanProjectBuildArtifacts(outputBuildDir: string): void {
+  if (!fs.existsSync(outputBuildDir)) return;
+
+  const projectArtifact = /(?:_bn_gfx\.(?:s|o|d)|_bn_[^/]+_graphics_file_info\.txt$|^bn_ofiles\.txt$|bn_(?:regular_bg_items|direct_bitmap_items|sprite_items|palette_bitmap_items)_[^/]+\.h$|^(?:event_[^/]+|game|graphics_manager|main|resource_registry|script_[^/]+|startup)\.(?:o|d|cpp|h|txt)$)/i;
+  const projectAudioArtifact = /^(?:bn_(?:audio_soundbank|sound_items|music_items)(?:\.|_|$)|_bn_(?:maxmod|aas)_audio_files_info\.txt$)/i;
+
+  for (const entry of fs.readdirSync(outputBuildDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    if (!projectArtifact.test(entry.name) && !projectAudioArtifact.test(entry.name)) continue;
+    fs.rmSync(path.join(outputBuildDir, entry.name), { force: true });
+  }
 }
 
 /**

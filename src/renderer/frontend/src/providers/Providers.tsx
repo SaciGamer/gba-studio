@@ -5,6 +5,11 @@ import { IProjectSettings } from "./contexts/interfaces/IProjectElement";
 import { IMainSettings } from "./contexts/interfaces/ISettingElement";
 import { ISettingUtils } from "./contexts/interfaces/ISettingUtils";
 import { IUserSettings } from "./contexts/interfaces/IUserSettings";
+import { IVariablesSettings } from "./contexts/interfaces/IVariablesElement";
+import { ISpriteSettings } from './contexts/interfaces/ISpriteElement';
+import { IScriptsSettings } from './contexts/interfaces/IScriptElement';
+import { IPalettesSettings } from './contexts/interfaces/IPalettesElement';
+import { createEmptyPrefabs, IPrefabsSettings } from './contexts/interfaces/IPrefabElement';
 
 // Criar os providers com nomes personalizados
 export const { Context: SettingsUtilsContext, Provider: SettingsUtilsProvider } = createProvider<ISettingUtils>(
@@ -42,6 +47,35 @@ export const { Context: BackgroundContext, Provider: BackgroundProvider } = crea
     { valueName: "backgrounds", setValueName: "setBackgrounds", ignoredFields: ["_saved"/*, "_deleted"*/] }
 );
 
+export const { Context: SpriteContext, Provider: SpriteProvider } = createProvider<ISpriteSettings[]>(
+    [],
+    { valueName: "spriteResources", setValueName: "setSpriteResources", ignoredFields: ["_saved"] }
+);
+
+export const { Context: VariablesContext, Provider: VariablesProvider } = createProvider<IVariablesSettings>(
+    {
+        _resourceType: 'variables',
+        _version: '1.0',
+        _saved: true,
+        _deleted: false,
+        variables: [],
+    },
+    { valueName: "variables", setValueName: "setVariables", ignoredFields: ["_saved"] }
+);
+
+export const { Context: ScriptsContext, Provider: ScriptsProvider } = createProvider<IScriptsSettings>(
+    { _resourceType: 'scripts', _version: '1.0', _saved: true, _deleted: false, scripts: [] },
+    { valueName: 'scripts', setValueName: 'setScripts', ignoredFields: ['_saved'] }
+);
+export const { Context: PalettesContext, Provider: PalettesProvider } = createProvider<IPalettesSettings>(
+    { _resourceType: 'palettes', _version: '1.0', _saved: true, _deleted: false, palettes: [] },
+    { valueName: 'palettes', setValueName: 'setPalettes', ignoredFields: ['_saved'] }
+);
+export const { Context: PrefabsContext, Provider: PrefabsProvider } = createProvider<IPrefabsSettings>(
+    createEmptyPrefabs(),
+    { valueName: 'prefabs', setValueName: 'setPrefabs', ignoredFields: ['_saved'] }
+);
+
 // Função genérica para criar providers com nomes personalizados para value e setValue
 function createProvider<T>(
     defaultValue: T,
@@ -70,7 +104,9 @@ function createProvider<T>(
 
         // Função para atualizar tanto o estado quanto a ref
         const updateValue = (newValue: T | ((prev: T) => T)) => {
-            const nextValue = newValue instanceof Function ? newValue(stateValue) : newValue;
+            // Updates can arrive several times between React renders (for
+            // example during a drag), so always build from the latest value.
+            const nextValue = newValue instanceof Function ? newValue(stateValueRef.current) : newValue;
             stateValueRef.current = nextValue; // Atualiza o valor na ref
             setStateValue(nextValue); // Atualiza o estado (se precisar refletir na UI)
         };

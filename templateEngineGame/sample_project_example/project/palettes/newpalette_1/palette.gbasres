@@ -1,0 +1,25 @@
+{
+  "id": "custom-1789094338782",
+  "name": "New Palette",
+  "custom": true,
+  "colors": [
+    "#000000",
+    "#009249",
+    "#240092",
+    "#2492db",
+    "#492400",
+    "#49b649",
+    "#6d2492",
+    "#6db6db",
+    "#924900",
+    "#92db49",
+    "#b64992",
+    "#b6dbdb",
+    "#db6d00",
+    "#dbff49",
+    "#ff6d92",
+    "#ffffdb"
+  ],
+  "_resourceType": "palette",
+  "_saved": true
+}

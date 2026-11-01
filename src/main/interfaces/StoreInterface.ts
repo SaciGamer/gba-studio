@@ -4,11 +4,21 @@ export interface IPreferences {
     recentProjects: IRecentProject[];
     tempBuildPath?: string;
     tempProjectBackupLimit?: number;
+    historyLimit?: number;
+    gameWorldPanInertia?: boolean;
+    gameWorldMovementMode?: 'free' | 'grid';
+    sceneObjectSnapSize?: 8 | 16;
+    gameWorldRecenterEnabled?: boolean;
+    gameWorldRecenterScenes?: boolean;
+    gameWorldRecenterActors?: boolean;
+    gameWorldRecenterTriggers?: boolean;
 }
 export interface IRecentProject {
     path: string;
-    name: string;
+    title: string;
     lastOpened: Date;
+    hasCartridgeImage?: boolean;
+    cartridgeImage?: string | null;
 }
 export interface IStoreData {
     preferences: IPreferences;

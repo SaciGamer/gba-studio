@@ -1,14 +1,19 @@
+import type { NumericValue } from '../../../../../../shared/numericValues';
+import type { ScriptArgument } from '../../../../../../shared/scriptParameters';
 import { IChangeScene } from "@/components/events/interfaces/IScene";
-import { IFade } from "@/components/events/interfaces/IFade";
+import { IFade, IFadeOptions } from "@/components/events/interfaces/IFade";
 import { IWait } from "@/components/events/interfaces/IWaiting";
 import { IResourceSettings } from "./IBaseSettings";
-import { LayerMultiProps } from "@/components/events/interfaces/ILayer";
+import { IChangeBackgroundArgs, IChangePaletteBackgroundArgs, IVisibleBackgroundArgs, LayerMultiProps } from "@/components/events/interfaces/ILayer";
+import { EVariableType, VariableValue } from "./IVariablesElement";
 
 export enum ETypeScene {
     TOPDOWN = 'Top Down',
     PLATFORM = 'Platformer',
     ADVENTURE = 'Adventure',
+    // TODO(restore-shooter-game): keep these legacy values so existing Shooter projects still deserialize; re-expose them in RightPanel sceneTypes when restoring the feature.
     SHMUP = 'Shoot Em\'Up',
+    SHOOTER = 'Shoot Em\'Up',
     POINTNCLICK = 'Point Click',
     LOGO = 'Logo'
 }
@@ -21,22 +26,176 @@ export enum EImageType {
 export interface IBackgroundElement {
     layerId: number;
     backgroundId?: string | null;
+    /** Image top-left position in scene coordinates. */
+    x?: number;
+    y?: number;
+    paletteId?: string | null;
+    /** Reconstructible tile edits applied over this layer at build time. */
+    tileMap?: number[][];
+    /** Palette selected for each painted 8×8 cell; all scene layers share 16 palette banks. */
+    tilePaletteIds?: Array<Array<string | null>>;
+    /** Source tileset for each painted tile-map cell, allowing mixed tilesets per layer. */
+    tileMapTilesetIds?: Array<Array<string | null>>;
+    /** Blob-47 terrain anchor per 8x8 map cell; -1 is empty. */
+    autoTileMap?: number[][];
+    autoTileMapVersion?: 1;
+    /** Optional regular_bg map-cell attributes authored by index. */
+    tileMapCellOverrides?: Array<{
+        index: number;
+        tileIndex: number;
+        horizontalFlip?: boolean;
+        verticalFlip?: boolean;
+        paletteId?: number;
+    }>;
+    paintPaletteId?: string | null;
+    selectedTilesetId?: string;
+    selectedTiles?: number[];
 }
 export interface IArgs {
-  __comment?: boolean;
-  __collapse?: boolean;
+    [key: string]: any;
+    __comment?: boolean;
+    /** Marks the Fade In inserted when a scene is created. */
+    __automatic?: boolean;
+    __name?: string;
+    __collapse?: boolean;
+    __x?: number;
+    __y?: number;
+    animationSpeed?: number;
+    showCamera?: boolean;
+}
+
+export interface ICallScriptArgs extends IArgs {
+    scriptId: string;
+    arguments?: ScriptArgument[];
+}
+
+export type IConditionValue =
+    | { kind: 'literal'; value: VariableValue; type: EVariableType }
+    | { kind: 'variable'; variableId: string; symbol: string; type: EVariableType }
+    | { kind: 'button'; button: string; type: 'boolean' }
+    | (NumericValue & { type?: 'number'; symbol?: string });
+
+export interface IIfArgs extends IArgs {
+    left: IConditionValue;
+    operator: '==' | '!=' | '>' | '>=' | '<' | '<=';
+    right: IConditionValue;
+}
+
+export interface IIfChildren {
+    then: IScriptsElement[];
+    else?: IScriptsElement[];
+    thenCollapsed?: boolean;
+    elseCollapsed?: boolean;
+}
+
+export interface IVariableReference {
+    kind: 'variable';
+    variableId: string;
+    symbol: string;
+    type: EVariableType;
+}
+
+export interface IVariableLiteral {
+    kind: 'literal';
+    type: EVariableType;
+    value: VariableValue;
+}
+
+export type IVariableValue = IVariableReference | IVariableLiteral;
+
+export interface IVariableSetValueArgs extends IArgs {
+    variableId: string;
+    variableSymbol: string;
+    value: IVariableValue | NumericValue;
+}
+
+export interface IVariableBooleanArgs extends IArgs {
+    variableId: string;
+    variableSymbol: string;
+}
+
+export interface IVariableResetAllArgs extends IArgs {
+    scope: 'ALL' | 'GLOBAL' | 'LOCAL' | 'TEMP';
 }
 export interface IScriptsElement {
     id: string;
+    version?: 1;
     command: string;
-    args?: IFade | IChangeScene | IWait | LayerMultiProps;
-    children?: Object[];
+    args?: IArgs & (IFade | IFadeOptions | IChangeScene | IWait | LayerMultiProps | IChangeBackgroundArgs | IVisibleBackgroundArgs | IChangePaletteBackgroundArgs | IIfArgs | IVariableSetValueArgs | IVariableBooleanArgs | IVariableResetAllArgs);
+    children?: IIfChildren;
+    position?: { x: number; y: number };
 }
 interface IPosAndWidth {
+    id?: string;
+    sceneId?: string;
+    name?: string;
     x: number;
     y: number;
     width: number;
     height: number;
+    collisionSide?: 'solid' | 'top' | 'down' | 'left' | 'right' | 'ladder';
+    activation?: 'enter' | 'exit' | 'stay' | 'interact' | 'touch' | 'input' | 'timer';
+    enabled?: boolean;
+    once?: boolean;
+    cooldownFrames?: number;
+    script?: IScriptsElement[];
+    onEnterScript?: IScriptsElement[];
+    onLeaveScript?: IScriptsElement[];
+}
+
+export interface ISceneTrigger extends IPosAndWidth {
+    id: string;
+    prefabId?: string;
+    prefabEventsDetached?: boolean;
+    prefabEditable?: boolean;
+    activation: 'enter' | 'exit' | 'stay' | 'interact' | 'touch' | 'input' | 'timer';
+    enabled: boolean;
+    once: boolean;
+    cooldownFrames: number;
+    onEnterScript?: IScriptsElement[];
+    onLeaveScript?: IScriptsElement[];
+    onInteractScript?: IScriptsElement[];
+    onInitScript?: IScriptsElement[];
+    onUpdateScript?: IScriptsElement[];
+}
+
+export interface IScriptGraphEdge {
+    id: string;
+    source: string;
+    sourceHandle: 'next' | 'then' | 'else';
+    target: string;
+    targetHandle: 'input';
+}
+
+export interface IScriptGraph {
+    version: 1;
+    entryNodeId: string | null;
+    nodes: IScriptsElement[];
+    edges: IScriptGraphEdge[];
+}
+
+export interface ISceneActor extends IPosAndWidth {
+    showCollider?: boolean;
+    keepRunningWhileOffscreen?: boolean;
+    onInitScript?: IScriptsElement[];
+    onInteractScript?: IScriptsElement[];
+    onUpdateScript?: IScriptsElement[];
+    prefabId?: string;
+    prefabEventsDetached?: boolean;
+    prefabEditable?: boolean;
+    actorId?: string;
+    direction?: string;
+    moveSpeed?: number;
+    animationSpeed?: number;
+    spriteId?: string;
+}
+
+export interface ISceneSpawnPoint {
+    id: string;
+    name: string;
+    x: number;
+    y: number;
+    direction?: string;
 }
 
 interface ICameraSettings {
@@ -45,7 +204,6 @@ interface ICameraSettings {
 }
 export interface ISceneSettings extends IResourceSettings, ICameraSettings {
     _index: number;
-    backgroundId?: string;  // REMOVER
     background?: string;    // Made optional
     backgrounds?: IBackgroundElement[];
     x: number;
@@ -58,17 +216,47 @@ export interface ISceneSettings extends IResourceSettings, ICameraSettings {
     paletteIds?: string[];
     spritePaletteIds?: string[];
     collisions?: IPosAndWidth[];
-    triggers?: IPosAndWidth[];
+    triggers?: ISceneTrigger[];
+    actors?: ISceneActor[];
+    spawnPoints?: ISceneSpawnPoint[];
+    editorPosition?: { x: number; y: number };
+    renderMode?: 'regular_tilemap' | 'palette_bitmap' | 'direct_bitmap';
+    gridSize?: 8 | 16;
     autoFadeSpeed?: number;
+    playerSpriteId?: string;
+    interactionButton?: string;
     script?: IScriptsElement[];
     playerHit1Script?: IScriptsElement[],
     playerHit2Script?: IScriptsElement[],
     playerHit3Script?: IScriptsElement[],
+    eventGraphs?: Record<string, IScriptGraph>;
     // Tiles editor fields
+    /** @deprecated Legacy per-scene definitions; Engine migrates these to project settings. */
+    autoTileSlots?: Array<{ autoTileId?: string; name?: string; tileSize?: 8 | 16 | 32; parts: Array<number | null> }>;
     imageType?: EImageType;
     selectedTilesetId?: string;
+    selectedTiles?: number[];
     tileMap?: number[][];
     isEditingMap?: boolean;
+    tileAnimations?: ITileAnimation[];
+}
+
+/** Declarative regular_bg tile animation shared by editor, preview and build. */
+export interface ITileAnimation {
+    id?: string;
+    name?: string;
+    layerId: number;
+    targetTileIndex: number;
+    targetTilesetId?: string;
+    frameTileIndices: number[];
+    frameTilesetIds?: string[];
+    /** Source tileset ID for each frame tile; omitted legacy entries use the layer's selected tileset. */
+    frameTilesetIds?: string[];
+    /** Editor-only state: whether this animation card is collapsed. */
+    collapsed?: boolean;
+    durationFrames: number;
+    loop: boolean;
+    initialFrame: number;
 }
 export interface SceneContextType {
     // Scene Settings

@@ -1,0 +1,25 @@
+{
+  "id": "preset-dreamcast",
+  "name": "Dreamcast",
+  "custom": false,
+  "colors": [
+    "#101010",
+    "#f0f0f0",
+    "#1f4e79",
+    "#5b9bd5",
+    "#70ad47",
+    "#a9d18e",
+    "#c55a11",
+    "#ed7d31",
+    "#7030a0",
+    "#a64d79",
+    "#bf0000",
+    "#ff6666",
+    "#00a6a6",
+    "#66cccc",
+    "#806000",
+    "#d6b656"
+  ],
+  "_resourceType": "palette",
+  "_saved": true
+}

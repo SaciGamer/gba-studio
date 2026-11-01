@@ -246,7 +246,7 @@ class EmulatorJS {
         }
         this.defaultAutoFireInterval = 100;
         this.autofireIntervals = {};
-        this.muted = false;
+        this.muted = this.config.muted === true;
         this.paused = true;
         this.missingLang = [];
         this.setElements(element);
@@ -1090,6 +1090,11 @@ class EmulatorJS {
             this.startGameFromDownload(romData);
         })();
     }
+    forwardRuntimeMonitor(msg) {
+        if (typeof msg !== "string" || !/\[GBAS_MONITOR:[12]\]/.test(msg)) return false;
+        window.dispatchEvent(new CustomEvent("gba-studio:runtime-monitor", { detail: msg }));
+        return true;
+    }
     initModule(wasmData, threadData) {
         if (typeof window.EJS_Runtime !== "function") {
             console.warn("EJS_Runtime is not defined!");
@@ -1106,11 +1111,13 @@ class EmulatorJS {
             callbacks: {},
             parent: this.elements.parent,
             print: (msg) => {
+                if (this.forwardRuntimeMonitor(msg)) return;
                 if (this.debug) {
                     console.log(msg);
                 }
             },
             printErr: (msg) => {
+                if (this.forwardRuntimeMonitor(msg)) return;
                 if (this.debug) {
                     console.log(msg);
                 }
@@ -1164,7 +1171,7 @@ class EmulatorJS {
             this.loadSettings();
             this.updateCheatUI();
             this.updateGamepadLabels();
-            if (!this.muted) this.setVolume(this.volume);
+            this.setVolume(this.muted ? 0 : this.volume);
             if (this.config.noAutoFocus !== true) this.elements.parent.focus();
             this.textElem.remove();
             this.textElem = null;
@@ -1238,6 +1245,7 @@ class EmulatorJS {
         this.createCheatsMenu();
         this.setVirtualGamepad();
         this.addEventListener(this.elements.parent, "keydown keyup", this.keyChange.bind(this));
+        this.addEventListener(window, "blur", () => this.releaseMappedInputs());
         this.addEventListener(this.elements.parent, "mousedown touchstart", (e) => {
             if (document.activeElement !== this.elements.parent && this.config.noAutoFocus !== true) this.elements.parent.focus();
         })
@@ -1323,6 +1331,7 @@ class EmulatorJS {
             this.updateGamepadLabels();
         })
         this.gamepad.on("disconnected", (e) => {
+            this.releaseMappedInputs(`gamepad:${e.gamepadIndex}:`);
             const gamepadSelection = this.getGamepadSelectionValue(e.gamepadIndex);
             if (!gamepadSelection) return;
             for (let i = 0; i < this.gamepadSelection.length; i++) {
@@ -1348,7 +1357,17 @@ class EmulatorJS {
             this.elements.bottomBar.netplay[0].style.display = "none";
         }
     }
+    getConfiguredGamepad() {
+        const configured = this.config.gbaStudioGamepad;
+        if (!configured || typeof configured.id !== 'string') return null;
+        const matches = this.gamepad.gamepads.filter(pad => pad && pad.id === configured.id);
+        return matches.find(pad => pad.index === configured.index) ?? (matches.length === 1 ? matches[0] : null);
+    }
     updateGamepadLabels() {
+        if (this.config.gbaStudioGamepad !== undefined) {
+            const selected = this.getConfiguredGamepad();
+            this.gamepadSelection = [selected ? `${selected.id}_${selected.index}` : '', '', '', ''];
+        }
         for (let i = 0; i < this.gamepadLabels.length; i++) {
             this.gamepadLabels[i].innerHTML = ""
             const def = this.createElement("option");
@@ -2061,6 +2080,7 @@ class EmulatorJS {
         const addButton = (buttonConfig, callback, element, both) => {
             const button = this.createElement("button");
             button.type = "button";
+            button.setAttribute("aria-label", this.localization(buttonConfig.displayName));
             const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
             svg.setAttribute("role", "presentation");
             svg.setAttribute("focusable", "false");
@@ -2248,7 +2268,7 @@ class EmulatorJS {
         // get all elements from this.config.buttonOpts with custom: true
         if (this.config.buttonOpts) {
             for (const [key, value] of Object.entries(this.config.buttonOpts)) {
-                if (value.custom === true) {
+                if (value.custom === true && value.visible !== false) {
                     const customBtn = addButton(value);
                 }
             }
@@ -3811,6 +3831,34 @@ class EmulatorJS {
         }
         this.autofireIntervals = {};
     }
+    // Track physical sources separately so releasing one binding does not release
+    // the action while another keyboard key or joystick input is still held.
+    updateMappedInput(player, button, source, value) {
+        this.mappedInputSources ??= new Map();
+        const id = `${player}:${button}`;
+        const sources = this.mappedInputSources.get(id) ?? new Map();
+        const before = Math.max(0, ...sources.values());
+        if (value) sources.set(source, value);
+        else sources.delete(source);
+        const after = Math.max(0, ...sources.values());
+        if (sources.size) this.mappedInputSources.set(id, sources);
+        else this.mappedInputSources.delete(id);
+        if (before === after) return;
+        if (this.isAutofireEnabled(player, button) && !this.analogAxes.includes(button)) {
+            after ? this.startAutofire(player, button, after) : this.stopAutofire(player, button);
+        } else {
+            this.gameManager.simulateInput(player, button, after);
+        }
+    }
+    releaseMappedInputs(prefix = '') {
+        if (!this.mappedInputSources) return;
+        for (const [id, sources] of [...this.mappedInputSources]) {
+            const [player, button] = id.split(':').map(Number);
+            for (const source of [...sources.keys()]) {
+                if (source.startsWith(prefix)) this.updateMappedInput(player, button, source, 0);
+            }
+        }
+    }
     keyChange(e) {
         if (e.repeat) return;
         if (!this.started) return;
@@ -3830,30 +3878,31 @@ class EmulatorJS {
         e.preventDefault();
         for (let i = 0; i < 4; i++) {
             for (let j = 0; j < 30; j++) {
-                if (this.controls[i][j] && this.controls[i][j].value === e.keyCode) {
+                if (this.controls[i][j] && (Array.isArray(this.controls[i][j].keyboardValues)
+                    ? (this.controls[i][j].keyboardValues.includes(this.keyMap[e.keyCode]) || this.controls[i][j].keyboardValues.includes(e.key?.toLowerCase()))
+                    : this.controls[i][j].value === e.keyCode)) {
                     const isAnalog = this.analogAxes.includes(j);
                     const inputValue = isAnalog ? 0x7fff : 1;
                     const isKeyUp = e.type === "keyup";
                     const value = isKeyUp ? 0 : inputValue;
 
-                    if (this.isAutofireEnabled(i, j) && !isAnalog) {
-                        isKeyUp ? this.stopAutofire(i, j) : this.startAutofire(i, j, inputValue);
-                    } else {
-                        this.gameManager.simulateInput(i, j, value);
-                    }
+                    this.updateMappedInput(i, j, `keyboard:${e.keyCode}`, value);
                 }
             }
         }
     }
     gamepadEvent(e) {
         if (!this.started) return;
-        const gamepadSelection = this.getGamepadSelectionValue(e.gamepadIndex);
-        if (!gamepadSelection) {
-            return;
-        }
-        const gamepadIndex = this.gamepadSelection.indexOf(gamepadSelection);
-        if (gamepadIndex < 0) {
-            return; // Gamepad not set anywhere
+        let gamepadIndex;
+        if (this.config?.gbaStudioGamepad !== undefined) {
+            const selected = this.getConfiguredGamepad();
+            if (!selected || selected.index !== e.gamepadIndex) return;
+            gamepadIndex = 0;
+        } else {
+            const gamepadSelection = this.getGamepadSelectionValue(e.gamepadIndex);
+            if (!gamepadSelection) return;
+            gamepadIndex = this.gamepadSelection.indexOf(gamepadSelection);
+            if (gamepadIndex < 0) return;
         }
 
         const toIntValue = (value) => {
@@ -3897,11 +3946,7 @@ class EmulatorJS {
                     const isButtonUp = e.type === "buttonup";
                     const value = isButtonUp ? 0 : inputValue;
 
-                    if (this.isAutofireEnabled(i, j) && !isAnalog) {
-                        isButtonUp ? this.stopAutofire(i, j) : this.startAutofire(i, j, inputValue);
-                    } else {
-                        this.gameManager.simulateInput(i, j, value);
-                    }
+                    this.updateMappedInput(i, j, `gamepad:${e.gamepadIndex}:button:${e.index}`, value);
                 } else if (e.type === "axischanged") {
                     if (typeof controlValue === "string" && controlValue.split(":")[0] === e.axis) {
                         if (isAnalog) {
@@ -3939,9 +3984,9 @@ class EmulatorJS {
                                 }
                             }
                         } else if (value === 0 || controlValue === e.label || controlValue === `${e.axis}:${value}`) {
-                            this.gameManager.simulateInput(i, j, ((value === 0) ? 0 : 1));
+                            this.updateMappedInput(i, j, `gamepad:${e.gamepadIndex}:axis:${e.axis}`, (controlValue === e.label || controlValue === `${e.axis}:${value}`) ? 1 : 0);
                         } else if (skippedZero) {
-                            this.gameManager.simulateInput(i, j, 0);
+                            this.updateMappedInput(i, j, `gamepad:${e.gamepadIndex}:axis:${e.axis}`, 0);
                         }
                     }
                 }

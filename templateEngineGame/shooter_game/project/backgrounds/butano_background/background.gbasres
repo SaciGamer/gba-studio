@@ -1,0 +1,11 @@
+{
+  "_resourceType": "background",
+  "id": "original_butano_background",
+  "name": "butano_background",
+  "filename": "butano_background.bmp",
+  "imageWidth": 256,
+  "imageHeight": 256,
+  "hd": false,
+  "tileColors": "",
+  "_deleted": false
+}

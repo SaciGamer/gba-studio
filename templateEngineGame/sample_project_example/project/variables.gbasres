@@ -1,0 +1,175 @@
+{
+  "_resourceType": "variables",
+  "_version": "1.0",
+  "_deleted": false,
+  "variables": [
+    {
+      "id": "aa7333a7-5485-42bb-9951-321e569a3063",
+      "name": "v_start_game",
+      "symbol": "variable_0",
+      "type": "boolean",
+      "initialValue": false,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "8627923d-6aa9-4690-b19b-89a8e13550a8",
+      "name": "v_time_ss",
+      "symbol": "variable_1",
+      "type": "number",
+      "initialValue": 0,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "bfc81682-0881-4dae-8c4d-cab0898a5b7e",
+      "name": "v_time_mm",
+      "symbol": "variable_2",
+      "type": "number",
+      "initialValue": 0,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "168695be-9bbf-483c-9ed9-322a32d1b2c5",
+      "name": "v_time_hh",
+      "symbol": "variable_3",
+      "type": "number",
+      "initialValue": 0,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "8bf83586-fda7-4d04-9d0d-5445127f3030",
+      "name": "v_see_next_picture",
+      "symbol": "variable_5",
+      "type": "number",
+      "initialValue": 0,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "50388943-fb13-4b80-8ee8-564162326266",
+      "name": "v_move_background",
+      "symbol": "variable_6",
+      "type": "number",
+      "initialValue": -48,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "f9bb5b28-5973-4192-9053-7b974a8ee7a2",
+      "name": "v_count_m_background",
+      "symbol": "variable_7",
+      "type": "number",
+      "initialValue": 0,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "617f0622-036d-4889-999d-698c56f09a56",
+      "name": "v_pan_cam_title",
+      "symbol": "variable_8",
+      "type": "number",
+      "initialValue": 0,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "33735d71-8e54-45c6-80ee-04ccd3064c4b",
+      "name": "v_door_open",
+      "symbol": "variable_9",
+      "type": "boolean",
+      "initialValue": false,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "a9e788c7-ce1a-4e78-b26a-faf3b13d48f3",
+      "name": "v_placa",
+      "symbol": "variable_10",
+      "type": "boolean",
+      "initialValue": false,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "46fa0351-1bf2-4f6a-89be-8882d5d719dc",
+      "name": "v_p_start_pos_x",
+      "symbol": "variable_11",
+      "type": "number",
+      "initialValue": 0,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "9305deff-17d2-4361-a616-e4acc7c136df",
+      "name": "v_p_start_pos_y",
+      "symbol": "variable_12",
+      "type": "number",
+      "initialValue": 0,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "50944154-9406-4b71-bb85-ce08e53d85be",
+      "name": "v_change_scene",
+      "symbol": "variable_13",
+      "type": "number",
+      "initialValue": -1,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "d0cbc1c9-4f86-44a7-b2d5-85163f5d7b16",
+      "name": "v_default_movement_x_px",
+      "symbol": "variable_14",
+      "type": "number",
+      "initialValue": 8,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "3c1972eb-c124-4fc0-a015-8a050770e5f7",
+      "name": "v_default_movement_y_px",
+      "symbol": "variable_15",
+      "type": "number",
+      "initialValue": 304,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "ecaa466f-65ef-48be-9aa6-35afbb188b5b",
+      "name": "v_default_player_move_y_tiles",
+      "symbol": "variable_16",
+      "type": "number",
+      "initialValue": 16,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "9db5457b-93c3-4f4d-abb4-6f14dfdf7e02",
+      "name": "v_loading",
+      "symbol": "variable_17",
+      "type": "number",
+      "initialValue": 0,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "89545c0f-a01e-4058-a5b0-33fa87bca5bd",
+      "name": "v_no_platform",
+      "symbol": "variable_18",
+      "type": "boolean",
+      "initialValue": false,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "c062d38d-6ecb-4f4a-b1d3-dd662df715af",
+      "name": "v_pan_default_x",
+      "symbol": "variable_19",
+      "type": "number",
+      "initialValue": 8,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "d5099688-649f-4ca1-890f-00d73402fbc7",
+      "name": "v_pan_default_y",
+      "symbol": "variable_20",
+      "type": "number",
+      "initialValue": 48,
+      "_resourceType": "variables"
+    },
+    {
+      "id": "4a1e1435-d1c2-497d-b677-5799af71b940",
+      "name": "v_deaths",
+      "symbol": "variable_21",
+      "type": "number",
+      "initialValue": 0,
+      "_resourceType": "variables"
+    }
+  ]
+}

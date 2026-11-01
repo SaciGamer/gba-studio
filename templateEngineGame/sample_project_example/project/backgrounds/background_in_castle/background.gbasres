@@ -1,0 +1,12 @@
+{
+  "_resourceType": "background",
+  "id": "ec2182a2-befe-4191-a130-6a5ac5d15160",
+  "autoColor": false,
+  "name": "background_in_castle",
+  "filename": "background_in_castle.bmp",
+  "imageWidth": 256,
+  "imageHeight": 256,
+  "hd": false,
+  "tileColors": "",
+  "_deleted": false
+}

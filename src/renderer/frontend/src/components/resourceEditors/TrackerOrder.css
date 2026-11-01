@@ -1,0 +1,16 @@
+.gba-order-item{display:flex;flex-direction:column;gap:2px;min-width:110px;cursor:grab;touch-action:pan-y}
+.gba-order-item:active{cursor:grabbing}
+.gba-beat-order-track{position:relative}
+.gba-order-item.dragging{position:absolute;left:10px;top:4px;opacity:0;pointer-events:none}
+.gba-order-drop-slot{flex:0 0 110px;width:110px;height:52px;box-sizing:border-box;border:2px dashed var(--music-primary,#64cdb1);border-radius:5px;background:color-mix(in srgb,var(--music-primary,#64cdb1) 14%,transparent);pointer-events:none}
+.gba-beat-order-track .gba-order-card{width:110px;min-width:110px;height:52px;min-height:52px;padding:4px 8px;gap:2px;cursor:inherit}
+.gba-beat-order-track .gba-order-add-pattern{height:52px;min-height:52px;border-style:dashed;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.gba-order-add-pattern-slot{display:flex;flex:none}
+.gba-piano-roll-add-pattern-slot{display:flex;flex:0 0 46px;height:100%;margin-left:4px;position:relative;z-index:12}
+.gba-piano-roll-add-pattern-large{width:46px;height:100%;min-height:120px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--music-border,#374546);border-radius:5px;background:var(--music-surface-raised,#222c2d);color:var(--music-text,#dce6e5);cursor:pointer}
+.gba-piano-roll-add-pattern-large .anticon,.gba-beat-order-track .gba-order-add-pattern .anticon{font-size:32px}
+.gba-piano-roll-add-pattern-large{position:relative}
+.gba-piano-roll-add-pattern-icon{position:absolute;left:50%;top:var(--piano-roll-visible-center,50%);transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;font-size:32px}
+.gba-beat-order-track .gba-order-add-pattern{background:var(--music-surface-raised,#222c2d)}
+.gba-piano-roll-add-pattern-large:disabled{cursor:not-allowed;opacity:.5}
+.gba-beat-order-track .gba-order-add-pattern{position:relative;z-index:2}

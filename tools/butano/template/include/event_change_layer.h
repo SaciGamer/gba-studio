@@ -5,6 +5,13 @@
 #include "bn_fixed.h"
 #include "bn_vector.h"
 
+struct LayerChangeEventData;
+struct LayerVisibilityEventData;
+struct BackgroundScrollEventData;
+struct BackgroundParallaxEventData;
+struct BackgroundTransformEventData;
+struct PaletteLayerEventData;
+
 /**
  * Event Change Layer Manager for {{PROJECT_NAME}}
  * Scripts struct and reference function
@@ -19,6 +26,23 @@ struct ArgsChangeLayer {
     bn::vector<LayerArgs, 4> layers;
 };
 
+struct PaletteLayerArgs {
+    int layer_id;
+    bool restore_palette;
+    const char* const* palette_ids;
+};
+
 bool run_change_layer(const void* args, const bn::string<64> scene_id);
+bool run_background_transform(const void* args, int operation);
+bool run_background_animation(const void* args);
+bool run_visible_background(const void* args, const bn::string<64> scene_id);
+bool run_change_palette_background(const void* args, const bn::string<64> scene_id);
+bool run_change_layer(const LayerChangeEventData& data, const bn::string<64>& scene_id);
+bool run_visible_background(const LayerVisibilityEventData& data, const bn::string<64>& scene_id);
+bool run_background_scroll(const void* args, const bn::string<64> scene_id);
+bool run_background_scroll(const BackgroundScrollEventData& data, const bn::string<64>& scene_id);
+bool run_background_parallax(const void* args, const bn::string<64> scene_id);
+bool run_background_parallax(const BackgroundParallaxEventData& data, const bn::string<64>& scene_id);
+bool run_change_palette_background(const PaletteLayerEventData& data, const bn::string<64>& scene_id);
 
 #endif // EVENT_CHANGE_LAYER_H

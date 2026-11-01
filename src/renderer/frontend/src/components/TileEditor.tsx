@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
 import FloatButttons from './FloatButtons';
 import { AntdToken } from './common/AntDToken';
+import { InputNumber } from './StepInputNumber';
 
 const { Content } = Layout;
 
@@ -51,6 +52,12 @@ const TileEditor: React.FC<TileEditorProps> = ({ scene, resetPanelSize, setShowF
   // const { settingUtils } = useSettingsUtilsContext();
 
   const { setScenes, elementSelected, setElementSelected, settingUtils } = useAppContexts();
+  const [assetReloadVersion, setAssetReloadVersion] = useState(0);
+  useEffect(() => {
+    const reload = () => setAssetReloadVersion(version => version + 1);
+    window.addEventListener('gba-studio:assets-reloaded', reload);
+    return () => window.removeEventListener('gba-studio:assets-reloaded', reload);
+  }, []);
 
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 });
@@ -183,7 +190,7 @@ const TileEditor: React.FC<TileEditorProps> = ({ scene, resetPanelSize, setShowF
     };
 
     loadTilesetImage();
-  }, [elementSelected?.selectedTilesetId]);
+  }, [elementSelected?.selectedTilesetId, assetReloadVersion]);
 
   const handleMapMouseDown = (row: number, col: number) => {
     if (selectedTiles.length === 0) return;

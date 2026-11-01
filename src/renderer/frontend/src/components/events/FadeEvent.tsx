@@ -1,5 +1,6 @@
 import { IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
 import { Select } from "antd";
+import NumericEventInput from '../NumericEventInput';
 import { Content } from "antd/es/layout/layout";
 import { IFade } from './interfaces/IFade';
 
@@ -38,10 +39,9 @@ export function FadeEvent({ event, onValueChange }: FadeEventsProps) {
 
 	return (
     <Content>
-      <Select 
-        defaultValue={`${args?.speed ?? FadeEvent.defaultValue().speed }`} 
-        options={optSpeed} style={{ width: "100%" }} 
-        onChange={(e) => onValueChange(event?.id!, { ...event?.args, speed: Number(e) })}
+      <NumericEventInput value={args?.speed ?? FadeEvent.defaultValue().speed} min={1} max={6}
+        onChange={speed => onValueChange(event?.id!, { ...event?.args, speed })}
+        renderNumber={(speed, onChange) => <Select value={String(speed)} options={optSpeed} style={{ flex: 1, minWidth: 0 }} onChange={value => onChange(Number(value))} />}
       />
     </Content>
 	);

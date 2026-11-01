@@ -1,0 +1,319 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "original_hero_body_walking",
+  "name": "hero_body_walking",
+  "filename": "hero_body_walking.bmp",
+  "imageWidth": 32,
+  "imageHeight": 256,
+  "playerFrameWidth": 32,
+  "playerFrameHeight": 32,
+  "playerFramesPerDirection": 2,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 16,
+  "playerCanvasOriginY": 16,
+  "playerCollisionX": -16,
+  "playerCollisionY": -16,
+  "playerCollisionWidth": 32,
+  "playerCollisionHeight": 32,
+  "playerAnimations": [
+    {
+      "id": "idle-down",
+      "name": "Idle Down",
+      "type": "idle",
+      "frames": [
+        0
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_hero_body_walking-idle-down",
+          "width": 32,
+          "height": 32,
+          "pieces": [
+            {
+              "id": "piece-original_hero_body_walking-idle-down",
+              "sourceX": 0,
+              "sourceY": 0,
+              "width": 32,
+              "height": 32,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-down",
+      "name": "Moving Down",
+      "type": "movement",
+      "frames": [
+        0,
+        1
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-left",
+      "name": "Idle Left",
+      "type": "idle",
+      "frames": [
+        2
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_hero_body_walking-idle-left",
+          "width": 32,
+          "height": 32,
+          "pieces": [
+            {
+              "id": "piece-original_hero_body_walking-idle-left",
+              "sourceX": 0,
+              "sourceY": 64,
+              "width": 32,
+              "height": 32,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-left",
+      "name": "Moving Left",
+      "type": "movement",
+      "frames": [
+        2,
+        3
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-right",
+      "name": "Idle Right",
+      "type": "idle",
+      "frames": [
+        4
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_hero_body_walking-idle-right",
+          "width": 32,
+          "height": 32,
+          "pieces": [
+            {
+              "id": "piece-original_hero_body_walking-idle-right",
+              "sourceX": 0,
+              "sourceY": 128,
+              "width": 32,
+              "height": 32,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-right",
+      "name": "Moving Right",
+      "type": "movement",
+      "frames": [
+        4,
+        5
+      ],
+      "canvasFrames": []
+    },
+    {
+      "id": "idle-up",
+      "name": "Idle Up",
+      "type": "idle",
+      "frames": [
+        6
+      ],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-original_hero_body_walking-idle-up",
+          "width": 32,
+          "height": 32,
+          "pieces": [
+            {
+              "id": "piece-original_hero_body_walking-idle-up",
+              "sourceX": 0,
+              "sourceY": 192,
+              "width": 32,
+              "height": 32,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moving-up",
+      "name": "Moving Up",
+      "type": "movement",
+      "frames": [
+        6,
+        7
+      ],
+      "canvasFrames": []
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "default",
+      "name": "Default",
+      "type": "default",
+      "animations": [
+        {
+          "id": "idle-down",
+          "name": "Idle Down",
+          "type": "idle",
+          "frames": [
+            0
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_hero_body_walking-idle-down",
+              "width": 32,
+              "height": 32,
+              "pieces": [
+                {
+                  "id": "piece-original_hero_body_walking-idle-down",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 32,
+                  "height": 32,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-down",
+          "name": "Moving Down",
+          "type": "movement",
+          "frames": [
+            0,
+            1
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-left",
+          "name": "Idle Left",
+          "type": "idle",
+          "frames": [
+            2
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_hero_body_walking-idle-left",
+              "width": 32,
+              "height": 32,
+              "pieces": [
+                {
+                  "id": "piece-original_hero_body_walking-idle-left",
+                  "sourceX": 0,
+                  "sourceY": 64,
+                  "width": 32,
+                  "height": 32,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-left",
+          "name": "Moving Left",
+          "type": "movement",
+          "frames": [
+            2,
+            3
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-right",
+          "name": "Idle Right",
+          "type": "idle",
+          "frames": [
+            4
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_hero_body_walking-idle-right",
+              "width": 32,
+              "height": 32,
+              "pieces": [
+                {
+                  "id": "piece-original_hero_body_walking-idle-right",
+                  "sourceX": 0,
+                  "sourceY": 128,
+                  "width": 32,
+                  "height": 32,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-right",
+          "name": "Moving Right",
+          "type": "movement",
+          "frames": [
+            4,
+            5
+          ],
+          "canvasFrames": []
+        },
+        {
+          "id": "idle-up",
+          "name": "Idle Up",
+          "type": "idle",
+          "frames": [
+            6
+          ],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-original_hero_body_walking-idle-up",
+              "width": 32,
+              "height": 32,
+              "pieces": [
+                {
+                  "id": "piece-original_hero_body_walking-idle-up",
+                  "sourceX": 0,
+                  "sourceY": 192,
+                  "width": 32,
+                  "height": 32,
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "moving-up",
+          "name": "Moving Up",
+          "type": "movement",
+          "frames": [
+            6,
+            7
+          ],
+          "canvasFrames": []
+        }
+      ]
+    }
+  ]
+}

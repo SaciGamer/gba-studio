@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+
+const bundle = await build({ entryPoints: ['src/shared/events/eventPendingFields.ts'], bundle: true, write: false, format: 'esm', platform: 'node' });
+const { getEventPendingFields: pending } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+assert.deepEqual(pending('EVENT_HIDE_ACTOR'), ['actorId']);
+assert.deepEqual(pending('EVENT_HIDE_ACTOR', { actorId: ' ' }), ['actorId']);
+assert.deepEqual(pending('EVENT_HIDE_ACTOR', { actorId: 'actor-1' }), []);
+assert.deepEqual(pending('EVENT_HIDE_ACTOR', { __comment: true }), []);
+assert.deepEqual(pending('EVENT_CALL_SCRIPT'), ['scriptId']);
+assert.deepEqual(pending('EVENT_DISPLAY_DIALOGUE', { text: '\n ' }), ['text']);
+assert.deepEqual(pending('EVENT_DISPLAY_DIALOGUE', { text: 'Hello' }), []);
+assert.deepEqual(pending('EVENT_MOVE_ACTOR', { actorId: 'actor-1', x: 0, y: 0 }), []);
+assert.deepEqual(pending('EVENT_VISIBLE_ACTOR', { actorId: 'actor-1', visible: false }), []);
+assert.deepEqual(pending('EVENT_MOVE_ACTOR', { actorId: 'actor-1', x: { kind: 'variable', variableId: '' } }), ['x']);
+assert.deepEqual(pending('EVENT_VARIABLE', { variableId: 'v', value: { kind: 'literal', type: 'boolean', value: false } }), []);
+assert.deepEqual(pending('EVENT_VARIABLE', { variableId: 'v', value: { kind: 'expression', operation: 'add', left: { kind: 'number', value: 0 }, right: { kind: 'variable', variableId: '' } } }), ['value']);
+assert.deepEqual(pending('EVENT_VARIABLE', { variableId: 'v', value: { kind: 'expression', operation: 'abs', left: { kind: 'number', value: 0 } } }), []);
+assert.deepEqual(pending('EVENT_VARIABLE', { variableId: 'v', value: { kind: 'formula', source: '' } }), ['value']);
+assert.deepEqual(pending('EVENT_SAVE_WRITE', { variableIds: ['v'] }), []);
+assert.deepEqual(pending('EVENT_SAVE_LOAD', { variableIds: [] }), ['variableId']);
+assert.deepEqual(pending('EVENT_HIDE_ALL_SPRITES'), []);
+assert.deepEqual(pending('EVENT_PLAY_SOUND', { soundId: 's', group: '' }), []);
+assert.deepEqual(pending('EVENT_CHANGE_LAYER', { backgroundId: null }), []);
+assert.deepEqual(pending('EVENT_WAIT'), []);
+assert.deepEqual(pending('EVENT_IF', { left: { kind: 'literal', type: 'number', value: 0 }, right: { kind: 'variable', variableId: '' }, operator: '==' }), ['right']);
+console.log('Pending event inputs: empty selections, text, nested values, defaults, multi-selection and optional fields passed.');
