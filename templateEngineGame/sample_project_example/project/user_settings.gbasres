@@ -1,13 +1,15 @@
 {
   "_resourceType": "user_settings",
   "_deleted": false,
-  "worldScrollX": -1053.7744454545455,
-  "worldScrollY": -674.5305545454545,
-  "zoom": 125,
+  "worldScrollX": -398,
+  "worldScrollY": 265.88,
+  "zoom": 50,
   "favoriteEvents": [
     "EVENT_FADE_IN",
     "EVENT_FADE_OUT",
-    "EVENT_CHANGE_SCENE"
+    "EVENT_CHANGE_SCENE",
+    "EVENT_INPUT_DISABLE",
+    "EVENT_INPUT_ENABLE"
   ],
   "hiddenTileGridSceneIds": [
     "738ec3e3-374f-44a8-8bda-8a027cce1d09",
@@ -23,7 +25,7 @@
     },
     "Dungeon_Tile_Set_16_cores": {
       "cellSize": 16,
-      "zoom": 250,
+      "zoom": 200,
       "showGrid": true
     },
     "Grass": {
@@ -55,37 +57,119 @@
   "tileEditorGridSize": 16,
   "showTileEditorGrid": true,
   "rightPanelScrollPositions": {
-    "e5f3214b-d8b2-418d-92e2-7e19289b8ede": 365,
-    "1d48336d-9f12-4fd0-995e-3fd4033f7bd5": 300,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede": 0,
+    "1d48336d-9f12-4fd0-995e-3fd4033f7bd5": 500,
     "28f0dc3e-a347-4f86-abba-48601e5be152": 0,
     "e5f3214b-d8b2-418d-92e2-7e19289b8ede:actor:c3499366-da3c-45d3-bf4b-a315272f02fb": 0,
     "3623f8fd-b5bc-4c04-997d-d7fa25df67f5": 35,
-    "7ded7879-cf05-4af7-b405-fabd85d38047": 35,
+    "7ded7879-cf05-4af7-b405-fabd85d38047": 0,
     "d8191841-adf3-46ed-917d-4d5d74c38ad2": 767,
-    "b9f21dc1-5606-41ee-bca2-8ec1a6059245": 100,
-    "fe360787-c3a4-4adc-9606-d0262568cd14": 563,
-    "28f0dc3e-a347-4f86-abba-48601e5be152:trigger:387bd913-a238-4969-ab34-841efa879706": 523,
-    "1155b235-5e58-4d07-a457-e90bbddf967e": 0,
-    "738ec3e3-374f-44a8-8bda-8a027cce1d08": 0,
-    "86889357-1de2-4fe1-a995-7d7a7b7b89eb": 100,
-    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:trigger:645da2b9-3525-4b14-8cad-847b74a67409": 0
+    "b9f21dc1-5606-41ee-bca2-8ec1a6059245": 0,
+    "fe360787-c3a4-4adc-9606-d0262568cd14": 948,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:trigger:387bd913-a238-4969-ab34-841efa879706": 300,
+    "1155b235-5e58-4d07-a457-e90bbddf967e": 258,
+    "738ec3e3-374f-44a8-8bda-8a027cce1d08": 2017,
+    "86889357-1de2-4fe1-a995-7d7a7b7b89eb": 1600,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:trigger:645da2b9-3525-4b14-8cad-847b74a67409": 0,
+    "dc6d6d10-0a1d-4815-abf0-e305d01527be": 0,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:trigger:f0f94a21-9ad5-490e-a94f-3e0ad957fd8b": 0,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:trigger:8173f65e-8b54-4c38-a2e8-bb749ab827cd": 0,
+    "1d48336d-9f12-4fd0-995e-3fd4033f7bd5:actor:9ec58fa0-8139-4012-b1cc-eee47e0367f1": 179,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:actor:099414ff-6ef9-49c2-a652-ce5c7bc0e06c": 0,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:actor:10caed66-8b8e-4443-8685-b172af770986": 288,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:actor:60952572-2900-4403-8195-696d395a1a2c": 373,
+    "9cdbe869-24f0-4ba4-8c7a-f522601b77e1": 467,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:actor:b110197e-7835-4b4c-bab6-54358a1be149": 200,
+    "dc6d6d10-0a1d-4815-abf0-e305d01527be:actor:328da288-ef9f-49b9-9ead-f5efda8123f1": 53,
+    "1d48336d-9f12-4fd0-995e-3fd4033f7bd5:actor:c889e048-4631-4b16-8129-11b636551176": 0,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:trigger:9897495d-fa13-49ba-9344-e578413c3d20": 0,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:actor:07d0ef0f-648b-4290-8eec-9fbf8df61fae": 0,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:actor:05fd81d9-f365-45e3-adc2-1a858a1e1359": 0,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:trigger:18b245a9-96d0-4e69-9478-1017008df89c": 0,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:actor:813fc349-83e7-49c8-8748-fff983a6cbda": 0,
+    "1484bca9-1dd8-4b19-b5e9-1d057614a9c1": 0,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:actor:9d87c9fb-b0f2-4148-b054-4e12c8cb6ef1": 0,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:actor:8176b57a-6b1e-410a-bb74-80c128620771": 768,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:actor:55b3b719-3e9b-4d9e-bed7-792b6905805b": 298,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:actor:9382dbe3-7de1-4e0b-a01e-ec44140a6678": 204,
+    "aee60099-6266-4007-bb38-9653582e89f5:actor:760043e1-4a90-4c85-80cd-f7dcd1fdd169": 135,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:trigger:24b325fa-bff4-4328-b741-89aa3552240a": 0,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:actor:049e3cc3-f9e3-42cd-b0f9-a6f30b0c0ecd": 0,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:actor:65af1a38-1afa-4f25-8f35-64b27313f823": 179,
+    "3fe9c7ca-dbf5-4b5b-8558-36efe1075309": 0,
+    "e5f3214b-d8b2-418d-92e2-7e19289b8ede:trigger:ca631ea0-5d6f-4dfc-a73f-7ba01e7f24ca": 0,
+    "9cdbe869-24f0-4ba4-8c7a-f522601b77e1:trigger:af8dc73f-13d6-40ba-9b34-b1f8717b7ce2": 365,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:actor:f90713a7-5b0d-4668-a88a-62269f9e48a6": 0,
+    "3fe9c7ca-dbf5-4b5b-8558-36efe1075309:trigger:e8462063-bae4-44c2-bdbb-2b19dd90a16d": 189,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:trigger:bf3cf8de-a14f-4447-bf64-e1da2f7d5d4a": 0,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:trigger:e2bb5ad1-662d-44dc-a991-a20504343a90": 0,
+    "9cdbe869-24f0-4ba4-8c7a-f522601b77e1:trigger:54ec707f-a4c2-4c60-87ad-828e6095dba3": 115,
+    "abad4acb-f49c-4c4f-bb65-9bd2eec66aab": 0,
+    "b35ba84c-8c98-4555-9da3-916925209810": 0,
+    "3fe9c7ca-dbf5-4b5b-8558-36efe1075309:actor:683ce1c6-a689-4fa6-a2dc-8a8ade5e4c78": 0,
+    "b0cc8275-8a25-4cca-8e5c-59c3d4d38df1": 600,
+    "bbe8da5c-1630-44cb-8321-ff4488a69fee": 298,
+    "87ba45fc-db8d-49b4-9382-8e44aa504201": 922,
+    "0b680133-4cc5-48a8-b722-4a522b127fa4": 653,
+    "2cfd85b0-d6ad-4fa4-a1a9-bc8f044d0124": 468,
+    "9cdbe869-24f0-4ba4-8c7a-f522601b77e1:trigger:530c3f0c-10b1-4b3e-be66-9fbab8666d19": 423,
+    "9cdbe869-24f0-4ba4-8c7a-f522601b77e1:trigger:530c3f0c-10b1-4b3e-be66-9fbab8666d19:focus:8108e7b9-6fce-490e-b646-320e9d8286f7": 59,
+    "9cdbe869-24f0-4ba4-8c7a-f522601b77e1:trigger:530c3f0c-10b1-4b3e-be66-9fbab8666d19:focus:9302423a-a471-4be0-a781-f2146679c82b": 0,
+    "9cdbe869-24f0-4ba4-8c7a-f522601b77e1:trigger:530c3f0c-10b1-4b3e-be66-9fbab8666d19:focus:d5c59895-8c95-4784-94f6-660085d92c7a": 0,
+    "9cdbe869-24f0-4ba4-8c7a-f522601b77e1:trigger:530c3f0c-10b1-4b3e-be66-9fbab8666d19:focus:661e8328-cc47-4117-8a13-5035c3bd5f72": 0,
+    "9cdbe869-24f0-4ba4-8c7a-f522601b77e1:trigger:4a5bbe32-c297-48b4-834d-37b602f3d692": 0,
+    "9cdbe869-24f0-4ba4-8c7a-f522601b77e1:trigger:f6181714-f7af-4672-81fa-4bfb99e9679d": 0,
+    "1d48336d-9f12-4fd0-995e-3fd4033f7bd5:trigger:211685f1-9115-41ff-912e-f7a51132d7b3": 0,
+    "7ded7879-cf05-4af7-b405-fabd85d38047:actor:2ffa11d8-dab1-438b-95b6-741e9d737771": 323,
+    "7ded7879-cf05-4af7-b405-fabd85d38047:actor:7bd1b7a8-3047-4cbe-8bfe-eddcdda5136b": 0,
+    "9cdbe869-24f0-4ba4-8c7a-f522601b77e1:trigger:9a94e3fb-172d-4ee6-87c1-f7db5e7618b8": 0,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:trigger:643c35c0-1d61-462e-b0a7-37b13a585c76": 0,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:trigger:864dca9c-006f-4b71-9125-e9c5d35572d3": 0,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:trigger:12e119fd-f0c8-4cad-8a9f-001719d5322e": 0,
+    "b0cc8275-8a25-4cca-8e5c-59c3d4d38df1:trigger:f687e8e4-bb43-429d-8aeb-cc4b7432a9e6": 34,
+    "87ba45fc-db8d-49b4-9382-8e44aa504201:focus:0aaf048e-4f43-4229-971d-8a8bf3a58617": 0,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:trigger:387bd913-a238-4969-ab34-841efa879706:focus:fe1d9acf-d054-4421-afcd-52ddb745848e": 68,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:trigger:fb0ccea0-30e7-4c58-a023-5d83e2db945c": 3980,
+    "28f0dc3e-a347-4f86-abba-48601e5be152:trigger:9007173a-621b-4e29-b41f-3b3bb5972780": 0
   },
   "spriteStateExpandedKeys": {
     "player": [
-      "[\"state-1791404412611\"]",
-      "[\"state-1791404411961\"]",
+      "[\"state-1791400556442\"]",
+      "[\"player\"]"
+    ],
+    "stage_1_monsters_2": [
       "[\"player\"]",
-      "[\"state-1791400556442\"]"
+      "[\"state-1791314966866\"]"
+    ],
+    "stage_1_monsters_1": [
+      "[\"player\"]",
+      "[\"state-1791314901378\"]"
     ]
   },
   "spriteSidebarLayout": {
     "sizes": [
-      600,
-      386
+      720,
+      410
     ],
     "sections": {
       "sprites": true,
       "states": true
     }
+  },
+  "hiddenTileAnimations": [],
+  "eventEditorFocus": {},
+  "spriteCenterLayout": {
+    "sizes": [
+      300,
+      170
+    ],
+    "sections": {
+      "tiles": true,
+      "frames": true
+    },
+    "expandedSizes": [
+      300,
+      170
+    ]
   }
 }
