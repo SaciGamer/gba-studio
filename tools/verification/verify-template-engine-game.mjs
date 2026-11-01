@@ -3,9 +3,9 @@ import path from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 
-const { ResourceBuilder } = await import(pathToFileURL(path.resolve(import.meta.dirname, '..', 'dist', 'main', 'utils', 'builders', 'ResourceBuilder.js')).href);
+const { ResourceBuilder } = await import(pathToFileURL(path.resolve(import.meta.dirname, '../..', 'dist', 'main', 'utils', 'builders', 'ResourceBuilder.js')).href);
 
-const root = path.resolve(import.meta.dirname, '..', 'templateEngineGame');
+const root = path.resolve(import.meta.dirname, '../..', 'templateEngineGame');
 const projects = [
   { id: 'sample_project_example', file: 'sample_project.gbaproj', requireShooter: false },
   { id: 'shooter_game', file: 'shooter_game.gbaproj', requireShooter: true },
@@ -36,7 +36,7 @@ for (const project of projects) {
   try {
     fs.mkdirSync(path.join(output, 'include'), { recursive: true });
     fs.mkdirSync(path.join(output, 'src'), { recursive: true });
-    const builder = new ResourceBuilder(output, path.resolve(import.meta.dirname, '..', 'tools', 'butano', 'template'));
+    const builder = new ResourceBuilder(output, path.resolve(import.meta.dirname, '../..', 'tools', 'butano', 'template'));
     for (const file of resources) {
       const value = JSON.parse(fs.readFileSync(file, 'utf8'));
       const serialized = JSON.stringify(value);

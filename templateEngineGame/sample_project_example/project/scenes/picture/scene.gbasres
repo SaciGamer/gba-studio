@@ -84,6 +84,15 @@
       "children": {
         "then": [
           {
+            "id": "aa1fc184-8709-471e-b54e-0389cbd66f08",
+            "version": 1,
+            "command": "EVENT_UI_DESTROY",
+            "args": {
+              "uiId": "fb35f2c5-b20d-4899-8520-3d022fd766d6",
+              "__collapse": false
+            }
+          },
+          {
             "id": "f5961f55-a643-4886-a2ad-4d7c46a18f6b",
             "version": 1,
             "command": "EVENT_CHANGE_SCENE",

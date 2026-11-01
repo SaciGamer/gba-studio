@@ -70,7 +70,23 @@ export function inspectGbaMemory(elf, { minIwramTail = DEFAULT_MIN_IWRAM_TAIL, m
     return { ...region, availableEnd, staticEnd, staticSpan: staticEnd - region.start, tail, sections: allocated };
   });
   const motionStateName = 'ActorMotionManager::instance()::manager';
-  const checkedStates = [...REQUIRED_EWRAM_STATES, ...(symbols.some(symbol => symbol.name === motionStateName) ? [motionStateName] : [])];
+  const scriptStateName = 'ScriptCommand::instance()::sc';
+  const directory = path.dirname(path.resolve(filename));
+  const manifestFile = path.join(directory, 'runtime-feature-manifest.json');
+  let scriptExcluded = false;
+  if (fs.existsSync(manifestFile)) {
+    const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+    const featuresFile = path.join(directory, 'include/gba_studio_features.h');
+    scriptExcluded = manifest.selectionApplied === true && Array.isArray(manifest.modules) && !manifest.modules.includes('scripts')
+      && Array.isArray(manifest.sourceFiles) && !manifest.sourceFiles.includes('src/script_command_manager.cpp')
+      && Array.isArray(manifest.eventCodes) && manifest.eventCodes.length === 0
+      && Array.isArray(manifest.scriptIds) && manifest.scriptIds.length === 0
+      && fs.existsSync(featuresFile) && /^#define GBA_STUDIO_FEATURE_SCRIPTS 0\s*$/m.test(fs.readFileSync(featuresFile, 'utf8'))
+      && !fs.existsSync(path.join(directory, 'src/script_command_manager.cpp'));
+  }
+  if (scriptExcluded && symbols.some(symbol => symbol.name === scriptStateName)) errors.push('Excluded ScriptCommand state remains in the ELF; inspect incremental project objects');
+  const requiredStates = REQUIRED_EWRAM_STATES.filter(name => name !== scriptStateName || !scriptExcluded);
+  const checkedStates = [...requiredStates, ...(symbols.some(symbol => symbol.name === motionStateName) ? [motionStateName] : [])];
   const singletons = checkedStates.flatMap(name => {
     // Exact names exclude the tiny "guard variable for ..." entries in IWRAM.
     const symbol = symbols.find(entry => entry.name === name);
@@ -99,7 +115,7 @@ if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === imp
     const args = process.argv.slice(2);
     const elf = args.find(arg => !arg.startsWith('--'));
     if (!elf || args.includes('--help')) {
-      console.log('Usage: node tools/verify-gba-memory.mjs <project.elf> [--min-iwram-tail=8192] [--min-ewram-tail=32768]');
+      console.log('Usage: node tools/verification/verify-gba-memory.mjs <project.elf> [--min-iwram-tail=8192] [--min-ewram-tail=32768]');
       process.exitCode = args.includes('--help') ? 0 : 1;
     } else {
       const options = {};

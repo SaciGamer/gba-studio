@@ -8,6 +8,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Versioned development verification tools and regression fixtures, with tests
+  using bundled music assets instead of private reference projects.
 - Eight numeric local variables (Local A-H) per actor or trigger, shared across
   the instance's event tabs, with a Reset Local Variables event.
 - Reusable script parameters with typed values and reference arguments.

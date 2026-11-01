@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 
-const root = path.resolve(import.meta.dirname, '..');
+const root = path.resolve(import.meta.dirname, '../..');
 const projectDir = path.join(root, 'templateEngineGame', 'shooter_game');
 assert.equal(fs.existsSync(path.join(projectDir, 'reference_assets')), false, 'Reference assets must remain outside the project package');
 const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gba-studio-shooter-build-'));
@@ -97,7 +97,7 @@ try {
     ['soda7_xcopy_ohc.s3m', 's3m_fixture.s3m'],
     ['battle_clean.it', 'it_fixture.it'],
   ];
-  const fixtureSourceDir = path.join(root, 'projeto_exemplo', 'audio');
+  const fixtureSourceDir = path.join(root, 'templateEngineGame', 'sample_project_example', 'assets', 'musics');
   const buildAudioDir = path.join(outputDir, 'audio');
   for (const [sourceName, targetName] of trackerFixtures) {
     const source = path.join(fixtureSourceDir, sourceName);

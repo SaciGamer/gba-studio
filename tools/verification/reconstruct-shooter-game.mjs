@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-const root = path.resolve(import.meta.dirname, '..');
-const source = path.join(root, 'projeto_exemplo');
+const root = path.resolve(import.meta.dirname, '../..');
+if (!process.argv[2]) throw new Error('Usage: node tools/verification/reconstruct-shooter-game.mjs <source-project-directory>');
+const source = path.resolve(process.argv[2]);
 const target = path.join(root, 'templateEngineGame', 'shooter_game');
 const graphicsSource = path.join(source, 'graphics');
 const audioSource = path.join(source, 'audio');
@@ -36,7 +37,7 @@ const uuid = name => `${stableId(name).slice(0, 8)}-${stableId(name).slice(8, 12
 let eventSequence = 0;
 const event = (command, args = {}) => ({ id: uuid(`${command}:${JSON.stringify(args)}:${eventSequence++}`), version: 1, command, args });
 
-if (!fs.existsSync(graphicsSource) || !fs.existsSync(audioSource)) throw new Error('projeto_exemplo graphics/audio are required');
+if (!fs.existsSync(graphicsSource) || !fs.existsSync(audioSource)) throw new Error('Source project graphics/audio are required');
 for (const dir of [path.join(target, 'assets'), path.join(target, 'project'), path.join(target, 'reference_assets')]) {
   if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
 }
@@ -117,7 +118,6 @@ const stageSceneIds = new Map(stageSpecs.map(stage => [stage.name, uuid(`scene:$
 const introSceneId = uuid('scene:intro');
 const titleSceneId = uuid('scene:title');
 const howToPlaySceneId = uuid('scene:how-to-play');
-const creditsSceneId = uuid('scene:credits');
 const sceneDefaults = (id, index, name, backgroundId, script, actors = []) => ({
   _resourceType: 'scene', id, _index: index, _deleted: false, name,
   backgroundId, backgrounds: [{ layerId: 0, backgroundId, name: '', path: '' }],
@@ -160,13 +160,12 @@ const titleScript = [
   event('EVENT_HBE_EFFECT_ENABLE', { preset: 'mosaic_wave', intensity: 6, layerId: 0, __collapse: true }),
   event('EVENT_FADE_IN', { speed: 2, __automatic: true, __collapse: true }),
   event('EVENT_MENU_OPEN', {
-    prompt: 'BUTANO FIGHTER', options: ['START', 'HOW TO PLAY', 'CREDITS', 'RUMBLE ON/OFF'],
+    prompt: 'BUTANO FIGHTER', options: ['START', 'HOW TO PLAY', 'RUMBLE ON/OFF'],
     resultVariable: menuResultVariable, __collapse: true,
   }),
   branchOnMenuResult(0, leaveTitle(stageOneId).map((item, index) => index === 1 ? { ...item, args: { ...item.args, direction: 'up' } } : item)),
   branchOnMenuResult(1, leaveTitle(howToPlaySceneId)),
-  branchOnMenuResult(2, leaveTitle(creditsSceneId)),
-  branchOnMenuResult(3, [event('EVENT_RUMBLE', { durationFrames: 12, intensity: 70 }), ...leaveTitle(titleSceneId)]),
+  branchOnMenuResult(2, [event('EVENT_RUMBLE', { durationFrames: 12, intensity: 70 }), ...leaveTitle(titleSceneId)]),
 ];
 writeJson(path.join(scenesDir, 'title', 'scene.gbasres'), sceneDefaults(titleSceneId, 1, 'Title', bg('butano_background'), titleScript, titleActors));
 
@@ -192,13 +191,6 @@ const howToPlayScript = [
   event('EVENT_CHANGE_SCENE', { sceneId: titleSceneId, x: { type: 'number', value: 120 }, y: { type: 'number', value: 136 }, direction: 'left', fadeSpeed: 2 }),
 ];
 writeJson(path.join(scenesDir, 'how_to_play', 'scene.gbasres'), sceneDefaults(howToPlaySceneId, 2, 'How To Play', bg('butano_background'), howToPlayScript, howToActors));
-
-const creditsScript = [
-  event('EVENT_PLAY_MUSIC', { musicId: 'fruit', volume: 70 }),
-  event('EVENT_CREDITS_PLAY', { text: 'BUTANO FIGHTER\\n\\nOriginal game and art\\nButano sample project\\n\\nReconstructed with GBA Studio events\\n\\nPress A after the credits to return.', dialogueFont: 'fixed8x8', showFrame: false, horizontalAlign: 'center', verticalAlign: 'center', animate: true, animationSpeed: 'slow' }),
-  event('EVENT_CHANGE_SCENE', { sceneId: titleSceneId, x: { type: 'number', value: 120 }, y: { type: 'number', value: 136 }, direction: 'left', fadeSpeed: 2 }),
-];
-writeJson(path.join(scenesDir, 'credits', 'scene.gbasres'), sceneDefaults(creditsSceneId, 3, 'Credits', bg('butano_background'), creditsScript));
 
 for (const [index, stage] of stageSpecs.entries()) {
   const sceneId = stageSceneIds.get(stage.name);
@@ -244,5 +236,5 @@ writeJson(path.join(target, 'project', 'variables.gbasres'), { _resourceType: 'v
 ] });
 writeJson(path.join(target, 'project', 'scripts.gbasres'), { _resourceType: 'scripts', scripts: [] });
 writeJson(path.join(target, 'project', 'user_settings.gbasres'), { _resourceType: 'user_settings' });
-writeJson(path.join(target, 'shooter_game.gbaproj'), { _resourceType: 'project', name: 'ShooterGameOriginal', author: 'GBA Studio', notes: 'Reconstructed from projeto_exemplo using engine ShooterKit resources.', _version: '0.5.0', _release: '1' });
+writeJson(path.join(target, 'shooter_game.gbaproj'), { _resourceType: 'project', name: 'ShooterGameOriginal', author: 'GBA Studio', notes: 'Reconstructed from source assets using engine ShooterKit resources.', _version: '0.5.0', _release: '1' });
 console.log(`Reconstructed shooter package: ${graphicFiles.length} source graphics (${included.length} build-compatible), ${fs.readdirSync(audioSource).length} audio files, ${stageSpecs.length} stages.`);

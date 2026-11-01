@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const workspace = path.resolve(import.meta.dirname, '..');
+const workspace = path.resolve(import.meta.dirname, '../..');
 const site = path.join(workspace, '..', 'gba-studio-site');
 const docsRoot = path.join(site, 'docs');
 const buildRoot = path.join(site, 'build');

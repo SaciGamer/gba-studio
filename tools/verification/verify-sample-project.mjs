@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const repositoryRoot = path.resolve(import.meta.dirname, '..');
+const repositoryRoot = path.resolve(import.meta.dirname, '../..');
 const migratedRoot = path.join(repositoryRoot, 'templateEngineGame', 'sample_project_example');
 const legacyRoot = path.join(repositoryRoot, 'sample_project_example');
 const root = fs.existsSync(path.join(migratedRoot, 'sample_project.gbaproj')) ? migratedRoot : legacyRoot;
