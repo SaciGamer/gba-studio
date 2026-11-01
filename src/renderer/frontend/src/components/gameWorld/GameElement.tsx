@@ -1,31 +1,41 @@
+import { resolveTextTemplate } from '../../../../../shared/textTemplate';
+import { coordinatePixels } from '../../../../../shared/events/coordinateUnits';
+import { sceneObjectAxisPosition } from '@/utils/sceneObjectPosition';
+import ActorColliderOverlay from '../ActorColliderOverlay';
+import { findPlayerTargetCanvas, getPlayerTargetDragPosition, setPlayerTargetDragActive } from '@/utils/playerTargetDrag';
 import { useDraggable } from '@dnd-kit/core';
-import React, { CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import { getChangeSceneMarkerPosition } from './changeScenePreviewGeometry';
+import React, { CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { v4 as uuidv4 } from 'uuid';
 
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { useI18n } from '@/i18n/I18n';
 import { ETypeScene, IBackgroundElement, ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
-import { EditOutlined, EyeInvisibleOutlined, PlaySquareTwoTone } from '@ant-design/icons';
-import { Button, Tooltip, message } from 'antd';
+import { EditOutlined, EyeInvisibleOutlined, PlaySquareTwoTone, WarningOutlined } from '@ant-design/icons';
+import { Badge, Button, Tooltip, message } from 'antd';
 import { Content } from 'antd/es/layout/layout';
 import { AntdToken } from '../common/AntDToken';
 import { elementStyle, titleStyle } from './GameElement.styles';
 import { joinLocalAssetPath } from '@/utils/localAssetUrl';
 import { addCanvasTiles } from '@/utils/tileCount';
 import { drawSceneBackground } from '@/utils/drawSceneBackground';
+import { paintAnimatedTileset, useSceneTileAnimationFrames } from '@/utils/tileAnimationPreview';
 import { loadPaletteTransparentImage } from '@/utils/paletteTransparency';
 import { BLOB47_MASK_INDEX, BLOB47_MASKS, getBlob47Mask } from '@/utils/blobAutoTile';
-import { loadPaletteLibrary, normalizePalette } from '../resourceEditors/paletteLibrary';
+import { getConfiguredPalettes, getPaletteSlotOptions, getPreviewPalettes, loadPaletteLibrary, normalizePalette } from '../resourceEditors/paletteLibrary';
 import { clearImageCache, loadCachedImage } from '@/utils/imageCache';
 import { clearPaletteTransparentImageCache } from '@/utils/paletteTransparency';
 import { fontCharacterWidth, fontGlyphIndex, PREVIEW_FONTS, type PreviewFontId } from '@/utils/fontMetrics';
-import { getSceneCollisionColor, getSceneCollisionFill, getCollisionSideForScene, drawLadderCollisionIcon } from '@/utils/collisionColors';
+import { getSceneCollisionColor, getSceneCollisionFill, getCollisionSideForScene, drawLadderCollisionIcon, drawUnknownCollisionReference } from '@/utils/collisionColors';
 import { loadTilesetAssets } from '@/utils/tilesetAssets';
 import { AUTO_TILE_VIEW_KEY, loadAutoTileAssets, toAutoTileSourceKey } from '@/utils/autoTileAssets';
 import { loadProjectAssetFiles } from '@/utils/projectAssetCache';
-import { cacheSceneCanvas, getCachedSceneCanvas } from '@/utils/sceneRenderCache';
+import { cacheSceneCanvas, getCachedSceneCanvas, getCachedSceneRenderParts } from '@/utils/sceneRenderCache';
+import { createSceneLayerComposition } from '@/utils/sceneLayerComposition';
 import { copyMixedTileSelection, clearMixedTileSelection, pasteMixedTileSelection, mixedTilePasteOrigin, expandMixedTileSelection, type MixedTileClipboard, type TileSelectionData } from '@/utils/mixedTileSelection';
+import { countObjectAttention, countSceneAttention } from '../../../../../shared/events/eventAttention';
+import { calculateSceneSpriteBudget } from '../../../../../shared/sceneSpriteBudget';
 
 function drawCamera(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, sceneElement: any) {
   const screenBaseX = 240;
@@ -101,21 +111,10 @@ function actorBounds(actor: any, grid: number) {
   };
 }
 
-function NonScalingOutline({ width, height, color, strokeWidth = 1, dashed = false }: { width: number; height: number; color: string; strokeWidth?: number; dashed?: boolean }) {
+function NonScalingOutline({ width, height, color, strokeWidth = 1, dashed = false, fill = 'none' }: { width: number; height: number; color: string; strokeWidth?: number; dashed?: boolean; fill?: string }) {
   return <svg aria-hidden="true" viewBox={`0 0 ${width} ${height}`} width={width} height={height} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none' }}>
-    <rect x="0.5" y="0.5" width={Math.max(0, width - 1)} height={Math.max(0, height - 1)} fill="none" stroke={color} strokeWidth={strokeWidth} strokeDasharray={dashed ? '6 4' : undefined} vectorEffect="non-scaling-stroke" shapeRendering="crispEdges" />
+    <rect x="0.5" y="0.5" width={Math.max(0, width - 1)} height={Math.max(0, height - 1)} fill={fill} stroke={color} strokeWidth={strokeWidth} strokeDasharray={dashed ? '6 4' : undefined} vectorEffect="non-scaling-stroke" shapeRendering="crispEdges" />
   </svg>;
-}
-
-// Actors are 16 px wide by default, so their horizontal anchor advances in
-// 16 px columns. Their vertical anchor, triggers, and all dimensions keep the
-// native 8×8 tile cadence.
-function snapActorX(value: number) {
-  return Math.round((value - 8) / 16) * 16 + 8;
-}
-
-function snapActorY(value: number) {
-  return Math.round((value - 4) / 8) * 8 + 4;
 }
 
 function getCanvasTilePosition(canvas: HTMLCanvasElement, clientX: number, clientY: number, grid: number) {
@@ -130,6 +129,13 @@ function getCanvasTilePosition(canvas: HTMLCanvasElement, clientX: number, clien
     row: Math.max(0, Math.min(rows - 1, Math.floor(y / grid))),
   };
 }
+
+const clonePrefabEvents = (events: any[] | undefined): any[] | undefined => events?.map(event => ({
+  ...event,
+  id: uuidv4(),
+  args: event.args ? { ...event.args } : event.args,
+  ...(event.children ? { children: { ...event.children, then: clonePrefabEvents(event.children.then) ?? [], ...(event.children.else ? { else: clonePrefabEvents(event.children.else) } : {}) } } : {}),
+}));
 
 
 interface CameraPreviewRect {
@@ -210,11 +216,13 @@ function collectUiTextEvents(scripts: any[] = []): any[] {
 
 interface GameElementProps {
   sceneElement: ISceneSettings;
+  sceneObjectSnapSize?: 8 | 16;
   isSelected: boolean;
   isSecondarySelected?: boolean;
+  matchesSearch?: boolean;
   isClipboardSource?: boolean;
   onSelect: (scene: ISceneSettings, event?: React.MouseEvent) => void;
-  changeScenePreviews?: Array<{ id: string; x: number; y: number; direction: string }>;
+  changeScenePreviews?: Array<{ id: string; x: number; y: number; direction: string; xUnit?: 'tiles' | 'pixels'; yUnit?: 'tiles' | 'pixels' }>;
   changeScenePreviewLayer?: HTMLElement | null;
   changeScenePreviewOffset?: { x: number; y: number };
   sceneDragOffset?: { x: number; y: number };
@@ -230,7 +238,7 @@ interface GameElementProps {
   // onElementHovered: (elementHovered: boolean) => void;
 }
 
-const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, isSecondarySelected = false, isClipboardSource = false, onSelect, changeScenePreviews = [], changeScenePreviewLayer, changeScenePreviewOffset, sceneDragOffset, cameraPreviews = [], actorPositionPreview, onMoveChangeScenePreview, onEditTiles, isDimmed = false, selectedObject, onSelectObject, onSceneMouseMove, onSceneMouseLeave/*, onElementHovered*/ }) => {
+const GameElement: React.FC<GameElementProps> = ({ sceneElement, sceneObjectSnapSize = 8, isSelected, isSecondarySelected = false, matchesSearch = true, isClipboardSource = false, onSelect, changeScenePreviews = [], changeScenePreviewLayer, changeScenePreviewOffset, sceneDragOffset, cameraPreviews = [], actorPositionPreview, onMoveChangeScenePreview, onEditTiles, isDimmed = false, selectedObject, onSelectObject, onSceneMouseMove, onSceneMouseLeave/*, onElementHovered*/ }) => {
   if (!sceneElement) return null;
 
   const { token } = AntdToken();
@@ -239,6 +247,9 @@ const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, isS
   const [isHovered, setIsHovered] = useState(false);
   const [isEditButtonHovered, setIsEditButtonHovered] = useState(false);
   const [isEditButtonVisible, setIsEditButtonVisible] = useState(false);
+  const editButtonTopRef = useRef<number | null>(null);
+  const editButtonRef = useRef<HTMLAnchorElement | HTMLButtonElement | null>(null);
+  const sceneRootRef = useRef<HTMLDivElement | null>(null);
   const [triggerStart, setTriggerStart] = useState<{ col: number; row: number } | null>(null);
   const [triggerEnd, setTriggerEnd] = useState<{ col: number; row: number } | null>(null);
   const [areaTool, setAreaTool] = useState<'trigger' | 'collision' | 'erase' | null>(null);
@@ -262,15 +273,21 @@ const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, isS
   const [tileStrokePreview, setTileStrokePreview] = useState<{ tool: 'pencil' | 'square'; start: { col: number; row: number }; last: { col: number; row: number } } | null>(null);
   const [autoTileStrokePreview, setAutoTileStrokePreview] = useState<{ tool: 'pencil' | 'square'; start: { col: number; row: number }; last: { col: number; row: number } } | null>(null);
   const [tileHover, setTileHover] = useState<{ col: number; row: number } | null>(null);
+  const [prefabPlacementHover, setPrefabPlacementHover] = useState<{ x: number; y: number } | null>(null);
   const [selectedTileCells, setSelectedTileCells] = useState<Array<{ col: number; row: number }>>([]);
   const [tileSelectionPreview, setTileSelectionPreview] = useState<{ start: { col: number; row: number }; current: { col: number; row: number }; mode: 'select' | 'move'; cells: Array<{ col: number; row: number }> } | null>(null);
   const tileSelectionDragRef = useRef<{ clipboard?: MixedTileClipboard; mode: 'select' | 'move'; start: { col: number; row: number }; current: { col: number; row: number }; cells: Array<{ col: number; row: number }>; map: number[][]; paletteIds: Array<Array<string | null>>; tilesetIds: Array<Array<string | null>>; overrides: NonNullable<IBackgroundElement['tileMapCellOverrides']> } | null>(null);
   const tileHoverRef = useRef<{ col: number; row: number } | null>(null);
-  const { backgrounds, settingUtils, setSettingUtils, settings, setSettings, setScenes, setElementSelected, userSettings, palettes, spriteResources, variables } = useAppContexts();
+  const { backgrounds, settingUtils, setSettingUtils, settings, setSettings, setScenes, setElementSelected, userSettings, palettes, spriteResources, variables, prefabs, scripts } = useAppContexts();
   
+  const animationLayerTilesetIds = useMemo(() => Object.fromEntries((sceneElement.backgrounds ?? []).map(layer => [
+    layer.layerId, layer.selectedTilesetId ?? layer.backgroundId ?? sceneElement.selectedTilesetId ?? '',
+  ])), [sceneElement.backgrounds, sceneElement.selectedTilesetId]);
+  const tileAnimationFrames = useSceneTileAnimationFrames(sceneElement.id ?? '', sceneElement.tileAnimations, userSettings.hiddenTileAnimations, isSelected, animationLayerTilesetIds);
   const [tilesetImage, setTilesetImage] = useState<HTMLImageElement | null>(null);
   const [tilesetImagesById, setTilesetImagesById] = useState<Record<string, HTMLImageElement>>({});
   const [actorSpritePreviews, setActorSpritePreviews] = useState<Record<string, { url: string; width: number; height: number }>>({});
+  const [foregroundLayersPreview, setForegroundLayersPreview] = useState<string | null>(null);
   const [spriteAssetPaths, setSpriteAssetPaths] = useState<Record<string, string>>({});
   const [assetReloadVersion, setAssetReloadVersion] = useState(0);
   const [commonFontImages, setCommonFontImages] = useState<Record<string, string>>({});
@@ -284,6 +301,7 @@ const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, isS
     ...collectUiTextEvents(sceneElement.script ?? []),
     ...Object.values(sceneElement.eventGraphs ?? {}).flatMap((graph: any) => collectUiTextEvents(graph?.nodes ?? [])),
   ].filter((event, index, events) => events.findIndex(candidate => candidate.id === event.id) === index), [sceneElement.script, sceneElement.eventGraphs]);
+  const pendingEventCount = useMemo(() => countSceneAttention(sceneElement, settings), [sceneElement, settings]);
   useEffect(() => {
     void Promise.all([window.electronAPI.getCommonFontImages(), window.electronAPI.fetchImages('fonts')]).then(async ([images, fontsResponse]: [Record<string, string>, any]) => {
       const sources = { ...(images ?? {}) };
@@ -311,12 +329,19 @@ const GameElement: React.FC<GameElementProps> = ({ sceneElement, isSelected, isS
   }, [settings?.font8x8Image, settings?.font8x16Image, settings?.font8x8VariablesImage, settings?.font8x16VariablesImage, settings?.font16x16VariablesImage]);
   useEffect(() => {
     let cancelled = false;
-    loadProjectAssetFiles('sprites', settingUtils.projectPathFile ?? settingUtils.localImagePath).then(files => {
-      if (cancelled) return;
-      const paths = Object.fromEntries(files.map(file => [file.id, file.path]));
-      setSpriteAssetPaths(paths);
-    }).catch(() => undefined);
-    return () => { cancelled = true; };
+    const reloadSpriteAssets = () => {
+      loadProjectAssetFiles('sprites', settingUtils.projectPathFile ?? settingUtils.localImagePath).then(files => {
+        if (cancelled) return;
+        const paths = Object.fromEntries(files.map(file => [file.id, file.path]));
+        setSpriteAssetPaths(paths);
+      }).catch(() => undefined);
+    };
+    reloadSpriteAssets();
+    window.addEventListener('gba-studio:assets-reloaded', reloadSpriteAssets);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('gba-studio:assets-reloaded', reloadSpriteAssets);
+    };
   }, [settingUtils.projectPathFile, settingUtils.localImagePath]);
   useEffect(() => {
     let cancelled = false;
@@ -459,8 +484,12 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     }));
   });
   const layerTileCount = renderedTileCount ?? uniqueTileKeys.size;
-  const hasInitialPlayer = settings?.startSceneId === sceneElement.id && Boolean(settings?.playerSpriteId);
-  const actorCount = (sceneElement.actors?.length ?? 0) + (hasInitialPlayer ? 1 : 0);
+  const hasInitialPlayer = Boolean(settings?.playerSpriteId);
+  const spriteBudget = useMemo(() => calculateSceneSpriteBudget(sceneElement, {
+    sprites: spriteResources, prefabs: prefabs?.prefabs ?? [], scripts: scripts?.scripts ?? [],
+    playerSpriteId: settings?.playerSpriteId, hasPlayer: hasInitialPlayer,
+  }), [sceneElement, spriteResources, prefabs, scripts, settings?.playerSpriteId, hasInitialPlayer]);
+  const actorCount = spriteBudget.peakSprites;
   const triggerCount = sceneElement.triggers?.length ?? 0;
   const counterStyle = (value: number, limit: number): CSSProperties => ({
     padding: '1px 5px',
@@ -474,6 +503,10 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     return `${label}: ${value} de ${limit}.`;
   };
   const [draggingChangeScenePreviewId, setDraggingChangeScenePreviewId] = useState<string | null>(null);
+  const playerTargetDrag = useRef<{ grabX: number; grabY: number; originX: number; originY: number; stepX: number; stepY: number; width?: number; height?: number } | null>(null);
+  const playerTargetDragSource = useRef(Symbol('player-target'));
+  const playerTargetDragHandlers = useRef({ setSettings, onMoveChangeScenePreview });
+  useLayoutEffect(() => { playerTargetDragHandlers.current = { setSettings, onMoveChangeScenePreview }; }, [setSettings, onMoveChangeScenePreview]);
   const [originalBackgroundLayer, setOriginalBackgroundLayer] = useState<number | null>(null);
   useEffect(() => {
     setOriginalBackgroundLayer(null);
@@ -498,6 +531,49 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     const timer = window.setTimeout(() => setIsEditButtonVisible(true), 300);
     return () => window.clearTimeout(timer);
   }, [isSelected]);
+
+  useEffect(() => {
+    const isEditingThisScene = settingUtils.tileEditSceneId === sceneElement.id;
+    if (!isSelected || isEditingThisScene) {
+      editButtonTopRef.current = null;
+      return;
+    }
+    const sceneRoot = sceneRootRef.current;
+    const viewport = sceneRoot?.closest<HTMLElement>('[data-testid="game-world-viewport"]');
+    if (!sceneRoot || !viewport) return;
+    let animationFrame = 0;
+    const updatePosition = () => {
+      animationFrame = 0;
+      const button = editButtonRef.current;
+      if (button) {
+        const sceneBounds = sceneRoot.getBoundingClientRect();
+        const viewportBounds = viewport.getBoundingClientRect();
+        const scale = sceneBounds.height / Math.max(1, sceneElement.height);
+        const centerY = (viewportBounds.top + viewportBounds.height / 2 - sceneBounds.top) / Math.max(scale, 0.001);
+        const centerAlignedTop = centerY - 15;
+        const nextTop = Math.max(0, Math.min(sceneElement.height - 30, centerAlignedTop));
+        if (editButtonTopRef.current === null || Math.abs(editButtonTopRef.current - nextTop) >= 0.5) {
+          editButtonTopRef.current = nextTop;
+          button.style.top = `${nextTop}px`;
+          button.style.bottom = 'auto';
+        }
+      }
+    };
+    const schedulePosition = () => {
+      if (!animationFrame) animationFrame = window.requestAnimationFrame(updatePosition);
+    };
+    // Moving the world or the scene only moves this control; it must not
+    // rerender the scene, its event previews or its animated backgrounds.
+    const movementObserver = new MutationObserver(schedulePosition);
+    movementObserver.observe(sceneRoot, { attributes: true, attributeFilter: ['style'] });
+    const world = sceneRoot.closest<HTMLElement>('.react-transform-component');
+    if (world) movementObserver.observe(world, { attributes: true, attributeFilter: ['style'] });
+    const resizeObserver = new ResizeObserver(schedulePosition);
+    resizeObserver.observe(sceneRoot);
+    resizeObserver.observe(viewport);
+    schedulePosition();
+    return () => { window.cancelAnimationFrame(animationFrame); movementObserver.disconnect(); resizeObserver.disconnect(); };
+  }, [isSelected, isEditButtonVisible, sceneElement.id, sceneElement.height, settingUtils.tileEditSceneId]);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: sceneElement.id,
@@ -548,6 +624,10 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
         if (tilesetId) referencedTilesetIds.add(tilesetId);
       }));
     }
+    for (const animation of sceneElement.tileAnimations ?? []) {
+      if (animation.targetTilesetId) referencedTilesetIds.add(animation.targetTilesetId);
+      animation.frameTilesetIds?.forEach(id => { if (id) referencedTilesetIds.add(id); });
+    }
     settings?.autoTileSlots?.forEach(slot => { if (slot.autoTileId) referencedTilesetIds.add(toAutoTileSourceKey(slot.autoTileId)); });
     if (activeTilesetId) referencedTilesetIds.add(activeTilesetId);
     const loadReferencedTilesets = async () => {
@@ -573,7 +653,7 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     };
     loadReferencedTilesets();
     return () => { cancelled = true; };
-  }, [sceneElement.backgrounds, settings?.autoTileSlots, sceneElement.selectedTilesetId, activeTilesetId, settingUtils.localImagePath, settingUtils.projectPathFile, assetReloadVersion]);
+  }, [sceneElement.backgrounds, sceneElement.tileAnimations, settings?.autoTileSlots, sceneElement.selectedTilesetId, activeTilesetId, settingUtils.localImagePath, settingUtils.projectPathFile, assetReloadVersion]);
 
   // Render elementos
   useEffect(() => {
@@ -585,7 +665,8 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     // CANVAS
     let canvas = document.createElement('canvas');
 
-    const cachedScene = getCachedSceneCanvas(sceneElement.id);
+    const cachedParts = getCachedSceneRenderParts(sceneElement.id);
+    const cachedScene = !isTileEditingScene && cachedParts ? cachedParts.background : getCachedSceneCanvas(sceneElement.id);
     const displayCanvasOnStart = canvasRef.current;
     if (cachedScene && displayCanvasOnStart) {
       if (displayCanvasOnStart.width !== cachedScene.width) displayCanvasOnStart.width = cachedScene.width;
@@ -594,6 +675,7 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
       if (cachedContext) {
         cachedContext.clearRect(0, 0, displayCanvasOnStart.width, displayCanvasOnStart.height);
         cachedContext.drawImage(cachedScene, 0, 0);
+        setForegroundLayersPreview(!isTileEditingScene && cachedParts?.foreground ? cachedParts.foreground.toDataURL() : null);
         hasRenderedSceneRef.current = true;
         setImageLoading(false);
       }
@@ -618,6 +700,13 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
 
     canvas.width = maxWidth;
     canvas.height = maxHeight;
+
+    const foregroundCanvas = document.createElement('canvas');
+    foregroundCanvas.width = maxWidth;
+    foregroundCanvas.height = maxHeight;
+    const foregroundContext = foregroundCanvas.getContext('2d');
+    if (foregroundContext) foregroundContext.imageSmoothingEnabled = false;
+    const layerComposition = createSceneLayerComposition(maxWidth, maxHeight);
 
     // Desliga o filtro de suavização
     ctx.imageSmoothingEnabled = false;
@@ -666,11 +755,11 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     //     };
     //   }
     // });
-    const bgPromises = (sceneElement.backgrounds || []).sort((a, b) => a.layerId - b.layerId).map(lbg => {
+    const bgPromises = [...(sceneElement.backgrounds || [])].sort((a, b) => a.layerId - b.layerId).map(lbg => {
       const bgData = backgrounds.find(b => !b._deleted && b.id === lbg.backgroundId);
       if (!bgData) return null;
 
-      const availablePalettes = palettes.palettes.length ? palettes.palettes : loadPaletteLibrary();
+      const availablePalettes = getPreviewPalettes(palettes.palettes.length ? palettes.palettes : loadPaletteLibrary(), settings?.colorPaletteIds);
       // normalizePalette always provides the 16 GBA entries. Only picker thumbnails
       // deliberately use a slice of eight colors.
       const paletteColors = normalizePalette(availablePalettes.find(palette => palette.id === lbg.paletteId) ?? {})?.colors;
@@ -687,20 +776,30 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
         image,
         counterImage: counterImage ?? image,
         layerId: lbg.layerId,
+        backgroundId: lbg.backgroundId ?? undefined,
         x: Number(lbg.x) || 0,
         y: Number(lbg.y) || 0,
         sourcePath,
         visible: !userSettings.hiddenBackgroundLayers?.includes(`${sceneElement.id}:${lbg.layerId}`),
       }));
-    }).filter((image): image is Promise<{ image: HTMLCanvasElement | null; counterImage: HTMLCanvasElement | null; layerId: number; x: number; y: number; sourcePath: string; visible: boolean }> => image !== null);
+    }).filter((image): image is Promise<{ image: HTMLCanvasElement | null; counterImage: HTMLCanvasElement | null; layerId: number; backgroundId?: string; x: number; y: number; sourcePath: string; visible: boolean }> => image !== null);
 
     // BACKGROUNDS END
 
     Promise.all(bgPromises).then(async images => {
       if (cancelled) return;
+      const animatedSources = new Map<HTMLImageElement | HTMLCanvasElement, Map<string, HTMLImageElement | HTMLCanvasElement>>();
+      const animatedSource = (image: HTMLImageElement | HTMLCanvasElement, layer: number, tilesetId: string) => {
+        let layers = animatedSources.get(image);
+        if(!layers) { layers = new Map(); animatedSources.set(image, layers); }
+        const key = `${layer}:${tilesetId}`;
+        let result = layers.get(key);
+        if(!result) { result = paintAnimatedTileset(image, layer, tileAnimationFrames, tilesetId, tilesetImagesById); layers.set(key, result); }
+        return result;
+      };
       const renderedTileKeys = new Set<string>();
       let editedLayerTileCanvas: HTMLCanvasElement | null = null;
-      const availablePalettes = palettes.palettes.length ? palettes.palettes : loadPaletteLibrary();
+      const availablePalettes = getPreviewPalettes(palettes.palettes.length ? palettes.palettes : loadPaletteLibrary(), settings?.colorPaletteIds);
       // Colorize is also valid for a source background with no TileSet. Build
       // a temporary overlay from palette-remapped copies of that source; the
       // original asset remains untouched and the same recipe is materialized
@@ -778,8 +877,9 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
         .filter(layer => layer.layerId !== editingLayerId && layer.tileMap?.some(row => row.some(tile => tile >= 0)))
         .sort((left, right) => left.layerId - right.layerId);
       const nonEditingMapLayerIds = new Set(nonEditingTileLayers.map(layer => layer.layerId));
+      const contextForLayer = (layerId: number) => layerComposition.context(layerId);
       const repeatBackground = sceneElement.sceneType !== ETypeScene.LOGO && sceneElement.sceneType !== ETypeScene.POINTNCLICK;
-      images.forEach(({ image, counterImage, layerId, x, y, visible }) => {
+      images.forEach(({ image, counterImage, layerId, backgroundId, x, y, visible }) => {
         if (!image) return;
         // The selected layer's map overwrites pixels in its source image. Count
         // that composed result below instead of adding the source and paint
@@ -798,15 +898,17 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
         const drawY = y;
         // Keep the active layer crisp and retain the other layers as a muted
         // context instead of constantly hiding/reloading them during editing.
-        ctx.save();
-        ctx.globalAlpha = shouldDimInactiveLayers && layerId !== editingLayerId ? .26 : 1;
-        drawSceneBackground(ctx, image, drawX, drawY, canvas.width, canvas.height, repeatBackground, originalBackgroundLayer === layerId);
+        const layerContext = contextForLayer(layerId);
+        layerContext.save();
+        layerContext.globalAlpha = shouldDimInactiveLayers && layerId !== editingLayerId ? .26 : 1;
+        const displayedBackground = backgroundId ? animatedSource(image, layerId, backgroundId) : image;
+        drawSceneBackground(layerContext, displayedBackground, drawX, drawY, canvas.width, canvas.height, repeatBackground, originalBackgroundLayer === layerId);
         const colorizedOverlay = colorizedBackgroundOverlays.get(layerId);
-        if (colorizedOverlay) ctx.drawImage(colorizedOverlay, 0, 0);
-        ctx.restore();
+        if (colorizedOverlay) layerContext.drawImage(colorizedOverlay, 0, 0);
+        layerContext.restore();
         if (shouldDimInactiveLayers && layerId !== editingLayerId) {
-          ctx.fillStyle = 'rgba(0, 0, 0, .18)';
-          ctx.fillRect(drawX, drawY, image.width, image.height);
+          layerContext.fillStyle = 'rgba(0, 0, 0, .18)';
+          layerContext.fillRect(drawX, drawY, image.width, image.height);
         }
       });
 
@@ -838,19 +940,19 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
             }));
           }));
           const grid = sceneElement.gridSize ?? 8;
-          const availablePalettes = palettes.palettes.length ? palettes.palettes : loadPaletteLibrary();
+          const availablePalettes = getPreviewPalettes(palettes.palettes.length ? palettes.palettes : loadPaletteLibrary(), settings?.colorPaletteIds);
           for (const layer of nonEditingTileLayers) {
             const fallbackTileset = loadedTilesets.get(layer.selectedTilesetId ?? sceneElement.selectedTilesetId ?? '');
             const source = images.find(image => image.layerId === layer.layerId)?.counterImage;
             if(!fallbackTileset && !layer.tileMapTilesetIds?.flat().some(Boolean)) {
               if(source) addCanvasTiles(source, renderedTileKeys);
-              return;
+              continue;
             }
             const overlay = document.createElement('canvas');
             overlay.width = canvas.width;
             overlay.height = canvas.height;
             const overlayContext = overlay.getContext('2d');
-            if(!overlayContext) return;
+            if(!overlayContext) continue;
             const layerPosition = images.find(image => image.layerId === layer.layerId);
             const layerX = layerPosition?.x ?? (Number(layer.x) || 0);
             const layerY = layerPosition?.y ?? (Number(layer.y) || 0);
@@ -878,7 +980,7 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
               const tilesPerRow = Math.max(1, Math.floor(tileset.naturalWidth / grid));
               const storedPaletteId = layer.tilePaletteIds?.[rowIndex]?.[colIndex];
               const sourceTileset = storedPaletteId && storedPaletteId !== '__original__' ? (paletteImages.get(`${sourceId}:${storedPaletteId}`) ?? tileset) : tileset;
-              overlayContext.drawImage(sourceTileset, (tileIndex % tilesPerRow) * grid, Math.floor(tileIndex / tilesPerRow) * grid, grid, grid, layerX + colIndex * grid, layerY + rowIndex * grid, grid, grid);
+              overlayContext.drawImage(animatedSource(sourceTileset, layer.layerId, sourceId), (tileIndex % tilesPerRow) * grid, Math.floor(tileIndex / tilesPerRow) * grid, grid, grid, layerX + colIndex * grid, layerY + rowIndex * grid, grid, grid);
             }));
             // Count the same composition that the build pipeline receives,
             // before the dimming-only preview treatment is applied.
@@ -892,15 +994,17 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
             }
             composedContext?.drawImage(overlay, 0, 0);
             addCanvasTiles(composedLayer, renderedTileKeys);
+            if (userSettings.hiddenBackgroundLayers?.includes(`${sceneElement.id}:${layer.layerId}`)) continue;
             if (shouldDimInactiveLayers) {
               overlayContext.globalCompositeOperation = 'source-atop';
               overlayContext.fillStyle = 'rgba(0, 0, 0, .18)';
               overlayContext.fillRect(0, 0, overlay.width, overlay.height);
             }
-            ctx.save();
-            ctx.globalAlpha = shouldDimInactiveLayers ? .26 : 1;
-            ctx.drawImage(overlay, 0, 0);
-            ctx.restore();
+            const layerContext = contextForLayer(layer.layerId);
+            layerContext.save();
+            layerContext.globalAlpha = shouldDimInactiveLayers ? .26 : 1;
+            layerContext.drawImage(overlay, 0, 0);
+            layerContext.restore();
           }
         } catch (error) {
           images.forEach(({ image, counterImage, layerId }) => {
@@ -914,15 +1018,12 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
       // is replayed here and later by the build pipeline.
       if (editingTileMap && (tilesetImage || Object.keys(tilesetImagesById).length > 0)) {
         const grid = sceneElement.gridSize ?? 8;
-        const availablePalettes = palettes.palettes.length ? palettes.palettes : loadPaletteLibrary();
-        const defaultPaletteId = Array.isArray(settings?.paletteIds)
-          ? settings.paletteIds.find((paletteId): paletteId is string => typeof paletteId === 'string')
-          : undefined;
+        const availablePalettes = getPreviewPalettes(palettes.palettes.length ? palettes.palettes : loadPaletteLibrary(), settings?.colorPaletteIds);
         const paletteSources = new Map<string, { tilesetId: string | null; paletteId: string }>();
         editingTileMap.forEach((mapRow, row) => mapRow.forEach((tile, col) => {
           if (tile < 0) return;
           const tilesetId = editingTileMapTilesetIds?.[row]?.[col] ?? activeTilesetId;
-          const paletteId = editingLayer?.tilePaletteIds?.[row]?.[col] ?? defaultPaletteId;
+          const paletteId = editingLayer?.tilePaletteIds?.[row]?.[col];
           if (paletteId && paletteId !== '__original__') paletteSources.set(`${tilesetId ?? ''}:${paletteId}`, { tilesetId, paletteId });
         }));
         const paletteTilesets = new Map<string, HTMLCanvasElement>();
@@ -942,11 +1043,9 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
           const cellTileset = tilesetId ? tilesetImagesById[tilesetId] ?? (tilesetId === activeTilesetId ? tilesetImage : null) : tilesetImage;
           if (!cellTileset) return;
           const tilesPerRow = Math.max(1, Math.floor(cellTileset.naturalWidth / grid));
-          // Colorize's special erase brush stores an explicit marker so the
-          // cell returns to the source tileset palette instead of inheriting
-          // the project's default palette.
+          // Both unpainted palette cells and Colorize's erase marker use the source colors.
           const storedPaletteId = editingLayer?.tilePaletteIds?.[row]?.[col];
-          const paletteId = storedPaletteId === '__original__' ? undefined : (storedPaletteId ?? defaultPaletteId);
+          const paletteId = storedPaletteId === '__original__' ? undefined : (storedPaletteId);
           const tileSource = paletteId ? paletteTilesets.get(`${tilesetId ?? ''}:${paletteId}`) ?? cellTileset : cellTileset;
           if(!editedLayerTileCanvas) {
             editedLayerTileCanvas = document.createElement('canvas');
@@ -971,29 +1070,39 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
           };
           const editedContext = editedLayerTileCanvas.getContext('2d', { willReadFrequently: true });
           if (editedContext) drawCell(editedContext, cellTileset);
-          drawCell(ctx, tileSource);
+          if (!userSettings.hiddenBackgroundLayers?.includes(`${sceneElement.id}:${editingLayerId}`)) {
+            drawCell(contextForLayer(editingLayerId), animatedSource(tileSource, editingLayerId, tilesetId ?? activeTilesetId ?? ''));
+          }
         }));
       }
       if(editedLayerTileCanvas) addCanvasTiles(editedLayerTileCanvas, renderedTileKeys);
       if(!cancelled) setRenderedTileCount(renderedTileKeys.size);
+      if (cancelled) return;
+      layerComposition.draw(ctx, !isTileEditingScene ? foregroundContext : null);
 
       // Scene events are an editor-only layer and must not cover tile layers.
       if (isEventsLayer) {
         sceneElement.collisions?.forEach(c => {
+          const ladderIsAvailable = sceneElement.sceneType === ETypeScene.PLATFORM;
+          if (c.collisionSide === 'ladder' && !ladderIsAvailable) {
+            drawUnknownCollisionReference(ctx, c.x, c.y, c.width, c.height);
+            return;
+          }
           ctx.fillStyle = getSceneCollisionFill(c.collisionSide, 0.7);
           ctx.fillRect(c.x, c.y, c.width, c.height);
           if (c.collisionSide === 'ladder') drawLadderCollisionIcon(ctx, c.x, c.y, c.width, c.height);
-        });
-        sceneElement.triggers?.forEach(t => {
-          ctx.strokeStyle = "rgba(0,255,0,0.5)";
-          ctx.strokeRect(t.x, t.y, t.width, t.height);
         });
       }
       // TRIGGERS END
 
       if (!cancelled) {
-        if (originalBackgroundLayer === null) cacheSceneCanvas(sceneElement.id, canvas);
+        if (originalBackgroundLayer === null && !isTileEditingScene) cacheSceneCanvas(sceneElement.id, canvas, foregroundContext ? foregroundCanvas : undefined);
         const displayCanvas = canvasRef.current;
+        if (!isTileEditingScene && foregroundContext) {
+          setForegroundLayersPreview(foregroundCanvas.toDataURL());
+        } else {
+          setForegroundLayersPreview(null);
+        }
         if (displayCanvas) {
           if (displayCanvas.width !== canvas.width) displayCanvas.width = canvas.width;
           if (displayCanvas.height !== canvas.height) displayCanvas.height = canvas.height;
@@ -1010,7 +1119,7 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     return () => {
       cancelled = true;
     };
-  }, [originalBackgroundLayer, sceneElement.showCamera, sceneElement.sceneType, sceneElement.cameraPosition?.x, sceneElement.cameraPosition?.y, editingTileMap, editingTileMapTilesetIds, activeTilesetId, editingLayerId, isEventsLayer, sceneElement.gridSize, sceneElement.triggers, sceneElement.actors, sceneElement.collisions, tilesetImage, tilesetImagesById, assetReloadVersion, sceneElement.width, sceneElement.height, sceneElement.backgrounds, settings?.autoTileSlots, backgrounds, palettes.palettes, settings?.paletteIds, settingUtils.tileEditSceneId, settingUtils.localImagePath, settingUtils.localImagePathHD, settingUtils.tileFlipHorizontal, settingUtils.tileFlipVertical, userSettings.hiddenBackgroundLayers]);
+  }, [originalBackgroundLayer, sceneElement.showCamera, sceneElement.sceneType, sceneElement.cameraPosition?.x, sceneElement.cameraPosition?.y, editingTileMap, editingTileMapTilesetIds, activeTilesetId, editingLayerId, isEventsLayer, sceneElement.gridSize, sceneElement.triggers, sceneElement.actors, sceneElement.collisions, tilesetImage, tilesetImagesById, assetReloadVersion, sceneElement.width, sceneElement.height, sceneElement.backgrounds, settings?.autoTileSlots, backgrounds, palettes.palettes, settings?.paletteIds, settings?.colorPaletteIds, settingUtils.tileEditSceneId, settingUtils.localImagePath, settingUtils.localImagePathHD, settingUtils.tileFlipHorizontal, settingUtils.tileFlipVertical, userSettings.hiddenBackgroundLayers, tileAnimationFrames]);
 
   const computedElementStyle: CSSProperties = elementStyle(
     transform,
@@ -1033,28 +1142,6 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
         : computedElementStyle.transform,
   };
 
-  const handleMoveInitialPlayerPosition = (e:any) => {
-    if (!draggingInitialPosition) return;
-
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const scale = userSettings.zoom / 100 || 1;
-
-    let x = Math.floor(((e.clientX - rect.left) / scale) / 16); // tile X
-    let y = Math.floor(((e.clientY - rect.top) / scale) / 16);  // tile Y
-
-    // limita dentro do grid
-    const maxX = Math.floor((rect.width / scale) / 16) - 2;
-    const maxY = Math.floor((rect.height / scale) / 16) - 2;
-
-    x = Math.max(0, Math.min(x, maxX));
-    y = Math.max(0, Math.min(y, maxY));
-
-    // dispara atualização para settings
-    setSettings(prev => ({...prev, startX: x, startY: y }));
-  };
-
   const getRotation = (direction: string): number => {
     switch (direction) {
       case 'up': return -90;
@@ -1065,55 +1152,58 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     }
   };
 
-  useEffect(() => {
-    if (!draggingInitialPosition) return;
-
-    const handleMouseMove = (event: MouseEvent) => {
-      const canvas = document.elementFromPoint(event.clientX, event.clientY)
-        ?.closest<HTMLCanvasElement>('canvas[data-scene-id]');
-      if (!canvas) return;
-
-      const rect = canvas.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-      const maxX = Math.max(0, Math.floor(canvas.width / 16) - 2);
-      const maxY = Math.max(0, Math.floor(canvas.height / 16) - 2);
-      const x = Math.max(0, Math.min(Math.floor(((event.clientX - rect.left) / rect.width * canvas.width) / 16), maxX));
-      const y = Math.max(0, Math.min(Math.floor(((event.clientY - rect.top) / rect.height * canvas.height) / 16), maxY));
-      setSettings(previous => ({ ...previous, startSceneId: canvas.dataset.sceneId || previous.startSceneId, startX: x, startY: y, _saved: false }));
+  const beginPlayerTargetDrag = (event: React.MouseEvent<HTMLElement>, preview?: { id: string; xUnit?: 'pixels' | 'tiles'; yUnit?: 'pixels' | 'tiles' }) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const sprite = spriteResources.find(item => item.id === settings?.playerSpriteId);
+    playerTargetDrag.current = {
+      grabX: (event.clientX - rect.left) / Math.max(1, rect.width) * 16,
+      grabY: (event.clientY - rect.top) / Math.max(1, rect.height) * 16,
+      originX: Number(sprite?.playerCanvasOriginX ?? 0), originY: Number(sprite?.playerCanvasOriginY ?? 8), width: sprite?.playerFrameWidth ?? 16, height: sprite?.playerFrameHeight ?? 16,
+      stepX: sceneObjectSnapSize,
+      stepY: sceneObjectSnapSize,
     };
-    const stopDragging = () => setDraggingInitialPosition(false);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', stopDragging);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', stopDragging);
-    };
-  }, [draggingInitialPosition]);
+    setPlayerTargetDragActive(playerTargetDragSource.current, true);
+    if (preview) setDraggingChangeScenePreviewId(preview.id); else setDraggingInitialPosition(true);
+  };
 
   useEffect(() => {
-    if(!draggingChangeScenePreviewId) return;
-
-    const handleMouseMove = (event: MouseEvent) => {
-      const canvas = document.elementFromPoint(event.clientX, event.clientY)
-        ?.closest<HTMLCanvasElement>('canvas[data-scene-id]');
-      if(!canvas) return;
-
-      const rect = canvas.getBoundingClientRect();
-      if(!rect.width || !rect.height) return;
-      const maxX = Math.max(0, Math.floor(canvas.width / 16) - 2);
-      const maxY = Math.max(0, Math.floor(canvas.height / 16) - 2);
-      const x = Math.max(0, Math.min(Math.floor(((event.clientX - rect.left) / rect.width * canvas.width) / 16), maxX));
-      const y = Math.max(0, Math.min(Math.floor(((event.clientY - rect.top) / rect.height * canvas.height) / 16), maxY));
-      onMoveChangeScenePreview(draggingChangeScenePreviewId, canvas.dataset.sceneId || sceneElement.id, x, y);
+    if (!draggingInitialPosition && !draggingChangeScenePreviewId) return;
+    let moved = false;
+    let lastCanvas = [...document.querySelectorAll<HTMLCanvasElement>('canvas[data-scene-id]')].find(canvas => canvas.dataset.sceneId === sceneElement.id);
+    const release = () => setPlayerTargetDragActive(playerTargetDragSource.current, false);
+    const move = (event: MouseEvent) => {
+      const hitCanvas = findPlayerTargetCanvas(event.clientX, event.clientY);
+      if (hitCanvas) lastCanvas = hitCanvas;
+      const canvas = hitCanvas ?? (lastCanvas?.isConnected ? lastCanvas : undefined);
+      const drag = playerTargetDrag.current;
+      if (!canvas || !drag) return;
+      moved = true;
+      const { x, y } = getPlayerTargetDragPosition(canvas, event.clientX, event.clientY, drag);
+      if (draggingInitialPosition) playerTargetDragHandlers.current.setSettings(previous => ({ ...previous, startSceneId: canvas.dataset.sceneId || previous.startSceneId, startX: x, startY: y, _saved: false }));
+      else if (draggingChangeScenePreviewId) playerTargetDragHandlers.current.onMoveChangeScenePreview(draggingChangeScenePreviewId, canvas.dataset.sceneId || sceneElement.id, x, y);
     };
-    const stopDragging = () => setDraggingChangeScenePreviewId(null);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', stopDragging);
+    const stop = () => {
+      release();
+      playerTargetDrag.current = null;
+      setDraggingInitialPosition(false);
+      setDraggingChangeScenePreviewId(null);
+      if (!moved) return;
+      const suppressClick = (event: MouseEvent) => { event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); window.removeEventListener('click', suppressClick, true); window.clearTimeout(timer); };
+      const timer = window.setTimeout(() => window.removeEventListener('click', suppressClick, true), 500);
+      window.addEventListener('click', suppressClick, true);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', stop);
+    window.addEventListener('blur', stop);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', stopDragging);
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', stop);
+      window.removeEventListener('blur', stop);
+      release();
     };
-  }, [draggingChangeScenePreviewId, onMoveChangeScenePreview, sceneElement.id]);
+  }, [draggingInitialPosition, draggingChangeScenePreviewId, sceneElement.id]);
 
   const handleHovered = (isHovered: boolean) => {
     setIsHovered(isHovered)
@@ -1433,8 +1523,10 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     const stroke = colorizeStrokeRef.current;
     if (!stroke || (stroke.last.col === col && stroke.last.row === row)) return;
     const next = stroke.paletteMap.map(line => [...line]);
-    const paletteId = editingLayer?.paintPaletteId ?? null;
-    if (settingUtils.activeSubButton !== 'subAction2' && !paletteId) {
+    const paletteId = editingLayer?.paintPaletteId ?? (settings?.colorPaletteIds?.[0] ? '__slot__:0' : null);
+    const library = palettes.palettes.length ? palettes.palettes : loadPaletteLibrary();
+    const configuredPalettes = [...getConfiguredPalettes(library, settings?.colorPaletteIds), ...getPaletteSlotOptions(library, settings?.colorPaletteIds)];
+    if (settingUtils.activeSubButton !== 'subAction2' && !configuredPalettes.some(palette => palette.id === paletteId)) {
       message.warning('Selecione uma paleta antes de usar o Colorize.');
       return;
     }
@@ -1472,6 +1564,31 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     setTileHover({ col, row });
     const x = col * grid;
     const y = row * grid;
+    if (settingUtils.activeButton === 'add' && settingUtils.activeSubButton === 'Prefab' && settingUtils.pendingPrefabPlacement) {
+      const prefab = prefabs.prefabs.find(item => item.id === settingUtils.pendingPrefabPlacement);
+      if (!prefab) { setSettingUtils(previous => ({ ...previous, pendingPrefabPlacement: null, activeButton: 'select', activeSubButton: '' })); return; }
+      const id = uuidv4();
+      if (prefab.type === 'actor') {
+        const pointX = Math.floor(x / 16) * 16 + 8;
+        const pointY = y + 4;
+        const actor = { ...prefab.actor, id, actorId: id, prefabId: prefab.id, name: prefab.name, x: pointX, y: pointY, width: 16, height: 8, anchor: 'center', direction: 'right',
+          onInteractScript: clonePrefabEvents(prefab.actor?.onInteractScript) ?? [], onInitScript: clonePrefabEvents(prefab.actor?.onInitScript) ?? [], onUpdateScript: clonePrefabEvents(prefab.actor?.onUpdateScript) ?? [] };
+        const updated = { ...sceneElement, actors: [...(sceneElement.actors ?? []), actor], _saved: false };
+        setElementSelected(updated);
+        setScenes(previous => previous.map(scene => scene.id === updated.id ? updated : scene));
+        setSettingUtils(previous => ({ ...previous, activeButton: 'select', activeSubButton: '', pendingPrefabPlacement: null, activeSceneObject: { sceneId: sceneElement.id, type: 'actor', id }, activeTriggerId: null }));
+      } else {
+        const template = prefab.trigger ?? {};
+        const width = Math.max(8, Number(template.width) || 32), height = Math.max(8, Number(template.height) || 32);
+        const trigger = { ...template, id, sceneId: sceneElement.id, prefabId: prefab.id, name: prefab.name, x: Math.min(x, Math.max(0, sceneElement.width - width)), y: Math.min(y, Math.max(0, sceneElement.height - height)), width, height,
+          onEnterScript: clonePrefabEvents(template.onEnterScript) ?? [], onLeaveScript: clonePrefabEvents(template.onLeaveScript) ?? [], onInteractScript: clonePrefabEvents(template.onInteractScript) ?? [], onInitScript: clonePrefabEvents(template.onInitScript) ?? [], onUpdateScript: clonePrefabEvents(template.onUpdateScript) ?? [] };
+        const updated = { ...sceneElement, triggers: [...(sceneElement.triggers ?? []), trigger], _saved: false };
+        setElementSelected(updated);
+        setScenes(previous => previous.map(scene => scene.id === updated.id ? updated : scene));
+        setSettingUtils(previous => ({ ...previous, activeButton: 'select', activeSubButton: '', pendingPrefabPlacement: null, activeSceneObject: { sceneId: sceneElement.id, type: 'trigger', id }, activeTriggerId: id }));
+      }
+      return;
+    }
     const update = (changes: Partial<ISceneSettings>) => {
       const updated = { ...sceneElement, ...changes, _saved: false };
       setElementSelected(updated);
@@ -1563,7 +1680,6 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     if (tool === 'add' && subTool === 'Actor') {
       if (actorCount >= 128) {
         message.warning('Esta cena já atingiu o limite de 128 sprites, incluindo o Player inicial.');
-        return;
       }
       // Actors are anchored at their centre. A 16×8 actor therefore expands
       // evenly around the grid origin rather than drifting right/down.
@@ -1664,7 +1780,7 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
       const paletteMap = Array.from({ length: rows }, (_, mapRow) => Array.from({ length: columns }, (_, mapCol) => editingLayer?.tilePaletteIds?.[mapRow]?.[mapCol] ?? null));
       colorizeStrokeRef.current = { last: { col: -1, row: -1 }, paletteMap };
       if (subTool === 'subAction3') {
-        if (!editingLayer?.paintPaletteId) {
+        if (!editingLayer?.paintPaletteId && !settings?.colorPaletteIds?.[0]) {
           message.warning('Selecione uma paleta antes de usar o Colorize.');
         } else {
           matchingCells(col, row).forEach(cell => paintColorize(cell.col, cell.row));
@@ -1713,7 +1829,33 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     setAreaTool('erase');
   };
 
+  const updatePrefabPlacementHover = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (event.buttons & 4) return;
+    if (settingUtils.activeButton !== 'add' || settingUtils.activeSubButton !== 'Prefab' || !settingUtils.pendingPrefabPlacement || !isSelected || settingUtils.tileEditSceneId !== sceneElement.id) {
+      setPrefabPlacementHover(null);
+      return;
+    }
+    const canvas = canvasRef.current;
+    const prefab = prefabs.prefabs.find(item => item.id === settingUtils.pendingPrefabPlacement);
+    if (!canvas || !prefab) return;
+    const rect = canvas.getBoundingClientRect();
+    const grid = sceneElement.gridSize ?? 8;
+    const rawX = (event.clientX - rect.left) * canvas.width / rect.width;
+    const rawY = (event.clientY - rect.top) * canvas.height / rect.height;
+    const x = prefab.type === 'actor' ? Math.floor(rawX / 16) * 16 + 8 : Math.floor(rawX / grid) * grid;
+    const y = prefab.type === 'actor' ? Math.floor(rawY / grid) * grid + 4 : Math.floor(rawY / grid) * grid;
+    setPrefabPlacementHover({ x, y });
+  };
+
+  const updatePlayerTargetHover = (event: React.PointerEvent<HTMLElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const position = getCanvasTilePosition(canvas, event.clientX, event.clientY, 1);
+    onSceneMouseMove?.(sceneElement, position.col, position.row);
+  };
+
   const updateTriggerDrag = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (event.buttons & 4) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const grid = sceneElement.gridSize ?? 8;
@@ -1731,8 +1873,10 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
       tileSelectionDrag.current = { col, row };
       setTileSelectionPreview({ start: tileSelectionDrag.start, current: tileSelectionDrag.current, mode: tileSelectionDrag.mode, cells: tileSelectionDrag.cells });
     }
-    tileHoverRef.current = { col, row };
-    setTileHover({ col, row });
+    if (tileHoverRef.current?.col !== col || tileHoverRef.current?.row !== row) {
+      tileHoverRef.current = { col, row };
+      setTileHover({ col, row });
+    }
     if (autoTileStrokeRef.current) paintAutoTileStroke(col, row);
     if (tileStrokeRef.current) paintTiles(col, row);
     if (colorizeStrokeRef.current) paintColorize(col, row);
@@ -1954,6 +2098,7 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const grid = sceneElement.gridSize ?? 8;
+    const snapSize = sceneObjectSnapSize;
     const current = draggingObject.type === 'actor'
       ? sceneElement.actors?.find(item => item.id === draggingObject.id)
       : sceneElement.triggers?.find(item => item.id === draggingObject.id);
@@ -1964,12 +2109,8 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
     const rawX = (event.clientX - rect.left) * canvas.width / rect.width - draggingObject.offsetX;
     const rawY = (event.clientY - rect.top) * canvas.height / rect.height - draggingObject.offsetY;
     const centeredActor = draggingObject.type === 'actor' && (current as any).anchor === 'center';
-    const x = centeredActor
-      ? Math.max(width / 2, Math.min(sceneElement.width - width / 2, snapActorX(rawX)))
-      : Math.max(0, Math.min(sceneElement.width - width, Math.round(rawX / grid) * grid));
-    const y = centeredActor
-      ? Math.max(height / 2, Math.min(sceneElement.height - height / 2, snapActorY(rawY)))
-      : Math.max(0, Math.min(sceneElement.height - height, Math.round(rawY / grid) * grid));
+    const x = sceneObjectAxisPosition(rawX, sceneElement.width, width, centeredActor, snapSize);
+    const y = sceneObjectAxisPosition(rawY, sceneElement.height, height, centeredActor, snapSize);
     // Persist only on release. Rebuilding the canvas on every pointer move
     // caused asynchronous background/grid redraws to flash during a drag.
     setDragPreviewPosition({ x, y });
@@ -2064,9 +2205,10 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
   return (
     <Content
       id={sceneElement?.id}
-      ref={setNodeRef}
+      ref={(node: HTMLDivElement | null) => { sceneRootRef.current = node; setNodeRef(node); }}
       className="game-element"
-      style={{...displayedElementStyle, width: canvasRef.current?.width, height: canvasRef.current?.height, opacity: isDimmed ? .35 : isSecondarySelected ? .72 : 1, filter: isSecondarySelected ? 'brightness(.82)' : undefined, pointerEvents: isDimmed ? 'none' : undefined, outline: 'none'}}
+      data-search-match={matchesSearch ? 'true' : 'false'}
+      style={{...displayedElementStyle, backgroundColor: 'transparent', width: canvasRef.current?.width, height: canvasRef.current?.height, opacity: isDimmed ? .35 : isSecondarySelected || !matchesSearch ? .72 : 1, filter: isSecondarySelected || !matchesSearch ? 'brightness(.82)' : undefined, pointerEvents: isDimmed ? 'none' : undefined, outline: 'none'}}
       {...attributes}
       onClick={event => onSelect(sceneElement, event)}
       onContextMenu={(e) => {
@@ -2077,15 +2219,13 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
       onMouseLeave={() => handleHovered(false) }
     >
       {/* PLAYER INITIAL POSITION */}
-      <Content style={{ position: 'relative', width: sceneElement.width, height: sceneElement.height, flex: 'none', overflow: 'visible' }}
-        onMouseUp={() => setDraggingInitialPosition(false)}
-        onMouseMove={(e) => handleMoveInitialPlayerPosition(e)}
+      <Content style={{ position: 'relative', width: sceneElement.width, height: sceneElement.height, flex: 'none', overflow: 'visible', backgroundColor: 'black', isolation: 'isolate' }}
       >
         {imageLoading && (
           <div aria-label="Carregando imagem da cena" style={{ position: 'absolute', left: 0, top: 0, width: sceneElement.width, height: sceneElement.height, background: `linear-gradient(110deg, ${token.colorFillSecondary} 30%, ${token.colorFillTertiary} 45%, ${token.colorFillSecondary} 60%)`, backgroundSize: '200% 100%', animation: 'gba-scene-skeleton 1.4s ease-in-out infinite', zIndex: 20, pointerEvents: 'none' }} />
         )}
         {/* Renderiza tileMap se disponivel */}
-        <canvas ref={canvasRef} data-scene-id={sceneElement.id} data-edit-tool={`${settingUtils.activeButton}:${settingUtils.activeSubButton}`} data-tile-editing={settingUtils.tileEditSceneId === sceneElement.id ? 'true' : 'false'} data-tile-grid={settingUtils.tileEditSceneId === sceneElement.id && (userSettings.showTileEditorGrid ?? true) ? 'visible' : 'hidden'} data-selected={isSelected ? 'true' : 'false'} data-active-object={settingUtils.activeSceneObject?.id ?? ''} onPointerDown={editCanvas} onPointerMove={updateTriggerDrag} onPointerUp={finishTriggerDrag} onPointerLeave={() => { tileHoverRef.current = null; setTileHover(null); onSceneMouseLeave?.(); }} onClick={event => {
+        <canvas ref={canvasRef} data-scene-id={sceneElement.id} data-edit-tool={`${settingUtils.activeButton}:${settingUtils.activeSubButton}`} data-tile-editing={settingUtils.tileEditSceneId === sceneElement.id ? 'true' : 'false'} data-tile-grid={settingUtils.tileEditSceneId === sceneElement.id && (userSettings.showTileEditorGrid ?? true) ? 'visible' : 'hidden'} data-selected={isSelected ? 'true' : 'false'} data-active-object={settingUtils.activeSceneObject?.id ?? ''} onPointerDown={editCanvas} onPointerMove={event => { updateTriggerDrag(event); updatePrefabPlacementHover(event); }} onPointerUp={finishTriggerDrag} onPointerLeave={() => { tileHoverRef.current = null; setTileHover(null); setPrefabPlacementHover(null); onSceneMouseLeave?.(); }} onClick={event => {
           // While the tile editor is active, clicks belong to its canvas
           // tools, including Shift+click for selecting connected tiles.
           if (settingUtils.tileEditSceneId === sceneElement.id) event.stopPropagation();
@@ -2105,12 +2245,34 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
           Number(sceneElement.cameraPosition?.y ?? 0),
           Number(sceneElement.width) || canvasRef.current?.width || 0,
           Number(sceneElement.height) || canvasRef.current?.height || 0,
-        ).map((rect, index) => <span key={`show-camera-view-${index}`} aria-label="Show Camera on View" style={{ position: 'absolute', left: rect.left, top: rect.top, width: rect.width, height: rect.height, boxSizing: 'border-box', background: 'rgba(130, 133, 130, .3)', pointerEvents: 'none', zIndex: 2 }}>
+        ).map((rect, index) => <span key={`show-camera-view-${index}`} aria-label="Show Camera on View" style={{ position: 'absolute', left: rect.left, top: rect.top, width: rect.width, height: rect.height, boxSizing: 'border-box', background: 'rgba(130, 133, 130, .3)', pointerEvents: 'none', zIndex: 10 }}>
           <NonScalingOutline width={rect.width} height={rect.height} color="rgba(149, 149, 149, .9)" strokeWidth={1} dashed />
         </span>)}
         {isTileEditingScene && (userSettings.showTileEditorGrid ?? true) && <svg aria-hidden="true" viewBox={`0 0 ${sceneElement.width} ${sceneElement.height}`} width={sceneElement.width} height={sceneElement.height} style={{ position: 'absolute', left: 0, top: 0, width: sceneElement.width, height: sceneElement.height, overflow: 'visible', pointerEvents: 'none', zIndex: 1 }}>
           <path d={editingGridPath} fill="none" stroke={token.colorBgContainer} strokeWidth={1} vectorEffect="non-scaling-stroke" shapeRendering="crispEdges" />
         </svg>}
+        {settingUtils.pendingPrefabPlacement && prefabPlacementHover && isSelected && settingUtils.tileEditSceneId === sceneElement.id && (() => {
+          const prefab = prefabs.prefabs.find(item => item.id === settingUtils.pendingPrefabPlacement);
+          if (!prefab) return null;
+          const grid = sceneElement.gridSize ?? 8;
+          if (prefab.type === 'actor') {
+            const actor = { ...(prefab.actor ?? {}), x: prefabPlacementHover.x, y: prefabPlacementHover.y, width: 16, height: 8, anchor: 'center' };
+            const bounds = actorBounds(actor as any, grid);
+            const spriteId = prefab.actor?.spriteId;
+            const sprite = spriteResources.find(item => item.id === spriteId) as any;
+            const source = spriteAssetPaths[spriteId ?? ''];
+            const direction = 'right';
+            const directionRow = ({ down: 0, left: 1, right: 2, up: 3 } as Record<string, number>)[direction] ?? 2;
+            const originX = Number(sprite?.playerCanvasOriginX ?? 0), originY = Number(sprite?.playerCanvasOriginY ?? (sprite?.playerFrameHeight ?? 16) / 2);
+            return <span data-testid="prefab-placement-preview" style={{ position: 'absolute', left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height, boxSizing: 'border-box', background: 'rgba(22,119,255,.14)', opacity: .72, pointerEvents: 'none', zIndex: 15 }}>
+              {source && <span style={{ position: 'absolute', left: bounds.width / 2 - originX, top: bounds.height / 2 - originY, width: sprite?.playerFrameWidth ?? 16, height: sprite?.playerFrameHeight ?? 16, backgroundImage: `url("${source}")`, backgroundPosition: `0 ${directionRow * 33.333}%`, backgroundSize: `${((sprite?.imageWidth ?? 64) / (sprite?.playerFrameWidth ?? 16)) * 100}% ${((sprite?.imageHeight ?? 64) / (sprite?.playerFrameHeight ?? 16)) * 100}%`, backgroundRepeat: 'no-repeat', imageRendering: 'pixelated' }} />}
+              <NonScalingOutline width={bounds.width} height={bounds.height} color="#1677ff" strokeWidth={1} dashed />
+            </span>;
+          }
+          const width = Math.max(8, Number(prefab.trigger?.width) || 32), height = Math.max(8, Number(prefab.trigger?.height) || 32);
+          const x = Math.min(prefabPlacementHover.x, Math.max(0, sceneElement.width - width)), y = Math.min(prefabPlacementHover.y, Math.max(0, sceneElement.height - height));
+          return <span data-testid="prefab-placement-preview" style={{ position: 'absolute', left: x, top: y, width, height, boxSizing: 'border-box', background: 'rgba(82,196,26,.18)', pointerEvents: 'none', zIndex: 15 }}><NonScalingOutline width={width} height={height} color="#52c41a" strokeWidth={1} dashed /></span>;
+        })()}
         {isTileEditingScene && !isEventsLayer && settingUtils.tileSourceHover?.sceneId === sceneElement.id && settingUtils.tileSourceHover.layerId === editingLayerId && (() => {
           const hoveredLayer = sceneElement.backgrounds?.find(layer => layer.layerId === editingLayerId);
           const grid = sceneElement.gridSize ?? 8;
@@ -2313,13 +2475,14 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
           return <span data-testid={areaTool === 'erase' ? 'erase-area-preview' : undefined} style={{ position: 'absolute', left, top, width, height, boxSizing: 'border-box', background: areaFill, pointerEvents: 'none', zIndex: 5 }}><NonScalingOutline width={width} height={height} color={areaColor} strokeWidth={1} dashed /></span>;
         })()}
         {isEventsLayer && sceneElement.triggers?.map(trigger => {
+          const triggerDisabled = trigger.enabled === false;
           const preview = draggingObject?.type === 'trigger' && draggingObject.id === trigger.id ? dragPreviewPosition : null;
           const resized = resizingTrigger?.id === trigger.id ? resizePreview : null;
           const bounds = resized ?? { x: preview?.x ?? trigger.x, y: preview?.y ?? trigger.y, width: trigger.width, height: trigger.height };
           const handleStyle = (cursor: string, style: CSSProperties): CSSProperties => ({ position: 'absolute', ...style, zIndex: 2, cursor, pointerEvents: settingUtils.activeButton === 'select' ? 'auto' : 'none' });
           const beginResize = (edges: string) => (event: React.PointerEvent<HTMLElement>) => startTriggerResize(trigger, edges, event);
-          return <span key={trigger.id} title={trigger.name || 'Trigger'} onPointerDown={event => { if (settingUtils.activeButton !== 'select') return; event.stopPropagation(); startObjectDrag('trigger', trigger, event); }} onPointerMove={resizingTrigger ? undefined : moveSceneObject} onPointerUp={resizingTrigger ? undefined : finishObjectDrag} onClick={event => { if (settingUtils.activeButton !== 'select') return; event.stopPropagation(); onSelectObject?.('trigger', trigger.id!); }} style={{ position: 'absolute', left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height, boxSizing: 'border-box', background: 'rgba(82,196,26,.16)', cursor: settingUtils.activeButton === 'select' ? 'move' : 'crosshair', pointerEvents: settingUtils.activeButton === 'select' ? 'auto' : 'none', zIndex: 2 }}>
-            <NonScalingOutline width={bounds.width} height={bounds.height} color={selectedObject?.type === 'trigger' && selectedObject.id === trigger.id ? '#faad14' : '#52c41a'} strokeWidth={1} />
+          return <span id={`scene-edit-target-${sceneElement.id}-${trigger.id}`} key={trigger.id} title={trigger.name || 'Trigger'} onPointerDown={event => { if (settingUtils.activeButton !== 'select') return; event.stopPropagation(); startObjectDrag('trigger', trigger, event); }} onPointerMove={resizingTrigger ? undefined : moveSceneObject} onPointerUp={resizingTrigger ? undefined : finishObjectDrag} onClick={event => { if (settingUtils.activeButton !== 'select') return; event.stopPropagation(); onSelectObject?.('trigger', trigger.id!); }} style={{ position: 'absolute', left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height, boxSizing: 'border-box', cursor: settingUtils.activeButton === 'select' ? 'move' : 'crosshair', pointerEvents: settingUtils.activeButton === 'select' ? 'auto' : 'none', zIndex: 2 }}>
+            <NonScalingOutline width={bounds.width} height={bounds.height} color={selectedObject?.type === 'trigger' && selectedObject.id === trigger.id ? '#faad14' : triggerDisabled ? '#8c8c8c' : '#52c41a'} fill={triggerDisabled ? 'rgba(140,140,140,.16)' : 'rgba(82,196,26,.16)'} strokeWidth={1} dashed={triggerDisabled} />
             <span aria-label="Resize trigger top" onPointerDown={beginResize('n')} onPointerMove={resizeTrigger} onPointerUp={finishTriggerResize} style={handleStyle('ns-resize', { left: 0, right: 0, top: -4, height: 8 })} />
             <span aria-label="Resize trigger bottom" onPointerDown={beginResize('s')} onPointerMove={resizeTrigger} onPointerUp={finishTriggerResize} style={handleStyle('ns-resize', { left: 0, right: 0, bottom: -4, height: 8 })} />
             <span aria-label="Resize trigger left" onPointerDown={beginResize('w')} onPointerMove={resizeTrigger} onPointerUp={finishTriggerResize} style={handleStyle('ew-resize', { top: 0, bottom: 0, left: -4, width: 8 })} />
@@ -2337,13 +2500,27 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
           const canvasPreview = actorSpritePreviews[actorKey];
           const canvasOriginX = Number(sprite?.playerCanvasOriginX ?? 0);
           const canvasOriginY = Number(sprite?.playerCanvasOriginY ?? (sprite?.playerFrameHeight ?? 16) / 2);
-          return <span key={actorKey} title={actor.name || 'Actor'} onPointerDown={isEventsLayer ? event => { if (settingUtils.activeButton !== 'select') return; event.stopPropagation(); startObjectDrag('actor', actor, event); } : undefined} onPointerMove={isEventsLayer ? moveSceneObject : undefined} onPointerUp={isEventsLayer ? finishObjectDrag : undefined} onClick={isEventsLayer ? event => { if (settingUtils.activeButton !== 'select') return; event.stopPropagation(); if (actor.id) onSelectObject?.('actor', actor.id); } : undefined} style={{ position: 'absolute', left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height, boxSizing: 'border-box', cursor: isEventsLayer && settingUtils.activeButton === 'select' ? 'move' : 'default', pointerEvents: isEventsLayer && settingUtils.activeButton === 'select' ? 'auto' : 'none', zIndex: 3, overflow: 'visible' }}>
+          return <span id={`scene-edit-target-${sceneElement.id}-${actor.id}`} key={actorKey} title={actor.name || 'Actor'} onPointerDown={isEventsLayer ? event => { if (settingUtils.activeButton !== 'select') return; event.stopPropagation(); startObjectDrag('actor', actor, event); } : undefined} onPointerMove={isEventsLayer ? moveSceneObject : undefined} onPointerUp={isEventsLayer ? finishObjectDrag : undefined} onClick={isEventsLayer ? event => { if (settingUtils.activeButton !== 'select') return; event.stopPropagation(); if (actor.id) onSelectObject?.('actor', actor.id); } : undefined} style={{ position: 'absolute', left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height, boxSizing: 'border-box', cursor: isEventsLayer && settingUtils.activeButton === 'select' ? 'move' : 'default', pointerEvents: isEventsLayer && settingUtils.activeButton === 'select' ? 'auto' : 'none', zIndex: isEventsLayer ? 3 : 1, overflow: 'visible' }}>
             {(canvasPreview || spriteUrl) && <span aria-label={`${actor.name || 'Actor'} sprite preview`} style={{ position: 'absolute', left: bounds.width / 2 - canvasOriginX, top: bounds.height / 2 - canvasOriginY, width: canvasPreview?.width ?? sprite?.playerFrameWidth ?? 16, height: canvasPreview?.height ?? sprite?.playerFrameHeight ?? 16, backgroundImage: `url("${canvasPreview?.url ?? spriteUrl}")`, backgroundPosition: canvasPreview ? undefined : `0 ${directionRow * 33.333}%`, backgroundSize: canvasPreview ? '100% 100%' : `${((sprite?.imageWidth ?? 64) / (sprite?.playerFrameWidth ?? 16)) * 100}% ${((sprite?.imageHeight ?? 64) / (sprite?.playerFrameHeight ?? 16)) * 100}%`, backgroundRepeat: 'no-repeat', imageRendering: 'pixelated', pointerEvents: 'none', zIndex: 0 }} />}
-            {isEventsLayer && <span aria-hidden="true" style={{ position: 'absolute', inset: 0, boxSizing: 'border-box', background: 'rgba(22,119,255,.18)', pointerEvents: 'none', zIndex: 1 }}>
-              <NonScalingOutline width={bounds.width} height={bounds.height} color={selectedObject?.type === 'actor' && selectedObject.id === actor.id ? 'rgba(250,173,20,.78)' : 'rgba(22,119,255,.62)'} strokeWidth={1} />
+            {isTileEditingScene && actor.showCollider === true && <ActorColliderOverlay testId={`actor-collider-${actor.id}`} left={bounds.width / 2 + Number(sprite?.playerCollisionX ?? 0)} top={bounds.height / 2 + Number(sprite?.playerCollisionY ?? 0)} width={Math.max(1, Number(sprite?.playerCollisionWidth ?? 16))} height={Math.max(1, Number(sprite?.playerCollisionHeight ?? 8))} />}
+            {isEventsLayer && <span aria-hidden="true" style={{ position: 'absolute', inset: 0, boxSizing: 'border-box', pointerEvents: 'none', zIndex: 1 }}>
+              <NonScalingOutline width={bounds.width} height={bounds.height} color={selectedObject?.type === 'actor' && selectedObject.id === actor.id ? '#1677ff' : 'rgba(22,119,255,.62)'} fill="rgba(22,119,255,.18)" strokeWidth={1} />
             </span>}
           </span>;
         })}
+        {[...(sceneElement.actors ?? []).map(object => ({ type: 'actor' as const, object })), ...(sceneElement.triggers ?? []).map(object => ({ type: 'trigger' as const, object }))].map(({ type, object }) => {
+          const count = countObjectAttention(object);
+          if (!count) return null;
+          const preview = draggingObject?.type === type && draggingObject.id === object.id ? dragPreviewPosition : null;
+          const position = preview ? { ...object, ...preview } : object;
+          const bounds = type === 'actor' ? actorBounds(position, sceneElement.gridSize ?? 8) : null;
+          const resized = type === 'trigger' && resizingTrigger?.id === object.id ? resizePreview : null;
+          const left = bounds ? bounds.left + bounds.width : (resized?.x ?? position.x) + (resized?.width ?? object.width);
+          const top = bounds ? bounds.top : resized?.y ?? position.y;
+          const key = object.id ?? (object as any).actorId ?? `${object.x}:${object.y}`;
+          return <Tooltip key={`${type}-${key}`} title={t('scene.pendingEventsWarning')}><span role="img" tabIndex={0} aria-label={`${count} events need attention`} data-testid={`${type}-pending-events-${key}`} style={{ position: 'absolute', left: left - 8, top: top - 8, zIndex: 10, pointerEvents: 'auto', color: token.colorWarning }}><Badge count={count} size="small" color={token.colorWarning}><WarningOutlined style={{ padding: 2, borderRadius: '50%', background: token.colorBgElevated }} /></Badge></span></Tooltip>;
+        })}
+        {!isTileEditingScene && foregroundLayersPreview && <span aria-hidden="true" data-testid="scene-foreground-layers" style={{ position: 'absolute', inset: 0, width: sceneElement.width, height: sceneElement.height, pointerEvents: 'none', zIndex: 2, backgroundImage: `url("${foregroundLayersPreview}")`, backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat', imageRendering: 'pixelated' }} />}
         {sceneElement.showCamera && variableTextEvents.map(event => {
           const args = event.args ?? {};
           const variable = variables.variables.find((item: any) => item.id === args.variableId);
@@ -2355,7 +2532,7 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
           const sceneHeight = Math.max(1, Number(sceneElement.height) || canvasRef.current?.height || 1);
           const cameraX = ((Number(sceneElement.cameraPosition?.x ?? 0) % sceneWidth) + sceneWidth) % sceneWidth;
           const cameraY = ((Number(sceneElement.cameraPosition?.y ?? 0) % sceneHeight) + sceneHeight) % sceneHeight;
-          return <span key={`variable-text-${event.id}`} aria-label="Variable text preview" style={{ position: 'absolute', left: cameraX + Number(args.x ?? 0), top: cameraY + Number(args.y ?? 0), display: 'block', whiteSpace: 'nowrap', height: metrics.glyphHeight, background: 'transparent', pointerEvents: 'none', zIndex: 4 }}>
+          return <span key={`variable-text-${event.id}`} aria-label="Variable text preview" style={{ position: 'absolute', left: cameraX + coordinatePixels(args, 'x'), top: cameraY + coordinatePixels(args, 'y'), display: 'block', whiteSpace: 'nowrap', height: metrics.glyphHeight, background: 'transparent', pointerEvents: 'none', zIndex: 4 }}>
             {Array.from(value).map((character: string, index: number) => {
               const glyph = fontGlyphIndex(character);
               if (glyph < 0) return null;
@@ -2373,8 +2550,8 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
           const sceneHeight = Math.max(1, Number(sceneElement.height) || canvasRef.current?.height || 1);
           const cameraX = ((Number(sceneElement.cameraPosition?.x ?? 0) % sceneWidth) + sceneWidth) % sceneWidth;
           const cameraY = ((Number(sceneElement.cameraPosition?.y ?? 0) % sceneHeight) + sceneHeight) % sceneHeight;
-          return <span key={`ui-text-${event.id}`} aria-label="UI text preview" style={{ position: 'absolute', left: cameraX + Number(args.x ?? 0), top: cameraY + Number(args.y ?? 0), display: 'block', pointerEvents: 'none', zIndex: 5 }}>
-            {String(args.text ?? '').split('\n').map((line: string, lineIndex: number) => <span key={lineIndex} style={{ display: 'flex', height: metrics.glyphHeight, whiteSpace: 'nowrap' }}>
+          return <span key={`ui-text-${event.id}`} aria-label="UI text preview" style={{ position: 'absolute', left: cameraX + coordinatePixels(args, 'x'), top: cameraY + coordinatePixels(args, 'y'), display: 'block', pointerEvents: 'none', zIndex: 5 }}>
+            {resolveTextTemplate(String(args.text ?? ''), variables.variables).split('\n').map((line: string, lineIndex: number) => <span key={lineIndex} style={{ display: 'flex', height: metrics.glyphHeight, whiteSpace: 'nowrap' }}>
               {Array.from(line).map((character: string, index: number) => {
                 const glyph = fontGlyphIndex(character);
                 const width = fontCharacterWidth(font, character);
@@ -2424,53 +2601,59 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
           ));
         })}
         {/* Ícone do player sobreposto */}
-        {settings?.startSceneId === sceneElement?.id && !isTileEditingScene && (
-            <PlaySquareTwoTone twoToneColor={[draggingInitialPosition ? "orange" : "gray", "red"]} 
-              rotate={getRotation(settings.startDirection)} 
-              style={{
-                position: "absolute", 
-                left: settings.startX * 16, 
-                top: settings.startY * 16, 
-                fontSize: 16, 
-                color: "red", 
-                cursor: draggingInitialPosition ? "grabbing" : "grab" }} 
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  setDraggingInitialPosition(true);
-              }}
-            />
-        )}
-        {changeScenePreviewLayer && createPortal(changeScenePreviews.map((preview, index) => (
+        {settings?.startSceneId === sceneElement?.id && (() => {
+          const marker = getChangeSceneMarkerPosition({ ...sceneElement, x: 0, y: 0 }, { x: settings.startX, y: settings.startY }, spriteResources.find(item => item.id === settings.playerSpriteId));
+          return <PlaySquareTwoTone data-testid="initial-player-target" aria-label={t('world.initialPlayerTarget')} twoToneColor={[draggingInitialPosition ? 'orange' : 'gray', 'red']} rotate={getRotation(settings.startDirection)}
+            onPointerEnter={updatePlayerTargetHover}
+            onPointerMove={updatePlayerTargetHover}
+            onPointerLeave={() => onSceneMouseLeave?.()}
+            style={{ position: 'absolute', left: marker.left, top: marker.top, fontSize: 16, zIndex: 8, pointerEvents: 'auto', cursor: draggingInitialPosition ? 'grabbing' : 'grab' }}
+            onPointerDown={event => event.stopPropagation()}
+            onClick={event => event.stopPropagation()}
+            onMouseDown={event => beginPlayerTargetDrag(event)} />;
+        })()}
+        {changeScenePreviewLayer && createPortal(changeScenePreviews.map(preview => {
+          const marker = getChangeSceneMarkerPosition(sceneElement, preview, spriteResources.find(item => item.id === settings?.playerSpriteId));
+          return (
           <PlaySquareTwoTone
             key={preview.id}
+            data-testid={`scene-arrival-target-${preview.id}`}
+            onPointerEnter={updatePlayerTargetHover}
+            onPointerMove={updatePlayerTargetHover}
+            onPointerLeave={() => onSceneMouseLeave?.()}
+            aria-label={t('world.sceneArrivalTarget', { x: preview.x, y: preview.y })}
             twoToneColor={["#1677ff", "#91caff"]}
             rotate={getRotation(preview.direction)}
             title={`Change Scene arrival at ${preview.x}, ${preview.y}`}
             style={{
               position: "absolute",
-              left: sceneElement.x + preview.x * 16 + (changeScenePreviewOffset?.x ?? 0),
-              top: sceneElement.y + preview.y * 16 + (changeScenePreviewOffset?.y ?? 0),
+              left: marker.left + (changeScenePreviewOffset?.x ?? 0),
+              top: marker.top + (changeScenePreviewOffset?.y ?? 0),
               fontSize: 16,
               color: "#1677ff",
               pointerEvents: "auto",
               cursor: draggingChangeScenePreviewId === preview.id ? "grabbing" : "grab",
               zIndex: 11,
-              // Slightly separate arrivals deliberately configured at the
-              // same tile, while keeping their tile position recognisable.
-              transform: `translate(${index * 3}px, ${index * 3}px)`,
             }}
-            onMouseDown={event => {
-              event.preventDefault();
-              event.stopPropagation();
-              setDraggingChangeScenePreviewId(preview.id);
-            }}
+            onPointerDown={event => event.stopPropagation()}
+            onClick={event => event.stopPropagation()}
+            onMouseDown={event => beginPlayerTargetDrag(event, preview)}
           />
-        )), changeScenePreviewLayer)}
+        ); }), changeScenePreviewLayer)}
       </Content>
 
+        {pendingEventCount > 0 && <div style={{ position: 'absolute', top: 4, right: 4, zIndex: 30, pointerEvents: 'auto', display: 'flex', gap: 8, color: token.colorWarning }}>
+          <Tooltip zIndex={10000} getPopupContainer={() => document.body} trigger={['hover', 'focus']} title={t('scene.pendingEventsWarning')}>
+            <span aria-label={t('scene.pendingEventsWarning')} data-testid="scene-pending-events">
+              <Badge count={pendingEventCount} size="small" color={token.colorWarning}><WarningOutlined style={{ padding: 3, borderRadius: '50%', background: token.colorBgElevated, boxShadow: token.boxShadowSecondary }} /></Badge>
+            </span>
+          </Tooltip>
+        </div>}
+
       {/* The edit control remains behind the title until it is intentionally hovered. */}
-      {onEditTiles && isSelected && isEditButtonVisible && (
+      {onEditTiles && isSelected && isEditButtonVisible && settingUtils.tileEditSceneId !== sceneElement.id && (
         <Button
+          ref={node => { editButtonRef.current = node; }}
           aria-label="Edit tiles"
           title="Edit tiles"
           size="small"
@@ -2485,13 +2668,13 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
             // Six pixels remain exposed on the right so the hidden tab can
             // always receive a pointer hover.
             right: -6,
-            bottom: '100%',
-            zIndex: 3,
+            ...(editButtonTopRef.current === null ? { bottom: '100%' } : { top: editButtonTopRef.current, bottom: 'auto' }),
+            zIndex: -1,
             width: 36,
             height: 30,
             borderRadius: `0 ${token.borderRadius}px ${token.borderRadius}px 0`,
             background: token.colorBgElevated,
-            boxShadow: token.boxShadowSecondary,
+            boxShadow: 'none',
             transform: isEditButtonHovered ? 'translateX(28px)' : 'translateX(0)',
             transition: 'transform 160ms ease-out',
           }}
@@ -2523,8 +2706,8 @@ const editingLayerId = settingUtils.tileEditSceneId === sceneElement.id ? (setti
           <Tooltip title={`${limitMessage('Tiles nas layers da cena', layerTileCount, 4096)} Cada background usa blocos de 8×8.`}>
             <span style={counterStyle(layerTileCount, 4096)}>S: {layerTileCount}/4096</span>
           </Tooltip>
-          <Tooltip title={`${limitMessage(`Actors nesta cena${hasInitialPlayer ? ' (inclui o Player inicial)' : ''}`, actorCount, 128)}`}>
-            <span style={counterStyle(actorCount, 128)}>Actors: {actorCount}/128</span>
+          <Tooltip title={`${limitMessage(`Sprites nesta cena${hasInitialPlayer ? ' (inclui o Player inicial)' : ''}`, actorCount, 128)}`}>
+            <span style={counterStyle(actorCount, 128)}>Sprites: {spriteBudget.unbounded ? '≥' : ''}{actorCount}/128</span>
           </Tooltip>
           <Tooltip title={`Triggers nesta cena: ${triggerCount}`}>
             <span style={counterStyle(triggerCount, 128)}>T: {triggerCount}</span>

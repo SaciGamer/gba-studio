@@ -3,9 +3,16 @@
 
 #include "bn_string.h"
 #include "resource_types.h"
+#include "gba_studio_features.h"
+#if GBA_STUDIO_FEATURE_WAIT
 #include "event_wait.h"
+#endif
+#if GBA_STUDIO_FEATURE_WAIT_INPUT
 #include "event_wait_input.h"
+#endif
+#if GBA_STUDIO_FEATURE_WAIT_SIGNAL
 #include "event_wait_signal.h"
+#endif
 #include "event_fade.h"
 #include "event_motion.h"
 
@@ -29,6 +36,7 @@ public:
     static bool execute(const void* args);
 };
 
+#if GBA_STUDIO_FEATURE_WAIT
 class WaitEventHandler
 {
 public:
@@ -37,17 +45,22 @@ public:
     static bool execute(const void* args);
 };
 
+#endif
+#if GBA_STUDIO_FEATURE_WAIT_INPUT
 class WaitInputEventHandler
 {
 public:
     static EventStatus execute_status(const void* args, WaitInput& state);
 };
 
+#endif
+#if GBA_STUDIO_FEATURE_WAIT_SIGNAL
 class WaitSignalEventHandler
 {
 public:
     static EventStatus execute_status(const void* args, WaitSignal& state);
 };
+#endif
 
 class SaveEventHandler
 {
@@ -62,11 +75,18 @@ public:
     static bool execute(const void* args);
 };
 
+class PhysicsEventHandler
+{
+public:
+    static EventStatus execute_status(const bn::string<64>& command, const void* args, const char* self_actor_id = nullptr);
+};
+
 class CameraEventHandler
 {
 public:
     static EventStatus execute_status(const void* args, MotionEventState& state);
     static bool execute(const CameraEventData& data);
+    static bool stop_follow();
     static bool follow(const CameraFollowEventData& data);
     static bool shake(const CameraShakeEventData& data);
     static bool execute(const void* args);
@@ -110,17 +130,19 @@ class ActorEventHandler
 {
 public:
     static bool state(const void* args);
-    static EventStatus move_status(const void* args, MotionEventState& state);
+    static EventStatus move_status(const void* args, MotionEventState& state, const char* self_actor_id = nullptr);
     static bool spawn(const ActorSpawnEventData& data);
     static bool remove(const ActorRemoveEventData& data);
     static bool visible(const ActorVisibilityEventData& data);
     static bool animation_speed(const ActorAnimationSpeedEventData& data);
+    static bool animation(const ActorAnimationControlEventData& data);
     static bool priority(const ActorPriorityEventData& data);
     static bool move(const ActorMoveEventData& data);
     static bool spawn(const void* args);
     static bool remove(const void* args);
     static bool visible(const void* args);
     static bool animation_speed(const void* args);
+    static bool animation(const void* args);
     static bool priority(const void* args);
     static bool move(const void* args);
 };

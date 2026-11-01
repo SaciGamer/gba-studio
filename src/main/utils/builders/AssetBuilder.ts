@@ -1,3 +1,4 @@
+import { DEFAULT_PALETTES } from '../../../shared/defaultPalettes';
 /**
  * Asset Builder - manages project assets (graphics, audio, etc.)
  * Copies and organizes assets into the build directory structure
@@ -5,6 +6,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import crypto from 'node:crypto';
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { materializeSpriteCanvas } from './SpriteCanvasBuilder';
@@ -12,14 +14,16 @@ import { fitRegularBgBmp, regularBgDimensions } from './regularBgDimensions';
 import { indexedTransparency, encodeSpriteBmp } from './spriteCanvasPixels';
 import { JsonResourceDefault, ResourceFile } from '../types/BuildTypes';
 import { runBuildJobs } from './runBuildJobs';
+import { flattenItInstrumentModeForBuild } from '../../../shared/trackerItBuildCompatibility';
+import { readTrackerProjectForBuild, musicAssetSymbol } from './TrackerProjectPackage';
+import { exportMusicComposition } from '../../../renderer/frontend/src/utils/trackerCompositionExport';
+import { isMusicCompositionDocument } from '../../../renderer/frontend/src/utils/trackerComposition';
+import { materializeBackgroundAnimations } from './BackgroundAnimationAssets';
+import { finalizeTileAnimationAssets, type TileAnimationAssetPlan } from './TileAnimationAssets';
+import { encodeSlotPalettePixels } from './SlotPalettePixels';
 
 const execFileAsync = promisify(execFile);
-const BUILTIN_TILE_PALETTES: Record<string, string[]> = {
-  'preset-gba': ['#000000', '#ffffff', '#b5d8a8', '#73a55c', '#3d6b3d', '#203c56', '#456b8c', '#8fb8d8', '#f4d35e', '#ee964b', '#f95738', '#9e2a2b', '#6a4c93', '#8e7dbe', '#2a9d8f', '#264653'],
-  'preset-gameboy': ['#0f380f', '#306230', '#8bac0f', '#9bbc0f', '#1b1b1b', '#3b4a2f', '#5f7c3b', '#cadc9f', '#283618', '#606c38', '#a3b18a', '#dad7cd', '#344e41', '#588157', '#a3b18a', '#fefae0'],
-  'preset-grayscale': ['#000000', '#111111', '#222222', '#333333', '#444444', '#555555', '#666666', '#777777', '#888888', '#999999', '#aaaaaa', '#bbbbbb', '#cccccc', '#dddddd', '#eeeeee', '#ffffff'],
-  'preset-sunset': ['#16001e', '#301934', '#512b58', '#7b2d5f', '#a44255', '#d05a4e', '#ef8354', '#f6bd60', '#f7ede2', '#84a59d', '#52796f', '#354f52', '#2f3e46', '#e07a5f', '#3d405b', '#81b29a'],
-};
+
 // AssetBuilder is also used by build verification outside Electron.  Its tool
 // lookup needs the same answer as electron-is-dev without requiring Electron
 // merely to load this file.
@@ -39,11 +43,36 @@ export class AssetBuilder {
   private __dirname: string;
   private readonly magickPath?: string;
   private readonly tilesetSourcePaths = new Map<string, string>();
+  private readonly backgroundSourcePaths = new Map<string, string>();
+  private readonly preparedGraphics = new Set<string>();
+  private tileAnimationPlans: TileAnimationAssetPlan[] = [];
+  public finalizeTileAnimations(resources: ResourceFile[], buildDir: string): void {
+    finalizeTileAnimationAssets(this.tileAnimationPlans, resources, buildDir);
+  }
+  public hasPreparedGraphic(name: string): boolean { return this.preparedGraphics.has(name); }
+  public async materializeBackgroundAnimations(resources: ResourceFile[], assetsDir: string): Promise<JsonResourceDefault[]> {
+    const frames = await materializeBackgroundAnimations(resources, assetsDir, this.getGraphicsDir(), this.getMagickPath());
+    for (const frame of frames) this.preparedGraphics.add(path.parse(String(frame.filename)).name);
+    return frames;
+  }
 
   constructor(dirname: string, buildDir: string, magickPath?: string) {
     this.__dirname = dirname;
     this.buildDir = buildDir;
     this.magickPath = magickPath;
+  }
+
+  /** Resolve missing UI defaults into the build, without modifying saved assets. */
+  public async prepareUiDefaults(projectAssetDir: string, defaultDirs: string[]): Promise<void> {
+    for (const filename of ['cursor.png', 'frame.png']) {
+      if (fs.existsSync(path.join(projectAssetDir, 'ui', filename))) continue;
+      const source = defaultDirs.map(directory => path.join(directory, filename)).find(candidate => fs.existsSync(candidate));
+      if (!source) throw new Error(`Default UI asset not found: ${filename}`);
+      const destination = path.join(this.getGraphicsDir(), filename);
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.copyFileSync(source, destination);
+      await this.processAssets(source, destination, 'ui');
+    }
   }
 
   /**
@@ -55,6 +84,8 @@ export class AssetBuilder {
     options: AssetCopyOptions = {}
   ): Promise<{ copiedCount: number; skippedCount: number }> {
     const { overwrite = true, preserveStructure = true, verbose = false } = options;
+    this.preparedGraphics.clear();
+    this.tilesetSourcePaths.clear();
     if (!fs.existsSync(sourceAssetDir)) {
       console.warn('..: Asset directory not found:', sourceAssetDir);
       return { copiedCount: 0, skippedCount: 0 };
@@ -66,7 +97,9 @@ export class AssetBuilder {
 
     let copiedCount = 0;
     let skippedCount = 0;
-    this.tilesetSourcePaths.clear();
+    const assetCachePath = path.join(this.buildDir, '.asset-copy-cache.json');
+    let assetCache: Record<string, string> = {};
+    try { assetCache = JSON.parse(fs.readFileSync(assetCachePath, 'utf8')); } catch { /* no build cache yet */ }
     const spriteSources: Array<{ filename: string; path: string }> = [];
     // Source sheets are editor inputs, like tilesets. Clear legacy copied
     // sheets before rebuilding other categories that may share a basename.
@@ -85,12 +118,12 @@ export class AssetBuilder {
     if (fs.existsSync(graphicsDir)) for (const entry of fs.readdirSync(graphicsDir, { withFileTypes: true })) {
       if (!entry.isFile()) continue;
       const stem = path.parse(entry.name).name;
-      if ((staleNames.has(stem) || stem.startsWith('gbas_canvas_')) && /\.(png|bmp|gif|jpe?g|json)$/i.test(entry.name)) fs.unlinkSync(path.join(graphicsDir, entry.name));
+      if (staleNames.has(stem) && /\.(png|bmp|gif|jpe?g|json)$/i.test(entry.name)) fs.unlinkSync(path.join(graphicsDir, entry.name));
     }
     const generatedDir = path.join(this.buildDir, 'build');
     if (fs.existsSync(generatedDir)) for (const entry of fs.readdirSync(generatedDir, { withFileTypes: true })) {
       if (!entry.isFile()) continue;
-      if ([...staleNames].some(stem => entry.name === `bn_sprite_items_${stem}.h` || entry.name.startsWith(`${stem}_bn_gfx.`)) || /^(bn_sprite_items_)?gbas_canvas_/.test(entry.name)) fs.unlinkSync(path.join(generatedDir, entry.name));
+      if ([...staleNames].some(stem => entry.name === `bn_sprite_items_${stem}.h` || entry.name.startsWith(`${stem}_bn_gfx.`))) fs.unlinkSync(path.join(generatedDir, entry.name));
     }
 
     const walk = async (dir: string, relativeBase: string, resourceFiles: ResourceFile[]) => {
@@ -117,11 +150,20 @@ export class AssetBuilder {
           }
 
           // Determine destination based on asset type
+          let trackerBuildBytes: Uint8Array | null = null;
           if (['.mod', '.xm', '.s3m', '.it'].includes(ext)) {
             this.validateTrackerModule(sourcePath, ext);
+            if (ext === '.it') {
+              const sourceBytes = fs.readFileSync(sourcePath);
+              const sourceBuffer = sourceBytes.buffer.slice(sourceBytes.byteOffset, sourceBytes.byteOffset + sourceBytes.byteLength) as ArrayBuffer;
+              const compatible = flattenItInstrumentModeForBuild(sourceBuffer);
+              if (!compatible) throw new Error(`IT module ${entry.name} has an instrument map that cannot be prepared for the GBA audio build.`);
+              if (compatible !== sourceBuffer) trackerBuildBytes = new Uint8Array(compatible);
+            }
           }
           const assetCategory = relativeBase.toLowerCase().replace(/\\/g, '/').split('/')[0];
           const isImage = ['.png', '.bmp', '.gif', '.jpg', '.jpeg'].includes(ext);
+          if (isImage && assetCategory === 'avatars') await this.validateAvatarDimensions(sourcePath);
           if (isImage && assetCategory === 'sprites') {
             spriteSources.push({ filename: path.relative(spriteDir, sourcePath).replace(/\\/g, '/'), path: sourcePath });
             continue;
@@ -134,19 +176,60 @@ export class AssetBuilder {
           // Palette graphics are editor sources. Build-time palette remapping
           // uses the colors stored in palette resources and generated swatches.
           if (isImage && assetCategory === 'palettes') continue;
-          const relForDest = preserveStructure ? path.join(path.dirname(relativePath), filename) : filename;
+          const relForDest = assetCategory === 'avatars'
+            ? `avatar_${filename}`
+            : preserveStructure ? path.join(path.dirname(relativePath), filename) : filename;
           const destPath = this.getAssetDestination(sourcePath, relForDest, relativeBase);
 
           if (!fs.existsSync(path.dirname(destPath))) {
             fs.mkdirSync(path.dirname(destPath), { recursive: true });
           }
 
+          const resourceFile = resourceFiles.find(r => r.jsonContent?._resourceType !== 'sprite' && (r.jsonContent?._resourceType !== 'background' || Boolean((r.jsonContent as any).hd) === (assetCategory === 'backgrounds-hd')) && r.jsonContent?.filename && this.sanitizeFilename(r.jsonContent.filename) === filename);
+          if (resourceFile?.jsonContent?._resourceType === 'background' && resourceFile.jsonContent.id) {
+            this.backgroundSourcePaths.set(resourceFile.jsonContent.id, sourcePath);
+          }
+          if ((resourceFile?.jsonContent as any)?.__backgroundAnimationSheetOnly) {
+            const stem = path.parse(destPath).name;
+            for (const suffix of ['.bmp', '.json']) {
+              const stale = path.join(this.getGraphicsDir(), stem + suffix);
+              if (fs.existsSync(stale)) fs.unlinkSync(stale);
+            }
+            for (const name of fs.existsSync(generatedDir) ? fs.readdirSync(generatedDir) : [])
+              if (name === `bn_regular_bg_items_${stem}.h` || name === `bn_direct_bitmap_items_${stem}.h` || name.startsWith(`${stem}_bn_gfx.`)) fs.unlinkSync(path.join(generatedDir, name));
+            skippedCount++;
+            continue;
+          }
+          const cacheKey = path.relative(this.buildDir, destPath).replace(/\\/g, '/');
+          const resourceFingerprint = resourceFile?.jsonContent ? { ...resourceFile.jsonContent } : null;
+          // Background dimensions are populated from the converted graphic by
+          // processAssets; they are output metadata, not an input to conversion.
+          if (resourceFingerprint?._resourceType === 'background') {
+            delete resourceFingerprint.imageWidth;
+            delete resourceFingerprint.imageHeight;
+          }
+          const fingerprint = crypto.createHash('sha256')
+            .update(fs.readFileSync(sourcePath))
+            .update(ext === '.it' ? 'it-build-compat-v1' : '')
+            .update(JSON.stringify(resourceFingerprint))
+            .update(relativeBase)
+            .digest('hex');
+          const descriptorPath = path.join(path.dirname(destPath), `${path.parse(destPath).name}.json`);
+          if (fs.existsSync(destPath) && fs.existsSync(descriptorPath) && assetCache[cacheKey] === fingerprint) {
+            // Cached files are valid outputs for this run too. This set gates
+            // resource emission later in transcodeProject, so cache hits must
+            // register the prepared graphic just like a fresh conversion.
+            this.preparedGraphics.add(path.parse(destPath).name);
+            skippedCount++;
+            continue;
+          }
           if (!fs.existsSync(destPath) || overwrite) {
-            fs.copyFileSync(sourcePath, destPath);
+            if (trackerBuildBytes) fs.writeFileSync(destPath, trackerBuildBytes);
+            else fs.copyFileSync(sourcePath, destPath);
 
-            const resourceFile = resourceFiles.find(r => r.jsonContent?._resourceType !== 'sprite' && r.jsonContent?.filename && this.sanitizeFilename(r.jsonContent.filename) === filename);
             options.onProgress?.(`Preparando asset: ${relativePath}`, 'asset', relativePath);
             await this.processAssets(sourcePath, destPath, relativeBase, resourceFile);
+            assetCache[cacheKey] = fingerprint;
             
             if (verbose) {
               console.log('..: Copied asset:', relativePath);
@@ -163,18 +246,97 @@ export class AssetBuilder {
     };
 
     await walk(sourceAssetDir, '', resourceFiles);
+    const activeSpriteGraphics = new Set<string>();
     for (const file of resourceFiles) {
       const resource = file.jsonContent;
       if (resource?._resourceType !== 'sprite' || resource._deleted) continue;
       const filename = String(resource.filename ?? '').replace(/\\/g, '/');
-      const exact = spriteSources.find(source => source.filename === filename);
-      const candidates = exact ? [exact] : spriteSources.filter(source => path.basename(source.filename) === path.basename(filename));
+      const normalizeSpriteFilename = (value: string) => value.replace(/\\/g, '/').toLowerCase().replace(/ /g, '_').replace(/-/g, '_');
+      const normalizedFilename = normalizeSpriteFilename(filename);
+      const exactCandidates = spriteSources.filter(source => normalizeSpriteFilename(source.filename) === normalizedFilename);
+      const candidates = exactCandidates.length > 0
+        ? exactCandidates
+        : spriteSources.filter(source => path.posix.basename(normalizeSpriteFilename(source.filename)) === path.posix.basename(normalizedFilename));
       if (candidates.length !== 1) throw new Error(`Sprite ${resource.name ?? resource.id}: source image not found or ambiguous (${filename})`);
       options.onProgress?.(`Gerando imagem do sprite: ${resource.name ?? filename}`, 'sprite', String(resource.name ?? filename));
-      await materializeSpriteCanvas(resource, candidates[0].path, graphicsDir, this.getMagickPath());
-      copiedCount++;
+      const spriteFingerprint = crypto.createHash('sha256')
+        .update(fs.readFileSync(candidates[0].path))
+        .update(JSON.stringify({ ...resource, __spriteCanvas: undefined }))
+        .digest('hex');
+      await materializeSpriteCanvas(resource, candidates[0].path, graphicsDir, this.getMagickPath(), spriteFingerprint);
+      if (resource.__spriteCanvas) {
+        this.preparedGraphics.add(resource.__spriteCanvas.graphicsName);
+        activeSpriteGraphics.add(resource.__spriteCanvas.graphicsName);
+      }
+      skippedCount++;
     }
+    for (const entry of fs.readdirSync(graphicsDir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.startsWith('gbas_canvas_')) continue;
+      const extension = path.extname(entry.name).toLowerCase();
+      const stem = path.parse(entry.name).name;
+      if (['.bmp', '.json'].includes(extension) && !activeSpriteGraphics.has(stem)) fs.rmSync(path.join(graphicsDir, entry.name), { force: true });
+    }
+    if (fs.existsSync(generatedDir)) for (const entry of fs.readdirSync(generatedDir, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const spriteHeader = entry.name.match(/^bn_sprite_items_(gbas_canvas_[a-z0-9_]+)\.h$/i)?.[1];
+      const generatedSprite = entry.name.match(/^(gbas_canvas_[a-z0-9_]+)_bn_gfx\./i)?.[1];
+      const graphicsName = spriteHeader ?? generatedSprite;
+      if (graphicsName && !activeSpriteGraphics.has(graphicsName)) fs.rmSync(path.join(generatedDir, entry.name), { force: true });
+    }
+    fs.writeFileSync(assetCachePath, JSON.stringify(assetCache, null, 2));
     return { copiedCount, skippedCount };
+  }
+
+  /** Materialize each saved .gbatracker target as a Butano audio module. */
+  public materializeTrackerProjects(projectMusicDir: string): number {
+    if (!fs.existsSync(projectMusicDir)) return 0;
+    const files: string[] = [];
+    const visit = (directory: string) => {
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const source = path.join(directory, entry.name);
+        if (entry.isDirectory()) visit(source);
+        else if (entry.isFile() && entry.name.toLowerCase().endsWith('.gbatracker')) files.push(source);
+      }
+    };
+    visit(projectMusicDir);
+    // Remove UUID filenames emitted by older builds; Butano rejects them even
+    // when the corrected module is also present in the cached audio directory.
+    const audioDir = this.getAudioDir();
+    if (fs.existsSync(audioDir)) for (const entry of fs.readdirSync(audioDir, { withFileTypes: true })) {
+      if (entry.isFile() && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(mod|xm|s3m|it)$/i.test(entry.name)) {
+        fs.rmSync(path.join(audioDir, entry.name));
+      }
+    }
+    const seen = new Set<string>();
+    for (const source of files.sort()) {
+      const project = readTrackerProjectForBuild(fs.readFileSync(source), path.relative(projectMusicDir, source));
+      const composition = project.composition;
+      if (!isMusicCompositionDocument(composition)) {
+        throw new Error(`GBA Tracker project ${path.basename(source)} contains an invalid canonical composition.`);
+      }
+      const format = composition.targetFormat;
+      if (format !== project.format) {
+        throw new Error(`GBA Tracker project ${path.basename(source)} has inconsistent target format metadata.`);
+      }
+      const extension = format.toLowerCase();
+      if (seen.has(project.id)) throw new Error(`Duplicate GBA Tracker project ID ${project.id} in project/musics.`);
+      seen.add(project.id);
+      const exported = exportMusicComposition(composition, format);
+      for (const warning of exported.warnings) console.warn(`..: ${path.basename(source)} (${format}): ${warning}`);
+      let moduleBytes = Buffer.from(exported.moduleData);
+      if (extension === 'it') {
+        const sourceBuffer = moduleBytes.buffer.slice(moduleBytes.byteOffset, moduleBytes.byteOffset + moduleBytes.byteLength) as ArrayBuffer;
+        const compatible = flattenItInstrumentModeForBuild(sourceBuffer);
+        if (!compatible) throw new Error(`GBA Tracker project ${path.basename(source)} uses an IT instrument map that cannot be prepared for the GBA audio build.`);
+        moduleBytes = Buffer.from(compatible);
+      }
+      const destination = path.join(this.getAudioDir(), `${musicAssetSymbol(project.id)}.${extension}`);
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.writeFileSync(destination, moduleBytes);
+      try { this.validateTrackerModule(destination, `.${extension}`); }
+      catch (error) { fs.rmSync(destination, { force: true }); throw error; }
+    }
+    return files.length;
   }
 
   /**
@@ -373,20 +535,32 @@ export class AssetBuilder {
     }
     const jobs: Array<() => Promise<JsonResourceDefault | undefined>> = [];
     const scenes = resourceFiles.filter(file => file.jsonContent?._resourceType === 'scene');
+    this.tileAnimationPlans = [];
+    const originalBackgrounds = new Map<string, string>();
+    for (const file of scenes) for (const layer of (file.jsonContent as any).backgrounds ?? []) {
+      originalBackgrounds.set(`${file.jsonContent?.id}:${layer.layerId}`, layer.backgroundId ?? '');
+    }
     const backgrounds = resourceFiles.filter(file => file.jsonContent?._resourceType === 'background');
     const paletteResources = resourceFiles.filter(file => file.jsonContent?._resourceType === 'palette');
     const paletteSettings = resourceFiles.find(file => file.jsonContent?._resourceType === 'palettes')?.jsonContent as any;
     const settings = resourceFiles.find(file => file.jsonContent?._resourceType === 'settings')?.jsonContent as any;
     const paletteDirectory = path.join(this.buildDir, '.tile-palettes');
     const palettePaths = new Map<string, string>();
+    const tileCachePath = path.join(this.buildDir, '.tile-layer-cache.json');
+    let tileCache: Record<string, string> = {};
+    try { tileCache = JSON.parse(fs.readFileSync(tileCachePath, 'utf8')); } catch { /* no generated layer cache yet */ }
     if (fs.existsSync(paletteDirectory)) fs.rmSync(paletteDirectory, { recursive: true, force: true });
-    const defaultPaletteId = Array.isArray(settings?.paletteIds) ? settings.paletteIds.find((id: unknown) => typeof id === 'string') : undefined;
+    const defaultSlots: Array<string | null> = Array.from({ length: 16 }, (_, index) => settings?.colorPaletteIds?.[index] ?? null);
     const paletteDefinitions = [
-      ...Object.entries(BUILTIN_TILE_PALETTES).map(([id, colors]) => ({ id, colors })),
+      ...DEFAULT_PALETTES,
       ...paletteResources.map(file => file.jsonContent),
       ...(Array.isArray(paletteSettings?.palettes) ? paletteSettings.palettes : []),
     ];
     const requiredPaletteIds = new Set<string>();
+    defaultSlots.forEach((id, slot) => {
+      const palette = paletteDefinitions.find((palette: any) => palette.id === id);
+      if (palette) paletteDefinitions.push({ ...palette, id: `__slot__:${slot}` });
+    });
     for (const sceneFile of scenes) {
       const scene = sceneFile.jsonContent as any;
       for (const layer of Array.isArray(scene.backgrounds) ? scene.backgrounds : []) {
@@ -398,12 +572,7 @@ export class AssetBuilder {
             if (typeof paletteId === 'string' && paletteId !== '__original__') requiredPaletteIds.add(paletteId);
           }
         }
-        if (hasTileMap && typeof defaultPaletteId === 'string' && defaultPaletteId) {
-          const needsDefaultPalette = layer.tileMap.some((row: number[], rowIndex: number) => row.some((tile: number, colIndex: number) =>
-            Number(tile) >= 0 && layer.tilePaletteIds?.[rowIndex]?.[colIndex] == null,
-          ));
-          if (needsDefaultPalette) requiredPaletteIds.add(defaultPaletteId);
-        }
+
       }
     }
     if (requiredPaletteIds.size) fs.mkdirSync(paletteDirectory, { recursive: true });
@@ -429,13 +598,12 @@ export class AssetBuilder {
             if (typeof paletteId === 'string' && paletteId !== '__original__') referencedPaletteIds.add(paletteId);
           }
         }
-        if (typeof defaultPaletteId === 'string' && defaultPaletteId) referencedPaletteIds.add(defaultPaletteId);
         const missingPalette = [...referencedPaletteIds].find(id => !palettePaths.has(id));
         if (missingPalette) {
           throw new Error(`Unknown tile palette '${missingPalette}' referenced by scene ${scene.id ?? '<scene>'} layer ${layer.layerId ?? 0}`);
         }
         const source = backgrounds.find(file => file.jsonContent?.id === layer.backgroundId)?.jsonContent;
-        const tilesetId = layer.selectedTilesetId ?? scene.selectedTilesetId;
+        const tilesetId = layer.selectedTilesetId;
         const tilesetIds = new Set<string>();
         if (hasTileMap) {
           layer.tileMap.forEach((row: number[], rowIndex: number) => row.forEach((tile: number, colIndex: number) => {
@@ -445,8 +613,7 @@ export class AssetBuilder {
           }));
         }
         if (hasTileMap && !tilesetIds.size) {
-          console.warn('..: Skipping tile layer without tileset:', scene.id, layer.layerId);
-          return;
+          throw new Error(`Cannot materialize scene ${scene.id ?? '<scene>'} layer ${layer.layerId ?? 0}: painted tiles have no source tileset`);
         }
 
         const logicalWidth = Math.round(Number(scene.width) || Number(source?.imageWidth) || 240);
@@ -472,15 +639,7 @@ export class AssetBuilder {
             const sourceKey = id.startsWith('auto-tile:')
               ? `auto-tile:${this.sanitizeFilename(id.slice('auto-tile:'.length)).replace(/\.[^/.]+$/, '')}`
               : this.sanitizeFilename(id).replace(/\.[^/.]+$/, '');
-            // Projects created before auto-tiles received their own asset
-            // folder may still keep those source images under `tilesets`.
-            // Use that location as a build-time fallback while continuing to
-            // exclude every source image from Graphics.
-            const legacyAutoTileKey = id.startsWith('auto-tile:')
-              ? this.sanitizeFilename(id.slice('auto-tile:'.length)).replace(/\.[^/.]+$/, '')
-              : null;
-            const sourcePath = this.tilesetSourcePaths.get(sourceKey)
-              ?? (legacyAutoTileKey ? this.tilesetSourcePaths.get(legacyAutoTileKey) : undefined);
+            const sourcePath = this.tilesetSourcePaths.get(sourceKey);
             if (sourcePath) availableTilesetBmps.set(id, sourcePath);
           }
         }
@@ -491,20 +650,44 @@ export class AssetBuilder {
           // asks for a matching JSON descriptor.
           if (!source && fs.existsSync(sourceBmp)) fs.rmSync(sourceBmp, { force: true });
           if (missingTileSources.length) {
-            throw new Error(`Missing tile source image(s) for scene ${scene.id ?? '<scene>'} layer ${layer.layerId ?? 0}: ${missingTileSources.join(', ')}. Add the image to assets/auto-tiles (or assets/tilesets for legacy projects).`);
+            throw new Error(`Missing tile source image(s) for scene ${scene.id ?? '<scene>'} layer ${layer.layerId ?? 0}: ${missingTileSources.join(', ')}. Add each image to its matching assets/tilesets or assets/auto-tiles folder.`);
           }
-          console.warn('..: Skipping tile layer because build graphics are unavailable:', scene.id, layer.layerId);
-          return;
+          throw new Error(`Cannot materialize scene ${scene.id ?? '<scene>'} layer ${layer.layerId ?? 0}: background graphic is unavailable (${source?.filename ?? '<empty layer>'})`);
         }
 
         const grid = Number(scene.gridSize) === 16 ? 16 : 8;
+        const fingerprintHash = crypto.createHash('sha256');
+        fingerprintHash.update(JSON.stringify({ sceneId: scene.id, layerId: layer.layerId, logicalWidth, logicalHeight, grid, tileMap: layer.tileMap, tileMapTilesetIds: layer.tileMapTilesetIds, tilesetId, tilePaletteIds: layer.tilePaletteIds, paletteApplication: 2, paletteColors: paletteDefinitions.filter((palette: any) => referencedPaletteIds.has(palette.id)).map((palette: any) => [palette.id, palette.colors]) }));
+        fingerprintHash.update(fs.readFileSync(sourceBmp));
+        for (const [id, filename] of [...availableTilesetBmps].sort(([left], [right]) => left.localeCompare(right))) {
+          fingerprintHash.update(id);
+          fingerprintHash.update(fs.readFileSync(filename));
+        }
+        const fingerprint = fingerprintHash.digest('hex');
+        const cachedDescriptor = path.join(graphicsDir, `${derivedId}.json`);
+        if (!defaultSlots.some(Boolean) && tileCache[derivedId] === fingerprint && fs.existsSync(destination) && fs.existsSync(cachedDescriptor)) {
+          const padded = fitRegularBgBmp(fs.readFileSync(destination), logicalWidth, logicalHeight);
+          // Empty edited layers need a temporary transparent source for a
+          // cache fingerprint. It is only needed when composing a cache miss.
+          if (!source && fs.existsSync(sourceBmp)) fs.rmSync(sourceBmp, { force: true });
+          this.preparedGraphics.add(derivedId);
+          layer.backgroundId = derivedId;
+          return {
+            ...(source ?? { _resourceType: 'background', autoColor: true, tileColors: '', imageWidth: Number(scene.width) || 240, imageHeight: Number(scene.height) || 160 }),
+            imageWidth: padded.width,
+            imageHeight: padded.height,
+            id: derivedId,
+            name: derivedId,
+            filename: derivedFilename,
+          };
+        }
         const sizedBase = path.join(graphicsDir, `${derivedId}_sized_base.bmp`);
         fs.writeFileSync(sizedBase, fitRegularBgBmp(fs.readFileSync(sourceBmp), logicalWidth, logicalHeight).data);
         const colorizedBase = path.join(graphicsDir, `${derivedId}_colorized_base.bmp`);
         const compositionBase = hasColorize ? colorizedBase : sizedBase;
         if (hasColorize) await this.composeColorizedBackground(sizedBase, colorizedBase, layer.tilePaletteIds, grid, palettePaths);
         if (hasTileMap) {
-          await this.composeTileLayer(compositionBase, availableTilesetBmps, destination, layer.tileMap, grid, layer.tileMapTilesetIds, tilesetId, layer.tilePaletteIds, palettePaths, defaultPaletteId);
+          await this.composeTileLayer(compositionBase, availableTilesetBmps, destination, layer.tileMap, grid, layer.tileMapTilesetIds, tilesetId, layer.tilePaletteIds, palettePaths);
         } else {
           fs.copyFileSync(compositionBase, destination);
         }
@@ -514,6 +697,7 @@ export class AssetBuilder {
         const padded = fitRegularBgBmp(fs.readFileSync(destination), logicalWidth, logicalHeight);
         fs.writeFileSync(destination, padded.data);
         fs.writeFileSync(path.join(graphicsDir, `${derivedId}.json`), JSON.stringify({ type: 'regular_bg' }, null, 2));
+        tileCache[derivedId] = fingerprint;
 
         layer.backgroundId = derivedId;
         return {
@@ -532,11 +716,148 @@ export class AssetBuilder {
     // Change Background. A resource does not need to be assigned to a scene
     // layer in order to be selected later by an event.
     try {
-      const derived = await runBuildJobs(jobs, parallel);
-      return derived.filter((resource): resource is JsonResourceDefault => resource !== undefined);
+      const results = await runBuildJobs(jobs, parallel);
+      const derived = results.filter((resource): resource is JsonResourceDefault => resource !== undefined);
+      derived.push(...await this.materializeTileAnimationLayers(resourceFiles, derived, originalBackgrounds, palettePaths));
+      if (defaultSlots.some(Boolean)) {
+        const definitions = new Map<string, string[]>(paletteDefinitions.map((palette: any) => [palette.id, palette.colors]));
+        for (const resource of derived) {
+          const owner = scenes.flatMap(file => {
+            const scene = file.jsonContent as any;
+            return (scene.backgrounds ?? []).map((layer: any) => ({ scene, layer }));
+          }).find(({ scene, layer }: any) => [
+            `derived_${String(scene.id).replace(/[^a-zA-Z0-9_]/g, '_')}_layer_${layer.layerId}`,
+            `animated_${String(scene.id).replace(/[^a-zA-Z0-9_]/g, '_')}_layer_${layer.layerId}`,
+          ].includes(String(resource.id)));
+          if (!owner) continue;
+          const { scene, layer } = owner;
+          const filename = path.join(graphicsDir, String(resource.filename));
+          const image = await this.readGraphicRgba(filename, true);
+          const grid = Number(scene.gridSize) === 16 ? 16 : 8;
+          const frames = (resource as any).__paletteFrames;
+          const encoded = encodeSlotPalettePixels(image.rgba, image.width, defaultSlots, definitions, (x, y) => {
+            if (frames && y >= Number(resource.imageHeight)) return frames[Math.floor(y / 8)]?.[Math.floor(x / 8)];
+            const row = Math.floor(y / grid), col = Math.floor(x / grid);
+            return layer.tilePaletteIds?.[row]?.[col];
+          });
+          if (encoded.bindings.length) {
+            fs.writeFileSync(filename, encodeSpriteBmp(encoded.rgba, image.width, image.height));
+            (resource as any).__slotPaletteBindings = encoded.bindings;
+          }
+          delete (resource as any).__paletteFrames;
+        }
+      }
+      fs.writeFileSync(tileCachePath, JSON.stringify(tileCache, null, 2));
+      for (const resource of derived) if (resource?.filename) this.preparedGraphics.add(path.parse(resource.filename).name);
+      return derived;
     } finally {
       if (fs.existsSync(paletteDirectory)) fs.rmSync(paletteDirectory, { recursive: true, force: true });
     }
+  }
+
+  private async materializeTileAnimationLayers(resources: ResourceFile[], derived: JsonResourceDefault[], originalBackgrounds: Map<string, string>, palettePaths: Map<string, string>): Promise<JsonResourceDefault[]> {
+    const graphics = this.getGraphicsDir();
+    const backgrounds: any[] = [...resources.map(resource => resource.jsonContent), ...derived].filter(resource => resource?._resourceType === 'background');
+    const output: JsonResourceDefault[] = [];
+    for (const resource of resources) {
+      const scene = resource.jsonContent as any;
+      if (scene?._resourceType !== 'scene' || !scene.tileAnimations?.length) continue;
+      for (const layer of scene.backgrounds ?? []) {
+        const animations = scene.tileAnimations.filter((animation: any) => Number(animation.layerId) === Number(layer.layerId));
+        if (!animations.length || !layer.backgroundId) continue;
+        const source = backgrounds.find(background => background.id === layer.backgroundId);
+        if (!source?.filename) throw new Error(`Tile animation background missing in scene ${scene.name || scene.id}, layer ${layer.layerId}`);
+        const graphic = `animated_${String(scene.id).replace(/[^a-zA-Z0-9_]/g, '_')}_layer_${layer.layerId}`;
+        const basePath = path.join(graphics, this.toBmpFilename(source.filename));
+        const base = await this.readGraphicRgba(basePath, true);
+        const columns = base.width / 8, area = columns * (base.height / 8);
+        const originalBackground = originalBackgrounds.get(`${scene.id}:${layer.layerId}`);
+        const sources = new Map<string, string>();
+        const dimensions = new Map<string, { width: number; height: number }>();
+        const resolveSource = async (id: string) => {
+          if (dimensions.has(id)) return dimensions.get(id)!;
+          const key = id.startsWith('auto-tile:') ? `auto-tile:${this.sanitizeFilename(id.slice(10)).replace(/\.[^/.]+$/, '')}` : this.sanitizeFilename(id).replace(/\.[^/.]+$/, '');
+          const background = backgrounds.find(item => item.id === id);
+          const filename = this.backgroundSourcePaths.get(id) ?? this.tilesetSourcePaths.get(key) ?? (background?.filename ? path.join(graphics, this.toBmpFilename(background.filename)) : undefined);
+          if (!filename || !fs.existsSync(filename)) throw new Error(`Tile animation source '${id}' missing in scene ${scene.name || scene.id}, layer ${layer.layerId}`);
+          const { stdout } = await execFileAsync(this.getMagickPath(), ['identify', '-format', '%w %h', filename], { windowsHide: true });
+          const [width, height] = stdout.trim().split(/\s+/).map(Number);
+          sources.set(id, filename); dimensions.set(id, { width, height });
+          return { width, height };
+        };
+        const plan: TileAnimationAssetPlan = { sceneId: scene.id, layerId: Number(layer.layerId), graphic, width: base.width, height: base.height, entries: [] };
+        const frameTiles: number[][] = Array.from({ length: base.height / 8 }, () => []);
+        const frameSources: string[][] = Array.from({ length: base.height / 8 }, () => []);
+        const framePalettes: Array<Array<string | null>> = Array.from({ length: base.height / 8 }, () => []);
+        let ordinal = 0;
+        const grid = Number(scene.gridSize) === 16 ? 16 : 8;
+        for (const animation of animations) {
+          const targetId = animation.targetTilesetId || layer.selectedTilesetId || originalBackground || scene.selectedTilesetId;
+          const size = await resolveSource(targetId);
+          const target = Number(animation.targetTileIndex);
+          if (!Number.isInteger(target) || target < 0 || target >= Math.floor(size.width / 8) * Math.floor(size.height / 8)) throw new Error(`Tile animation destination ${target} outside '${targetId}'`);
+          const sourceX = (target % Math.floor(size.width / 8)) * 8, sourceY = Math.floor(target / Math.floor(size.width / 8)) * 8;
+          const groups = new Map<string, number[]>();
+          const addTarget = (x: number, y: number, painted: boolean) => {
+            if (x < 0 || y < 0 || x >= base.width || y >= base.height) return;
+            const palette = layer.tilePaletteIds?.[Math.floor(y / grid)]?.[Math.floor(x / grid)];
+            const paletteId = palette && palette !== '__original__' ? palette : '';
+            const targets = groups.get(paletteId) ?? [];
+            targets.push((y / 8) * columns + x / 8); groups.set(paletteId, targets);
+          };
+          if (targetId === originalBackground) {
+            if (!(Number(layer.tileMap?.[Math.floor(sourceY / grid)]?.[Math.floor(sourceX / grid)] ?? -1) >= 0)) addTarget(sourceX, sourceY, false);
+          } else {
+            for (const [rowIndex, row] of (layer.tileMap ?? []).entries()) for (const [columnIndex, tile] of row.entries()) {
+              if (!Number.isInteger(tile) || tile < 0) continue;
+              const id = layer.tileMapTilesetIds?.[rowIndex]?.[columnIndex] ?? layer.selectedTilesetId ?? scene.selectedTilesetId;
+              if (id !== targetId) continue;
+              const perRow = Math.floor(size.width / grid);
+              const x = (tile % perRow) * grid, y = Math.floor(tile / perRow) * grid;
+              if (sourceX >= x && sourceX < x + grid && sourceY >= y && sourceY < y + grid) addTarget(columnIndex * grid + sourceX - x, rowIndex * grid + sourceY - y, true);
+            }
+          }
+          if (!groups.size) {
+            console.warn(`..: Ignoring tile animation '${animation.name || animation.id || target}' in scene ${scene.name || scene.id}, layer ${layer.layerId}: destination from '${targetId}' is no longer painted in this layer`);
+            continue;
+          }
+          for (const [palette, targets] of groups) {
+            const frames: number[] = [];
+            for (const [index, frame] of animation.frameTileIndices.entries()) {
+              const id = animation.frameTilesetIds?.[index] || targetId;
+              const frameSize = await resolveSource(id);
+              if (!Number.isInteger(frame) || frame < 0 || frame >= Math.floor(frameSize.width / 8) * Math.floor(frameSize.height / 8)) throw new Error(`Tile animation frame ${frame} outside '${id}'`);
+              const cell = area + ordinal++, row = Math.floor(cell / columns), column = cell % columns;
+              frameTiles[row] ??= []; frameSources[row] ??= []; framePalettes[row] ??= [];
+              frameTiles[row][column] = frame; frameSources[row][column] = id; framePalettes[row][column] = palette || '__original__';
+              frames.push(cell);
+            }
+            plan.entries.push({ animation: { ...animation }, targets, frames });
+          }
+        }
+        if (!plan.entries.length) {
+          scene.tileAnimations = scene.tileAnimations.filter((animation: any) => Number(animation.layerId) !== Number(layer.layerId));
+          continue;
+        }
+        if (plan.entries.length > 32) throw new Error(`Scene ${scene.name || scene.id}, layer ${layer.layerId}: tile animation palette variants exceed 32`);
+        const maps = 1 + Math.ceil(ordinal / area), height = base.height * maps;
+        const rgba = new Uint8Array(base.width * height * 4);
+        rgba.set(base.rgba);
+        const temporary = path.join(graphics, `.${graphic}.base.bmp`), destination = path.join(graphics, `${graphic}.bmp`);
+        fs.writeFileSync(temporary, encodeSpriteBmp(rgba, base.width, height));
+        try {
+          await this.composeTileLayer(temporary, sources, destination, frameTiles, 8, frameSources, undefined, framePalettes, palettePaths);
+        } finally { fs.rmSync(temporary, { force: true }); }
+        // Extra maps are replacement sheets in ROM; runtime uses only map 0.
+        const descriptor = { type: 'regular_bg', height: base.height, bpp_mode: 'bpp_8', flipped_tiles_reduction: false, tiles_compression: 'none', map_compression: 'none', palette_compression: 'none' };
+        fs.writeFileSync(path.join(graphics, `${graphic}.json`), JSON.stringify(descriptor, null, 2));
+        layer.backgroundId = graphic;
+        this.preparedGraphics.add(graphic);
+        this.tileAnimationPlans.push(plan);
+        output.push({ ...source, id: graphic, name: graphic, filename: `${graphic}.bmp`, imageWidth: base.width, imageHeight: base.height, __paletteFrames: framePalettes } as any);
+      }
+    }
+    return output;
   }
 
   /**
@@ -546,14 +867,17 @@ export class AssetBuilder {
    */
   public async materializeDialogueFrame(sourceFilename = 'frame.png'): Promise<void> {
     const graphicsDir = this.getGraphicsDir();
+    // Full-screen menus are frameless. Remove artifacts from older builds too.
+    for (const extension of ['bmp', 'json']) {
+      fs.rmSync(path.join(graphicsDir, `menu_frame_fullscreen_sprite.${extension}`), { force: true });
+    }
     const sourceBase = this.sanitizeFilename(path.basename(sourceFilename)).replace(/\.[^/.]+$/, '');
     const sourcePath = [
       path.join(graphicsDir, `${sourceBase}.bmp`),
       path.join(graphicsDir, `${sourceBase}.png`),
     ].find(candidate => fs.existsSync(candidate));
     if (!sourcePath) {
-      console.warn('..: Dialogue frame source not found:', sourceFilename);
-      return;
+      throw new Error(`Dialogue frame source not found: ${sourceFilename}`);
     }
 
     const workDir = path.join(this.buildDir, '.dialogue-frame');
@@ -593,6 +917,32 @@ export class AssetBuilder {
       ];
       await execFileAsync(magick, spriteArgs);
       fs.writeFileSync(path.join(graphicsDir, 'dialogue_frame_sprite.json'), JSON.stringify({ type: 'sprite', width: 64, height: 64 }, null, 2));
+
+      const panelFrames = [
+        ['menu_frame_side_1_sprite', 60, 160],
+        ['menu_frame_side_2_sprite', 120, 160],
+      ] as const;
+      for (const [name, width, height] of panelFrames) {
+        const sheetWidth = Math.ceil(width / 64) * 64;
+        const sheetHeight = Math.ceil(height / 64) * 64;
+        const output = path.join(graphicsDir, `${name}.bmp`);
+        const panelArgs = [
+          '-size', `${width}x${height}`, `xc:${indexZeroColor}`,
+          topLeft, '-geometry', '+0+0', '-composite',
+          '-size', `${width - 16}x8`, `tile:${top}`, '-geometry', '+8+0', '-composite',
+          topRight, '-geometry', `+${width - 8}+0`, '-composite',
+          '-size', `8x${height - 16}`, `tile:${left}`, '-geometry', '+0+8', '-composite',
+          '-size', `${width - 16}x${height - 16}`, `tile:${center}`, '-geometry', '+8+8', '-composite',
+          '-size', `8x${height - 16}`, `tile:${right}`, '-geometry', `+${width - 8}+8`, '-composite',
+          bottomLeft, '-geometry', `+0+${height - 8}`, '-composite',
+          '-size', `${width - 16}x8`, `tile:${bottom}`, '-geometry', `+8+${height - 8}`, '-composite',
+          bottomRight, '-geometry', `+${width - 8}+${height - 8}`, '-composite',
+          '-background', indexZeroColor, '-gravity', 'northwest', '-extent', `${sheetWidth}x${sheetHeight}`,
+          '-compress', 'None', '-type', 'Palette', `BMP3:${output}`,
+        ];
+        await execFileAsync(magick, panelArgs);
+        fs.writeFileSync(path.join(graphicsDir, `${name}.json`), JSON.stringify({ type: 'sprite', width: 64, height: 64 }, null, 2));
+      }
     } finally {
       fs.rmSync(workDir, { recursive: true, force: true });
     }
@@ -660,7 +1010,7 @@ export class AssetBuilder {
     } finally { fs.rmSync(raw, { force: true }); }
   }
 
-  private async composeTileLayer(sourceBmp: string, tilesetBmps: Map<string, string>, destination: string, tileMap: number[][], grid: number, tileMapTilesetIds?: Array<Array<string | null>>, fallbackTilesetId?: string, tilePaletteIds?: Array<Array<string | null>>, palettePaths: Map<string, string> = new Map(), defaultPaletteId?: string): Promise<void> {
+  private async composeTileLayer(sourceBmp: string, tilesetBmps: Map<string, string>, destination: string, tileMap: number[][], grid: number, tileMapTilesetIds?: Array<Array<string | null>>, fallbackTilesetId?: string, tilePaletteIds?: Array<Array<string | null>>, palettePaths: Map<string, string> = new Map()): Promise<void> {
     const magickPath = this.getMagickPath();
     const normalizedInputs: string[] = [];
     const originalSource = sourceBmp;
@@ -691,7 +1041,7 @@ export class AssetBuilder {
         if (!tilesetBmp || !tilesPerRow) continue;
         const sourceX = (tile % tilesPerRow) * grid;
         const sourceY = Math.floor(tile / tilesPerRow) * grid;
-        const paletteId = tilePaletteIds?.[row]?.[col] ?? defaultPaletteId;
+        const paletteId = tilePaletteIds?.[row]?.[col];
         const palettePath = paletteId ? palettePaths.get(paletteId) : undefined;
         const operation = ['(', tilesetBmp, '-crop', `${grid}x${grid}+${sourceX}+${sourceY}`, '+repage'];
         if (palettePath) operation.push('-remap', palettePath);
@@ -775,6 +1125,7 @@ export class AssetBuilder {
       }
     }
     await this.createGraphicsJson(path.dirname(sourcePath), bmpPath, relativeBase, resourceFile);
+    this.preparedGraphics.add(path.parse(bmpPath).name);
   }
 
   /**
@@ -879,11 +1230,12 @@ export class AssetBuilder {
     if (bytes.length < 192 || text(0, 4) !== 'IMPM') invalid('missing the IT signature/header');
     const orders = u16(0x20);
     const instruments = u16(0x22);
+    const samples = u16(0x24);
     const patterns = u16(0x26);
-    const tableEnd = 0xC0 + orders + instruments * 4 + patterns * 4;
-    if (orders < 0 || instruments < 0 || patterns < 0 || tableEnd > bytes.length) invalid('pointer tables exceed file size');
+    const tableEnd = 0xC0 + orders + (instruments + samples + patterns) * 4;
+    if (orders < 0 || instruments < 0 || samples < 0 || patterns < 0 || tableEnd > bytes.length) invalid('pointer tables exceed file size');
     for (let index = 0; index < patterns; index++) {
-      const pointer = u32(0xC0 + orders + instruments * 4 + index * 4);
+      const pointer = u32(0xC0 + orders + (instruments + samples) * 4 + index * 4);
       if (pointer <= 0 || pointer >= bytes.length) invalid(`pattern ${index} pointer is outside the file`);
       const packedLength = u16(pointer);
       const rows = u16(pointer + 2);
@@ -1028,9 +1380,14 @@ export class AssetBuilder {
       type = "sprite";
     }
 
+    let avatarHeight = 16;
+    if (rel === 'avatars') {
+      const bmp = fs.readFileSync(destDir);
+      if (bmp.length >= 26 && bmp.toString('ascii', 0, 2) === 'BM') avatarHeight = Math.abs(bmp.readInt32LE(22));
+    }
     const jsonContent = {
       type,
-      ...(type === 'sprite' ? { height: resourceFile?.jsonContent?.playerFrameHeight ?? 16 } : {}),
+      ...(type === 'sprite' ? { height: rel === 'avatars' ? avatarHeight : resourceFile?.jsonContent?.playerFrameHeight ?? 16 } : {}),
     };
 
     const jsonPath = path.join(
@@ -1038,6 +1395,13 @@ export class AssetBuilder {
       path.basename(destDir, path.extname(destDir)) + ".json"
     );
     fs.writeFileSync(jsonPath, JSON.stringify(jsonContent, null, 2));
+  }
+
+  private async validateAvatarDimensions(sourcePath: string): Promise<void> {
+    const { stdout } = await execFileAsync(this.getMagickPath(), [sourcePath + '[0]', '-format', '%w %h', 'info:']);
+    const [width, height] = stdout.trim().split(/\s+/).map(Number);
+    if (width !== height || (width !== 16 && width !== 32))
+      throw new Error(`Avatar ${path.basename(sourcePath)} must be exactly 16x16 or 32x32 pixels (received ${width}x${height})`);
   }
 
   /** 

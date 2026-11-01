@@ -1,4 +1,9 @@
+import { isActiveProjectEntry } from '../../../../../shared/projectCollectionEntries';
+import { withDefaultInputMap } from '../../../../../shared/inputMap';
 import useAppContexts from '@/providers/contexts/AppContexts';
+import { useScriptParameterVariables } from './ScriptParameterContext';
+import { filterVariableOption, variableOptions, variableCascaderOptions, variableCascaderPath } from './variableOptions';
+import { useI18n } from '@/i18n/I18n';
 import { IConditionValue, IIfArgs, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { Cascader, Input, Select, Space, Typography } from 'antd';
 import StepInputNumber, { InputNumber } from '../StepInputNumber';
@@ -37,7 +42,7 @@ const prefixForValue = (value: IConditionValue): string => {
   return '""';
 };
 
-function Operand({
+export function Operand({
   value,
   variables,
   buttonOptions,
@@ -48,6 +53,7 @@ function Operand({
   buttonOptions: Array<{ value: string; label: string }>;
   onChange: (value: IConditionValue) => void;
 }) {
+  const { t } = useI18n();
   const selectedVariable = value.kind === 'variable'
     ? variables.find(variable => variable.id === value.variableId)
     : undefined;
@@ -58,12 +64,13 @@ function Operand({
   }
   const renderLiteral = () => {
     if (value.kind === 'button') {
-      return <Select value={value.button} options={buttonOptions} onChange={button => onChange({ kind: 'button', type: 'boolean', button })} />;
+      return <Select showSearch optionFilterProp="label" value={value.button} options={buttonOptions} onChange={button => onChange({ kind: 'button', type: 'boolean', button })} />;
     }
     if (type === 'boolean') {
       return (
         <Select
           aria-label="Boolean value"
+          showSearch optionFilterProp="label"
           value={value.kind === 'literal' ? value.value as boolean : false}
           options={[{ value: true, label: 'True' }, { value: false, label: 'False' }]}
           onChange={(next) => onChange({ kind: 'literal', type, value: next })}
@@ -76,19 +83,20 @@ function Operand({
   return (
     <Space.Compact block>
       <Cascader
+        showSearch
         allowClear={false}
-        value={value.kind === 'variable' ? ['Variables', value.variableId] : value.kind === 'button' ? ['Button', value.button] : value.type === 'boolean' ? ['Boolean', String(value.value)] : [value.type === 'number' ? 'Number' : 'Text']}
+        value={value.kind === 'variable' ? variableCascaderPath(value.variableId) : value.kind === 'button' ? ['Button', value.button] : value.type === 'boolean' ? ['Boolean', String(value.value)] : [value.type === 'number' ? 'Number' : 'Text']}
         options={[
           { value: 'Number', label: 'Number' },
           { value: 'Text', label: 'Text' },
-          { value: 'Variables', label: 'Variables', children: variables.map(variable => ({ value: variable.id, label: variable.name || variable.symbol })) },
+          { value: 'Variables', label: 'Variables', children: variableCascaderOptions(variables, t) },
           { value: 'Boolean', label: 'Boolean', children: [{ value: 'true', label: 'True' }, { value: 'false', label: 'False' }] },
           { value: 'Button', label: 'Button', children: buttonOptions },
         ]}
         displayRender={() => prefixForValue(value)}
         style={{ width: 42 }}
         onChange={(path) => {
-          const [category, selected] = path as string[];
+          const category = path[0], selected = path[path.length - 1] as string;
           if (category === 'Variables' && selected) {
             const variable = variables.find(item => item.id === selected);
             if (variable) onChange({ kind: 'variable', variableId: variable.id, symbol: variable.symbol, type: variable.type });
@@ -106,9 +114,10 @@ function Operand({
       {value.kind === 'variable' ? (
         <Select
           aria-label="Variable value"
+          showSearch filterOption={filterVariableOption}
           style={{ flex: 1 }}
           value={value.variableId}
-          options={variables.map(variable => ({ value: variable.id, label: variable.name || variable.symbol }))}
+          options={variableOptions(variables, t)}
           onChange={(variableId: string) => {
             const variable = variables.find(item => item.id === variableId);
             if (variable) onChange({ kind: 'variable', variableId, symbol: variable.symbol, type: variable.type });
@@ -120,10 +129,12 @@ function Operand({
 }
 
 export default function IfEvent({ event, onValueChange }: IfEventProps) {
-  const { variables, settings } = useAppContexts();
+  const { variables: globalVariables, settings } = useAppContexts();
+  const parameters = useScriptParameterVariables();
+  const variables = { variables: [...parameters, ...globalVariables.variables].filter(isActiveProjectEntry) };
   const buttonOptions = [
     ...['A', 'B', 'L', 'R', 'START', 'SELECT', 'UP', 'DOWN', 'LEFT', 'RIGHT'].map(button => ({ value: button, label: button })),
-    ...Object.keys(settings?.inputMap ?? {}).map(action => ({ value: action, label: `Action: ${action}` })),
+    ...Object.keys(withDefaultInputMap(settings?.inputMap)).map(action => ({ value: action, label: `Action: ${action}` })),
   ];
   const args = event?.args as IIfArgs | undefined;
   const [condition, setCondition] = useState<IIfArgs>({
@@ -146,6 +157,7 @@ export default function IfEvent({ event, onValueChange }: IfEventProps) {
       <Typography.Text strong>Condition</Typography.Text>
       <Operand value={condition.left} variables={variables.variables} buttonOptions={buttonOptions} onChange={(left) => update({ ...condition, left })} />
       <Cascader
+        showSearch
         style={{ width: '100%' }}
         allowClear={false}
         value={[condition.operator === '==' || condition.operator === '!=' ? 'equality' : 'ordering', condition.operator]}

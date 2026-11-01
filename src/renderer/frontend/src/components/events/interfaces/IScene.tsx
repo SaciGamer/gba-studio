@@ -12,6 +12,8 @@ export interface IChangeScene extends IArgs {
   sceneId?: string | null,
   x?: CustomField | NumericValue,
   y?: CustomField | NumericValue,
+  xUnit?: 'tiles' | 'pixels',
+  yUnit?: 'tiles' | 'pixels',
   direction?: string,
   fadeSpeed?: number,
 }

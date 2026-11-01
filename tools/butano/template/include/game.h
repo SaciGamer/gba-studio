@@ -2,7 +2,10 @@
 #define {{PROJECT_NAME_UPPER}}_GAME_H
 
 #include "graphics_manager.h"
+#include "gba_studio_features.h"
+#if GBA_STUDIO_FEATURE_SCRIPTS
 #include "script_command_manager.h"
+#endif
 #include <cstdint>
 
 /**
@@ -12,7 +15,9 @@
 class Game {
 private:
     bool running;
+#if GBA_STUDIO_FEATURE_SHOOTER || GBA_STUDIO_FEATURE_SPAWNER
     uint32_t shooter_scene_revision = 0;
+#endif
     // bn::scene::status status;
 
 public:

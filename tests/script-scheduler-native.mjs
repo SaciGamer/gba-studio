@@ -11,8 +11,9 @@ const output = fs.mkdtempSync(path.join(os.tmpdir(), 'gba-studio-scheduler-test-
 const executable = path.join(output, process.platform === 'win32' ? 'scheduler.exe' : 'scheduler');
 const compiler = process.env.CXX || 'g++';
 try {
+  fs.writeFileSync(path.join(output, 'native-features.h'), fs.readFileSync(path.join(template, 'include/gba_studio_features.h'), 'utf8').replace('#define GBA_STUDIO_FEATURE_SAVE 1', '#define GBA_STUDIO_FEATURE_SAVE 0'));
   const build = spawnSync(compiler, [
-    '-std=c++17', '-Wall', '-Wextra', '-Werror',
+    '-std=c++17', '-Wall', '-Wextra', '-Werror', '-include', path.join(output, 'native-features.h'),
     '-I', fixtures, '-I', path.join(root, 'tests/native/support'), '-I', path.join(template, 'include'),
     ...['script_command_manager.cpp', 'event_wait.cpp', 'event_wait_input.cpp', 'variable_manager.cpp', 'script_trigger_manager.cpp']
       .map(file => path.join(template, 'src', file)),

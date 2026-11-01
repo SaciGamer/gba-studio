@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';import path from 'node:path';
+import assert from 'node:assert/strict';import path from 'node:path';import fs from 'node:fs';
 import {build}from'esbuild';import express from'express';import {chromium}from'playwright';
 const frontend=path.resolve('src/renderer/frontend/src');
 const js=await build({stdin:{resolveDir:frontend,loader:'tsx',contents:`
@@ -9,18 +9,28 @@ function Fixture(){const[mode,setMode]=useState('Actor'),[event,setEvent]=useSta
 window.testContext={variables:{variables:[{id:'local-0',name:'Local 0',symbol:'LOCAL0',type:'number',initialValue:20},{id:'flag',name:'Flag',symbol:'FLAG',type:'boolean',initialValue:false}]},scenes,elementSelected:scenes[0],backgrounds:[],settings:{},settingUtils:{localImagePath:'',localImagePathHD:''}};
 const props={event,customTitle:()=>{},onValueChange:(id,args)=>setEvent({...event,args})};const content=mode==='Camera'?<Camera {...props}/>:mode==='Scene'?<SceneEvent {...props}/>:mode==='Variable'?<Variable {...props}/>:mode==='If'?<If {...props}/>:mode==='Wait'?<WaitEvent {...props}/>:<Runtime {...props}/>;
 return <ConfigProvider><App><I18nProvider language="en_US"><Space>{Object.keys(initial).map(name=><Button key={name} onClick={()=>{setMode(name);setEvent({id:'event',...structuredClone(initial[name])});}}>{name}</Button>)}</Space><div key={mode} data-testid="event-panel" style={{width:420,padding:20}}>{content}</div></I18nProvider></App></ConfigProvider>}
-createRoot(document.getElementById('root')).render(<Fixture/>);`},bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',alias:{'@':frontend},loader:{'.png':'dataurl','.jpg':'dataurl'},define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'ctx',setup(b){b.onResolve({filter:/AppContexts$/},()=>({path:'ctx',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:'export default ()=>window.testContext;',loader:'js'}));}}]});
+createRoot(document.getElementById('root')).render(<Fixture/>);`},bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',alias:{'@':frontend},loader:{'.png':'dataurl','.jpg':'dataurl','.css':'empty'},define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'ctx',setup(b){b.onResolve({filter:/AppContexts$/},()=>({path:'ctx',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:'export default ()=>window.testContext;',loader:'js'}));}}]});
 const app=express();app.get('/test.js',(_,r)=>r.type('js').send(js.outputFiles[0].text));app.get('/',(_,r)=>r.type('html').send('<html><body><div id="root"></div><script>window.electronAPI={getCommonFontImages:async()=>({}),fetchImages:async()=>({status:"success",fileImages:[],localPath:""})};</script><script src="/test.js"></script></body></html>'));
 const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});const browser=await chromium.launch({headless:true});
 try{const page=await browser.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));page.setDefaultTimeout(8000);await page.goto(`http://127.0.0.1:${server.address().port}`);
  const panel=page.getByTestId('event-panel');
- await page.evaluate(()=>window.addEventListener('gba-studio:actor-position-preview',event=>window.actorPreview=event.detail));await page.getByRole('button',{name:'Move',exact:true}).click();await panel.getByRole('spinbutton').first().hover();assert.equal(await page.evaluate(()=>window.actorPreview.x),48);assert.equal(await page.evaluate(()=>window.actorPreview.y),80);assert.equal(await panel.getByRole('button',{name:'Unit for X'}).textContent(),'tiles');await panel.getByRole('button',{name:'Unit for X'}).click();assert.equal(await panel.getByRole('button',{name:'Unit for X'}).textContent(),'px');assert.equal(await page.evaluate(()=>window.actorPreview.x),3);assert.equal(await page.evaluate(()=>window.actorPreview.y),5);assert.equal(await page.evaluate(()=>window.eventValue.args.yUnit),'pixels');assert.equal(await panel.getByRole('button',{name:'Unit for Y'}).textContent(),'px');await panel.getByRole('button',{name:'Unit for Y'}).click();assert.equal(await page.evaluate(()=>window.eventValue.args.xUnit),'tiles');await page.evaluate(()=>window.reloadEvent());assert.equal(await page.evaluate(()=>window.eventValue.args.xUnit),'tiles');
+ await page.evaluate(()=>window.addEventListener('gba-studio:actor-position-preview',event=>window.actorPreview=event.detail));
+ await page.getByRole('button',{name:'Move',exact:true}).click();await panel.getByRole('spinbutton').first().hover();
+ for(const name of ['Options','Movement Type'])assert.equal(await panel.getByRole('tab',{name,exact:true}).isDisabled(),true);
+ assert.equal(await page.evaluate(()=>window.actorPreview.x),48);assert.equal(await page.evaluate(()=>window.actorPreview.y),80);
+ await panel.getByRole('button',{name:'Unit for X'}).click();
+ assert.equal(await panel.getByRole('button',{name:'Unit for X'}).textContent(),'px');
+ assert.equal(await page.evaluate(()=>window.actorPreview.x),3);assert.equal(await page.evaluate(()=>window.actorPreview.y),80);
+ assert.equal(await page.evaluate(()=>window.eventValue.args.yUnit),'tiles');assert.equal(await panel.getByRole('button',{name:'Unit for Y'}).textContent(),'tiles');
+ await panel.getByRole('button',{name:'Unit for Y'}).click();assert.equal(await page.evaluate(()=>window.eventValue.args.xUnit),'pixels');
+ assert.equal(await page.evaluate(()=>window.actorPreview.y),5);await page.evaluate(()=>window.reloadEvent());
+ assert.equal(await page.evaluate(()=>window.eventValue.args.xUnit),'pixels');
 
  await page.getByRole('button',{name:'PropertyMove',exact:true}).click();
  assert.equal(await panel.getByRole('button',{name:'Unit for Y'}).textContent(),'tiles');
  assert.equal(await panel.getByRole('button',{name:'Unit for Y'}).isDisabled(),false);
  await panel.getByRole('button',{name:'Unit for X'}).click();
- assert.equal(await page.evaluate(()=>window.eventValue.args.yUnit),'pixels');
+ assert.equal(await page.evaluate(()=>window.eventValue.args.yUnit),'tiles');
  await panel.getByRole('button',{name:'Unit for X'}).click();
  assert.equal(await page.evaluate(()=>window.eventValue.args.xUnit),'tiles');
  assert.equal(await page.evaluate(()=>window.eventValue.args.yUnit),'tiles');
@@ -40,14 +50,15 @@ try{const page=await browser.newPage(),errors=[];page.on('pageerror',error=>erro
  assert.equal(await page.evaluate(()=>window.motionLabel),'Pan Camera');
  await panel.getByRole('checkbox',{name:'Move to destination with speed'}).check();
  await page.waitForFunction(()=>window.eventValue.args.animated===true);
- assert.equal(await page.evaluate(()=>window.motionLabel),'Pan Camera To {0, 0}');
- await panel.getByRole('spinbutton',{name:'Speed (pixels per frame)'}).fill('2');await page.keyboard.press('Tab');
+ assert.equal(await page.evaluate(()=>window.motionLabel),'Pan Camera → {0, 0}');
+ await panel.locator('.ant-select').filter({has:page.getByRole('combobox',{name:'Movement speed',exact:true})}).locator('.ant-select-selector').click();
+ await page.getByText('Speed 2',{exact:true}).filter({visible:true}).click();
  assert.equal(await page.evaluate(()=>window.eventValue.args.speed),2);
  await panel.getByRole('checkbox',{name:'Move to destination with speed'}).uncheck();
  assert.equal(await page.evaluate(()=>window.motionLabel),'Pan Camera');
  await page.getByRole('button',{name:'Move',exact:true}).click();
  await panel.getByRole('checkbox',{name:'Move to destination with speed'}).check();
- assert.equal(await page.evaluate(()=>window.motionLabel),'Move Actor To {3, 5}');
+ assert.equal(await page.evaluate(()=>window.motionLabel),'Move Actor → {3, 5}');
  await page.evaluate(()=>window.reloadEvent());assert.equal(await panel.getByRole('checkbox',{name:'Move to destination with speed'}).isChecked(),true);
  await panel.locator('.ant-select').filter({has:page.getByRole('combobox',{name:'Movement speed',exact:true})}).locator('.ant-select-selector').click();
  await page.getByText('Speed \u00bd',{exact:true}).filter({visible:true}).click();
@@ -55,6 +66,29 @@ try{const page=await browser.newPage(),errors=[];page.on('pageerror',error=>erro
  await panel.locator('.ant-select').filter({has:page.getByRole('combobox',{name:'Animation speed',exact:true})}).locator('.ant-select-selector').click();
  await page.getByText('Speed 8 (Faster)',{exact:true}).filter({visible:true}).click();
  assert.equal(await page.evaluate(()=>window.eventValue.args.animationSpeed),8);
+
+ for(const name of ['Movement','Options','Movement Type'])assert.equal(await panel.getByRole('tab',{name,exact:true}).count(),1);
+ await panel.getByRole('tab',{name:'Options',exact:true}).click();
+ assert.equal(await panel.getByRole('checkbox',{name:'Walls',exact:true}).isChecked(),true);
+ assert.equal(await panel.getByRole('checkbox',{name:'Actors',exact:true}).isChecked(),false);
+ await panel.getByRole('checkbox',{name:'Walls',exact:true}).uncheck();await panel.getByRole('checkbox',{name:'Actors',exact:true}).check();
+ assert.equal(await panel.evaluate(element=>element.scrollWidth<=element.clientWidth+1),true,'Movement options must fit the event panel');
+ fs.mkdirSync('test-results',{recursive:true});await panel.screenshot({path:'test-results/actor-movement-options.png'});
+ const lock=panel.locator('.ant-select').filter({has:page.getByRole('combobox',{name:'Lock Direction H/V',exact:true})});await lock.locator('.ant-select-selector').click();
+ await page.getByText('Horizontal (H)',{exact:true}).filter({visible:true}).click();
+ await panel.getByRole('tab',{name:'Movement Type',exact:true}).click();
+ await panel.locator('.ant-select-selector').filter({visible:true}).click();await page.getByText('Diagonal',{exact:true}).filter({visible:true}).click();
+ assert.equal(await page.evaluate(()=>window.eventValue.args.movementType),'diagonal');
+ await page.evaluate(()=>window.reloadEvent());await panel.getByRole('tab',{name:'Options',exact:true}).click();
+ assert.equal(await panel.getByRole('checkbox',{name:'Walls',exact:true}).isChecked(),false);assert.equal(await panel.getByRole('checkbox',{name:'Actors',exact:true}).isChecked(),true);
+ assert.equal(await page.evaluate(()=>window.eventValue.args.lockDirection),'horizontal');
+ await panel.getByRole('checkbox',{name:'Walls',exact:true}).check();await panel.getByRole('checkbox',{name:'Actors',exact:true}).uncheck();
+ await panel.getByRole('tab',{name:'Movement',exact:true}).click();
+ await panel.getByRole('checkbox',{name:'Move to destination with speed'}).uncheck();
+ for(const name of ['Options','Movement Type'])assert.equal(await panel.getByRole('tab',{name,exact:true}).isDisabled(),true);
+ assert.equal(await panel.getByRole('tab',{name:'Movement',exact:true}).getAttribute('aria-selected'),'true');
+ await panel.getByRole('checkbox',{name:'Move to destination with speed'}).check();
+ for(const name of ['Options','Movement Type'])assert.equal(await panel.getByRole('tab',{name,exact:true}).isEnabled(),true);
  await panel.locator('.ant-select').filter({has:page.getByRole('combobox',{name:'Movement speed',exact:true})}).locator('.ant-select-selector').click();
  await page.getByText('Custom speed',{exact:true}).filter({visible:true}).click();
  await panel.getByRole('spinbutton',{name:'Movement speed',exact:true}).fill('0.75');await page.keyboard.press('Tab');

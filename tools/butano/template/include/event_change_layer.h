@@ -9,6 +9,7 @@ struct LayerChangeEventData;
 struct LayerVisibilityEventData;
 struct BackgroundScrollEventData;
 struct BackgroundParallaxEventData;
+struct BackgroundTransformEventData;
 struct PaletteLayerEventData;
 
 /**
@@ -32,6 +33,8 @@ struct PaletteLayerArgs {
 };
 
 bool run_change_layer(const void* args, const bn::string<64> scene_id);
+bool run_background_transform(const void* args, int operation);
+bool run_background_animation(const void* args);
 bool run_visible_background(const void* args, const bn::string<64> scene_id);
 bool run_change_palette_background(const void* args, const bn::string<64> scene_id);
 bool run_change_layer(const LayerChangeEventData& data, const bn::string<64>& scene_id);

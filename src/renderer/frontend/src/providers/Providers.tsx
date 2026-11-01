@@ -9,6 +9,7 @@ import { IVariablesSettings } from "./contexts/interfaces/IVariablesElement";
 import { ISpriteSettings } from './contexts/interfaces/ISpriteElement';
 import { IScriptsSettings } from './contexts/interfaces/IScriptElement';
 import { IPalettesSettings } from './contexts/interfaces/IPalettesElement';
+import { createEmptyPrefabs, IPrefabsSettings } from './contexts/interfaces/IPrefabElement';
 
 // Criar os providers com nomes personalizados
 export const { Context: SettingsUtilsContext, Provider: SettingsUtilsProvider } = createProvider<ISettingUtils>(
@@ -69,6 +70,10 @@ export const { Context: ScriptsContext, Provider: ScriptsProvider } = createProv
 export const { Context: PalettesContext, Provider: PalettesProvider } = createProvider<IPalettesSettings>(
     { _resourceType: 'palettes', _version: '1.0', _saved: true, _deleted: false, palettes: [] },
     { valueName: 'palettes', setValueName: 'setPalettes', ignoredFields: ['_saved'] }
+);
+export const { Context: PrefabsContext, Provider: PrefabsProvider } = createProvider<IPrefabsSettings>(
+    createEmptyPrefabs(),
+    { valueName: 'prefabs', setValueName: 'setPrefabs', ignoredFields: ['_saved'] }
 );
 
 // Função genérica para criar providers com nomes personalizados para value e setValue

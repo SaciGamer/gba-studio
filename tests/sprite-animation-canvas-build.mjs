@@ -22,12 +22,16 @@ try{
  const source=path.join(assets,'sprites/source.bmp');fs.writeFileSync(source,encodeSpriteBmp(pixels,width,height));const original=fs.readFileSync(source);
  fs.writeFileSync(path.join(output,'graphics/source.bmp'),original);fs.writeFileSync(path.join(output,'graphics/source.json'),'{}');fs.writeFileSync(path.join(output,'build/bn_sprite_items_source.h'),'stale');
  const builder=new ResourceBuilder(output,path.join(root,'tools/butano/template'));const file=builder.processResourceObject(resource);
- await new AssetBuilder(path.join(root,'dist'),output,magick).copyAssets(assets,[file],{preserveStructure:false});
+ const assetBuilder = new AssetBuilder(path.join(root,'dist'),output,magick);
+ await assetBuilder.copyAssets(assets,[file],{preserveStructure:false});
  const baked=file.jsonContent.__spriteCanvas;assert.ok(baked);assert.ok(baked.graphicsName.length<64);assert.equal(fs.existsSync(path.join(output,'graphics/source.bmp')),false);assert.equal(fs.existsSync(path.join(output,'build/bn_sprite_items_source.h')),false);assert.deepEqual(fs.readFileSync(source),original);
+ const generatedSpritePath=path.join(output,'graphics',baked.graphicsName+'.bmp');const generatedSpriteMtime=fs.statSync(generatedSpritePath).mtimeMs;
+ await assetBuilder.copyAssets(assets,[file],{preserveStructure:false});
+ assert.equal(fs.statSync(generatedSpritePath).mtimeMs,generatedSpriteMtime,'An unchanged sprite canvas is reused between builds');
  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(output,'graphics',baked.graphicsName+'.json'))),{type:'sprite',width:16,height:16});
  const bmp=fs.readFileSync(path.join(output,'graphics',baked.graphicsName+'.bmp'));const mask=indexedTransparency(bmp);assert.equal(mask[3*48+4],0);assert.equal(mask[16],1);
  const regenerated=builder.processResourceObject(file.jsonContent);const header=regenerated.headerContent.toString();assert.match(header,/ANIMATION_0_FRAMES\[\] = \{ 0, 1 \}/);assert.match(header,/ANIMATION_1_FRAMES\[\] = \{ 2 \}/);assert.doesNotMatch(header,/SpriteCanvasPiece|SpriteCanvasFrameDefinition|__SPRITECANVAS/);
- await builder.generateResourceRegistryClass([regenerated],{projectName:'sprite_canvas'});const registry=fs.readFileSync(path.join(output,'src/resource_registry.cpp'),'utf8');assert.ok(registry.includes(baked.graphicsName));assert.match(registry,/, 48, 16, 16, 16,/);
+ await builder.generateResourceRegistryClass([regenerated],{projectName:'sprite_canvas'});const registry=fs.readFileSync(path.join(output,'src/resource_registry.cpp'),'utf8');assert.ok(registry.includes(baked.graphicsName));assert.match(registry,new RegExp(`"${baked.graphicsName}", 16, 16, 8, 0,`));
  assert.throws(()=>createSpriteCanvasPlan({...resource,playerAnimationStates:[{id:'x',animations:[{id:'bad',frames:[99]}]}]},16,16),/outside/);
  assert.throws(()=>createSpriteCanvasPlan({...resource,playerAnimationStates:[{id:'x',animations:[{id:'bad',canvasFrames:[{id:'big',width:128,height:16,pieces:[]}]}]}]},16,16),/supported/);
  assert.throws(()=>createSpriteCanvasPlan({...resource,playerFrameWidth:1.5},16,16),/integers/);
@@ -39,4 +43,4 @@ try{
   const png=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',ihdr),chunk('PLTE',Buffer.from([0,0,0,0,0,0])),chunk('IDAT',deflateSync(Buffer.concat(chunks))),chunk('IEND',Buffer.alloc(0))]);const mask=indexedTransparency(png);for(let y=0;y<h;y++)for(let x=0;x<w;x++)assert.equal(mask[y*w+x],(x+y)%2===0?1:0);
  }
  console.log('Sprite canvas export passed: composition, flips, empty frames, state offsets, both orientations, original-source exclusion, palette indices and generated runtime registry.');
-}finally{fs.rmSync(temp,{recursive:true,force:true});}
+}finally{assert.ok(path.resolve(temp).startsWith(path.resolve(os.tmpdir())+path.sep)&&path.basename(temp).startsWith('gba-studio-sprite-canvas-'));fs.rmSync(temp,{recursive:true,force:true});}

@@ -1,3 +1,4 @@
+import { spriteHardwareShape } from '../../../shared/sceneSpriteBudget';
 export type SpriteStripOrientation = 'horizontal' | 'vertical';
 export interface CanvasPiece {
     sourceX: number;
@@ -26,6 +27,10 @@ export interface CanvasAnimationPlan {
 export interface SpriteCanvasPlan {
     frameWidth: number;
     frameHeight: number;
+    canvasWidth: number;
+    canvasHeight: number;
+    partsColumns: number;
+    partsRows: number;
     width: number;
     height: number;
     orientation: SpriteStripOrientation;
@@ -33,7 +38,6 @@ export interface SpriteCanvasPlan {
     animations: CanvasAnimationPlan[];
     idleFrame: number;
 }
-const shapes = [[8, 8], [16, 8], [8, 16], [16, 16], [32, 8], [8, 32], [32, 16], [16, 32], [32, 32], [64, 32], [32, 64], [64, 64]];
 const integer = (value: unknown, fallback: number): number => {
     if (value === undefined || value === null) return fallback;
     if (typeof value !== 'number' || !Number.isInteger(value)) throw new Error('Sprite canvas dimensions and frame indices must be integers');
@@ -86,9 +90,14 @@ export function createSpriteCanvasPlan(resource: any, sourceWidth: number, sourc
     if (!frames.length)
         throw new Error(`Sprite ${label}: no exportable frames`);
     const width = Math.max(...frames.map(frame => frame.width)), height = Math.max(...frames.map(frame => frame.height));
-    const shape = shapes.filter(([w, h]) => w >= width && h >= height).sort((a, b) => a[0] * a[1] - b[0] * b[1])[0];
-    if (!shape)
-        throw new Error(`Sprite ${label}: canvas ${width}x${height} exceeds the supported single-sprite GBA sizes (maximum 64x64)`);
+    const shape = spriteHardwareShape(width, height);
+    const partsColumns = Math.ceil(width / shape[0]);
+    const partsRows = Math.ceil(height / shape[1]);
+    if (partsColumns * partsRows > 16)
+        throw new Error(`Sprite ${label}: canvas ${width}x${height} needs ${partsColumns * partsRows} GBA objects; one actor is limited to 16 composed objects`);
+    const maximumGraphicsBytes = 32 * 1024;
+    if (partsColumns * partsRows * shape[0] * shape[1] > maximumGraphicsBytes)
+        throw new Error(`Sprite ${label}: canvas ${width}x${height} exceeds the 32 KiB GBA OBJ graphics memory budget`);
     // Hardware flip mirrors the padded GBA rectangle. If a logical canvas is
     // narrower, bake its automatic left variant so padding cannot move the actor.
     if (animations.length) {
@@ -114,6 +123,34 @@ export function createSpriteCanvasPlan(resource: any, sourceWidth: number, sourc
         frames.splice(0, frames.length, ...packedFrames);
         animations.splice(0, animations.length, ...packedAnimations);
     }
+    const logicalFrames = frames.slice();
+    const hardwareFrames: CanvasFramePlan[] = [];
+    const logicalFrameStarts: number[] = [];
+    for (const frame of logicalFrames) {
+        logicalFrameStarts.push(hardwareFrames.length);
+        for (let partY = 0; partY < partsRows; partY++) for (let partX = 0; partX < partsColumns; partX++) {
+            const partLeft = partX * shape[0], partTop = partY * shape[1];
+            const pieces: CanvasPiece[] = [];
+            for (const piece of frame.pieces) {
+                const left = Math.max(piece.x, partLeft), top = Math.max(piece.y, partTop);
+                const right = Math.min(piece.x + piece.width, partLeft + shape[0]);
+                const bottom = Math.min(piece.y + piece.height, partTop + shape[1]);
+                if (right <= left || bottom <= top) continue;
+                const sourceOffsetX = left - piece.x, sourceOffsetY = top - piece.y;
+                pieces.push({
+                    ...piece,
+                    sourceX: piece.sourceX + (piece.flipX ? piece.width - sourceOffsetX - (right - left) : sourceOffsetX),
+                    sourceY: piece.sourceY + (piece.flipY ? piece.height - sourceOffsetY - (bottom - top) : sourceOffsetY),
+                    width: right - left, height: bottom - top,
+                    x: left - partLeft, y: top - partTop,
+                });
+            }
+            hardwareFrames.push({ id: `${frame.id}:part:${partX}:${partY}`, width: shape[0], height: shape[1], pieces });
+        }
+    }
+    for (const animation of animations)
+        animation.frames = animation.frames.map(index => logicalFrameStarts[index]);
+    frames.splice(0, frames.length, ...hardwareFrames);
     const orientation: SpriteStripOrientation = resource.playerAnimationStripOrientation === 'vertical' ? 'vertical' : 'horizontal';
-    return { frameWidth: shape[0], frameHeight: shape[1], width: shape[0] * (orientation === 'horizontal' ? frames.length : 1), height: shape[1] * (orientation === 'vertical' ? frames.length : 1), orientation, frames, animations, idleFrame: animations[0]?.frames[0] ?? Math.max(0, Math.min(frames.length - 1, integer(resource.playerIdleFrame, 0))) };
+    return { frameWidth: shape[0], frameHeight: shape[1], canvasWidth: width, canvasHeight: height, partsColumns, partsRows, width: shape[0] * (orientation === 'horizontal' ? frames.length : 1), height: shape[1] * (orientation === 'vertical' ? frames.length : 1), orientation, frames, animations, idleFrame: animations[0]?.frames[0] ?? Math.max(0, Math.min(frames.length - 1, integer(resource.playerIdleFrame, 0))) };
 }

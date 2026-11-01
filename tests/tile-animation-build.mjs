@@ -20,7 +20,7 @@ try {
   ] });
   const output = result.headerContent.toString('utf8');
   assert.match(output, /RegularBgMapCellOverride SCENE_TILE_ANIMATION_BACKGROUNDS_LAYER_0_MAP_OVERRIDES\[\] = \{ \{ 4, 15367 \} \};/);
-  assert.match(output, /\{ 0, "water-bg", nullptr, nullptr, nullptr, 0, 0, 3, 0, SCENE_TILE_ANIMATION_BACKGROUNDS_LAYER_0_MAP_OVERRIDES, 1 \}/);
+  assert.match(output, /\{ 0, "water-bg", nullptr, 0, 0, 0, SCENE_TILE_ANIMATION_BACKGROUNDS_LAYER_0_MAP_OVERRIDES, 1 \}/);
   assert.match(output, /static const int SCENE_TILE_ANIMATION_TILE_ANIMATION_0_FRAMES\[\] = \{ 32, 33, 34 \};/);
   assert.match(output, /static const TileAnimation SCENE_TILE_ANIMATION_TILE_ANIMATION_0 = \{ 0, 16, [^,]+, 3, 4, true, 1 \};/);
   assert.match(output, /static const int SCENE_TILE_ANIMATION_TILE_ANIMATION_1_FRAMES\[\] = \{ 8, 9 \};/);
@@ -30,6 +30,10 @@ try {
   assert.match(graphics, /animation\.duration_frames/);
   assert.match(graphics, /regular_bg_map_ptr::allocate_optional/);
   assert.match(graphics, /map_cell_overrides_count/);
+  assert.match(graphics, /map_copy->tiles_offset\(\)/);
+  assert.match(graphics, /map_copy->palette_banks_offset\(\) << 12/);
+  assert.match(graphics, /\(\*destination_cells\)\[cell_index\] = uint16_t\(\(\*source_cells\)\[cell_index\] \+ cell_offset\)/);
+  assert.match(graphics, /\(\*destination_cells\)\[cell_override\.cell_index\] = uint16_t\(cell_override\.cell \+ cell_offset\)/);
   assert.match(graphics, /bg_ptr\.set_map\(\*map_copy\)/);
   assert.match(sceneInterface, /tileMapCellOverrides\?:/);
   assert.match(sceneInterface, /horizontalFlip\?: boolean/);
@@ -43,6 +47,9 @@ try {
   assert.throws(() => builder.processResourceObject({ _resourceType: 'scene', id: 'duplicate-target', tileAnimations: [
     { targetTileIndex: 4, frameTileIndices: [1] }, { targetTileIndex: 4, frameTileIndices: [2] },
   ] }), /already animated/);
+  assert.doesNotThrow(() => builder.processResourceObject({ _resourceType: 'scene', id: 'independent-layer-targets', tileAnimations: [
+    { layerId: 0, targetTileIndex: 4, frameTileIndices: [1] }, { layerId: 1, targetTileIndex: 4, frameTileIndices: [2] },
+  ] }), 'Independent layers may use the same generated tile index');
   assert.throws(() => builder.processResourceObject({ _resourceType: 'scene', id: 'bad-map-override', backgrounds: [{ layerId: 0, tileMapCellOverrides: [{ index: 0, tileIndex: 1024 }] }] }), /tileIndex must be between 0 and 1023/);
   const generatedBuild = path.join(tempDir, 'generated-build');
   fs.mkdirSync(generatedBuild, { recursive: true });
@@ -78,5 +85,6 @@ try {
   } }], generatedBuild), /exceeds 7 logical tiles/);
   console.log('Tile animation build contract passed.');
 } finally {
+  assert.ok(path.resolve(tempDir).startsWith(path.resolve(os.tmpdir()) + path.sep) && path.basename(tempDir).startsWith('gba-studio-tile-animation-'));
   fs.rmSync(tempDir, { recursive: true, force: true });
 }

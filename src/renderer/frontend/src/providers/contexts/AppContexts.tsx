@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { BackgroundContext, ElementContext, PalettesContext, ProjectContext, SceneContext, ScriptsContext, SettingsContext, SettingsUtilsContext, SpriteContext, UserSettingsContext, VariablesContext } from "../Providers";
+import { BackgroundContext, ElementContext, PalettesContext, PrefabsContext, ProjectContext, SceneContext, ScriptsContext, SettingsContext, SettingsUtilsContext, SpriteContext, UserSettingsContext, VariablesContext } from "../Providers";
 
 const useSettingsUtilsContext = () =>  {
     const context = useContext(SettingsUtilsContext);
@@ -74,6 +74,7 @@ const useSpriteContext = () => {
 }
 const useScriptsContext = () => { const context = useContext(ScriptsContext); if (!context) throw new Error('useScriptsContext must be used within a ScriptsProvider'); return context; };
 const usePalettesContext = () => { const context = useContext(PalettesContext); if (!context) throw new Error('usePalettesContext must be used within a PalettesProvider'); return context; };
+const usePrefabsContext = () => { const context = useContext(PrefabsContext); if (!context) throw new Error('usePrefabsContext must be used within a PrefabsProvider'); return context; };
 
 export const useAppContexts = () => {
   const sceneCtx = useSceneContext();
@@ -87,6 +88,7 @@ export const useAppContexts = () => {
     const spriteCtx = useSpriteContext();
     const scriptsCtx = useScriptsContext();
     const palettesCtx = usePalettesContext();
+    const prefabsCtx = usePrefabsContext();
 
   return {
     scenes: sceneCtx.scenes,
@@ -132,6 +134,10 @@ export const useAppContexts = () => {
     setPalettes: palettesCtx.setPalettes,
     palettesRef: palettesCtx.palettesRef,
     ignoredFieldsPalettes: palettesCtx.ignoredFields,
+    prefabs: prefabsCtx.prefabs,
+    setPrefabs: prefabsCtx.setPrefabs,
+    prefabsRef: prefabsCtx.prefabsRef,
+    ignoredFieldsPrefabs: prefabsCtx.ignoredFields,
 
     settingUtils: settingUtilsCtx.settingUtils,
     setSettingUtils: settingUtilsCtx.setSettingUtils,

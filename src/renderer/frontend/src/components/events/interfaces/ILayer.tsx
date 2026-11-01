@@ -40,3 +40,8 @@ export interface IChangePaletteBackgroundArgs extends IArgs {
   /** Restores the background's original palette and disables overrides. */
   restorePaletteLayerDefault?: boolean;
 }
+
+export interface IDefaultPalettesArgs extends IArgs {
+  /** Each null entry restores that index to its Settings default. */
+  paletteIds: Array<string | null>;
+}

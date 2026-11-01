@@ -73,6 +73,11 @@
   box-shadow: none !important;
 }
 
+html[data-hide-button-focus-ring='true'] button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 .gba-theme-glass {
   background: #dce7f0;
 }
@@ -327,6 +332,73 @@ body, html {
   align-items: center;
 }
 
+.project-hierarchy .left-navigation-section > .ant-collapse-item > .ant-collapse-header {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.project-hierarchy .left-navigation-section > .ant-collapse-item > .ant-collapse-header > .ant-collapse-header-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.project-hierarchy .left-navigation-section > .ant-collapse-item > .ant-collapse-header > .ant-collapse-extra {
+  flex: 0 0 auto;
+}
+
+.project-hierarchy .custom-tree .ant-tree-node-content-wrapper {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.project-hierarchy .custom-tree .ant-tree-title {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.project-hierarchy .custom-tree .ant-tree-title > .ant-flex {
+  box-sizing: border-box;
+  flex-wrap: nowrap;
+}
+
+.project-hierarchy .custom-tree .ant-tree-title .ant-typography {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.music-left-navigation.ant-collapse {
+  display: flex;
+  flex-direction: column;
+}
+
+.music-left-navigation.ant-collapse > .ant-collapse-item {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 40px;
+}
+
+.music-left-navigation.ant-collapse > .ant-collapse-item > .ant-collapse-content-active {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.music-left-navigation.ant-collapse > .ant-collapse-item > .ant-collapse-content-active > .ant-collapse-content-box {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
 /* .ant-collapse-content-box {
   background-color: #1aeb2ca3;
 } */
@@ -358,4 +430,42 @@ body, html {
 
 .ant-app *::-webkit-scrollbar-button {
   display: none;
+}
+.event-attention-tree .ant-tree-title {
+  display: block;
+  width: 100%;
+}
+
+.event-attention-tree .ant-tree-node-selected .gba-hierarchy-warning {
+  color: inherit !important;
+}
+
+/* Keep layer notifications on the tab corner, with room above the scroll clip. */
+.gba-background-tabs > .ant-tabs-nav > .ant-tabs-nav-wrap {
+  padding-top: 8px;
+  margin-top: -8px;
+}
+
+.gba-background-tabs > .ant-tabs-nav .ant-tabs-nav-list {
+  padding-right: 8px;
+}
+
+.gba-background-tabs > .ant-tabs-nav .ant-tabs-tab-btn,
+.gba-background-tabs > .ant-tabs-nav .gba-attention-label {
+  position: static !important;
+}
+
+.gba-background-tabs > .ant-tabs-nav .gba-attention-anchor {
+  top: 0 !important;
+  right: 0 !important;
+}
+.palette-slot-select .ant-select-selector {
+  padding: 0 !important;
+  overflow: hidden;
+}
+.palette-slot-select .ant-select-selection-item { padding: 0 !important; height: 46px !important; display: flex; align-items: stretch; }
+.palette-slot-select .ant-select-selection-item > span { width: 100% !important; height: 46px !important; border: 0 !important; border-radius: 0 !important; }
+.palette-slot-default .ant-select-selection-item { opacity: .35; filter: grayscale(1); }
+.palette-slot-select .ant-select-selection-placeholder {
+  opacity: 1;
 }

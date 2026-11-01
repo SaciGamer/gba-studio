@@ -4,7 +4,6 @@
   "_index": 1,
   "_deleted": false,
   "name": "Title",
-  "backgroundId": "original_butano_background",
   "backgrounds": [
     {
       "layerId": 0,
@@ -62,7 +61,6 @@
         "options": [
           "START",
           "HOW TO PLAY",
-          "CREDITS",
           "RUMBLE ON/OFF"
         ],
         "resultVariable": "a0a7f9a0-002f-43b2-80a7-f9a0002f3b2d",
@@ -149,55 +147,6 @@
               "command": "EVENT_CHANGE_SCENE",
               "args": {
                 "sceneId": "39057e0e-71af-4b65-8905-7e0e71afb65c",
-                "x": {
-                  "type": "number",
-                  "value": 120
-                },
-                "y": {
-                  "type": "number",
-                  "value": 136
-                },
-                "direction": "right",
-                "fadeSpeed": 2
-              }
-            }
-          ],
-          "else": []
-        },
-        "__collapse": false
-      }
-    },
-    {
-      "id": "e6eef12b-bc0b-4412-86ee-f12bbc0b412d",
-      "version": 1,
-      "command": "EVENT_IF",
-      "args": {
-        "left": {
-          "kind": "variable",
-          "variableId": "a0a7f9a0-002f-43b2-80a7-f9a0002f3b2d"
-        },
-        "operator": "==",
-        "right": {
-          "kind": "literal",
-          "type": "number",
-          "value": 2
-        },
-        "children": {
-          "then": [
-            {
-              "id": "8f6820a3-884a-42a1-8f68-20a3884a2a15",
-              "version": 1,
-              "command": "EVENT_HBE_EFFECT_DISABLE",
-              "args": {
-                "__collapse": true
-              }
-            },
-            {
-              "id": "33765d7c-66fe-4138-8376-5d7c66fe1382",
-              "version": 1,
-              "command": "EVENT_CHANGE_SCENE",
-              "args": {
-                "sceneId": "a636971f-85c6-4633-8636-971f85c6633f",
                 "x": {
                   "type": "number",
                   "value": 120

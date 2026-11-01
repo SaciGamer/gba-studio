@@ -1,7 +1,20 @@
 #include "script_trigger_manager.h"
 #include "script_command_manager.h"
+#include "gba_studio_features.h"
+#if GBA_STUDIO_FEATURE_SCENE_CHANGE
 #include "event_change_scene.h"
+#endif
 #include "graphics_manager.h"
+
+namespace {
+    bool transition_active() {
+#if GBA_STUDIO_FEATURE_SCENE_CHANGE
+        return changeScene.active;
+#else
+        return false;
+#endif
+    }
+}
 
 void ScriptTriggerManager::reset()
 {
@@ -17,11 +30,11 @@ void ScriptTriggerManager::cancel_scene(const bn::string<64>& id)
 
 void ScriptTriggerManager::advance(State& state)
 {
-    if(ScriptCommand::instance().execute(scene_id, state.running_program, state.running_count))
+    if(ScriptCommand::instance().execute(scene_id, state.running_program, state.running_count, nullptr, state.owner_id))
     {
         // Unlike scene OnInit, completed triggers do not need to retain a
         // scheduler slot: fired/running state controls their next activation.
-        ScriptCommand::instance().restart(scene_id, state.running_program);
+        ScriptCommand::instance().restart(scene_id, state.running_program, nullptr, state.owner_id);
         state.running_program = nullptr;
         state.running_count = 0;
     }
@@ -37,11 +50,12 @@ void ScriptTriggerManager::update(const Scenes& scene, int player_x, int player_
     }
     for(int i = 0; i < scene.triggers_count && i < 64; ++i)
     {
-        const ScriptTrigger& trigger = scene.triggers[i];
+        ScriptTrigger modified;
+        const ScriptTrigger& trigger = GraphicsManager::instance().resolve_script_trigger(i, scene.triggers[i], modified);
         State& state = states[i];
+        state.owner_id = trigger.id;
         if(state.cooldown > 0) --state.cooldown;
-        const bool inside = player_x >= trigger.x && player_x < trigger.x + trigger.width &&
-                            player_y >= trigger.y && player_y < trigger.y + trigger.height;
+        const bool inside = trigger.enabled && GraphicsManager::instance().player_overlaps_trigger(trigger, player_x, player_y);
         const bool entered = inside && !state.inside;
         const bool exited = !inside && state.inside;
         state.inside = inside;
@@ -51,7 +65,7 @@ void ScriptTriggerManager::update(const Scenes& scene, int player_x, int player_
             // not a cooperative program already in flight. Use single-instance
             // semantics: ignore retriggers until completion, with no queue.
             advance(state);
-            if(changeScene.active || GraphicsManager::instance().get_scene_revision() != scene_revision) return;
+            if(transition_active() || GraphicsManager::instance().get_scene_revision() != scene_revision) return;
             continue;
         }
         if(!trigger.enabled || state.cooldown > 0 || (trigger.once && state.fired)) continue;
@@ -76,12 +90,12 @@ void ScriptTriggerManager::update(const Scenes& scene, int player_x, int player_
             if(program && program_count > 0) {
                 // A trigger may be entered and exited repeatedly. Restart the
                 // selected program so its complete body runs on every firing.
-                ScriptCommand::instance().restart(scene.id, program);
+                ScriptCommand::instance().restart(scene.id, program, nullptr, state.owner_id);
                 state.running_program = program;
                 state.running_count = program_count;
                 state.fired = true; state.cooldown = trigger.cooldown_frames;
                 advance(state);
-                if(changeScene.active || GraphicsManager::instance().get_scene_revision() != scene_revision) return;
+                if(transition_active() || GraphicsManager::instance().get_scene_revision() != scene_revision) return;
             }
         }
     }

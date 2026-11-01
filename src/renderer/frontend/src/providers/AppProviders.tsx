@@ -1,7 +1,7 @@
 import { ComponentType, ReactNode } from 'react';
 import { BuildStateProvider } from './BuildStateProvider';
 import { HistoryProvider } from './HistoryProvider';
-import { BackgroundProvider, ElementProvider, PalettesProvider, ProjectProvider, SceneProvider, ScriptsProvider, SettingsProvider, SettingsUtilsProvider, SpriteProvider, UserSettingsProvider, VariablesProvider } from "./Providers";
+import { BackgroundProvider, ElementProvider, PalettesProvider, PrefabsProvider, ProjectProvider, SceneProvider, ScriptsProvider, SettingsProvider, SettingsUtilsProvider, SpriteProvider, UserSettingsProvider, VariablesProvider } from "./Providers";
 
 const composeProviders = (...providers: ComponentType<{ children: ReactNode }>[]) => {
     return ({ children }: { children: ReactNode }) => 
@@ -18,6 +18,7 @@ const AppProvider = composeProviders(
     SpriteProvider,
     ScriptsProvider,
     PalettesProvider,
+    PrefabsProvider,
     VariablesProvider,
     ElementProvider,
     SceneProvider,

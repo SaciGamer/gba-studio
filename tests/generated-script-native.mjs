@@ -24,7 +24,7 @@ const branch = [
     { id: 'wait', command: 'EVENT_WAIT', args: { units: 'frames', frames: 2 } }, mark('then', 11),
   ], else: [mark('else', 99)] } }, mark('after-if', 22),
 ];
-const loop = (id = 'loop') => ({ id, command: 'EVENT_FOR', version: 2, args: { variableId: 'index', start: 1, end: 2, step: 1 },
+const loop = (id = 'loop') => ({ id, command: 'EVENT_FOR', version: 1, args: { variableId: 'index', start: 1, end: 2, step: 1 },
   children: { then: [readIndex, { id: 'continue', command: 'EVENT_CONTINUE', args: {} }, mark('unreachable', 99)] },
 });
 try {
@@ -57,6 +57,21 @@ try {
     script: [{ ...loop(), version: 3 }],
   }), /unsupported schema version 3/);
   const headers = scenes.map(scene => builder.processResourceObject({ _resourceType: 'scene', ...scene }).headerContent.toString('utf8'));
+  await builder.writeScriptSourceMap();
+  const sourceMap = JSON.parse(fs.readFileSync(path.join(output, 'runtime-script-source-map.json'), 'utf8'));
+  const allHeaders = fs.readdirSync(path.join(output, 'include')).filter(name => name.endsWith('_res.h')).map(name => fs.readFileSync(path.join(output, 'include', name), 'utf8')).join('\n');
+  for (const [symbol, entries] of Object.entries(sourceMap.programs)) {
+    if (!entries.length) { assert.ok(allHeaders.includes(`${symbol}_COUNT = 0`)); continue; }
+    const body = allHeaders.match(new RegExp(`ScriptCommandData ${symbol}\\[\\] = \\{\\n([\\s\\S]*?)\\n\\};`))?.[1];
+    assert.ok(body, `Source map array ${symbol} must exist`);
+    const rows = body.split('\n').filter(row => row.trim());
+    assert.equal(rows.length, entries.length);
+    entries.forEach((entry, index) => {
+      assert.equal(entry.index, index);assert.ok(entry.id);
+      assert.ok(rows[index].includes(`"${entry.command}"`));
+      assert.ok(rows[index].includes(`, ${entry.nextIndex}, ${entry.falseIndex}, ${entry.loopIndex}`), `Control-flow map for ${entry.id}`);
+    });
+  }
   fs.writeFileSync(path.join(output, 'include/generated_scripts.h'), headers.join('\n'));
   const executable = path.join(output, process.platform === 'win32' ? 'generated.exe' : 'generated');
   const build = spawnSync(process.env.CXX || 'g++', [
@@ -71,5 +86,6 @@ try {
   assert.equal(run.status, 0, `Generated program execution failed:\n${run.error ?? ''}${run.stdout}${run.stderr}`);
   process.stdout.write(run.stdout);
 } finally {
+  assert.ok(path.resolve(output).startsWith(path.resolve(os.tmpdir()) + path.sep) && path.basename(output).startsWith('gba-studio-generated-script-test-'));
   fs.rmSync(output, { recursive: true, force: true });
 }

@@ -44,6 +44,14 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "src/renderer/frontend/src/img/CartuchoGBA.png",
+        "to": "bin/cartridge/CartuchoGBA.png"
+      },
+      {
+        "from": "src/renderer/frontend/src/img/CartuchoGBASemFundo.png",
+        "to": "bin/cartridge/CartuchoGBASemFundo.png"
       }
     ],
     "files": [

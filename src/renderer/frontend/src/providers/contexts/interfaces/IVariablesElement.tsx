@@ -6,6 +6,7 @@ export type EVariableScope = 'GLOBAL' | 'LOCAL' | 'TEMP';
 export type VariableValue = number | boolean | string;
 
 export interface IVariableDefinition {
+  _deleted?: boolean;
   id: string;
   name: string;
   symbol: string;

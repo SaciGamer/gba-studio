@@ -13,12 +13,13 @@ try {
   for (const args of [undefined, {}, { __collapse: true }]) {
     const header = builder.processResourceObject({
       _resourceType: 'scene', id: 'zero_args', backgrounds: [],
-      script: ['EVENT_HIDE_ALL_SPRITES', 'EVENT_SHOW_ALL_SPRITES'].map((command, index) => ({
+      script: ['EVENT_HIDE_ALL_SPRITES', 'EVENT_SHOW_ALL_SPRITES', 'EVENT_CAMERA_STOP_FOLLOW'].map((command, index) => ({
         id: `event-${index}`, command, ...(args === undefined ? {} : { args }),
       })),
     }).headerContent.toString();
     assert.match(header, /static const void\* SCENE_ZERO_ARGS_ARGS_0 = nullptr;/);
     assert.match(header, /static const void\* SCENE_ZERO_ARGS_ARGS_1 = nullptr;/);
+    assert.match(header, /static const void\* SCENE_ZERO_ARGS_ARGS_2 = nullptr;/);
     const cpp = path.join(temp, 'test.cpp');
     fs.writeFileSync(cpp, header + '\nint main(){return 0;}');
     const build = spawnSync(process.env.CXX || 'g++', [

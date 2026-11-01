@@ -18,6 +18,11 @@ const EVENT_MIGRATORS: Record<number, EventMigrator> = {
 /** Normalize persisted event records before they enter the canonical graph. */
 export function migrateScriptEvent(event: IScriptsElement): IScriptsElement {
   const version = event.version;
+  if((event.command === EEvents.SAVE_WRITE || event.command === EEvents.SAVE_LOAD) && (version === undefined || version === 1)) {
+    const { variableId, variableIds, schema, ...args } = event.args ?? {};
+    return { ...event, version: 1, args: { ...args, slot: args.slot ?? 0 },
+      children: event.children ?? { then: [] } };
+  }
   if (version === undefined || version === 1) {
     if (event.command === EEvents.UI_ANIMATE && event.args && !event.args.uiId) {
       return { ...event, version: 1, args: { ...event.args, uiId: '__LAST_UI__', animation: 'move', speed: 2 } };
@@ -45,8 +50,12 @@ export function migrateScriptsToGraph(scripts: IScriptsElement[]): IScriptGraph 
       const next = items[index + 1]?.id ?? continuation;
       const position = typeof event.args?.__x === 'number' && typeof event.args?.__y === 'number' ? { x: event.args.__x, y: event.args.__y } : event.position ?? { x: 80 + depth * 360, y: 90 + nodes.length * 145 };
       const migrated = migrateScriptEvent(event);
-      nodes.push({ ...migrated, children: undefined, position });
-      if (event.command === EEvents.IF) {
+      nodes.push({ ...migrated, children: event.command === EEvents.SWITCH ? event.children : undefined, position });
+      if(event.command === EEvents.SAVE_WRITE || event.command === EEvents.SAVE_LOAD) {
+        addEdge(event.id, 'next', next);
+        addEdge(event.id, 'then', visit(event.children?.then ?? [], next, depth + 1));
+        addEdge(event.id, 'else', visit(event.children?.else ?? [], undefined, depth + 1));
+      } else if (event.command === EEvents.IF) {
         addEdge(event.id, 'then', visit(event.children?.then ?? [], next, depth + 1));
         addEdge(event.id, 'else', visit(event.children?.else ?? [], next, depth + 1));
       } else addEdge(event.id, 'next', next);
@@ -115,7 +124,14 @@ export function graphToScripts(graph: IScriptGraph): IScriptsElement[] {
     while (current && current !== stop && !path.has(current)) {
       path.add(current); const source = byId.get(current); if (!source) break;
       const event = { ...source, args: { ...source.args, __x: source.position?.x, __y: source.position?.y }, children: undefined };
-      if (source.command === EEvents.IF) {
+      if(source.command === EEvents.SAVE_WRITE || source.command === EEvents.SAVE_LOAD) {
+        const continuation = outgoing(graph, source.id, 'next');
+        result.push({ ...event, children: { then: build(outgoing(graph, source.id, 'then'), continuation, path), else: build(outgoing(graph, source.id, 'else'), undefined, path) } });
+        current = continuation;
+      } else if (source.command === EEvents.SWITCH) {
+        result.push({ ...event, children: source.children });
+        current = outgoing(graph, source.id, 'next');
+      } else if (source.command === EEvents.IF) {
         const thenTarget = outgoing(graph, source.id, 'then'), elseTarget = outgoing(graph, source.id, 'else'), join = nearestJoin(graph, thenTarget, elseTarget);
         result.push({ ...event, children: { then: build(thenTarget, join, path), else: build(elseTarget, join, path) } }); current = join;
       } else { if (source.args?.__comment !== true) result.push(event); current = outgoing(graph, source.id, 'next'); }

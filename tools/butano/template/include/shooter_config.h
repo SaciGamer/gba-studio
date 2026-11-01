@@ -6,7 +6,6 @@ struct ShooterConfig
 {
     const char* default_wave_id;
     const char* projectile_sprite_id;
-    int player_hit_points;
     int default_damage;
     int boss_hit_points;
 };

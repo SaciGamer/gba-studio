@@ -6,7 +6,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const source = fs.readFileSync(path.join(root, 'tools', 'butano', 'template', 'src', 'dialogue_manager.cpp'), 'utf8').replaceAll('\r\n', '\n');
 const header = fs.readFileSync(path.join(root, 'tools', 'butano', 'template', 'include', 'dialogue_manager.h'), 'utf8');
 const handlers = fs.readFileSync(path.join(root, 'tools', 'butano', 'template', 'src', 'script_event_handlers.cpp'), 'utf8');
-assert.match(source, /if\(visible \|\| value\.empty\(\)\) return false/);
+assert.match(source, /if\(visible \|\| !value \|\| !value\[0\]\) return false/);
 assert.match(source, /acknowledged/);
 assert.match(header, /current_page/);
 assert.match(header, /total_pages/);

@@ -19,6 +19,8 @@ const DEFAULT_CREDITS_FILENAME = 'gba-studio-credits.json';
 const CREDITS_CONFIG_DIRECTORY = 'config';
 const MAX_DOCUMENT_BYTES = 64 * 1024;
 const REQUEST_TIMEOUT_MS = 3500;
+const REFRESH_INTERVAL_MS = 15 * 60 * 1000;
+const RETRY_INTERVAL_MS = 60 * 1000;
 
 const emergencyCredits: LauncherCredit[] = [
   { entry: '@#SaciGamer-Dev', href: 'https://sacigamer.github.io/gba-studio-site/' },
@@ -27,6 +29,9 @@ const emergencyCredits: LauncherCredit[] = [
 ];
 
 let refreshPromise: Promise<LauncherCredit[] | null> | null = null;
+let nextRefreshAt = 0;
+let lastRemoteCredits: LauncherCredit[] | null = null;
+let localCreditsPromise: Promise<LauncherCredit[]> | null = null;
 
 function isSafeCredit(value: unknown): value is LauncherCredit {
   if (!value || typeof value !== 'object') return false;
@@ -76,16 +81,28 @@ function getCacheCreditsPath(): string {
   return path.join(app.getPath('userData'), CREDITS_CONFIG_DIRECTORY, DEFAULT_CREDITS_FILENAME);
 }
 
-function fetchRemoteCredits(): Promise<LauncherCredit[]> {
+function fetchRemoteCredits(url = REMOTE_CREDITS_URL, visited = new Set<string>(), deadline = Date.now() + REQUEST_TIMEOUT_MS): Promise<LauncherCredit[]> {
+  if (visited.has(url) || visited.size >= 4) return Promise.reject(new Error('Credits redirect limit reached'));
+  if (new URL(url).protocol !== 'https:') return Promise.reject(new Error('Credits redirects require HTTPS'));
+  if (Date.now() >= deadline) return Promise.reject(new Error('Credits request timed out'));
+  visited.add(url);
   return new Promise((resolve, reject) => {
-    const request = https.get(REMOTE_CREDITS_URL, {
+    const request = https.get(url, {
       headers: {
         Accept: 'application/json',
         'User-Agent': 'GBA-Studio-Credits',
       },
     }, (response) => {
+      if ([301, 302, 303, 307, 308].includes(response.statusCode ?? 0) && response.headers.location) {
+        response.resume();
+        clearTimeout(timeout);
+        try { resolve(fetchRemoteCredits(new URL(response.headers.location, url).href, visited, deadline)); }
+        catch (error) { reject(error); }
+        return;
+      }
       if (response.statusCode !== 200) {
         response.resume();
+        clearTimeout(timeout);
         reject(new Error(`Credits request returned HTTP ${response.statusCode ?? 'unknown'}`));
         return;
       }
@@ -93,6 +110,8 @@ function fetchRemoteCredits(): Promise<LauncherCredit[]> {
       let body = '';
       let tooLarge = false;
       response.setEncoding('utf8');
+      response.once('error', reject);
+      response.once('aborted', () => reject(new Error('Credits response was interrupted')));
       response.on('data', (chunk: string) => {
         body += chunk;
         if (Buffer.byteLength(body, 'utf8') > MAX_DOCUMENT_BYTES) {
@@ -101,6 +120,7 @@ function fetchRemoteCredits(): Promise<LauncherCredit[]> {
         }
       });
       response.on('end', () => {
+        clearTimeout(timeout);
         if (tooLarge) return;
         try {
           const document = parseCreditsDocument(JSON.parse(body));
@@ -112,9 +132,10 @@ function fetchRemoteCredits(): Promise<LauncherCredit[]> {
       });
     });
 
-    request.setTimeout(REQUEST_TIMEOUT_MS, () => {
+    const timeout = setTimeout(() => {
       request.destroy(new Error('Credits request timed out'));
-    });
+    }, Math.max(1, deadline - Date.now()));
+    request.once('close', () => clearTimeout(timeout));
     request.once('error', reject);
   });
 }
@@ -145,18 +166,24 @@ async function loadLocalCredits(): Promise<LauncherCredit[]> {
 }
 
 export async function loadLauncherCredits(): Promise<LauncherCredit[]> {
-  return loadLocalCredits();
+  localCreditsPromise ??= loadLocalCredits();
+  return localCreditsPromise;
 }
 
 export async function refreshLauncherCredits(): Promise<LauncherCredit[] | null> {
+  if (!refreshPromise && Date.now() < nextRefreshAt) return lastRemoteCredits;
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
         const remoteCredits = await fetchRemoteCredits();
         await writeCache(remoteCredits);
+        localCreditsPromise = Promise.resolve(remoteCredits);
+        lastRemoteCredits = remoteCredits;
+        nextRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
         return remoteCredits;
       } catch (error) {
-        console.info('Using local credits because the remote document is unavailable:', error);
+        nextRefreshAt = Date.now() + RETRY_INTERVAL_MS;
+        console.info('Using local credits:', error instanceof Error ? error.message : String(error));
         return null;
       }
     })().finally(() => {

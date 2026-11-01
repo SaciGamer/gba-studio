@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 const root = path.resolve(import.meta.dirname, '..');
 const source = fs.readFileSync(path.join(root, 'tools/butano/template/src/graphics_manager.cpp'), 'utf8');
 const start = source.indexOf('void GraphicsManager::change_single_layer(');
-const end = source.indexOf('\nvoid GraphicsManager::change_palette_layer(', start);
+const end = source.indexOf('\nconst BackgroundPalette* GraphicsManager::resolve_slot_palette(', start);
 assert.ok(start >= 0 && end > start, 'Actual Change Background implementation must be present');
 const output = fs.mkdtempSync(path.join(os.tmpdir(), 'gba-studio-layer-runtime-'));
 try {
@@ -22,6 +22,7 @@ try {
 #include <vector>
 #define BN_LOG(...) ((void) 0)
 int creations = 0;
+int bitmap_blits = 0;
 bool allocation_fails = false;
 namespace bn {
 template<int N> using string = std::string;
@@ -57,6 +58,16 @@ struct regular_bg_ptr {
   void set_blending_enabled(bool v) { state->blending = v; }
   void set_position(int x, int y) { state->x = x; state->y = y; }
 };
+struct color { color(int,int,int) {} };
+using direct_bitmap_item = regular_bg_item;
+struct sp_direct_bitmap_bg_ptr : regular_bg_ptr {
+  static optional<sp_direct_bitmap_bg_ptr> create_optional() { return sp_direct_bitmap_bg_ptr{}; }
+};
+struct sp_direct_bitmap_bg_painter {
+  explicit sp_direct_bitmap_bg_painter(sp_direct_bitmap_bg_ptr&) {}
+  void fill(color) {}
+  void blit(int,int,const direct_bitmap_item&) { ++bitmap_blits; }
+};
 }
 struct Scenes { const char* scene_type; };
 struct Backgrounds { const char* id; const char* name; int image_width; int image_height; };
@@ -69,6 +80,10 @@ bn::optional<bn::regular_bg_item> get_bg_item_from_name(const bn::string<64>& na
   if(name == "missing") return {};
   return bn::regular_bg_item{name};
 }
+bn::optional<bn::direct_bitmap_item> get_bitmap_bg_item_from_name(const bn::string<64>& name) {
+  if(name == "missing") return {};
+  return bn::direct_bitmap_item{name};
+}
 struct LayerArgs { int layer_id; bn::string<64> background_id; bool visible; };
 class GraphicsManager {
 public:
@@ -76,8 +91,11 @@ public:
   bn::vector<bn::optional<bn::regular_bg_ptr>, 4> current_bgs;
   bn::vector<bn::string<64>, 4> current_bgs_id;
   bn::vector<int, 4> current_bgs_x, current_bgs_y, current_bgs_parallax_x, current_bgs_parallax_y;
+  bn::optional<bn::sp_direct_bitmap_bg_ptr> current_bitmap_bgs;
+  int bitmap_paint_x = 0, bitmap_paint_y = 0;
   int camera_x = 20, camera_y = 12, whole_scene_loads = 0;
-  void change_single_layer(int, const bn::string<64>&, bool);
+  void change_single_layer(int, const bn::string<64>&, bool, bool=false);
+  void set_camera_position(int,int) {}
   void change_layer(const bn::vector<LayerArgs, 4>&) { ++whole_scene_loads; }
 };
 ${source.slice(start, end)}
@@ -133,6 +151,18 @@ int main() {
   assert(sparse.current_bgs_x.size() == 4 && sparse.current_bgs_y.size() == 4);
   assert(sparse.current_bgs_parallax_x.size() == 4 && sparse.current_bgs_parallax_y.size() == 4);
   assert(sparse.whole_scene_loads == 0);
+  const Scenes bitmap{"Logo"};
+  sparse.currentScene = &bitmap;
+  sparse.change_single_layer(0, "old", true);
+  assert(sparse.current_bitmap_bgs && sparse.current_bgs_id[2] == "old" && bitmap_blits == 1);
+  auto bitmap_state = sparse.current_bitmap_bgs->state;
+  sparse.change_single_layer(0, "old", false);
+  assert(!bitmap_state->visible && bitmap_blits == 1);
+  sparse.change_single_layer(2, "new", true);
+  assert(sparse.current_bitmap_bgs->state == bitmap_state && bitmap_blits == 2);
+  assert(sparse.whole_scene_loads == 0 && sparse.current_bgs_id[2] == "new");
+  sparse.change_single_layer(2, "", false);
+  assert(!sparse.current_bitmap_bgs && sparse.current_bgs_id[2].empty());
   std::cout << "Change Background runtime checks passed: native slot reuse, four active layers, offsets/parallax, sparse slots, missing resources and allocation failure.\\n";
 }
 `;

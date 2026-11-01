@@ -12,6 +12,32 @@ try{const builder=new ResourceBuilder(temp,path.resolve('tools/butano/template')
  assert.match(actorMove({x:{type:'number',value:48},y:{kind:'literal',type:'number',value:80},xUnit:'pixels',yUnit:'pixels'}),/ActorMoveEventData[^\n]*"__PLAYER__", 48, 80/,'legacy numeric inputs keep their coordinates in pixel mode');
  assert.match(actorMove({x:number(3),y:5,xUnit:'tiles'}),/ActorMoveEventData[^\n]*"__PLAYER__", 48, 5/);
  const dynamicActor=actorMove({x:expression,y:5,xUnit:'tiles'});assert.match(dynamicActor,/op_number, 16/);assert.match(dynamicActor,/op_multiply/);headers.push(dynamicActor);
+ const {toRuntimeScripts}=await import(pathToFileURL(path.join(root,'dist/main/utils/types/RuntimeScript.js')));
+ const door={id:'door'};
+ const doorMove=toRuntimeScripts([{id:'move',command:'EVENT_MOVE_ACTOR',args:{actorId:'__PLAYER__',x:{kind:'property',actorId:'__SELF__',property:'x'},y:{kind:'property',actorId:'__SELF__',property:'y'},xUnit:'tiles',yUnit:'tiles'}}],door.id)[0];
+ assert.equal(doorMove.args.actorId,'__PLAYER__');
+ assert.deepEqual(doorMove.args.x,{kind:'property',actorId:door.id,property:'x'});
+ const {numericCoordinateInstructions}=await import(pathToFileURL(path.join(root,'dist/shared/numericValues.js')));
+ const doorY=numericCoordinateInstructions(doorMove.args.y,doorMove.args.yUnit==='tiles'?16:1);
+ assert.deepEqual(doorY,[{operation:'property',reference:door.id,argument:1}]);
+ const doorHeader=actorMove(doorMove.args);assert.doesNotMatch(doorHeader,/op_multiply/);headers.push(doorHeader);
+ for(const [property,unit,argument,multiply] of [['xPixels','pixels',7,false],['xPixels','tiles',7,false],['xTiles','pixels',5,true],['xTiles','tiles',5,true]]) {
+  const header=actorMove({x:{kind:'property',actorId:'door',property},y:0,xUnit:unit});
+  assert.match(header,new RegExp('op_property, 0, "door", '+argument));
+  assert.equal(header.includes('op_multiply'),multiply,'Property units remain independent of destination units');headers.push(header);
+ }
+ // The same actor position stays the same destination after switching units.
+ for(const [property,expected] of [['xPixels',240],['xTiles',240],['yPixels',172],['yTiles',160]]) {
+  for(const scale of [1,16]) {
+   const stack=[];
+   for(const instruction of numericCoordinateInstructions({kind:'property',actorId:'door',property},scale)) {
+    if(instruction.operation==='property') stack.push(({5:15,6:10,7:240,8:172})[instruction.argument]);
+    else if(instruction.operation==='number') stack.push(instruction.value);
+    else if(instruction.operation==='multiply') {const right=stack.pop();stack.push(stack.pop()*right);}
+   }
+   assert.deepEqual(stack,[expected]);
+  }
+ }
  assert.equal(catalog.EVENT_DEFAULTS.EVENT_MOVE_ACTOR.xUnit,'tiles');assert.equal(catalog.EVENT_DEFAULTS.EVENT_ACTOR_MOVE_TO.yUnit,'tiles');
  for(const[command,fields]of Object.entries(NUMERIC_EVENT_FIELDS))for(const[key,field]of Object.entries(fields)){
   const defaults={...structuredClone(catalog.EVENT_DEFAULTS[command]??{}),sceneId:'target',actorId:'__PLAYER__',uiId:'ui',variableId:'target',x:0,y:0,fadeSpeed:2,operator:'==',left:{kind:'literal',type:'number',value:0},right:{kind:'literal',type:'number',value:0}};

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include "bn_array.h"
 #include "bn_string.h"
+#include "runtime_capacity.h"
 
 struct ActorHandle { int slot = -1; uint16_t generation = 0; };
 
@@ -17,7 +18,8 @@ class ActorManager {
         uint16_t generation = 0;
         bool occupied = false;
     };
-    bn::array<Slot, 16> slots;
+    static constexpr int MAX_ACTORS = GBA_STUDIO_MAX_ACTORS;
+    bn::array<Slot, MAX_ACTORS> slots;
     bool valid(ActorHandle handle) const;
 public:
     static ActorManager& instance();

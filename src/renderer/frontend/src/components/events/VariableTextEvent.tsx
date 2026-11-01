@@ -1,8 +1,14 @@
+import { isActiveProjectEntry } from '../../../../../shared/projectCollectionEntries';
+import CoordinateInputs from './CoordinateInputs';
+import { coordinateScale } from '../../../../../shared/events/coordinateUnits';
 import React, { useEffect, useState } from 'react';
 import { Flex, Form, Select } from 'antd';
 import { InputNumber } from '../StepInputNumber';
 import NumericEventInput from '../NumericEventInput';
 import useAppContexts from '@/providers/contexts/AppContexts';
+import { useScriptParameterVariables } from './ScriptParameterContext';
+import { variableOptions as groupedVariableOptions } from './variableOptions';
+import { useI18n } from '@/i18n/I18n';
 import { IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { measureFontText, PREVIEW_FONTS, PreviewFontId } from '@/utils/fontMetrics';
 import { FontOptionPreview } from './RuntimeEventPanel';
@@ -14,7 +20,10 @@ interface Props {
 }
 
 export default function VariableTextEvent({ event, onValueChange }: Props) {
-  const { variables, settings } = useAppContexts();
+  const { t } = useI18n();
+  const { variables: globalVariables, settings } = useAppContexts();
+  const parameters = useScriptParameterVariables();
+  const variables = { variables: [...parameters, ...globalVariables.variables].filter(isActiveProjectEntry) };
   const [fontSources, setFontSources] = useState<Record<string, string>>({});
   const [paletteColors, setPaletteColors] = useState<Record<string, string>>({});
   const [assetReloadVersion, setAssetReloadVersion] = useState(0);
@@ -41,11 +50,11 @@ export default function VariableTextEvent({ event, onValueChange }: Props) {
     const textBounds = measureFontText(font, String(variable?.initialValue ?? ''));
     const nextMaxX = Math.max(0, 240 - textBounds.width);
     const nextMaxY = Math.max(0, 160 - textBounds.height);
-    if (typeof next.x !== 'object') next.x = Math.max(0, Math.min(nextMaxX, Math.trunc(Number(next.x) || 0)));
-    if (typeof next.y !== 'object') next.y = Math.max(0, Math.min(nextMaxY, Math.trunc(Number(next.y) || 0)));
+    if (typeof next.x !== 'object') next.x = Math.max(0, Math.min(Math.floor(nextMaxX / coordinateScale(next, 'x')), Math.trunc(Number(next.x) || 0)));
+    if (typeof next.y !== 'object') next.y = Math.max(0, Math.min(Math.floor(nextMaxY / coordinateScale(next, 'y')), Math.trunc(Number(next.y) || 0)));
     onValueChange(event.id, next);
   };
-  const variableOptions = variables.variables.map(variable => ({ value: variable.id, label: variable.name || variable.symbol }));
+  const variableOptions = groupedVariableOptions(variables.variables, t);
   useEffect(() => {
     void Promise.all([window.electronAPI.getCommonFontImages(), window.electronAPI.fetchImages('fonts')]).then(async ([images, fontsResponse]: [Record<string, string>, any]) => {
       const sources = { ...(images ?? {}) };
@@ -72,6 +81,6 @@ export default function VariableTextEvent({ event, onValueChange }: Props) {
   return <Form layout="vertical">
     <Form.Item label="Variable"><Select showSearch value={args.variableId || undefined} options={variableOptions} placeholder="Select variable" onChange={variableId => update({ variableId })} /></Form.Item>
     <Form.Item label="Font"><Select size="large" value={args.font ?? 'variable8x16'} options={fontOptions} onChange={font => update({ font })} /></Form.Item>
-    <Form.Item label="Position"><Flex gap={8} style={{ width: '100%' }}><NumericEventInput label="X" min={0} max={maxX} value={args.x ?? 0} onChange={x => update({ x: x ?? 0 })} style={{ flex: 1, minWidth: 0 }} /><NumericEventInput label="Y" min={0} max={maxY} value={args.y ?? 0} onChange={y => update({ y: y ?? 0 })} style={{ flex: 1, minWidth: 0 }} /></Flex></Form.Item>
+    <Form.Item label="Position"><CoordinateInputs args={args} onChange={update} min={[0, 0]} max={[maxX, maxY]} /></Form.Item>
   </Form>;
 }

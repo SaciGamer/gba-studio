@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const panel = fs.readFileSync('src/renderer/frontend/src/components/RightPanel.tsx', 'utf8');
+const workspace = fs.readFileSync('src/renderer/frontend/src/components/resourceEditors/MusicEditorWorkspace.tsx', 'utf8');
+const viewer = fs.readFileSync('src/renderer/frontend/src/components/resourceEditors/TrackerModuleViewer.tsx', 'utf8');
+const preview = fs.readFileSync('src/renderer/frontend/src/utils/trackerPreviewPlayer.ts', 'utf8');
+const pan = fs.readFileSync('src/renderer/frontend/src/utils/trackerNotePan.ts', 'utf8');
+const beatEditor = fs.readFileSync('src/renderer/frontend/src/components/resourceEditors/GBABeatEditor.tsx', 'utf8');
+
+assert.match(beatEditor, /<Slider className="gba-music-fader" aria-label=\{t\('music\.inspector\.panAria'\)\} min=\{-100\} max=\{100\} step=\{25\}/);
+assert.match(beatEditor, /marks=\{\{ "-100": "L", "-75": "-75%", "-50": "-50%", "-25": "-25%", 0: "C", 25: "25%", 50: "50%", 75: "75%", 100: "R" \}\}/);
+assert.match(beatEditor, /MusicDial label=\{t\('music\.inspector\.panAria'\)\} min=\{-100\} max=\{100\} step=\{25\} disabled=\{!notePanEditable\} value=\{Math\.round\(selectedPan \* 4\) \* 25\}/);
+assert.match(beatEditor, /onChange=\{value => props\.onNotePanChange\(selectedNote\.row, selectedChannel, quantizeTrackerNotePan\(value \/ 100\)\)\}/);
+assert.match(panel, /ariaLabelForHandle=\{t\('music\.inspector\.panAria'\)\} min=\{-1\} max=\{1\} step=\{0\.25\} value=\{quantizeTrackerNotePan\(noteSelection\.pan\)\}/);
+assert.match(panel, /onChange=\{value => editNote\(\{ pan: quantizeTrackerNotePan\(Number\(value\)\) \}\)\}/);
+assert.match(workspace, /pan: number;/);
+assert.match(viewer, /encodeTrackerNotePan\(info\.format, pan\)/);
+assert.match(pan, /format === 'MOD'[\s\S]*effect: 14/);
+assert.match(pan, /format === 'XM'[\s\S]*effect: 8/);
+assert.match(pan, /format === 'S3M'[\s\S]*effect: 19/);
+assert.match(pan, /if \(format === 'XM'\) return \{ effect: 8, parameter \};\s*return \{ effect: 24, parameter \};/);
+assert.match(pan, /const decodeNibblePan = \(parameter: number\) => \(parameter & 15\) \/ 8 - 1/);
+assert.match(pan, /export function quantizeTrackerNotePan\(pan: number\): number/);
+assert.match(pan, /Math\.round\(\(normalizeTrackerPan\(pan\) \+ 1\) \* 4\) \/ 4/);
+assert.match(beatEditor, /format === 'S3M' && selectedNoteEvent\.effect === 19 && \(selectedNoteEvent\.parameter >> 4\) === 8/);
+assert.match(preview, /format === 'MOD' && effect === 0x0e && \(parameter >> 4\) === 0x08/);
+assert.match(preview, /format === 'XM' && effect === 0x0e && \(parameter >> 4\) === 0x08/);
+assert.match(preview, /\(format === 'S3M' \|\| format === 'IT'\) && effect === 19 && \(parameter >> 4\) === 0x08/);
+console.log('Tracker per-note stereo pan UI, format encoding, and preview contract passed.');

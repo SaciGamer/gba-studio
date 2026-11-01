@@ -1,16 +1,16 @@
 {
   "_resourceType": "settings",
-  "startSceneId": "86889357-1de2-4fe1-a995-7d7a7b7b89eb",
-  "startX": 8,
-  "startY": 6,
+  "startSceneId": "bbe8da5c-1630-44cb-8321-ff4488a69fee",
+  "startX": 13,
+  "startY": 9.75,
   "startMoveSpeed": 1,
   "startAnimSpeed": 4,
-  "startDirection": "down",
+  "startDirection": "up",
   "colorMode": "mono",
   "demoFilter": "crt-easymode.glslp",
   "playerSpriteId": "player",
   "demoAudioMuted": false,
-  "demoAudioVolume": 0.13,
+  "demoAudioVolume": 0.5,
   "demoShowMenu": true,
   "uiCursorImage": "cursor.png",
   "uiFrameImage": "frame.png",
@@ -293,7 +293,7 @@
     "0": {
       "0": {
         "value": "x",
-        "value2": "GAMEPAD_16",
+        "value2": "BUTTON_2",
         "keyboardValues": [
           "x"
         ]
@@ -509,13 +509,67 @@
     "preset-gamecube",
     "preset-master-system",
     "preset-dreamcast",
-    "ed23f129-48a2-41dd-a430-ebf677044615",
-    "7396ff84-5488-4286-b11f-e3fcf9310b61",
+    null,
+    null,
     null,
     null,
     null,
     null,
     null,
     null
-  ]
+  ],
+  "demoShowFPS": true,
+  "demoShowCPU": true,
+  "inputMap": {
+    "move_left": [
+      "LEFT"
+    ],
+    "move_right": [
+      "RIGHT"
+    ],
+    "move_up": [
+      "UP"
+    ],
+    "move_down": [
+      "DOWN"
+    ],
+    "confirm": [
+      "A"
+    ],
+    "cancel": [
+      "B"
+    ],
+    "jump": [
+      "B"
+    ],
+    "start": [
+      "START"
+    ],
+    "select": [
+      "SELECT"
+    ],
+    "left_button": [
+      "L"
+    ],
+    "right_button": [
+      "R"
+    ]
+  },
+  "inputGroups": {
+    "gameplay": [
+      "B",
+      "L",
+      "R",
+      "START",
+      "UP",
+      "DOWN",
+      "LEFT",
+      "RIGHT",
+      "SELECT"
+    ],
+    "menu": [
+      "START",
+      "SELECT"
+    ]
+  }
 }

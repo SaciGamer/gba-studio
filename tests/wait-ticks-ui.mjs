@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import{build}from'esbuild';import{chromium,expect}from'@playwright/test';
+const frontend=path.resolve('src/renderer/frontend/src');
+const bundle=await build({stdin:{resolveDir:frontend,loader:'tsx',contents:`
+import React,{useState}from'react';import{createRoot}from'react-dom/client';import{App,ConfigProvider,theme}from'antd';import{I18nProvider}from'./i18n/I18n';import WaitEvent from './components/events/WaitEvent';import BackgroundAnimationEvent from './components/events/BackgroundAnimationEvent';
+function Harness(){const[event,setEvent]=useState({id:'wait',command:'EVENT_WAIT',args:{units:'ticks',frames:3,time:1}}),[animation,setAnimation]=useState({id:'animation',command:'EVENT_BACKGROUND_ANIMATE',args:{durationFrames:2}}),[dark,setDark]=useState(false);
+window.waitEvent=event;window.setDark=setDark;window.context={elementSelected:{id:'scene',sceneType:'Adventure'},backgrounds:[],scenes:[],scripts:{scripts:[]},variables:{variables:[]},settings:{},settingUtils:{activeSceneObject:null}};
+return <ConfigProvider theme={{algorithm:dark?theme.darkAlgorithm:theme.defaultAlgorithm,token:{motion:false}}}><App><I18nProvider language="en_US"><div id="wait" style={{width:350}}><WaitEvent event={event} customTitle={value=>window.waitTitle=value} onValueChange={(id,args)=>setEvent(previous=>({...previous,args}))}/></div><div id="animation" style={{width:350}}><BackgroundAnimationEvent event={animation} onValueChange={(id,args)=>setAnimation(previous=>({...previous,args}))}/></div></I18nProvider></App></ConfigProvider>;
+}createRoot(document.getElementById('root')).render(<Harness/>);
+`},bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',alias:{'@':frontend},define:{'process.env.NODE_ENV':'"production"'},loader:{'.css':'empty','.png':'dataurl'},plugins:[{name:'context',setup(b){b.onResolve({filter:/AppContexts$/},()=>({path:'context',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:'export default function useAppContexts(){return window.context}',loader:'js'}));}}]});
+const browser=await chromium.launch({headless:true});try{
+const page=await browser.newPage({viewport:{width:1100,height:1200}}),errors=[];page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));await page.setContent('<div id="root"></div>');await page.addScriptTag({content:bundle.outputFiles[0].text});
+const wait=page.locator('#wait'),prefix=wait.getByRole('button',{name:'Wait time unit',exact:true}),animationPrefix=page.locator('#animation').getByRole('button',{name:'Animation time unit',exact:true});
+await expect(prefix).toHaveText('Frames');await prefix.click();await expect(page.getByRole('menuitem',{name:'Ticks',exact:true})).toHaveCount(0);await page.getByRole('menuitem',{name:'Frames',exact:true}).click();
+const input=wait.getByRole('spinbutton');await input.fill('7');await input.press('Tab');await expect.poll(()=>page.evaluate(()=>window.waitEvent.args.frames)).toBe(7);await expect.poll(()=>page.evaluate(()=>window.waitTitle)).toContain('7 Frames');
+
+await page.mouse.move(1000,1100);await prefix.hover();const tip=page.getByRole('tooltip').filter({hasText:'Choose seconds or frames.'});await page.waitForTimeout(150);await expect(tip).toHaveCount(0);await expect(tip).toBeVisible();
+await prefix.click();await page.getByRole('menuitem',{name:'Seconds',exact:true}).click();await expect.poll(()=>page.evaluate(()=>window.waitEvent.args.units)).toBe('time');
+await prefix.click();await page.getByRole('menuitem',{name:'Frames',exact:true}).click();await expect.poll(()=>page.evaluate(()=>window.waitEvent.args.units)).toBe('frames');assert.equal(await page.evaluate(()=>window.waitEvent.args.frames),7);
+for(const dark of [false,true]){await page.evaluate(value=>window.setDark(value),dark);await expect.poll(async()=>await prefix.evaluate(e=>getComputedStyle(e).backgroundColor)).toBe(await animationPrefix.evaluate(e=>getComputedStyle(e).backgroundColor));}
+assert.deepEqual(errors,[]);console.log('Wait unit UI passed: legacy ticks displayed as frames, frames/seconds, retained values, delayed tooltip and matching animation prefix color in light/dark themes.');
+}finally{await browser.close();}

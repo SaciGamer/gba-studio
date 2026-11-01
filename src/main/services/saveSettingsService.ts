@@ -1,3 +1,5 @@
+import { normalizeSceneResource } from '../../shared/sceneResource';
+import { pruneDeletedProjectEntries } from '../../shared/projectCollectionEntries';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
@@ -8,6 +10,7 @@ import { getPreferences } from '@/handlers/preferenceHandlers';
 import { updatePreferences } from '@/handlers/preferenceHandlers';
 import { windows, directoryPathProject, originalProjectDirectory } from '@/main';
 import { setCurrentActiveSandboxDirectory } from '@/states/tempProjectState';
+import { formatMainWindowTitle } from '@/mainI18n';
 
 //Controllers
 const settingsController = SettingsController.getInstance();
@@ -30,10 +33,13 @@ export function updateWindowTitle(baseTitle: string, projectName: string, isSave
     lastWindowBaseTitle = baseTitle;
     lastProjectTitle = projectName;
     if (windows.main) {
-        const title = `${baseTitle ? baseTitle : ''} - ${projectName ? projectName : ''}`;
-        windows.main.setTitle(`${title}${saveInProgress ? ' (Salvando...)' : !isSaved ? ' (Modified)' : ''}`);
+        windows.main.setTitle(formatMainWindowTitle(baseTitle, projectName, isSaved, saveInProgress, getPreferences().language));
         settingsController.setIsSaved(isSaved);
     }
+}
+
+export function refreshWindowTitle(): void {
+    if (lastWindowBaseTitle || lastProjectTitle) updateWindowTitle(lastWindowBaseTitle, lastProjectTitle, settingsController.isSaved());
 }
 
 function updateSaveProgress(isInProgress: boolean): void {
@@ -149,7 +155,7 @@ export function saveChanges(dataToSave: any, options: SaveOptions = {}) {
             if (fileData && Array.isArray(fileData)) {
                 fileData.forEach((subFile: any) => {
                     const projectPath = path.join(activeProjectDirectory, 'project', subFile._resourceType + 's');
-                    const filenameFormatted = subFile.name.toLowerCase().replace(/ /g, '');
+                    const filenameFormatted = resourceFolderName(subFile.name);
 
                     if (subFile._deleted === true) {
                         return deleteSettings(projectPath, filenameFormatted!, subFile);
@@ -337,6 +343,7 @@ export function copyDirectoryContents(sourceDir: string, targetDir: string) {
 
 // Função para atualizar configurações
 function saveSettingsToStore<T>(basePath: any, folder: string, filename: string, newSettings: Partial<T>): T {
+    newSettings = normalizeSceneResource(pruneDeletedProjectEntries(newSettings));
     const pathFileToSave = path.join(basePath, folder ? path.join(`${folder}`, `${filename}.gbasres`) : filename);
     console.log('..: caminho para salvar a configuração: ', pathFileToSave);
     try {
@@ -381,7 +388,8 @@ function saveSettingsToStore<T>(basePath: any, folder: string, filename: string,
 // }
 
 function saveWithFolders(basePath: string, name: string, newSettings: any) {
-  const folderBase = path.join(basePath, name.replace(/\s+/g, ""));
+  newSettings = normalizeSceneResource(newSettings);
+  const folderBase = path.join(basePath, resourceFolderName(name));
   const fileName = newSettings._resourceType + ".gbasres";
   let targetFolder = folderBase;
   let counter = 1;
@@ -432,7 +440,7 @@ function cleanupDuplicateScenes(basePath: string, id: string, keepFolder: string
 
 function deleteSettings(basePath: string, folder: string, newSettings: any): void {
   // pasta alvo (ex: basePath/MyScene)
-  const targetFolder = path.join(basePath, folder.replace(/\s+/g, ""));
+  const targetFolder = path.join(basePath, resourceFolderName(folder));
   const fileName = newSettings._resourceType + ".gbasres";
   const filePath = path.join(targetFolder, fileName);
 
@@ -468,5 +476,14 @@ function deleteSettings(basePath: string, folder: string, newSettings: any): voi
   } catch (error) {
     console.error("..: Erro ao deletar configurações:", error);
   }
+}
+
+/** Create a filesystem-safe folder key without changing the resource's display name. */
+function resourceFolderName(name: unknown): string {
+  const normalized = String(name ?? '').toLowerCase().replace(/\s+/g, '');
+  const safeName = normalized
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    .replace(/[. ]+$/g, '');
+  return safeName || 'unnamed';
 }
 

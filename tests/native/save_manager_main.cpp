@@ -45,5 +45,13 @@ int main()
     };
     VariableManager::instance().initialize(incompatible, 3);
     if(SaveManager::instance().load_group(4, "score,rumble,name", 8)) return 22;
+    const VariableDefinition symbols[] = {
+        {"3e089418-5bba-4e48-b24b-3e59e313a9d4", VariableType::number, 42, false, "", "score"},
+        {"8ef704a3-7ca0-4e09-af41-c49783b842b8", VariableType::string, 0, false, "Ada", "hero"},
+    };
+    VariableManager::instance().initialize(symbols, 2);
+    if(VariableManager::instance().get_number("score") != 42) return 23;
+    if(!VariableManager::instance().set_number("score", 50) || VariableManager::instance().get_number(symbols[0].id) != 50) return 24;
+    if(VariableManager::instance().get_string("hero")[0] != 'A') return 25;
     return 0;
 }

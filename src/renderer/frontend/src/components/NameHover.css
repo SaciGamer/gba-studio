@@ -1,0 +1,13 @@
+.editable-name-input:not(:disabled):hover:not(:focus) {
+  border-color: var(--name-hover-color) !important;
+}
+
+.editable-name-title {
+  border-radius: var(--name-hover-radius);
+}
+
+.editable-name-title:hover,
+.editable-name-title:focus-visible {
+  outline: 1px solid var(--name-hover-color);
+  outline-offset: -1px;
+}

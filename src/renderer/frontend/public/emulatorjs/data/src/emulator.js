@@ -1091,7 +1091,7 @@ class EmulatorJS {
         })();
     }
     forwardRuntimeMonitor(msg) {
-        if (typeof msg !== "string" || !msg.includes("[GBAS_MONITOR:1]")) return false;
+        if (typeof msg !== "string" || !/\[GBAS_MONITOR:[12]\]/.test(msg)) return false;
         window.dispatchEvent(new CustomEvent("gba-studio:runtime-monitor", { detail: msg }));
         return true;
     }

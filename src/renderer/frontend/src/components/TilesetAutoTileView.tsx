@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DeleteOutlined } from '@ant-design/icons';
-import { Button, Flex, Input, Modal, Popconfirm, Select, Space, Tabs, Tooltip, Typography, theme } from 'antd';
+import { Button, Flex, Input, Modal, Popconfirm, Select, Space, Tabs, Timeline, Tooltip, Typography, theme } from 'antd';
 import { useI18n } from '@/i18n/I18n';
 import { joinLocalAssetPath } from '@/utils/localAssetUrl';
 import { loadPaletteTransparentImage } from '@/utils/paletteTransparency';
@@ -293,15 +293,13 @@ const TilesetAutoTileView: React.FC<TilesetAutoTileViewProps> = ({ slots, autoTi
     const groupIndex = BLOB47_PART_GROUPS.findIndex(group => group.includes(partIndex));
     return firstIncompleteGroupIndex >= 0 && groupIndex > firstIncompleteGroupIndex;
   };
-  const getCompositionStepStyle = (groupIndex: number): React.CSSProperties => {
-    const complete = BLOB47_PART_GROUPS[groupIndex].every(partIndex => activeParts[partIndex] != null);
-    const current = groupIndex === firstIncompleteGroupIndex;
-    return {
-      color: complete ? token.colorSuccess : current ? token.colorPrimary : token.colorTextSecondary,
-      fontWeight: complete || current ? 600 : 400,
-      transition: 'color 160ms ease, font-weight 160ms ease',
-    };
-  };
+  const compositionSteps = [
+    t('tiles.autoTileCompositionCenter'),
+    t('tiles.autoTileCompositionOuterCorners'),
+    t('tiles.autoTileCompositionStraightEdges'),
+    t('tiles.autoTileCompositionInnerCorners'),
+    t('tiles.autoTileCompositionVariations'),
+  ];
   const setPart = (partIndex: number, value: number | null) => {
     const updated = normalizedSlots.map(slot => ({ ...slot, parts: [...slot.parts] }));
     updated[activeSlot].parts[partIndex] = value;
@@ -504,13 +502,18 @@ const TilesetAutoTileView: React.FC<TilesetAutoTileViewProps> = ({ slots, autoTi
             </Popconfirm>
           </div>
           </Flex>
-          <ul style={{ margin: 0, paddingInlineStart: 18, lineHeight: 1.6, flex: '1 1 220px' }}>
-            <li style={getCompositionStepStyle(0)}>{t('tiles.autoTileCompositionCenter')}</li>
-            <li style={getCompositionStepStyle(1)}>{t('tiles.autoTileCompositionOuterCorners')}</li>
-            <li style={getCompositionStepStyle(2)}>{t('tiles.autoTileCompositionStraightEdges')}</li>
-            <li style={getCompositionStepStyle(3)}>{t('tiles.autoTileCompositionInnerCorners')}</li>
-            <li style={getCompositionStepStyle(4)}>{t('tiles.autoTileCompositionVariations')}</li>
-          </ul>
+          <Timeline
+            mode="left"
+            items={compositionSteps.map((title, groupIndex) => {
+              const complete = BLOB47_PART_GROUPS[groupIndex].every(partIndex => activeParts[partIndex] != null);
+              const current = groupIndex === firstIncompleteGroupIndex;
+              return {
+                color: complete ? token.colorSuccess : current ? token.colorPrimary : token.colorTextTertiary,
+                children: <Typography.Text type={complete || current ? undefined : 'secondary'} strong={complete || current}>{title}</Typography.Text>,
+              };
+            })}
+            style={{ flex: '1 1 220px', margin: '4px 0 0', paddingInlineStart: 4 }}
+          />
         </Flex>
         <Flex gap={8} wrap="wrap" style={{ width: '100%' }}>
           <Tooltip title={t('tiles.autoTileSourceHint')} trigger={['hover', 'focus']}>

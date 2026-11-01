@@ -3,6 +3,7 @@
 #define RESOURCE_TYPES_H
 
 #include <cstdint>
+#include "player_physics.h"
 #include "numeric_values.h"
 #include "bn_color.h"
 #include "event_change_layer.h"
@@ -46,6 +47,7 @@ struct VariableDefinition
     int number_value;
     bool boolean_value;
     const char* string_value;
+    const char* symbol = nullptr;
 };
 
 // struct Resource
@@ -62,8 +64,8 @@ struct VariableDefinition
 //     const char* filename;   // *_FILENAME (Background/Tileset) / *_BACKGROUND (Scene) / *_TILESET (Tileset)
 
 //     // Settings extras
-//     int start_x;            // SETTINGS_STARTX
-//     int start_y;            // SETTINGS_STARTY
+//     int start_x_pixels;            // SETTINGS_STARTX (tiles converted to pixels)
+//     int start_y_pixels;            // SETTINGS_STARTY (tiles converted to pixels)
 //     int move_speed;         // SETTINGS_STARTMOVESPEED
 //     int anim_speed;         // SETTINGS_STARTANIMSPEED
 //     const char* direction;  // SETTINGS_STARTDIRECTION
@@ -88,17 +90,13 @@ struct VariableDefinition
 
 struct Backgrounds
 {
-    ResourceType type;          // Tipo
 
     const char* id;             // *_ID quando existir
     
-    int auto_color;             // *_AUTOCOLOR (Background)
     const char* name;           // chave de lookup (ex.: "settings", "castle_novo")
-    const char* filename;       // *_FILENAME (Background/Tileset) / *_BACKGROUND (Scene) / *_TILESET (Tileset)
 
     int image_width;            // IMAGE_WIDTH
     int image_height;           // IMAGE_HEIGHT
-    const char* tile_colors;    // TILE_COLORS
 
 };
 
@@ -112,15 +110,14 @@ struct SceneLayer
 {
     int layerId;                // LAYER_ID
     const char* backgroundId;   // BACKGROUND_ID
-    const char* name;
-    const char* path;
     const char* paletteId;
     int x;
     int y;
-    int priority;                // hardware priority relative to sprites
     int z_order;                 // ordering among backgrounds
     const RegularBgMapCellOverride* map_cell_overrides;
     int map_cell_overrides_count;
+    bool affine = false;
+    const char* affine_graphics_name = nullptr;
 };
 
 struct InputBinding
@@ -128,6 +125,13 @@ struct InputBinding
     const char* action;
     const char* const* buttons;
     int buttons_count;
+};
+
+struct SceneInputMap
+{
+    const char* scene_type;
+    const InputBinding* bindings;
+    int bindings_count;
 };
 
 struct TileAnimation
@@ -156,15 +160,39 @@ struct WaitEventData
 };
 
 struct ButtonWaitEventData {
-    const char* button;
     const char* const* buttons;
     int buttons_count;
     bool override_button;
+};
+struct ButtonActionEventData { const char* button; bool custom; };
+
+struct ButtonScriptRemoveEventData {
+    const char* const* buttons;
+    int buttons_count;
+};
+
+struct ButtonPressWaitEventData {
+    const char* const* buttons;
+    int buttons_count;
 };
 
 struct WaitInputEventData {
     const char* action;
     int timeout_frames;
+};
+
+struct TriggerEnabledEventData {
+    const char* trigger_id;
+    bool enabled;
+};
+
+struct ActorFacingEventData {
+    const char* actor_id;
+    const char* target_actor_id;
+    bool look_x = true;
+    bool look_y = true;
+    int distance_x = 0;
+    int distance_y = 0;
 };
 
 struct ButtonHeldEventData {
@@ -234,6 +262,10 @@ struct SaveEventData {
     int schema;
     bool write;
 };
+struct VariablesSaveEventData { int slot; bool all_variables; const char* const* variable_ids; int variables_count; };
+struct GameDataEventData { int slot; uint32_t point; bool local_actions = false; };
+struct ScriptCommandData;
+struct GameSavePoint { uint32_t key; const ScriptCommandData* program; int count; int on_load; };
 
 struct HbeEffectEventData {
     const char* preset;
@@ -266,8 +298,8 @@ struct CameraEventData
     bool animated = false;
     int speed_q8 = 256;
 };
-struct CameraFollowEventData { bool enabled; };
-struct CameraShakeEventData { int frames; int amplitude; };
+struct CameraFollowEventData { bool enabled; const char* actor_id = "__PLAYER__"; bool clamp_to_scene = false; int dead_zone_width = 0; int dead_zone_height = 0; bool lock_x = false; bool lock_y = false; bool persist_across_scenes = false; };
+struct CameraShakeEventData { int frames; int amplitude; int axis = 0; };
 
 struct SceneChangeEventData
 {
@@ -304,12 +336,35 @@ struct BackgroundParallaxEventData
     int y;
 };
 
+struct BackgroundTransformEventData
+{
+    int layer_id;
+    int x;
+    int y;
+};
+
+struct BackgroundAnimationEventData
+{
+    int layer_id;
+    const char* regular_background_id;
+    const char* bitmap_background_id;
+    int frame_count;
+    int start_frame;
+    int frame_delta;
+    int step_x;
+    int step_y;
+    int duration_frames;
+    bool loop;
+};
+
 struct PaletteLayerEventData
 {
     int layer_id;
     bool restore_palette;
     const char* const* palette_ids;
 };
+
+struct DefaultPalettesEventData { const char* const* palette_ids; };
 
 struct BackgroundPalette
 {
@@ -335,12 +390,9 @@ struct ScriptConditionData {
 };
 
 struct ScriptCommandData {
-    const char* id;
     const char* command;
     // ponteiro genérico para args, pode ser outro struct
     const void* args;
-    const int argCount;
-    const uint8_t schemaVersion;
     const int nextIndex;
     const int falseIndex;
     const int loopIndex;
@@ -358,14 +410,7 @@ struct VariableSetValueData {
 
 enum class TriggerActivation : uint8_t { enter, exit, stay, interact, touch, input, timer };
 
-struct ScriptProgram {
-    const char* id;
-    const ScriptCommandData* commands;
-    int commands_count;
-};
-
 struct ScriptTrigger {
-    const char* id;
     int x;
     int y;
     int width;
@@ -378,6 +423,7 @@ struct ScriptTrigger {
     int on_enter_count;
     const ScriptCommandData* on_leave;
     int on_leave_count;
+    const char* id = nullptr;
 };
 
 struct ActorMoveEventData {
@@ -387,11 +433,19 @@ struct ActorMoveEventData {
     bool animated = false;
     int speed_q8 = 256;
     int animation_speed = -1;
+    bool collide_walls = true;
+    bool collide_actors = false;
+    int lock_axis = 0; // 0: none, 1: horizontal, 2: vertical
+    int movement_type = 0; // 0: horizontal first, 1: vertical first, 2: diagonal
+    bool options_enabled = false; // Preserve legacy instant-placement semantics.
 };
-struct ActorSpawnEventData { const char* actor_id; int x; int y; };
-struct ActorRemoveEventData { const char* actor_id; };
+struct ActorSpawnEventData { const char* actor_id; int x; int y; bool from_prefab = false; };
+struct ActorRemoveEventData { const char* actor_id; bool from_prefab = false; };
 struct ActorVisibilityEventData { const char* actor_id; bool visible; };
+struct ShowEmoteEventData { const char* actor_id; const char* emote_id; int distance = 12; };
 struct ActorAnimationSpeedEventData { const char* actor_id; int speed; };
+struct ActorAnimationControlEventData { const char* actor_id; const char* action; const char* state_id; const char* animation_id; int speed; int frame; bool reverse; };
+struct ActorDirectionEventData { const char* actor_id; int direction; };
 struct ActorStateEventData { const char* actor_id; const char* state_id; };
 struct ActorPriorityEventData { const char* actor_id; int priority; };
 struct SceneActor {
@@ -400,11 +454,18 @@ struct SceneActor {
     int x;
     int y;
     const char* direction;
+    int animation_speed;
+    const ScriptCommandData* on_init;
+    int on_init_count;
     const ScriptCommandData* on_interact;
     int on_interact_count;
+    const ScriptCommandData* on_update;
+    int on_update_count;
+    const char* spawn_prefab_id = nullptr;
+    bool keep_running_while_offscreen = false;
 };
-struct SceneCollision { const char* id; int x; int y; int width; int height; const char* side; };
-struct PlayMusicEventData { const char* music_id; int volume; };
+struct SceneCollision { int x; int y; int width; int height; const char* side; };
+struct PlayMusicEventData { const char* music_id; int volume; bool loop; };
 struct PlayJingleEventData { const char* music_id; int volume; };
 struct PlaySoundEventData {
     const char* sound_id;
@@ -425,7 +486,12 @@ struct DialogueEventData {
     const char* vertical_align;
     bool animate;
     const char* animation_speed;
-    bool continuous_scroll;
+    const char* avatar_image;
+    int avatar_size;
+    const char* avatar_placement;
+    const char* avatar_anchor;
+    int avatar_x;
+    int avatar_y;
 };
 struct UiSetTextEventData {
     const char* ui_id;
@@ -465,13 +531,41 @@ struct SpriteEffectEventData {
     int fade_intensity;
     int duration_frames;
 };
+
+struct ActorTransformEventData {
+    const char* actor_id;
+    int value;
+    int duration_frames;
+};
+struct ActorVisualEventData {
+    const char* actor_id;
+    int value;
+    int color;
+    int duration_frames = 1;
+};
 struct DialogueChoiceEventData {
     const char* prompt;
     const char* option_a;
     const char* option_b;
     const char* result_variable;
     const char* options;
-    int options_count;
+    const char* dialogue_font;
+    bool show_frame;
+    const char* horizontal_align;
+    const char* vertical_align;
+    bool animate;
+    const char* animation_speed;
+    bool allow_cancel;
+    const char* avatar_image;
+    int avatar_size;
+    const char* avatar_placement;
+    const char* avatar_anchor;
+    int avatar_x;
+    int avatar_y;
+    int columns = 1;
+    bool column_major = false;
+    int initial_selection = 0;
+    int menu_position = 0;
 };
 struct VariableTextEventData {
     const char* variable_id;
@@ -501,7 +595,6 @@ struct Scenes
     const SceneLayer* backgrounds_layers;   // Backgrounds com Layers
     const int backgrounds_layers_size;      // Tanho do backgrounds_layers
 
-    const char* tileset_id;             // ID do tileset da cena
     // const char* tilemap_id;          // ID do tilemap da cena
     
     // Scene
@@ -511,12 +604,6 @@ struct Scenes
     int camera_y;
     const char* scene_type;
 
-    // Tilemap extras
-    const char* tile_image_type;
-    int tile_map_rows;              // TILEMAP_*_HEIGHT (em tiles)
-    int tile_map_cols;              // TILEMAP_*_WIDTH (em tiles)
-    const int* tile_data;           // TILEMAP_*_DATA - ponteiro para array de dados dos tiles
-    // int tile_data_size;          // TILEMAP_*_DATA_SIZE - tamanho do array
     const ScriptTrigger* triggers;
     int triggers_count;
     const SceneActor* actors;
@@ -529,32 +616,29 @@ struct Scenes
     int spawner_timelines_count;
 };
 
-struct SpriteCanvasPiece
-{
-    int source_x;
-    int source_y;
-    int width;
-    int height;
-    int canvas_x;
-    int canvas_y;
+struct ScriptParameterDefinition {
+    VariableDefinition variable;
+    bool by_reference;
 };
-
+struct ScriptCallArgument {
+    const char* parameter_id;
+    const NumericProgram* number;
+    const char* string_value;
+    const char* string_variable_id;
+    NumericInstruction reference;
+    bool has_reference;
+};
+struct CallScriptEventData {
+    const char* script_id;
+    const ScriptCallArgument* arguments = nullptr;
+    int arguments_count = 0;
+};
 struct ScriptDefinition {
     const char* id;
     const ScriptCommandData* commands;
     int commands_count;
-};
-
-struct SpriteCanvasFrameDefinition
-{
-    const char* state_id;
-    const char* state_type;
-    const char* animation_id;
-    const char* frame_id;
-    int canvas_width;
-    int canvas_height;
-    int first_piece;
-    int pieces_count;
+    const ScriptParameterDefinition* parameters = nullptr;
+    int parameters_count = 0;
 };
 
 // A sequence exported by the Sprite Editor. `frames` indexes the generated
@@ -562,7 +646,6 @@ struct SpriteCanvasFrameDefinition
 struct SpriteAnimationDefinition
 {
     const char* state_id;
-    const char* state_type;
     const char* animation_id;
     const char* animation_type;
     const int* frames;
@@ -572,13 +655,9 @@ struct SpriteAnimationDefinition
 
 struct Sprites
 {
-    ResourceType type;
     const char* id;
     const char* name;
-    const char* filename;
     const char* graphics_name;       // Butano-safe asset identifier
-    int image_width;
-    int image_height;
     int frame_width;
     int frame_height;
     int animation_speed;
@@ -591,43 +670,35 @@ struct Sprites
     int collision_height;
     const SpriteAnimationDefinition* animations;
     int animations_count;
-    const SpriteCanvasFrameDefinition* canvas_frames;
-    int canvas_frames_count;
-    const SpriteCanvasPiece* canvas_pieces;
-    int canvas_pieces_count;
+    int canvas_width;
+    int canvas_height;
+    int composite_columns;
+    int composite_rows;
 };
 
 struct Settings
 {
-    ResourceType type;              // Tipo
 
     // Settings extras
     const char* start_scene_id;     // SETTINGS_STARTSCENEID
-    int start_x;                    // SETTINGS_STARTX
-    int start_y;                    // SETTINGS_STARTY
+    int start_x_pixels;                    // SETTINGS_STARTX (tiles converted to pixels)
+    int start_y_pixels;                    // SETTINGS_STARTY (tiles converted to pixels)
     int move_speed;                 // SETTINGS_STARTMOVESPEED
     int anim_speed;                 // SETTINGS_STARTANIMSPEED
     const char* direction;          // SETTINGS_STARTDIRECTION
 
-    int color_mode;                 // COLOR_MODE
     int fade_direction;             // SETTINGS_FADEDIRECTION (0 white, 1 black)
 
     const char* player_sprite_id;   // SETTINGS_PLAYERSPRITEID
     const char* ui_cursor_image;    // SETTINGS_UICURSORIMAGE
     const char* ui_frame_image;     // SETTINGS_UIFRAMEIMAGE
-    int player_frame_width;         // SETTINGS_PLAYERFRAMEWIDTH
-    int player_frame_height;        // SETTINGS_PLAYERFRAMEHEIGHT
-    int player_frames_per_direction;// SETTINGS_PLAYERFRAMESPERDIRECTION
-    int player_anim_speed;          // SETTINGS_PLAYERANIMSPEED
-    int player_idle_frame;          // SETTINGS_PLAYERIDLEFRAME
-    const SpriteCanvasFrameDefinition* player_canvas_frames;
-    int player_canvas_frames_count;
-    const SpriteCanvasPiece* player_canvas_pieces;
-    int player_canvas_pieces_count;
     const InputBinding* input_bindings;
     int input_bindings_count;
     const CombatConfig* combat_config;
     const ShooterConfig* shooter_config;
+    unsigned short input_group_masks[3] = { 0x3cf, 0x3f3, 1 };
+    const SceneInputMap* scene_input_maps = nullptr;
+    int scene_input_maps_count = 0;
 };
 
 #endif // RESOURCE_TYPES_H

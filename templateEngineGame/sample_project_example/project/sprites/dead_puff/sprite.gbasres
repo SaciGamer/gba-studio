@@ -1,0 +1,1976 @@
+{
+  "_resourceType": "sprite",
+  "_deleted": false,
+  "id": "dead_puff",
+  "name": "dead_puff",
+  "filename": "dead_puff.bmp",
+  "imageWidth": 768,
+  "imageHeight": 64,
+  "playerFrameWidth": 48,
+  "playerFrameHeight": 48,
+  "playerFramesPerDirection": 4,
+  "playerAnimSpeed": 6,
+  "playerIdleFrame": 0,
+  "playerCanvasOriginX": 40,
+  "playerCanvasOriginY": 44,
+  "playerCollisionX": 0,
+  "playerCollisionY": 0,
+  "playerCollisionWidth": 16,
+  "playerCollisionHeight": 8,
+  "playerAnimations": [
+    {
+      "id": "idle",
+      "name": "Idle",
+      "type": "idle",
+      "frames": [],
+      "canvasFrames": [
+        {
+          "id": "canvas-frame-autogen-1791566692990-0",
+          "width": 48,
+          "height": 48,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791566692990-0-32-32",
+              "sourceX": 32,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-0-40-32",
+              "sourceX": 40,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-0-32-48",
+              "sourceX": 32,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-0-40-48",
+              "sourceX": 40,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 40
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791566692990-1",
+          "width": 48,
+          "height": 48,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791566692990-1-24-32",
+              "sourceX": 88,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-1-32-32",
+              "sourceX": 96,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-1-40-32",
+              "sourceX": 104,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-1-24-48",
+              "sourceX": 88,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-1-32-48",
+              "sourceX": 96,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-1-40-48",
+              "sourceX": 104,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 40
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791566692990-2",
+          "width": 48,
+          "height": 48,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791566692990-2-24-16",
+              "sourceX": 152,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-2-32-16",
+              "sourceX": 160,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-2-40-16",
+              "sourceX": 168,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-2-24-32",
+              "sourceX": 152,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-2-32-32",
+              "sourceX": 160,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-2-40-32",
+              "sourceX": 168,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-2-24-48",
+              "sourceX": 152,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-2-32-48",
+              "sourceX": 160,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-2-40-48",
+              "sourceX": 168,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 40
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791566692990-3",
+          "width": 48,
+          "height": 48,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791566692990-3-24-16",
+              "sourceX": 216,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-3-32-16",
+              "sourceX": 224,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-3-24-32",
+              "sourceX": 216,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-3-32-32",
+              "sourceX": 224,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 24
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791566692990-4",
+          "width": 48,
+          "height": 48,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791566692990-4-24-16",
+              "sourceX": 280,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-4-32-16",
+              "sourceX": 288,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-4-40-16",
+              "sourceX": 296,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-4-24-32",
+              "sourceX": 280,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-4-32-32",
+              "sourceX": 288,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-4-40-32",
+              "sourceX": 296,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 24
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791566692990-5",
+          "width": 48,
+          "height": 48,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791566692990-5-16-16",
+              "sourceX": 336,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-5-24-16",
+              "sourceX": 344,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-5-32-16",
+              "sourceX": 352,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-5-16-32",
+              "sourceX": 336,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-5-24-32",
+              "sourceX": 344,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-5-32-32",
+              "sourceX": 352,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 24
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791566692990-6",
+          "width": 48,
+          "height": 48,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791566692990-6-16-16",
+              "sourceX": 400,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-6-24-16",
+              "sourceX": 408,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-6-32-16",
+              "sourceX": 416,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-6-16-32",
+              "sourceX": 400,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-6-24-32",
+              "sourceX": 408,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-6-32-32",
+              "sourceX": 416,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 24
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791566692990-7",
+          "width": 48,
+          "height": 48,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791566692990-7-0-16",
+              "sourceX": 448,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": -8
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-8-16",
+              "sourceX": 456,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-16-16",
+              "sourceX": 464,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-24-16",
+              "sourceX": 472,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-32-16",
+              "sourceX": 480,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-40-16",
+              "sourceX": 488,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-0-32",
+              "sourceX": 448,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-8-32",
+              "sourceX": 456,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-16-32",
+              "sourceX": 464,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-24-32",
+              "sourceX": 472,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-32-32",
+              "sourceX": 480,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-40-32",
+              "sourceX": 488,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-0-48",
+              "sourceX": 448,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-8-48",
+              "sourceX": 456,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-16-48",
+              "sourceX": 464,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-24-48",
+              "sourceX": 472,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-32-48",
+              "sourceX": 480,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-7-40-48",
+              "sourceX": 488,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 40
+            },
+            {
+              "id": "piece-1793460158246-0-0-awrej",
+              "sourceX": 464,
+              "sourceY": 0,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": -8
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791566692990-8",
+          "width": 48,
+          "height": 48,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791566692990-8-0-16",
+              "sourceX": 512,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-8-16",
+              "sourceX": 520,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-16-16",
+              "sourceX": 528,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-24-16",
+              "sourceX": 536,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-32-16",
+              "sourceX": 544,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-40-16",
+              "sourceX": 552,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-0-32",
+              "sourceX": 512,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-8-32",
+              "sourceX": 520,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": -8
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-16-32",
+              "sourceX": 528,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-24-32",
+              "sourceX": 536,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-32-32",
+              "sourceX": 544,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-40-32",
+              "sourceX": 552,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-0-48",
+              "sourceX": 512,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-8-48",
+              "sourceX": 520,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-16-48",
+              "sourceX": 528,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-24-48",
+              "sourceX": 536,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-32-48",
+              "sourceX": 544,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-8-40-48",
+              "sourceX": 552,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 40
+            },
+            {
+              "id": "piece-1793460202334-0-0-51ys5",
+              "sourceX": 528,
+              "sourceY": 0,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": -8
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791566692990-9",
+          "width": 48,
+          "height": 48,
+          "pieces": [
+            {
+              "id": "piece-autogen-1791566692990-9-0-16",
+              "sourceX": 576,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-8-16",
+              "sourceX": 584,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-16-16",
+              "sourceX": 592,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-24-16",
+              "sourceX": 600,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-32-16",
+              "sourceX": 608,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-40-16",
+              "sourceX": 616,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 8
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-0-32",
+              "sourceX": 576,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-8-32",
+              "sourceX": 584,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": -8
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-16-32",
+              "sourceX": 592,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-24-32",
+              "sourceX": 600,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-32-32",
+              "sourceX": 608,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-40-32",
+              "sourceX": 616,
+              "sourceY": 32,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 24
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-0-48",
+              "sourceX": 576,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-8-48",
+              "sourceX": 584,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-16-48",
+              "sourceX": 592,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-24-48",
+              "sourceX": 600,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 24,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-32-48",
+              "sourceX": 608,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 32,
+              "y": 40
+            },
+            {
+              "id": "piece-autogen-1791566692990-9-40-48",
+              "sourceX": 616,
+              "sourceY": 48,
+              "width": 8,
+              "height": 16,
+              "x": 40,
+              "y": 40
+            },
+            {
+              "id": "piece-1793460222997-0-0-zo66t",
+              "sourceX": 592,
+              "sourceY": 0,
+              "width": 8,
+              "height": 16,
+              "x": 16,
+              "y": -8
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-autogen-1791566692990-10",
+          "width": 48,
+          "height": 48,
+          "pieces": []
+        },
+        {
+          "id": "canvas-frame-autogen-1791566692990-11",
+          "width": 48,
+          "height": 48,
+          "pieces": []
+        }
+      ]
+    }
+  ],
+  "playerAnimationStates": [
+    {
+      "id": "player",
+      "name": "Morte",
+      "type": "fixed-direction",
+      "animations": [
+        {
+          "id": "idle",
+          "name": "Idle",
+          "type": "idle",
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-autogen-1791566692990-0",
+              "width": 48,
+              "height": 48,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566692990-0-32-32",
+                  "sourceX": 32,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-0-40-32",
+                  "sourceX": 40,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-0-32-48",
+                  "sourceX": 32,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-0-40-48",
+                  "sourceX": 40,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 40
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566692990-1",
+              "width": 48,
+              "height": 48,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566692990-1-24-32",
+                  "sourceX": 88,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-1-32-32",
+                  "sourceX": 96,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-1-40-32",
+                  "sourceX": 104,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-1-24-48",
+                  "sourceX": 88,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-1-32-48",
+                  "sourceX": 96,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-1-40-48",
+                  "sourceX": 104,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 40
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566692990-2",
+              "width": 48,
+              "height": 48,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566692990-2-24-16",
+                  "sourceX": 152,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-2-32-16",
+                  "sourceX": 160,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-2-40-16",
+                  "sourceX": 168,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-2-24-32",
+                  "sourceX": 152,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-2-32-32",
+                  "sourceX": 160,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-2-40-32",
+                  "sourceX": 168,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-2-24-48",
+                  "sourceX": 152,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-2-32-48",
+                  "sourceX": 160,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-2-40-48",
+                  "sourceX": 168,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 40
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566692990-3",
+              "width": 48,
+              "height": 48,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566692990-3-24-16",
+                  "sourceX": 216,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-3-32-16",
+                  "sourceX": 224,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-3-24-32",
+                  "sourceX": 216,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-3-32-32",
+                  "sourceX": 224,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 24
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566692990-4",
+              "width": 48,
+              "height": 48,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566692990-4-24-16",
+                  "sourceX": 280,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-4-32-16",
+                  "sourceX": 288,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-4-40-16",
+                  "sourceX": 296,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-4-24-32",
+                  "sourceX": 280,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-4-32-32",
+                  "sourceX": 288,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-4-40-32",
+                  "sourceX": 296,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 24
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566692990-5",
+              "width": 48,
+              "height": 48,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566692990-5-16-16",
+                  "sourceX": 336,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-5-24-16",
+                  "sourceX": 344,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-5-32-16",
+                  "sourceX": 352,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-5-16-32",
+                  "sourceX": 336,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-5-24-32",
+                  "sourceX": 344,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-5-32-32",
+                  "sourceX": 352,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 24
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566692990-6",
+              "width": 48,
+              "height": 48,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566692990-6-16-16",
+                  "sourceX": 400,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-6-24-16",
+                  "sourceX": 408,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-6-32-16",
+                  "sourceX": 416,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-6-16-32",
+                  "sourceX": 400,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-6-24-32",
+                  "sourceX": 408,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-6-32-32",
+                  "sourceX": 416,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 24
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566692990-7",
+              "width": 48,
+              "height": 48,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566692990-7-0-16",
+                  "sourceX": 448,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": -8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-8-16",
+                  "sourceX": 456,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-16-16",
+                  "sourceX": 464,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-24-16",
+                  "sourceX": 472,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-32-16",
+                  "sourceX": 480,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-40-16",
+                  "sourceX": 488,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-0-32",
+                  "sourceX": 448,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-8-32",
+                  "sourceX": 456,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-16-32",
+                  "sourceX": 464,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-24-32",
+                  "sourceX": 472,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-32-32",
+                  "sourceX": 480,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-40-32",
+                  "sourceX": 488,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-0-48",
+                  "sourceX": 448,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-8-48",
+                  "sourceX": 456,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-16-48",
+                  "sourceX": 464,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-24-48",
+                  "sourceX": 472,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-32-48",
+                  "sourceX": 480,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-7-40-48",
+                  "sourceX": 488,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 40
+                },
+                {
+                  "id": "piece-1793460158246-0-0-awrej",
+                  "sourceX": 464,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": -8
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566692990-8",
+              "width": 48,
+              "height": 48,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566692990-8-0-16",
+                  "sourceX": 512,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-8-16",
+                  "sourceX": 520,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-16-16",
+                  "sourceX": 528,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-24-16",
+                  "sourceX": 536,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-32-16",
+                  "sourceX": 544,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-40-16",
+                  "sourceX": 552,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-0-32",
+                  "sourceX": 512,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-8-32",
+                  "sourceX": 520,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": -8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-16-32",
+                  "sourceX": 528,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-24-32",
+                  "sourceX": 536,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-32-32",
+                  "sourceX": 544,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-40-32",
+                  "sourceX": 552,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-0-48",
+                  "sourceX": 512,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-8-48",
+                  "sourceX": 520,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-16-48",
+                  "sourceX": 528,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-24-48",
+                  "sourceX": 536,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-32-48",
+                  "sourceX": 544,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-8-40-48",
+                  "sourceX": 552,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 40
+                },
+                {
+                  "id": "piece-1793460202334-0-0-51ys5",
+                  "sourceX": 528,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": -8
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566692990-9",
+              "width": 48,
+              "height": 48,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791566692990-9-0-16",
+                  "sourceX": 576,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-8-16",
+                  "sourceX": 584,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-16-16",
+                  "sourceX": 592,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-24-16",
+                  "sourceX": 600,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-32-16",
+                  "sourceX": 608,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-40-16",
+                  "sourceX": 616,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-0-32",
+                  "sourceX": 576,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-8-32",
+                  "sourceX": 584,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": -8
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-16-32",
+                  "sourceX": 592,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-24-32",
+                  "sourceX": 600,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-32-32",
+                  "sourceX": 608,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-40-32",
+                  "sourceX": 616,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 24
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-0-48",
+                  "sourceX": 576,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-8-48",
+                  "sourceX": 584,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-16-48",
+                  "sourceX": 592,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-24-48",
+                  "sourceX": 600,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 24,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-32-48",
+                  "sourceX": 608,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 32,
+                  "y": 40
+                },
+                {
+                  "id": "piece-autogen-1791566692990-9-40-48",
+                  "sourceX": 616,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 40,
+                  "y": 40
+                },
+                {
+                  "id": "piece-1793460222997-0-0-zo66t",
+                  "sourceX": 592,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 16,
+                  "y": -8
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-autogen-1791566692990-10",
+              "width": 48,
+              "height": 48,
+              "pieces": []
+            },
+            {
+              "id": "canvas-frame-autogen-1791566692990-11",
+              "width": 48,
+              "height": 48,
+              "pieces": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "playerAnimationStripOrientation": "horizontal"
+}

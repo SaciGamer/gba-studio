@@ -1,4 +1,4 @@
-import { IpcMainInvokeEvent, ipcMain } from 'electron';
+import { IpcMainInvokeEvent, ipcMain, webContents } from 'electron';
 import Store from 'electron-store';
 import fs from 'fs';
 import path from 'path';
@@ -17,6 +17,7 @@ const defaultPreferences: IPreferences = {
   historyLimit: 50,
   gameWorldPanInertia: true,
   gameWorldMovementMode: 'grid',
+  sceneObjectSnapSize: 8,
 };
 
 // THEME --------------------------------------------------------
@@ -33,16 +34,20 @@ const defaultPreferences: IPreferences = {
 // THEME END--------------------------------------------------------
 
 // PREFERENCES CONFIG --------------------------------------------
+let preferencesSnapshot: IPreferences | undefined;
 // Carregar configuração de preferências 
 export const getPreferences = (): IPreferences => { 
-  const responseGetStore = __store.get('preferences', defaultPreferences); 
-  console.log('..: PreferencesConfig %s carregado do store!', responseGetStore)
-  return responseGetStore; 
+  preferencesSnapshot ??= __store.get('preferences', defaultPreferences);
+  return structuredClone(preferencesSnapshot);
 } 
 
 // Salvar configuração de preferências 
 const savePreferences = (preferenceConfig: IPreferences): void => { 
   __store.set('preferences', preferenceConfig); 
+  preferencesSnapshot = structuredClone(preferenceConfig);
+  for (const contents of webContents.getAllWebContents()) {
+    if (!contents.isDestroyed()) contents.send('preferences-updated');
+  }
 }
 
 // Atualizar uma única configuração 
@@ -74,14 +79,24 @@ export const updatePreferences = (key: keyof IPreferences, value: any): void => 
   // console.log("..: Atualizou preferencesConfig");
 }
 
-export const setGameWorldPreferences = (values: { panInertia: boolean; movementMode: 'free' | 'grid' }) => {
+export const setGameWorldPreferences = (values: { panInertia: boolean; movementMode: 'free' | 'grid'; sceneObjectSnapSize?: 8 | 16; recenterEnabled?: boolean; recenterScenes?: boolean; recenterActors?: boolean; recenterTriggers?: boolean }) => {
   const preferences = getPreferences();
   preferences.gameWorldPanInertia = Boolean(values.panInertia);
   preferences.gameWorldMovementMode = values.movementMode === 'free' ? 'free' : 'grid';
+  preferences.sceneObjectSnapSize = values.sceneObjectSnapSize === 16 ? 16 : 8;
+  preferences.gameWorldRecenterEnabled = values.recenterEnabled ?? preferences.gameWorldRecenterEnabled ?? true;
+  preferences.gameWorldRecenterScenes = values.recenterScenes ?? preferences.gameWorldRecenterScenes ?? true;
+  preferences.gameWorldRecenterActors = values.recenterActors ?? preferences.gameWorldRecenterActors ?? true;
+  preferences.gameWorldRecenterTriggers = values.recenterTriggers ?? preferences.gameWorldRecenterTriggers ?? true;
   savePreferences(preferences);
   return {
     gameWorldPanInertia: preferences.gameWorldPanInertia,
     gameWorldMovementMode: preferences.gameWorldMovementMode,
+    sceneObjectSnapSize: preferences.sceneObjectSnapSize,
+    gameWorldRecenterEnabled: preferences.gameWorldRecenterEnabled,
+    gameWorldRecenterScenes: preferences.gameWorldRecenterScenes,
+    gameWorldRecenterActors: preferences.gameWorldRecenterActors,
+    gameWorldRecenterTriggers: preferences.gameWorldRecenterTriggers,
   };
 };
 
@@ -137,8 +152,11 @@ const saveLastPositionSplitters = (lastPositionSplitters: number[] | Record<stri
   if (typeof lastPositionSplitters.projectId === 'string' && lastPositionSplitters.spriteNavigation) {
     __store.set(`splitter:spriteNavigation:${lastPositionSplitters.projectId}`, lastPositionSplitters.spriteNavigation);
   }
+  if (typeof lastPositionSplitters.projectId === 'string' && lastPositionSplitters.musicNavigation) {
+    __store.set(`splitter:musicNavigation:${lastPositionSplitters.projectId}`, lastPositionSplitters.musicNavigation);
+  }
   Object.entries(lastPositionSplitters).forEach(([key, sizes]) => {
-    if (key !== 'projectId' && key !== 'leftNavigation' && Array.isArray(sizes) && sizes.every(size => Number.isFinite(size))) {
+    if (key !== 'projectId' && key !== 'leftNavigation' && key !== 'musicNavigation' && Array.isArray(sizes) && sizes.every(size => Number.isFinite(size))) {
       __store.set(`splitter:${key}`, sizes);
     }
   });
@@ -151,6 +169,7 @@ const getLastPositionSplitters = (projectId?: string) => {
       ? __store.get(`splitter:leftNavigation:${projectId}`, null)
       : __store.get('splitter:leftNavigation', null),
     spriteNavigation: projectId ? __store.get(`splitter:spriteNavigation:${projectId}`, null) : null,
+    musicNavigation: projectId ? __store.get(`splitter:musicNavigation:${projectId}`, null) : null,
     centerWorkspace: __store.get('splitter:centerWorkspace', null),
   };
 }
@@ -270,7 +289,7 @@ export const initializeDefaultPaths = (): void => {
 
 export const configurarPreferenceHandlers = () => {
   ipcMain.handle('loadPreferences', () => getPreferences());
-  ipcMain.handle('set-game-world-preferences', (_event: IpcMainInvokeEvent, values: { panInertia: boolean; movementMode: 'free' | 'grid' }) => setGameWorldPreferences(values));
+  ipcMain.handle('set-game-world-preferences', (_event: IpcMainInvokeEvent, values: { panInertia: boolean; movementMode: 'free' | 'grid'; sceneObjectSnapSize?: 8 | 16; recenterEnabled?: boolean; recenterScenes?: boolean; recenterActors?: boolean; recenterTriggers?: boolean }) => setGameWorldPreferences(values));
   ipcMain.handle('removePreferences', (_event: IpcMainInvokeEvent, key: keyof IPreferences, value: unknown) => deletePreference(key, value));
   //--
   ipcMain.handle('loadLastUsedPath', () => getLastUsedPath());

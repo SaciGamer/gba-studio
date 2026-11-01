@@ -3,6 +3,7 @@ export type NumericEventField = { payload: string; member: string; minimum?: num
 const fields = (payload: string, names: Record<string, string>): Record<string, NumericEventField> => Object.fromEntries(Object.entries(names).map(([argument, member]) => [argument, { payload, member }]));
 const positions = (payload: string) => fields(payload, { x: 'x', y: 'y' });
 export const NUMERIC_EVENT_FIELDS: Record<string, Record<string, NumericEventField>> = {
+  EVENT_IF_ACTOR_FACING: fields('ActorFacingEventData', { distanceX: 'distance_x', distanceY: 'distance_y' }),
   EVENT_PAN_CAMERA: positions('CameraEventData'), EVENT_CAMERA_MOVE_TO: positions('CameraEventData'),
   EVENT_CAMERA_SHAKE: fields('CameraShakeEventData', { frames: 'frames', amplitude: 'amplitude' }),
   EVENT_ACTOR_SET_POSITION: positions('ActorMoveEventData'), EVENT_ACTOR_MOVE_TO: positions('ActorMoveEventData'), EVENT_MOVE_ACTOR: positions('ActorMoveEventData'),
@@ -19,6 +20,15 @@ export const NUMERIC_EVENT_FIELDS: Record<string, Record<string, NumericEventFie
   EVENT_MUSIC_FADE: fields('MusicFadeEventData', { targetVolume: 'target_volume', durationFrames: 'duration_frames' }),
   EVENT_BACKGROUND_SCROLL: fields('BackgroundScrollEventData', { layerId: 'layer_id', x: 'x', y: 'y' }),
   EVENT_BACKGROUND_SET_PARALLAX: fields('BackgroundParallaxEventData', { layerId: 'layer_id', x: 'x', y: 'y' }),
+  EVENT_BACKGROUND_SET_SCALE: fields('BackgroundTransformEventData', { x: 'x', y: 'y' }),
+  EVENT_ACTOR_SET_ROTATION: fields('ActorTransformEventData', { angle: 'value', durationFrames: 'duration_frames' }),
+  EVENT_ACTOR_SET_SCALE: fields('ActorTransformEventData', { scale: 'value', durationFrames: 'duration_frames' }),
+  EVENT_ACTOR_SET_TINT: fields('ActorVisualEventData', { value: 'value', durationFrames: 'duration_frames' }),
+  EVENT_ACTOR_SET_SATURATION: fields('ActorVisualEventData', { value: 'value' }),
+  EVENT_ACTOR_SET_BRIGHTNESS: fields('ActorVisualEventData', { value: 'value' }),
+  EVENT_ACTOR_SET_OPACITY: fields('ActorVisualEventData', { value: 'value' }),
+  EVENT_BACKGROUND_SET_ROTATION: fields('BackgroundTransformEventData', { angle: 'x' }),
+  EVENT_BACKGROUND_SET_SHEAR: fields('BackgroundTransformEventData', { x: 'x', y: 'y' }),
   EVENT_UI_SET_TEXT: positions('UiSetTextEventData'),
   EVENT_UI_SET_VALUE: fields('UiSetValueEventData', { value: 'value', x: 'x', y: 'y' }),
   EVENT_UI_ANIMATE: fields('UiAnimateEventData', { x: 'x', y: 'y', durationFrames: 'duration_frames' }),

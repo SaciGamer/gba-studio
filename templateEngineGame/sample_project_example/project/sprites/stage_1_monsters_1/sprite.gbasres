@@ -11,7 +11,7 @@
   "playerFramesPerDirection": 4,
   "playerAnimSpeed": 6,
   "playerIdleFrame": 0,
-  "playerCanvasOriginX": 0,
+  "playerCanvasOriginX": 8,
   "playerCanvasOriginY": 8,
   "playerCollisionX": 0,
   "playerCollisionY": 0,
@@ -25,17 +25,51 @@
       "frames": [],
       "canvasFrames": [
         {
-          "id": "canvas-frame-1791314923682",
+          "id": "canvas-frame-autogen-1791562806183-0",
           "width": 16,
           "height": 16,
           "pieces": [
             {
-              "id": "piece-1791314927067",
+              "id": "piece-autogen-1791562806183-0-0-0",
               "sourceX": 0,
-              "sourceY": 32,
-              "width": 16,
+              "sourceY": 0,
+              "width": 8,
               "height": 16,
               "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791562806183-0-8-0",
+              "sourceX": 8,
+              "sourceY": 0,
+              "width": 8,
+              "height": 16,
+              "x": 8,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "id": "canvas-frame-1793132164126",
+          "width": 16,
+          "height": 16,
+          "pieces": [
+            {
+              "id": "piece-1793132168290-0-0-sia45",
+              "sourceX": 0,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-1793132168290-0-8-g8zr0",
+              "sourceX": 8,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 8,
               "y": 0
             }
           ]
@@ -49,33 +83,51 @@
       "frames": [],
       "canvasFrames": [
         {
-          "id": "canvas-frame-1791314930510",
+          "id": "canvas-frame-autogen-1791562784161-0",
           "width": 16,
           "height": 16,
           "pieces": [
             {
-              "id": "piece-1791314933529",
+              "id": "piece-autogen-1791562784161-0-0-0",
               "sourceX": 0,
-              "sourceY": 32,
-              "width": 16,
+              "sourceY": 0,
+              "width": 8,
               "height": 16,
               "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791562784161-0-8-0",
+              "sourceX": 8,
+              "sourceY": 0,
+              "width": 8,
+              "height": 16,
+              "x": 8,
               "y": 0
             }
           ]
         },
         {
-          "id": "canvas-frame-1791314930976",
+          "id": "canvas-frame-autogen-1791562784161-1",
           "width": 16,
           "height": 16,
           "pieces": [
             {
-              "id": "piece-1791314948262",
+              "id": "piece-autogen-1791562784161-1-0-0",
               "sourceX": 0,
-              "sourceY": 48,
-              "width": 16,
+              "sourceY": 16,
+              "width": 8,
               "height": 16,
               "x": 0,
+              "y": 0
+            },
+            {
+              "id": "piece-autogen-1791562784161-1-8-0",
+              "sourceX": 8,
+              "sourceY": 16,
+              "width": 8,
+              "height": 16,
+              "x": 8,
               "y": 0
             }
           ]
@@ -93,8 +145,58 @@
           "id": "idle",
           "name": "Idle",
           "type": "idle",
-          "frames": [
-            0
+          "frames": [],
+          "canvasFrames": [
+            {
+              "id": "canvas-frame-autogen-1791562806183-0",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-autogen-1791562806183-0-0-0",
+                  "sourceX": 0,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791562806183-0-8-0",
+                  "sourceX": 8,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "canvas-frame-1793132164126",
+              "width": 16,
+              "height": 16,
+              "pieces": [
+                {
+                  "id": "piece-1793132168290-0-0-sia45",
+                  "sourceX": 0,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-1793132168290-0-8-g8zr0",
+                  "sourceX": 8,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
+                  "y": 0
+                }
+              ]
+            }
           ]
         },
         {
@@ -104,33 +206,51 @@
           "frames": [],
           "canvasFrames": [
             {
-              "id": "canvas-frame-1791314890394",
+              "id": "canvas-frame-autogen-1791562784161-0",
               "width": 16,
               "height": 16,
               "pieces": [
                 {
-                  "id": "piece-1791314893511",
+                  "id": "piece-autogen-1791562784161-0-0-0",
                   "sourceX": 0,
                   "sourceY": 0,
-                  "width": 16,
+                  "width": 8,
                   "height": 16,
                   "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791562784161-0-8-0",
+                  "sourceX": 8,
+                  "sourceY": 0,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
                   "y": 0
                 }
               ]
             },
             {
-              "id": "canvas-frame-1791314895195",
+              "id": "canvas-frame-autogen-1791562784161-1",
               "width": 16,
               "height": 16,
               "pieces": [
                 {
-                  "id": "piece-1791314896129",
+                  "id": "piece-autogen-1791562784161-1-0-0",
                   "sourceX": 0,
                   "sourceY": 16,
-                  "width": 16,
+                  "width": 8,
                   "height": 16,
                   "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791562784161-1-8-0",
+                  "sourceX": 8,
+                  "sourceY": 16,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
                   "y": 0
                 }
               ]
@@ -152,17 +272,26 @@
           "frames": [],
           "canvasFrames": [
             {
-              "id": "canvas-frame-1791314923682",
+              "id": "canvas-frame-1791562822284",
               "width": 16,
               "height": 16,
               "pieces": [
                 {
-                  "id": "piece-1791314927067",
+                  "id": "piece-1791562825438-0-0-op3jj",
                   "sourceX": 0,
                   "sourceY": 32,
-                  "width": 16,
+                  "width": 8,
                   "height": 16,
                   "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-1791562825438-0-8-lral5",
+                  "sourceX": 8,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
                   "y": 0
                 }
               ]
@@ -176,33 +305,51 @@
           "frames": [],
           "canvasFrames": [
             {
-              "id": "canvas-frame-1791314930510",
+              "id": "canvas-frame-autogen-1791562867494-2",
               "width": 16,
               "height": 16,
               "pieces": [
                 {
-                  "id": "piece-1791314933529",
+                  "id": "piece-autogen-1791562867494-2-0-0",
                   "sourceX": 0,
                   "sourceY": 32,
-                  "width": 16,
+                  "width": 8,
                   "height": 16,
                   "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791562867494-2-8-0",
+                  "sourceX": 8,
+                  "sourceY": 32,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
                   "y": 0
                 }
               ]
             },
             {
-              "id": "canvas-frame-1791314930976",
+              "id": "canvas-frame-autogen-1791562867494-3",
               "width": 16,
               "height": 16,
               "pieces": [
                 {
-                  "id": "piece-1791314948262",
+                  "id": "piece-autogen-1791562867494-3-0-0",
                   "sourceX": 0,
                   "sourceY": 48,
-                  "width": 16,
+                  "width": 8,
                   "height": 16,
                   "x": 0,
+                  "y": 0
+                },
+                {
+                  "id": "piece-autogen-1791562867494-3-8-0",
+                  "sourceX": 8,
+                  "sourceY": 48,
+                  "width": 8,
+                  "height": 16,
+                  "x": 8,
                   "y": 0
                 }
               ]

@@ -54,6 +54,7 @@ EventStatus run_fade_status(const FadeEventData& data, FadeType fadeType, Fade& 
 {
     if(!state.active)
     {
+        bn::blending::set_transparency_alpha(bn::fixed(1));
         state.speed = data.speed < 1 ? 1 : data.speed;
         state.active = true;
         if(fadeType == FadeType::IN) bn::blending::set_fade_alpha(bn::blending_fade_alpha(1));

@@ -3,10 +3,11 @@
 EventStatus CameraEventHandler::execute_status(const void* args, MotionEventState&) {
     return execute(args) ? EventStatus::completed : EventStatus::failed;
 }
-EventStatus ActorEventHandler::move_status(const void* args, MotionEventState&) {
+EventStatus ActorEventHandler::move_status(const void* args, MotionEventState&, const char*) {
     return move(args) ? EventStatus::completed : EventStatus::failed;
 }
 bool ActorEventHandler::state(const void*) { return true; }
+bool ActorEventHandler::animation(const void*) { std::abort(); }
 #include "script_command_manager.h"
 #include "variable_manager.h"
 #include "hooks.h"
@@ -34,6 +35,15 @@ EventStatus WaitInputEventHandler::execute_status(const void* args, WaitInput& s
 bool VariableEventHandler::execute(const bn::string<64>&, const void* args) {
     const auto& data = *static_cast<const VariableSetValueData*>(args);
     trace.push_back(data.source_variable_id ? VariableManager::instance().get_number(data.source_variable_id) : data.number_value);
+    if(data.variable_id && *data.variable_id && VariableManager::instance().find(data.variable_id)) {
+        VariableValueData value{data.type, data.number_value, data.boolean_value, data.string_value};
+        if(data.source_variable_id) {
+            value.number_value = VariableManager::instance().get_number(data.source_variable_id);
+            value.boolean_value = VariableManager::instance().get_boolean(data.source_variable_id);
+            value.string_value = VariableManager::instance().get_string(data.source_variable_id);
+        }
+        return VariableManager::instance().set_value(data.variable_id, value);
+    }
     return true;
 }
 bool ChangeSceneEventHandler::execute(const void* args) {
@@ -52,7 +62,9 @@ bool InputEventHandler::group(const void*) { return true; }
 #define UNTESTED_HANDLER(type, method) bool type::method(const void*) { std::abort(); }
 UNTESTED_HANDLER(FadeOptionsEventHandler, execute)
 UNTESTED_HANDLER(CameraEventHandler, execute)
+bool CameraEventHandler::stop_follow() { std::abort(); }
 UNTESTED_HANDLER(CameraEventHandler, follow)
+bool CameraEventHandler::follow(const CameraFollowEventData&) { std::abort(); }
 UNTESTED_HANDLER(CameraEventHandler, shake)
 UNTESTED_HANDLER(ActorEventHandler, move)
 UNTESTED_HANDLER(ActorEventHandler, spawn)
@@ -110,6 +122,7 @@ bool UiEventHandler::show(const void* args) {
 }
 UNTESTED_HANDLER(UiEventHandler, stop_animation)
 UNTESTED_HANDLER(SpriteEventHandler, effect)
+bool SpriteEventHandler::effect(const SpriteEffectEventData&) { std::abort(); }
 EventStatus FadeEventHandler::execute_status(const bn::string<64>&, const void*, Fade&) { std::abort(); }
 bool ChangeLayerEventHandler::execute(const void*, const bn::string<64>&) { std::abort(); }
 bool ChangePaletteBackgroundEventHandler::execute(const void*, const bn::string<64>&) { std::abort(); }
@@ -122,3 +135,7 @@ bool HbeEventHandler::execute(const void*) { std::abort(); }
 bool BlendEventHandler::set_alpha(const void*) { std::abort(); }
 bool run_background_scroll(const void*, const bn::string<64>) { std::abort(); }
 bool run_background_parallax(const void*, const bn::string<64>) { std::abort(); }
+bool run_background_transform(const void*, int) { std::abort(); }
+bool run_background_animation(const void*) { std::abort(); }
+
+EventStatus PhysicsEventHandler::execute_status(const bn::string<64>&, const void*, const char*) { std::abort(); }

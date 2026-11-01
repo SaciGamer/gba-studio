@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Input, Button, Space, message, Form, Divider, Switch, Typography, Radio } from 'antd';
+import { Modal, Input, Button, Space, message, Form, Divider, Switch, Typography, Radio, Row, Col, Checkbox } from 'antd';
 import StepInputNumber, { InputNumber } from './StepInputNumber';
 import { FolderOutlined, CheckCircleOutlined, ExclamationCircleOutlined, CloudDownloadOutlined } from '@ant-design/icons';
 import { useI18n } from '@/i18n/I18n';
@@ -14,6 +14,11 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
   const [cpuCount, setCpuCount] = useState(1);
   const [gameWorldPanInertia, setGameWorldPanInertia] = useState(true);
   const [gameWorldMovementMode, setGameWorldMovementMode] = useState<'free' | 'grid'>('grid');
+  const [sceneObjectSnapSize, setSceneObjectSnapSize] = useState<8 | 16>(8);
+  const [gameWorldRecenterEnabled, setGameWorldRecenterEnabled] = useState(true);
+  const [gameWorldRecenterScenes, setGameWorldRecenterScenes] = useState(true);
+  const [gameWorldRecenterActors, setGameWorldRecenterActors] = useState(true);
+  const [gameWorldRecenterTriggers, setGameWorldRecenterTriggers] = useState(true);
 
   useEffect(() => {
     if (!open) return;
@@ -37,6 +42,11 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
         setBuildThreads(Math.min(availableThreads, Math.max(1, configuredThreads)));
         setGameWorldPanInertia(preferences?.gameWorldPanInertia !== false);
         setGameWorldMovementMode(preferences?.gameWorldMovementMode === 'free' ? 'free' : 'grid');
+        setSceneObjectSnapSize(preferences?.sceneObjectSnapSize === 16 ? 16 : 8);
+        setGameWorldRecenterEnabled(preferences?.gameWorldRecenterEnabled !== false);
+        setGameWorldRecenterScenes(preferences?.gameWorldRecenterScenes !== false);
+        setGameWorldRecenterActors(preferences?.gameWorldRecenterActors !== false);
+        setGameWorldRecenterTriggers(preferences?.gameWorldRecenterTriggers !== false);
       } catch (err) {
         console.error(err);
       }
@@ -70,9 +80,14 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
       await window.electronAPI.setGameWorldPreferences({
         panInertia: gameWorldPanInertia,
         movementMode: gameWorldMovementMode,
+        sceneObjectSnapSize,
+        recenterEnabled: gameWorldRecenterEnabled,
+        recenterScenes: gameWorldRecenterScenes,
+        recenterActors: gameWorldRecenterActors,
+        recenterTriggers: gameWorldRecenterTriggers,
       });
       window.dispatchEvent(new CustomEvent('gba-studio:game-world-preferences', {
-        detail: { gameWorldPanInertia, gameWorldMovementMode },
+        detail: { gameWorldPanInertia, gameWorldMovementMode, sceneObjectSnapSize, gameWorldRecenterEnabled, gameWorldRecenterScenes, gameWorldRecenterActors, gameWorldRecenterTriggers },
       }));
       message.success('Preferences saved');
       onClose();
@@ -101,7 +116,7 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
       <Form layout="vertical">
         <Space direction="vertical" size={0} style={{ marginBottom: 24, display: 'flex' }}>
           <Typography.Text strong>GBA Studio Configuration</Typography.Text>
-          <Typography.Text type="secondary">General configurations to GBA Studio build.</Typography.Text>
+          <Typography.Text type="secondary">{t('preferences.configurationDescription')}</Typography.Text>
         </Space>
 
         <Divider>History</Divider>
@@ -120,6 +135,8 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
         </Form.Item>
 
         <Divider>Canvas Configuration</Divider>
+        <Row gutter={[24, 16]}>
+        <Col xs={24} sm={12}>
         <Form.Item label={t('preferences.panInertia')} extra={t('preferences.panInertiaDescription')}>
           <Switch
             data-testid="preferences-game-world-pan-inertia"
@@ -142,6 +159,30 @@ const PreferencesModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
             ]}
           />
         </Form.Item>
+        <Form.Item label={t('preferences.sceneObjectSnap')}>
+          <Radio.Group
+            data-testid="preferences-scene-object-snap-size"
+            aria-label={t('preferences.sceneObjectSnap')}
+            optionType="button"
+            buttonStyle="solid"
+            value={sceneObjectSnapSize}
+            onChange={event => setSceneObjectSnapSize(event.target.value)}
+            options={[{ value: 8, label: '8×8 px' }, { value: 16, label: '16×16 px' }]}
+          />
+        </Form.Item>
+
+        </Col>
+        <Col xs={24} sm={12}>
+          <Form.Item label={t('preferences.recenter')} extra={t('preferences.recenterDescription')}>
+            <Switch aria-label={t('preferences.recenter')} checked={gameWorldRecenterEnabled} onChange={setGameWorldRecenterEnabled} />
+          </Form.Item>
+          <Space direction="vertical">
+            <Checkbox disabled={!gameWorldRecenterEnabled} checked={gameWorldRecenterScenes} onChange={event => setGameWorldRecenterScenes(event.target.checked)}>{t('preferences.recenterScenes')}</Checkbox>
+            <Checkbox disabled={!gameWorldRecenterEnabled} checked={gameWorldRecenterActors} onChange={event => setGameWorldRecenterActors(event.target.checked)}>{t('preferences.recenterActors')}</Checkbox>
+            <Checkbox disabled={!gameWorldRecenterEnabled} checked={gameWorldRecenterTriggers} onChange={event => setGameWorldRecenterTriggers(event.target.checked)}>{t('preferences.recenterTriggers')}</Checkbox>
+          </Space>
+        </Col>
+        </Row>
 
         <Divider>Build Configuration</Divider>
         {/* Temporary Build Path */}

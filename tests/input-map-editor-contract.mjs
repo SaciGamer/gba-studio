@@ -12,7 +12,7 @@ assert.match(source, /delete nextMap\[action\]/);
 assert.match(source, /CombatConfigEditor/);
 assert.match(source, /maxProjectiles/);
 assert.match(source, /Player HP/);
-assert.match(ifEvent, /Object\.keys\(settings\?\.inputMap \?\? \{\}\)/);
+assert.match(ifEvent, /Object\.keys\(withDefaultInputMap\(settings\?\.inputMap\)\)/);
 assert.match(ifEvent, /Action: \$\{action\}/);
 assert.match(ifEvent, /buttonOptions/);
 console.log('Input map editor contract passed.');

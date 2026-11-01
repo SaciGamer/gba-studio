@@ -29,5 +29,6 @@ try {
   assert.throws(() => builder.processResourceObject({ _resourceType: 'settings', id: 'bad', shooterConfig: { bossHitPoints: 65536 } }), /shooterConfig\.bossHitPoints/);
   console.log('Shooter config build contract passed.');
 } finally {
+  assert.ok(path.resolve(temp).startsWith(path.resolve(os.tmpdir()) + path.sep) && path.basename(temp).startsWith('gba-studio-shooter-config-'));
   fs.rmSync(temp, { recursive: true, force: true });
 }

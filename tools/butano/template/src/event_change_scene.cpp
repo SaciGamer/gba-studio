@@ -28,7 +28,7 @@ bool run_change_scene(const SceneChangeEventData& data)
             if(nextScene)
             {
                 GraphicsManager::instance().spawn_player(*nextScene, changeScene.x, changeScene.y,
-                                                          changeScene.direction.data());
+                                                          changeScene.direction.data(), true);
                 BN_LOG("runChangeScene sceneName: ", nextScene->name);
             }
             else

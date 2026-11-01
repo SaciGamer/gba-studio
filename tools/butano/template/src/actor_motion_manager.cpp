@@ -2,6 +2,14 @@
 #include "graphics_manager.h"
 #include "actor_manager.h"
 #include "bn_log.h"
+namespace {
+    bool actor_blocked(const char* id, const Sprites& body, int x, int y) {
+        return GraphicsManager::instance().script_actor_blocked(id, body, x, y);
+    }
+    int actor_minimum_distance(const char* id, const Sprites& body, int x, int y) {
+        return GraphicsManager::instance().script_actor_minimum_distance(id, body, x, y);
+    }
+}
 
 ActorMotionManager::ActorMotionManager() {}
 
@@ -12,6 +20,10 @@ ActorMotionManager& ActorMotionManager::instance() {
     static ActorMotionManager manager;
 #endif
     return manager;
+}
+bool ActorMotionManager::controls_actor(const char* actor_id) const {
+    for(const auto& job : jobs) if(job.owner && actor_motion::same_text(job.actor_id, actor_id)) return true;
+    return false;
 }
 bool ActorMotionManager::controls_player() const {
     for(const auto& job : jobs) if(job.owner && actor_motion::same_text(job.actor_id, "__PLAYER__")) return true;
@@ -26,7 +38,15 @@ void ActorMotionManager::cancel(MotionEventState* owner) {
         job.owner = nullptr;
     }
 }
+void ActorMotionManager::stop_actor(const char* actor_id) {
+    for(auto& job : jobs) if(job.owner && actor_motion::same_text(job.actor_id, actor_id)) {
+        auto* owner = job.owner;
+        cancel(owner);
+        owner->stopped = true;
+    }
+}
 EventStatus ActorMotionManager::advance(const ActorMoveEventData& data, MotionEventState& owner) {
+    if(owner.stopped) { owner = {}; return EventStatus::completed; }
     auto& graphics = GraphicsManager::instance();
     Job* job = nullptr;
     for(auto& candidate : jobs) if(candidate.owner == &owner) { job = &candidate; break; }
@@ -37,8 +57,11 @@ EventStatus ActorMotionManager::advance(const ActorMoveEventData& data, MotionEv
         if(!job || !data.actor_id || !graphics.getScene()) return EventStatus::failed;
         job->body = graphics.read_script_actor_state(data.actor_id, job->state);
         if(!job->body) return EventStatus::failed;
+        job->options = {data.collide_walls, data.collide_actors, data.lock_axis, data.movement_type, data.actor_id, actor_blocked, actor_minimum_distance};
         const auto& scene = *graphics.getScene();
         int target_x = data.x, target_y = data.y;
+        if(data.lock_axis == 1) target_y = job->state.y;
+        if(data.lock_axis == 2) target_x = job->state.x;
         if(!actor_motion::clamp_destination(scene, *job->body, target_x, target_y)) return EventStatus::failed;
         job->owner = &owner; job->actor_id = data.actor_id; job->scene_revision = graphics.get_scene_revision();
         job->target_x = target_x; job->target_y = target_y; job->speed_q8 = std::clamp(data.speed_q8, 16, 4096);
@@ -53,7 +76,8 @@ EventStatus ActorMotionManager::advance(const ActorMoveEventData& data, MotionEv
         if(!search_owner) {
             if(++job->searches > 3) { cancel(&owner); return EventStatus::failed; }
             search_owner = job;
-            search.begin(*graphics.getScene(), *job->body, job->state, job->target_x, job->target_y, job->speed_q8);
+            search.begin(*graphics.getScene(), *job->body, job->state, job->target_x, job->target_y, job->speed_q8,
+                         true, actor_motion::same_text(job->actor_id, "__PLAYER__"), job->options);
         }
         const auto result = search.advance();
         if(result == actor_motion::SearchStatus::running) return EventStatus::running;
@@ -63,6 +87,8 @@ EventStatus ActorMotionManager::advance(const ActorMoveEventData& data, MotionEv
             cancel(&owner); return EventStatus::failed;
         }
         job->path_size = search.copy_reverse_path(job->path, 512);
+        job->target_x = search.destination_x();
+        job->target_y = search.destination_y();
         job->frame = 0;
         if(job->path_size < 0) { cancel(&owner); return EventStatus::failed; }
         return EventStatus::running;
@@ -70,9 +96,13 @@ EventStatus ActorMotionManager::advance(const ActorMoveEventData& data, MotionEv
     if(job->path_size == 0) { job->path_size = -1; return EventStatus::running; }
     const auto next_action = job->path[job->path_size - 1];
     const int dx = std::abs(job->target_x - job->state.x), dy = std::abs(job->target_y - job->state.y);
-    const int axis_distance = next_action.action == actor_motion::up || next_action.action == actor_motion::down ? dy : dx;
+    const int axis_distance = next_action.action >= actor_motion::up_left ? std::min(dx, dy) : next_action.action == actor_motion::up || next_action.action == actor_motion::down ? dy : dx;
     const int speed = axis_distance > 0 ? std::min(job->speed_q8, axis_distance * 256) : job->speed_q8;
-    actor_motion::step(*graphics.getScene(), *job->body, job->state, next_action.action, speed, job->frame == 0);
+    const int before_x = job->state.x, before_y = job->state.y;
+    actor_motion::step(*graphics.getScene(), *job->body, job->state, next_action.action, speed, job->frame == 0, job->options);
+    if(job->options.actors && job->state.x == before_x && job->state.y == before_y && next_action.action != actor_motion::idle) {
+        job->path_size = -1; return EventStatus::running;
+    }
     if(!graphics.apply_script_actor_state(job->actor_id, job->state, next_action.action)) { cancel(&owner); return EventStatus::failed; }
     if(++job->frame >= next_action.frames) { --job->path_size; job->frame = 0; }
     if(job->state.x == job->target_x && job->state.y == job->target_y) { cancel(&owner); return EventStatus::completed; }

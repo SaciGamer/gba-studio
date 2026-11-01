@@ -11,7 +11,7 @@ void require(bool value, const char* message) {
     if(!value) { std::cerr << message << '\n'; ++failures; }
 }
 ScriptCommandData command(const char* name, const void* args) {
-    return {"test", name, args, 0, 1, -1, -1, -1};
+    return {name, args, -1, -1, -1};
 }
 enum class Origin { init, actor, trigger, button };
 
@@ -28,16 +28,16 @@ void transition_case(Origin origin, bool same_scene, const char* id) {
     const SceneChangeEventData transition{same_scene ? id : "next", 0, 0, "right", 1};
     const ScriptCommandData change[] = {command("EVENT_CHANGE_SCENE", &transition)};
     const char* buttons[] = {"START"};
-    const ButtonWaitEventData binding{nullptr, buttons, 1, true};
+    const ButtonWaitEventData binding{buttons, 1, true};
     const ScriptCommandData attached[] = {
-        {"attach", "EVENT_WAIT_FOR_BUTTON", &binding, 0, 1, 2, 1, -1},
-        {"change", "EVENT_CHANGE_SCENE", &transition, 0, 1, 2, -1, -1},
+        {"EVENT_WAIT_FOR_BUTTON", &binding, 2, 1, -1},
+        {"EVENT_CHANGE_SCENE", &transition, 2, -1, -1},
     };
     const ScriptCommandData old_marker[] = {command("EVENT_VARIABLE", &old_mark)};
     const ScriptCommandData new_marker[] = {command("EVENT_VARIABLE", &new_mark)};
     ScriptTrigger triggers[] = {
-        {"change", 0, 0, 8, 8, TriggerActivation::stay, origin == Origin::trigger, false, 0, change, 1, nullptr, 0},
-        {"mark", 0, 0, 8, 8, TriggerActivation::stay, true, same_scene, 0, old_marker, 1, nullptr, 0}
+        {0, 0, 8, 8, TriggerActivation::stay, origin == Origin::trigger, false, 0, change, 1, nullptr, 0},
+        {0, 0, 8, 8, TriggerActivation::stay, true, same_scene, 0, old_marker, 1, nullptr, 0}
     };
     Scenes old_scene{}, new_scene{}, same_scene_target{};
     old_scene.id = id; old_scene.name = id;

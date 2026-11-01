@@ -1,9 +1,24 @@
+import NameInput, { useNameHoverStyle } from './NameHover';
+import useSceneObjectSnapSize from '@/utils/useSceneObjectSnapSize';
+import { sceneObjectAxisBounds, sceneObjectAxisPosition } from '@/utils/sceneObjectPosition';
+import ActorOffscreenControl from './ActorOffscreenControl';
+import { AttentionLabel, WarningField } from './WarningIndicator';
+import AdditionalEventWarnings from './events/AdditionalEventWarnings';
+import { hasAssetReferenceWarning } from '../../../../shared/events/sceneReferenceCleanup';
+import { trackerInstrumentOptions, trackerInstrumentHierarchyColor, trackerInstrumentHierarchyNumber } from '@/utils/trackerInstrumentOptions';
+import DirectionRadioGroup from './DirectionRadioGroup';
+import ResourceNameInput from './ResourceNameInput';
 import useAppContexts from '@/providers/contexts/AppContexts';
-import { EImageType, ETypeScene, IBackgroundElement, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
+import { sceneSearchAfterSelection } from '@/utils/sceneSearch';
+import { EImageType, ETypeScene, IBackgroundElement, ISceneActor, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { EVariableType, IVariableDefinition, VariableValue } from '@/providers/contexts/interfaces/IVariablesElement';
 import { IScriptDefinition } from '@/providers/contexts/interfaces/IScriptElement';
-import { BgColorsOutlined, CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled, DeleteOutlined, PictureOutlined, PlusOutlined, SettingOutlined } from '@ant-design/icons';
-import { Alert, Button, Checkbox, Divider, Flex, Form, Input, Layout, Radio, Segmented, Select, Space, Tabs, Tag, theme, Tooltip, Typography } from 'antd';
+import { exposeScriptInputs, scriptUsesParameter } from '../../../../shared/scriptParameters';
+import { ScriptParameterContext } from './events/ScriptParameterContext';
+import ScriptInputs from './events/ScriptInputs';
+import { AudioMutedOutlined, SoundOutlined, ArrowRightOutlined, AudioOutlined, BgColorsOutlined, CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled, CopyOutlined, DeleteOutlined, PictureOutlined, SettingOutlined } from '@ant-design/icons';
+import { Alert, App, Button, Checkbox, ColorPicker, Descriptions, Divider, Dropdown, Flex, Form, Input, Layout, Modal, Radio, Segmented, Select, Slider, Space, Tabs, Tag, theme, Tooltip, Typography } from 'antd';
+import { countEventAttention, countObjectAttention } from '../../../../shared/events/eventAttention';
 import StepInputNumber, { InputNumber } from './StepInputNumber';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,10 +26,10 @@ import { BackgroundSelector } from './BackgroundSelector';
 import CollapseEventManager from './events/CollapseEventManager';
 import SelectNewEvent from './events/SelectNewEvent';
 import FlowEditorManager from './events/FlowEditorManager';
-import RightPanelGWSettings, { CombatConfigEditor, ShooterConfigEditor } from './RightPanelGWSettings';
-import FadeEvent from './events/FadeEvent';
+import RightPanelGWSettings from './RightPanelGWSettings';
+// TODO(restore-shooter-game): re-import CombatConfigEditor and ShooterConfigEditor when restoring Shooter scene configuration.
 import { EEvents } from './events/interfaces/IEvents';
-import { loadPaletteLibrary } from './resourceEditors/paletteLibrary';
+import { getPaletteSlotOptions, getPreviewPalettes, loadPaletteLibrary } from './resourceEditors/paletteLibrary';
 import imgPlaceholder from '@/img/placeholder.png';
 import { joinLocalAssetPath } from '@/utils/localAssetUrl';
 import { loadPaletteTransparentImage } from '@/utils/paletteTransparency';
@@ -26,6 +41,14 @@ import { loadTilesetAssets } from '@/utils/tilesetAssets';
 import { AUTO_TILE_VIEW_KEY, loadAutoTileAssets, toAutoTileSourceKey } from '@/utils/autoTileAssets';
 import { BLOB47_MASK_INDEX, BLOB47_MASKS, getBlob47Mask } from '@/utils/blobAutoTile';
 import { getEventDepthColor } from './events/EventColors';
+import { ISpriteSettings } from '@/providers/contexts/interfaces/ISpriteElement';
+import { useMusicEditorWorkspace } from './resourceEditors/MusicEditorWorkspace';
+import MusicDial from './resourceEditors/MusicDial';
+import MusicInstrumentEnvelopeEditor from './resourceEditors/MusicInstrumentEnvelopeEditor';
+import MusicInstrumentZoneEditor from './resourceEditors/MusicInstrumentZoneEditor';
+import { quantizeTrackerNotePan } from '@/utils/trackerNotePan';
+import { sanitizeMusicAssetName } from '@/utils/musicAssetName';
+import type { IPrefabDefinition } from '@/providers/contexts/interfaces/IPrefabElement';
 
 const { useToken } = theme;
 const { Content } = Layout;
@@ -78,15 +101,16 @@ const getVariableDefaultName = (symbol: string): string => {
   return `Variable ${readableName}`;
 };
 
-const ReferenceList: React.FC<{ locations: ReferenceLocation[]; onSelect: (location: ReferenceLocation) => void }> = ({ locations, onSelect }) => (
-  <Space direction="vertical" size={2} style={{ width: '100%', padding: '8px 10px' }}>
-    <Typography.Text type="secondary">Usado em:</Typography.Text>
+const ReferenceList: React.FC<{ locations: ReferenceLocation[]; onSelect: (location: ReferenceLocation) => void; sceneNameOnly?: boolean }> = ({ locations, onSelect, sceneNameOnly }) => (
+  <div style={{ width: '100%', padding: sceneNameOnly ? '2px 10px' : '8px 10px', boxSizing: 'border-box', lineHeight: '22px' }}>
+    <Typography.Text type="secondary" style={{ display: 'block' }}>Usado em:</Typography.Text>
     {locations.length === 0 ? <Typography.Text type="secondary">Nenhuma referência encontrada.</Typography.Text> : locations.map((location, index) => (
-      <Typography.Link key={`${location.scene ?? ''}-${location.script ?? ''}-${location.event ?? ''}-${index}`} onClick={() => onSelect(location)}>
-        {[location.scene && `cena: ${location.scene}`, location.script && `script: ${location.script}`, location.event && `evento: ${location.event}`].filter(Boolean).join(', ')}
-      </Typography.Link>
+      <span key={`${location.scene ?? ''}-${location.script ?? ''}-${location.event ?? ''}-${index}`} style={{ display: sceneNameOnly ? 'inline' : 'block' }}><Typography.Link onClick={() => onSelect(location)}>
+        {sceneNameOnly ? location.scene || location.script : [location.scene && `cena: ${location.scene}`, location.script && `script: ${location.script}`, location.event && `evento: ${location.event}`].filter(Boolean).join(', ')}
+        {sceneNameOnly && index < locations.length - 1 ? ';' : ''}
+      </Typography.Link>{sceneNameOnly && index < locations.length - 1 ? ' ' : ''}</span>
     ))}
-  </Space>
+  </div>
 );
 
 const useReferenceNavigation = () => {
@@ -100,23 +124,23 @@ const useReferenceNavigation = () => {
     setSettingUtils(previous => ({
       ...previous,
       selectedSceneIds: scene ? [scene.id] : [],
+      worldSceneSearch: sceneSearchAfterSelection(previous.worldSceneSearch, scene),
       tileEditSceneId: object?.sceneId ?? null,
       tileEditLayerId: object ? 4 : null,
       activeSceneObject: object,
       activeTriggerId: object?.type === 'trigger' ? object.id : null,
       activeButton: 'select',
       activeSubButton: '',
+      referenceTarget: { eventId: location.eventId, tab: location.tab, requestId: Date.now() },
     }));
-    setElementSelected(scene ? { ...scene, _recenter: true }
+    setElementSelected(scene ? { ...scene, _recenter: true, _recenterTarget: object ? { type: object.type, id: object.id } : undefined }
       : referencedScript ? { ...referencedScript, script: referencedScript.events, _resourceType: 'script' } : null);
   };
 };
 
 const VariableSettingsForm: React.FC<{ variable: IVariableDefinition }> = ({ variable }) => {
   const { variables, scripts, scenes, setVariables, setElementSelected, setSettingUtils } = useAppContexts();
-  const [isEditingName, setIsEditingName] = useState(false);
   const defaultName = getVariableDefaultName(variable.symbol);
-  const displayedName = variable.name || defaultName;
 
   const updateVariable = (patch: Partial<IVariableDefinition>) => {
     const updatedVariable = { ...variable, ...patch };
@@ -137,33 +161,8 @@ const VariableSettingsForm: React.FC<{ variable: IVariableDefinition }> = ({ var
   const selectReference = useReferenceNavigation();
 
   return (
-    <Space direction="vertical" style={{ width: '100%' }}>
-      {isEditingName ? (
-        <Input
-          autoFocus
-          variant="borderless"
-          aria-label="Variable name"
-          placeholder={defaultName}
-          value={variable.name}
-          onChange={(event) => updateVariable({ name: event.target.value })}
-          onBlur={() => {
-            if (!variable.name.trim()) updateVariable({ name: defaultName });
-            setIsEditingName(false);
-          }}
-          onPressEnter={() => {
-            if (!variable.name.trim()) updateVariable({ name: defaultName });
-            setIsEditingName(false);
-          }}
-        />
-      ) : (
-        <Typography.Title
-          level={5}
-          onClick={() => setIsEditingName(true)}
-          style={{ margin: 0, cursor: 'pointer', padding: 10 }}
-        >
-          {displayedName}
-        </Typography.Title>
-      )}
+    <Space direction="vertical" style={{ width: '100%', minWidth: 0, alignItems: 'stretch' }}>
+      <ResourceNameInput name={variable.name || ''} defaultName={defaultName} label="Variable name" onChange={name => updateVariable({ name })} />
       <Divider style={{ margin: 0 }} />
       <ReferenceList locations={locations} onSelect={selectReference} />
       <Space direction="vertical" style={{ width: '100%', padding: 10 }}>
@@ -213,79 +212,403 @@ const VariableSettingsForm: React.FC<{ variable: IVariableDefinition }> = ({ var
 const ScriptSettingsForm: React.FC<{ script: IScriptDefinition }> = ({ script }) => {
   const { t } = useI18n();
   const { scripts, scenes, setScripts, setElementSelected, setSettingUtils } = useAppContexts();
-  const [isEditingName, setIsEditingName] = useState(false);
   const scriptIndex = scripts.scripts.findIndex(item => item.id === script.id);
   const defaultName = `Script ${Math.max(0, scriptIndex)}`;
-  const displayedName = script.name || defaultName;
   const updateScript = (patch: Partial<IScriptDefinition>) => {
+    if (patch.events || patch.parameters) patch = { ...patch, ...exposeScriptInputs(patch.events ?? script.events, patch.parameters ?? script.parameters) };
     const updated = { ...script, ...patch, ...(patch.events ? { script: patch.events } : {}), _saved: false };
     setScripts(previous => ({ ...previous, scripts: previous.scripts.map(item => item.id === script.id ? updated : item), _saved: false }));
     setElementSelected({ ...updated, script: updated.events, _resourceType: 'script' });
   };
   const locations = collectReferenceLocations(scenes, scripts.scripts, script.id, 'script');
   const selectReference = useReferenceNavigation();
-  return <Content><Space direction="vertical" style={{ width: '100%' }}>{isEditingName ? <Input autoFocus variant="borderless" placeholder={defaultName} value={script.name || ''} onChange={event => updateScript({ name: event.target.value })} onBlur={() => { if (!(script.name || '').trim()) updateScript({ name: defaultName }); setIsEditingName(false); }} onPressEnter={event => event.currentTarget.blur()} style={{ margin: 10, width: 'calc(100% - 20px)' }} /> : <Typography.Title level={5} onClick={() => setIsEditingName(true)} style={{ margin: 0, cursor: 'pointer', padding: 10 }}>{displayedName}</Typography.Title>}<Divider style={{ margin: 0 }} /><Space direction="vertical" size={4} style={{ width: '100%', padding: '8px 10px', boxSizing: 'border-box' }}>
+  return <Content><ScriptParameterContext.Provider value={script.parameters ?? []}><Space direction="vertical" size={0} style={{ width: '100%', minWidth: 0, alignItems: 'stretch' }}><ResourceNameInput name={script.name || ''} defaultName={defaultName} label={defaultName} onChange={name => updateScript({ name })} /><Divider style={{ margin: 0 }} /><Space direction="vertical" size={4} style={{ width: '100%', padding: '8px 10px', boxSizing: 'border-box' }}>
     <Typography.Text type="secondary">{t('scripts.description')}</Typography.Text>
     <Input.TextArea aria-label={t('scripts.description')} placeholder={t('scripts.descriptionPlaceholder')} value={script.description ?? ''} autoSize={{ minRows: 2, maxRows: 6 }} onChange={event => updateScript({ description: event.target.value })} />
-  </Space><ReferenceList locations={locations} onSelect={selectReference} /><Tabs style={{ padding: 10 }} items={[{ key: 'script', label: 'Script', children: <Space direction="vertical" style={{ width: '100%' }}><CollapseEventManager scripts={script.events} onScriptsChange={events => updateScript({ events })} /><SelectNewEvent tabIndex="1" onEventCreated={event => updateScript({ events: [...script.events, event] })} /></Space> }]} /></Space></Content>;
+    <ScriptInputs parameters={script.parameters ?? []} onChange={parameters => updateScript({ parameters })} canRemove={id => !scriptUsesParameter([script.events, ...Object.values(script.eventGraphs ?? {}).map(graph => graph.nodes)], id)} />
+  </Space><AdditionalEventWarnings visibleFields={['events']} value={script} onChange={updateScript} /><ReferenceList sceneNameOnly locations={locations} onSelect={selectReference} /><Tabs style={{ padding: '0 10px 10px' }} items={[{ key: 'script', label: 'Script', children: <Space direction="vertical" style={{ width: '100%' }}><CollapseEventManager scripts={script.events} onScriptsChange={events => updateScript({ events })} /><SelectNewEvent tabIndex="1" onEventCreated={event => updateScript({ events: [...script.events, event] })} /></Space> }]} /></Space></ScriptParameterContext.Provider></Content>;
 };
 
-const SceneObjectSettingsForm: React.FC<{ sceneId: string; type: 'actor' | 'trigger'; objectId: string; availableSprites?: any[] }> = ({ sceneId, type, objectId, availableSprites = [] }) => {
-const { scenes, setScenes, setElementSelected, spriteResources, settingUtils } = useAppContexts();
+const ActorSpriteSheetPicker: React.FC<{ tilesets: any[]; spriteFiles: any[]; spriteId?: string; warning?: boolean; onSpriteSelected: (spriteId?: string) => void }> = ({ tilesets, spriteFiles, spriteId, warning, onSpriteSelected }) => {
+  const { t } = useI18n();
+  const { token } = theme.useToken();
+  const { message } = App.useApp();
+  const { spriteResources, setSpriteResources } = useAppContexts();
+  const [tilesetId, setTilesetId] = useState<string>();
+  const [open, setOpen] = useState(false);
+  const [tileSize, setTileSize] = useState<8 | 16 | 32>(16);
+  const [zoom, setZoom] = useState(100);
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [crop, setCrop] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const pickerViewportRef = useRef<HTMLDivElement | null>(null);
+  const pickerPanStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
+  const cropDragRef = useRef<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
+  const [isPanningPicker, setIsPanningPicker] = useState(false);
+  const tileset = tilesets.find(item => item.id === tilesetId);
+  const displayScale = zoom / 100;
+  const selectedCompositeParts = crop ? (() => {
+    const shapes = [[8, 8], [16, 8], [8, 16], [16, 16], [32, 8], [8, 32], [32, 16], [16, 32], [32, 32], [64, 32], [32, 64], [64, 64]];
+    const shape = shapes.slice().sort((a, b) => {
+      const ac = Math.ceil(crop.width / a[0]) * Math.ceil(crop.height / a[1]);
+      const bc = Math.ceil(crop.width / b[0]) * Math.ceil(crop.height / b[1]);
+      return ac * a[0] * a[1] - bc * b[0] * b[1] || ac - bc || b[0] * b[1] - a[0] * a[1];
+    })[0];
+    return Math.ceil(crop.width / shape[0]) * Math.ceil(crop.height / shape[1]);
+  })() : 0;
+  const selectedCompositePixels = crop ? (() => {
+    const shapes = [[8, 8], [16, 8], [8, 16], [16, 16], [32, 8], [8, 32], [32, 16], [16, 32], [32, 32], [64, 32], [32, 64], [64, 64]];
+    const shape = shapes.slice().sort((a, b) => {
+      const ac = Math.ceil(crop.width / a[0]) * Math.ceil(crop.height / a[1]);
+      const bc = Math.ceil(crop.width / b[0]) * Math.ceil(crop.height / b[1]);
+      return ac * a[0] * a[1] - bc * b[0] * b[1] || ac - bc || b[0] * b[1] - a[0] * a[1];
+    })[0];
+    return Math.ceil(crop.width / shape[0]) * Math.ceil(crop.height / shape[1]) * shape[0] * shape[1];
+  })() : 0;
+  const displayWidth = imageSize.width * displayScale;
+
+  useEffect(() => {
+    setImageSize({ width: 0, height: 0 });
+    setCrop(null);
+    setZoom(100);
+    if (pickerViewportRef.current) {
+      pickerViewportRef.current.scrollLeft = 0;
+      pickerViewportRef.current.scrollTop = 0;
+    }
+  }, [tilesetId]);
+
+  const setPickerTileSize = (size: 8 | 16 | 32) => {
+    setTileSize(size);
+    setCrop(null);
+  };
+
+  const handlePickerWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (!event.ctrlKey) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setZoom(previous => Math.max(50, Math.min(400, previous + (event.deltaY < 0 ? 25 : -25))));
+  };
+
+  const handlePickerPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 1) return;
+    const viewport = pickerViewportRef.current;
+    if (!viewport) return;
+    event.preventDefault();
+    pickerPanStartRef.current = { x: event.clientX, y: event.clientY, scrollLeft: viewport.scrollLeft, scrollTop: viewport.scrollTop };
+    setIsPanningPicker(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePickerPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = pickerPanStartRef.current;
+    const viewport = pickerViewportRef.current;
+    if (!start || !viewport) return;
+    viewport.scrollLeft = start.scrollLeft - (event.clientX - start.x);
+    viewport.scrollTop = start.scrollTop - (event.clientY - start.y);
+  };
+
+  const stopPickerPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!pickerPanStartRef.current) return;
+    pickerPanStartRef.current = null;
+    setIsPanningPicker(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const cropCellAt = (clientX: number, clientY: number) => {
+    if (!imageRef.current || imageSize.width < tileSize || imageSize.height < tileSize) return;
+    const bounds = imageRef.current.getBoundingClientRect();
+    const x = (clientX - bounds.left) * imageSize.width / bounds.width;
+    const y = (clientY - bounds.top) * imageSize.height / bounds.height;
+    return {
+      x: Math.max(0, Math.min(Math.ceil(imageSize.width / tileSize) - 1, Math.floor(x / tileSize))),
+      y: Math.max(0, Math.min(Math.ceil(imageSize.height / tileSize) - 1, Math.floor(y / tileSize))),
+    };
+  };
+
+  const updateCropFromDrag = (endX: number, endY: number) => {
+    const start = cropDragRef.current;
+    if (!start) return;
+    const left = Math.min(start.startX, endX) * tileSize;
+    const top = Math.min(start.startY, endY) * tileSize;
+    const right = Math.min(imageSize.width, (Math.max(start.startX, endX) + 1) * tileSize);
+    const bottom = Math.min(imageSize.height, (Math.max(start.startY, endY) + 1) * tileSize);
+    setCrop({ x: left, y: top, width: right - left, height: bottom - top });
+  };
+
+  const handleCropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const cell = cropCellAt(event.clientX, event.clientY);
+    if (!cell) return;
+    event.preventDefault();
+    cropDragRef.current = { startX: cell.x, startY: cell.y, endX: cell.x, endY: cell.y };
+    updateCropFromDrag(cell.x, cell.y);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleCropPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!cropDragRef.current) return;
+    const cell = cropCellAt(event.clientX, event.clientY);
+    if (!cell) return;
+    cropDragRef.current.endX = cell.x;
+    cropDragRef.current.endY = cell.y;
+    updateCropFromDrag(cell.x, cell.y);
+  };
+
+  const handleCropPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    cropDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const createSpriteFromCrop = async () => {
+    const image = imageRef.current;
+    if (!tileset || !image || !crop) return;
+    setSaving(true);
+    try {
+      const canvasWidth = crop.width === 8 && crop.height === 8 && tileSize === 8 ? 8 : crop.width;
+      const canvasHeight = crop.width === 8 && crop.height === 8 && tileSize === 8 ? 16 : crop.height;
+      const canvas = document.createElement('canvas');
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Unable to create sprite image.');
+      context.clearRect(0, 0, canvasWidth, canvasHeight);
+      const destinationY = canvasHeight === 16 && crop.width === 8 && crop.height === 8 ? 4 : 0;
+      context.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, destinationY, crop.width, crop.height);
+      const baseName = tileset.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_') || 'tileset';
+      const filename = `${baseName}_actor_${canvasWidth}x${canvasHeight}_${crop.x}_${crop.y}_${uuidv4().slice(0, 8)}.png`;
+      const result = await window.electronAPI.saveGeneratedSpriteImage(filename, canvas.toDataURL('image/png').split(',')[1]);
+      if (result?.status !== 'success') throw new Error(result?.message ?? 'Unable to save sprite image.');
+
+      const frameId = uuidv4();
+      const pieceId = uuidv4();
+      const animation = {
+        id: 'idle', name: 'Idle', type: 'idle', frames: [],
+        canvasFrames: [{ id: frameId, width: canvasWidth, height: canvasHeight, pieces: [{ id: pieceId, sourceX: 0, sourceY: 0, width: canvasWidth, height: canvasHeight, x: 0, y: 0 }] }],
+      };
+      const spriteId = filename.replace(/\.[^/.]+$/, '');
+      const resource: ISpriteSettings = {
+        id: spriteId, name: `${tileset.name.replace(/\.[^/.]+$/, '')} ${tileSize}x${tileSize}`, filename,
+        _resourceType: 'sprite', _saved: false, _deleted: false, _pendingAssetRefresh: true,
+        imageWidth: canvasWidth, imageHeight: canvasHeight,
+        playerAnimationStripOrientation: 'horizontal', playerFrameWidth: canvasWidth, playerFrameHeight: canvasHeight,
+        playerFramesPerDirection: 1, playerAnimSpeed: 6, playerIdleFrame: 0,
+        playerCanvasOriginX: Math.floor(canvasWidth / 2), playerCanvasOriginY: Math.floor(canvasHeight / 2),
+        playerCollisionX: 0, playerCollisionY: 0, playerCollisionWidth: 16, playerCollisionHeight: 8,
+        playerAnimations: [animation],
+        playerAnimationStates: [{ id: 'idle', name: 'Idle', type: 'fixed-direction', flipRightToCreateLeftFacingFrames: false, animations: [animation] }],
+      };
+      setSpriteResources(previous => [...previous.filter(sprite => sprite.id !== spriteId), resource]);
+      onSpriteSelected(spriteId);
+      window.dispatchEvent(new Event('gba-studio:assets-reloaded'));
+      setOpen(false);
+    } catch (error) {
+      console.error('Unable to create actor sprite from tileset:', error);
+      message.error(t('actor.sprite.createFailed'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return <>
+    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+      <Typography.Text>Sprite Sheet</Typography.Text>
+      <WarningField warning={!!warning} message={t('events.missingReference')}>
+      <Select
+        aria-label="Sprite Sheet"
+        status={warning ? 'warning' : undefined}
+        style={{ width: '100%' }}
+        value={spriteId}
+        placeholder={t('actor.sprite.selectSprite')}
+        allowClear
+        showSearch
+        optionFilterProp="label"
+        onChange={value => {
+          if (value === '__CREATE_SPRITE_FROM_TILESET__') {
+            setOpen(true);
+            return;
+          }
+          onSpriteSelected(value);
+        }}
+      >
+        <Select.Option key="create-from-tileset" value="__CREATE_SPRITE_FROM_TILESET__" label={t('actor.sprite.chooseTileset')}>
+          <span style={{ color: token.colorPrimary }}>{t('actor.sprite.chooseTileset')}</span>
+        </Select.Option>
+        {spriteResources.filter(sprite => !sprite._deleted && spriteFiles.some(file => file.id.toLowerCase() === sprite.id.toLowerCase() || file.name.toLowerCase() === String(sprite.filename ?? '').toLowerCase())).map(sprite => {
+          const file = spriteFiles.find(item => item.id === sprite.id);
+          const filename = sprite.filename ?? file?.name;
+          const searchable = `${sprite.name} ${sprite.id} ${filename ?? ''}`;
+          return <Select.Option key={sprite.id} value={sprite.id} label={searchable}>
+            <PlayerSpriteOption name={sprite.name} path={file?.path ?? ''} />
+          </Select.Option>;
+        })}
+      </Select>
+      </WarningField>
+    </Space>
+    <Modal title={t('actor.sprite.createTitle')} open={open} width={760} onCancel={() => setOpen(false)} onOk={() => void createSpriteFromCrop()} okText={t('actor.sprite.create')} confirmLoading={saving} okButtonProps={{ disabled: !tileset || !crop || selectedCompositeParts > 16 || selectedCompositePixels > 32 * 1024 }}>
+      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <Select aria-label={t('actor.sprite.tileset')} placeholder={t('actor.sprite.selectTileset')} showSearch optionFilterProp="label" value={tilesetId} onChange={setTilesetId} options={tilesets.map(item => ({ value: item.id, label: item.name }))} />
+        <Flex align="center" gap={12}>
+          <Typography.Text>{t('actor.sprite.selectionSize')}</Typography.Text>
+          <Segmented size="small" value={tileSize} options={[8, 16, 32].map(size => ({ value: size, label: `${size}×${size}` }))} onChange={value => setPickerTileSize(value as 8 | 16 | 32)} />
+        </Flex>
+        <div ref={pickerViewportRef} onWheel={handlePickerWheel} onAuxClick={event => { if (event.button === 1) event.preventDefault(); }} style={{ height: 280, minHeight: 280, maxHeight: 280, flex: '0 0 280px', boxSizing: 'border-box', overflow: 'auto', padding: 4, border: `1px solid ${token.colorBorderSecondary}`, borderRadius: token.borderRadius, background: token.colorBgContainer, cursor: isPanningPicker ? 'grabbing' : 'default', touchAction: 'none' }}>
+          {tileset ? <div onPointerDown={event => event.button === 1 ? handlePickerPointerDown(event) : handleCropPointerDown(event)} onPointerMove={event => { handlePickerPointerMove(event); handleCropPointerMove(event); }} onPointerUp={event => { stopPickerPan(event); handleCropPointerUp(event); }} onPointerCancel={event => { stopPickerPan(event); handleCropPointerUp(event); }} onContextMenu={event => event.preventDefault()} title={t('actor.sprite.pickerTooltip')} style={{ position: 'relative', display: 'block', width: displayWidth || undefined, height: imageSize.height ? imageSize.height * displayScale : undefined, cursor: isPanningPicker ? 'grabbing' : 'crosshair', lineHeight: 0, touchAction: 'none', userSelect: 'none' }}>
+            <img ref={imageRef} src={tileset.path} alt={tileset.name} onLoad={event => { const image = event.currentTarget; setImageSize({ width: image.naturalWidth, height: image.naturalHeight }); }} style={{ display: 'block', width: displayWidth || 'auto', imageRendering: 'pixelated' }} />
+            {imageSize.width > 0 && <svg aria-hidden="true" viewBox={`0 0 ${imageSize.width} ${imageSize.height}`} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+              {Array.from({ length: Math.floor(imageSize.width / tileSize) }, (_, index) => <line key={`v-${index}`} x1={(index + 1) * tileSize} y1="0" x2={(index + 1) * tileSize} y2={imageSize.height} stroke={token.colorBgContainer} strokeWidth="1" vectorEffect="non-scaling-stroke" />)}
+              {Array.from({ length: Math.floor(imageSize.height / tileSize) }, (_, index) => <line key={`h-${index}`} x1="0" y1={(index + 1) * tileSize} x2={imageSize.width} y2={(index + 1) * tileSize} stroke={token.colorBgContainer} strokeWidth="1" vectorEffect="non-scaling-stroke" />)}
+            </svg>}
+            {crop && <span style={{ position: 'absolute', left: crop.x * displayScale, top: crop.y * displayScale, width: crop.width * displayScale, height: crop.height * displayScale, outline: `2px solid ${token.colorPrimary}`, background: 'rgba(22,119,255,.15)', pointerEvents: 'none' }} />}
+          </div> : <Flex style={{ width: '100%', height: '100%' }} align="center" justify="center"><Typography.Text type="secondary">{t('actor.sprite.selectTileset')}</Typography.Text></Flex>}
+        </div>
+        {tileset && imageSize.width > 0 && (imageSize.width < tileSize || imageSize.height < tileSize) && <Typography.Text type="danger">{t('actor.sprite.tilesetTooSmall')}</Typography.Text>}
+        {selectedCompositeParts > 16 && <Typography.Text type="danger">{t('actor.sprite.compositeLimit', { count: selectedCompositeParts })}</Typography.Text>}
+        {selectedCompositePixels > 32 * 1024 && <Typography.Text type="danger">{t('actor.sprite.vramLimit', { size: Math.ceil(selectedCompositePixels / 1024) })}</Typography.Text>}
+        <Typography.Text type="secondary">{tileSize === 8 ? t('actor.sprite.smallCanvasHint') : t('actor.sprite.selectCropHint')}</Typography.Text>
+      </Space>
+    </Modal>
+  </>;
+};
+
+const attentionLabel = (label: React.ReactNode, count: number) => <AttentionLabel label={label} count={count} />;
+
+const SceneObjectSettingsForm: React.FC<{ sceneId: string; type: 'actor' | 'trigger'; objectId: string; availableSprites?: any[]; availableTilesets?: any[] }> = ({ sceneId, type, objectId, availableSprites = [], availableTilesets = [] }) => {
+const { scenes, setScenes, prefabs, setPrefabs, setElementSelected, settingUtils, setSettingUtils } = useAppContexts();
+  const nameHoverStyle = useNameHoverStyle();
+  const { modal } = App.useApp();
+  const { t } = useI18n();
   const [isEditingName, setIsEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const cancelNameOnBlur = useRef(false);
+  const positionGrid = useSceneObjectSnapSize();
   const scene = scenes.find(item => item.id === sceneId);
   const object = type === 'actor' ? scene?.actors?.find(item => item.id === objectId) : scene?.triggers?.find(item => item.id === objectId);
   if (!scene || !object) return null;
+  const label = type === 'actor' ? 'Actor' : 'Trigger';
+  const linkedPrefab = object.prefabId ? prefabs.prefabs.find(item => item.id === object.prefabId && item.type === type) : undefined;
+  const prefabData: any = linkedPrefab ? type === 'actor' ? linkedPrefab.actor : linkedPrefab.trigger : {};
+  const eventKeys = type === 'actor' ? ['onInteractScript', 'onInitScript', 'onUpdateScript'] : ['onEnterScript', 'onLeaveScript', 'onInteractScript', 'onInitScript', 'onUpdateScript'];
+  const effectiveObject: any = linkedPrefab ? { ...object, ...(type === 'actor' && !object.prefabEventsDetached ? { spriteId: prefabData.spriteId, keepRunningWhileOffscreen: prefabData.keepRunningWhileOffscreen === true } : {}), ...(!object.prefabEventsDetached ? Object.fromEntries(eventKeys.map(key => [key, prefabData[key] ?? []])) : {}) } : object;
+  const prefabEventsLocked = !!linkedPrefab && object.prefabEditable !== true && object.prefabEventsDetached !== true;
+  const scriptTabLabel = (label: string, events: IScriptsElement[] | undefined) => attentionLabel(label, countEventAttention(events ?? []));
   const update = (changes: Record<string, unknown>) => {
     const key = type === 'actor' ? 'actors' : 'triggers';
-    const values = (scene[key] ?? []).map((item: any) => item.id === objectId ? { ...item, ...changes } : item);
-    const updated = { ...scene, [key]: values, _saved: false };
+    const sharedKeys = type === 'actor' ? ['spriteId', 'keepRunningWhileOffscreen', ...eventKeys] : eventKeys;
+    if (linkedPrefab && object.prefabEditable !== true) {
+      changes = Object.fromEntries(Object.entries(changes).filter(([field]) =>
+        !sharedKeys.includes(field) || (object.prefabEventsDetached === true && (field.endsWith('Script') || field === 'keepRunningWhileOffscreen'))));
+      if (!Object.keys(changes).length) return;
+    }
+    const sharedChanges = Object.fromEntries(Object.entries(changes).filter(([field]) => sharedKeys.includes(field)));
+    const prefabChanges = Object.fromEntries(Object.entries(sharedChanges).filter(([field]) => !(object.prefabEventsDetached && field.endsWith('Script'))));
+    const canEditPrefab = !!linkedPrefab && object.prefabEditable === true && Object.keys(prefabChanges).length > 0;
+    if (canEditPrefab) {
+      const prefabField = type === 'actor' ? 'actor' : 'trigger';
+      setPrefabs(previous => ({ ...previous, prefabs: previous.prefabs.map(item => item.id === linkedPrefab!.id ? { ...item, [prefabField]: { ...item[prefabField], ...prefabChanges } } : item), _saved: false }));
+    }
+    let updated: any;
+    setScenes(previous => previous.map(currentScene => {
+      if (currentScene.id !== sceneId && !canEditPrefab) return currentScene;
+      const values = ((currentScene as any)[key] ?? []).map((item: any) => {
+        const isCurrent = currentScene.id === sceneId && item.id === objectId;
+        const isLinkedInstance = canEditPrefab && item.prefabId === linkedPrefab!.id && item.type !== 'other';
+        if (!isCurrent && !isLinkedInstance) return item;
+        const next = { ...item, ...(isCurrent ? changes : {}), ...(isLinkedInstance ? Object.fromEntries(Object.entries(prefabChanges).filter(([field]) => field === 'spriteId' || !field.endsWith('Script') || !item.prefabEventsDetached)) : {}) };
+        if (isCurrent) updated = { ...currentScene, [key]: (currentScene as any)[key].map((entry: any) => entry.id === objectId ? next : entry), _saved: false };
+        return next;
+      });
+      if (!canEditPrefab || currentScene.id === sceneId) return { ...currentScene, [key]: values, _saved: false };
+      const sceneHasUpdatedPrefabInstance = values.some((item: any, index: number) => item !== ((currentScene as any)[key] ?? [])[index]);
+      return sceneHasUpdatedPrefabInstance ? { ...currentScene, [key]: values, _saved: false } : currentScene;
+    }));
+    if (!updated) updated = { ...scene, [key]: (scene[key] ?? []).map((item: any) => item.id === objectId ? { ...item, ...changes } : item), _saved: false };
+    setElementSelected(updated);
+  };
+  const getEventList = (value: unknown): any[] => Array.isArray(value) ? value : [];
+  const cloneEventList = (events: any[]): any[] => events.map(event => ({ ...event, id: uuidv4(), args: event.args ? { ...event.args } : event.args, ...(event.children ? { children: { ...event.children, then: cloneEventList(event.children.then ?? []), ...(event.children.else ? { else: cloneEventList(event.children.else) } : {}) } } : {}) }));
+  const unlinkPrefabEvents = () => {
+    const key = type === 'actor' ? 'actors' : 'triggers';
+    const changes = { prefabEventsDetached: true, ...Object.fromEntries(eventKeys.map(field => [field, cloneEventList(effectiveObject[field] ?? [])])) };
+    const updated = { ...scene, [key]: (scene[key] ?? []).map((item: any) => item.id === objectId ? { ...item, ...changes } : item), _saved: false };
     setScenes(previous => previous.map(item => item.id === sceneId ? updated : item));
     setElementSelected(updated);
   };
-  const label = type === 'actor' ? 'Actor' : 'Trigger';
+  const convertToPrefab = () => {
+    if (linkedPrefab) return;
+    const id = uuidv4();
+    const name = object.name || `${type === 'actor' ? t('prefabs.addActor') : t('prefabs.addTrigger')} ${prefabs.prefabs.filter(item => item.type === type).length + 1}`;
+    const prefab: IPrefabDefinition = type === 'actor'
+      ? { id, name, type, folderId: 'prefab-folder-actors', actor: { keepRunningWhileOffscreen: (object as any).keepRunningWhileOffscreen === true, spriteId: (object as any).spriteId, moveSpeed: (object as any).moveSpeed, animationSpeed: (object as any).animationSpeed, onInteractScript: (object as any).onInteractScript ?? [], onInitScript: (object as any).onInitScript ?? [], onUpdateScript: (object as any).onUpdateScript ?? [] } }
+      : { id, name, type, folderId: 'prefab-folder-triggers', trigger: { onEnterScript: (object as any).onEnterScript ?? [], onLeaveScript: (object as any).onLeaveScript ?? [], onInteractScript: (object as any).onInteractScript ?? [], onInitScript: (object as any).onInitScript ?? [], onUpdateScript: (object as any).onUpdateScript ?? [] } };
+    const key = type === 'actor' ? 'actors' : 'triggers';
+    const updated = { ...scene, [key]: (scene[key] ?? []).map((item: any) => item.id === objectId ? { ...item, prefabId: id } : item), _saved: false };
+    setPrefabs(previous => ({ ...previous, prefabs: [...previous.prefabs, prefab], _saved: false }));
+    setScenes(previous => previous.map(item => item.id === sceneId ? updated : item));
+    setElementSelected(updated);
+  };
+  const copyComponent = () => {
+    const id = uuidv4();
+    const eventFields = type === 'actor' ? ['onInteractScript', 'onInitScript', 'onUpdateScript'] : ['onEnterScript', 'onLeaveScript', 'onInteractScript', 'onInitScript', 'onUpdateScript'];
+    const copy: any = { ...object, id, ...(type === 'actor' ? { actorId: id } : {}), name: `${object.name || label} Copy`, ...Object.fromEntries(eventFields.map(field => [field, cloneEventList(getEventList((object as any)[field] ?? []))])) };
+    const key = type === 'actor' ? 'actors' : 'triggers';
+    const updated = { ...scene, [key]: [...(scene[key] ?? []), copy], _saved: false };
+    setScenes(previous => previous.map(item => item.id === sceneId ? updated : item));
+    setElementSelected(updated);
+    setSettingUtils(previous => ({ ...previous, activeSceneObject: { sceneId, type, id }, activeTriggerId: type === 'trigger' ? id : null }));
+  };
+  const deleteComponent = () => modal.confirm({ title: t('prefabs.deleteComponent'), content: t('prefabs.deleteComponentConfirm', { name: object.name || label }), okText: t('common.delete'), okButtonProps: { danger: true }, onOk: () => {
+    const key = type === 'actor' ? 'actors' : 'triggers';
+    const updated = { ...scene, [key]: (scene[key] ?? []).filter((item: any) => item.id !== objectId), _saved: false };
+    setScenes(previous => previous.map(item => item.id === sceneId ? updated : item));
+    setSettingUtils(previous => previous.activeSceneObject?.sceneId === sceneId && previous.activeSceneObject?.id === objectId ? { ...previous, activeSceneObject: null, activeTriggerId: null } : previous);
+    setElementSelected(updated);
+  } });
+  const componentMenu = { items: [
+    linkedPrefab ? { key: 'editable', label: <Checkbox checked={object.prefabEditable === true} onClick={event => event.stopPropagation()} onChange={event => update({ prefabEditable: event.target.checked })}>{t('prefabs.editableFromScene')}</Checkbox> } : { key: 'convert', label: t('prefabs.convertToPrefab') },
+    { key: 'copy', icon: <CopyOutlined />, label: t('prefabs.copyComponent') },
+    { key: 'delete', danger: true, icon: <DeleteOutlined />, label: t('prefabs.deleteComponent') },
+  ], onClick: ({ key }: { key: string }) => { if (key === 'convert') convertToPrefab(); else if (key === 'copy') copyComponent(); else if (key === 'delete') deleteComponent(); } };
   const snap = (value: number, step: number, offset = 0) => Math.round((value - offset) / step) * step + offset;
-  const positionX = (value: number | null) => {
-    const raw = Math.max(0, value ?? 0);
-    if (type === 'actor') return Math.max(8, snap(raw, 16, 8));
-    const max = Math.max(0, scene.width - (object.width ?? 8));
-    return Math.min(max, snap(raw, 8));
-  };
-  const positionY = (value: number | null) => {
-    const raw = Math.max(0, value ?? 0);
-    if (type === 'actor') return Math.max(4, snap(raw, 8, 4));
-    const max = Math.max(0, scene.height - (object.height ?? 8));
-    return Math.min(max, snap(raw, 8));
-  };
-  const dimension = (value: number | null, minimum: number, maximum: number) => Math.min(maximum, Math.max(minimum, snap(Math.max(minimum, value ?? minimum), 8)));
+  const positionWidth = type === 'actor' ? Math.max(16, object.width ?? 16) : object.width ?? 8;
+  const positionHeight = type === 'actor' ? Math.max(8, object.height ?? scene.gridSize ?? 8) : object.height ?? 8;
+  const centeredPosition = type === 'actor' && object.anchor === 'center';
+  const xBounds = sceneObjectAxisBounds(scene.width, positionWidth, centeredPosition);
+  const yBounds = sceneObjectAxisBounds(scene.height, positionHeight, centeredPosition);
+  const positionX = (value: number | null) => sceneObjectAxisPosition(value ?? xBounds.min, scene.width, positionWidth, centeredPosition, positionGrid);
+  const positionY = (value: number | null) => sceneObjectAxisPosition(value ?? yBounds.min, scene.height, positionHeight, centeredPosition, positionGrid);
+  const dimension = (value: number | null, minimum: number, maximum: number) => Math.min(maximum, Math.max(minimum, snap(Math.max(minimum, typeof value === 'number' ? value : minimum), 8)));
   const triggerMaxWidth = Math.max(8, Math.floor(Math.max(0, scene.width - object.x) / 8) * 8);
   const triggerMaxHeight = Math.max(8, Math.floor(Math.max(0, scene.height - object.y) / 8) * 8);
   const actorMoveSpeed = Number((object as any).moveSpeed ?? 2);
   const actorMoveSpeedIsCustom = !actorMoveSpeedOptions.some(option => option.value === actorMoveSpeed);
   const defaultName = `${label} ${(scene[type === 'actor' ? 'actors' : 'triggers']?.findIndex((item: any) => item.id === objectId) ?? 0) + 1}`;
   const restoreDefaultName = () => {
-    if (!(object.name ?? '').trim()) update({ name: defaultName });
+    if (cancelNameOnBlur.current) { cancelNameOnBlur.current = false; setNameDraft(object.name ?? ''); setIsEditingName(false); return; }
+    const name = nameDraft.trim() ? nameDraft : defaultName;
+    if (name !== object.name) update({ name });
     setIsEditingName(false);
   };
   return <Content style={{ padding: 10 }}>
-    {isEditingName ? <Input autoFocus variant="borderless" value={object.name ?? ''} placeholder={defaultName} onChange={event => update({ name: event.target.value })} onBlur={restoreDefaultName} onPressEnter={restoreDefaultName} /> : <Typography.Title level={5} onClick={() => setIsEditingName(true)} style={{ marginTop: 0, cursor: 'text' }}>{object.name || defaultName}</Typography.Title>}
+    {isEditingName ? <Input autoFocus variant="borderless" value={nameDraft} placeholder={defaultName} onChange={event => setNameDraft(event.target.value)} onBlur={restoreDefaultName} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancelNameOnBlur.current = true; event.currentTarget.blur(); } }} onPressEnter={event => event.currentTarget.blur()} /> : <Flex align="center" justify="space-between" gap={8}><Typography.Title className="editable-name-title" level={5} onClick={() => { setNameDraft(object.name ?? ''); setIsEditingName(true); }} style={{ ...nameHoverStyle, marginTop: 0, marginBottom: 0, cursor: 'text', flex: 1 }}>{object.name || defaultName}</Typography.Title><Dropdown menu={componentMenu} trigger={['click']}><Button type="text" aria-label={t('prefabs.componentActions')} icon={<SettingOutlined />} onClick={event => event.stopPropagation()} /></Dropdown></Flex>}
     <Divider style={{ margin: '8px 0' }} />
     <Space direction="vertical" style={{ width: '100%' }}>
       <Typography.Paragraph style={{ marginBottom: 8 }}>{type === 'actor' ? 'Start Position' : 'Position'}</Typography.Paragraph>
       <Flex gap={8}>
-        <InputNumber addonBefore="X" min={type === 'actor' ? 8 : 0} step={type === 'actor' ? 16 : 8} value={object.x} onChange={value => update({ x: positionX(value) })} style={{ flex: 1, minWidth: 0 }} />
-        <InputNumber addonBefore="Y" min={type === 'actor' ? 4 : 0} step={8} value={object.y} onChange={value => update({ y: positionY(value) })} style={{ flex: 1, minWidth: 0 }} />
+        <InputNumber addonBefore="X" min={xBounds.min} max={xBounds.max} step={positionGrid} value={object.x} onChange={value => update({ x: positionX(typeof value === 'number' ? value : null) })} style={{ flex: 1, minWidth: 0 }} />
+        <InputNumber addonBefore="Y" min={yBounds.min} max={yBounds.max} step={positionGrid} value={object.y} onChange={value => update({ y: positionY(typeof value === 'number' ? value : null) })} style={{ flex: 1, minWidth: 0 }} />
       </Flex>
       {type === 'actor' && <>
         <Space direction="vertical" size={6} style={{ width: '100%' }}>
           <Typography.Text>Direction</Typography.Text>
-              <Radio.Group buttonStyle="solid" style={{ width: '100%', display: 'flex' }} value={(object as any).direction ?? 'right'} onChange={event => update({ direction: event.target.value })}>
+              <DirectionRadioGroup buttonStyle="solid" style={{ width: '100%', display: 'flex' }} value={(object as any).direction ?? 'right'} onChange={event => update({ direction: event.target.value })}>
             <Radio.Button value="left" style={{ flex: 1, textAlign: 'center' }}><CaretLeftFilled /></Radio.Button>
             <Radio.Button value="up" style={{ flex: 1, textAlign: 'center' }}><CaretUpFilled /></Radio.Button>
             <Radio.Button value="down" style={{ flex: 1, textAlign: 'center' }}><CaretDownFilled /></Radio.Button>
             <Radio.Button value="right" style={{ flex: 1, textAlign: 'center' }}><CaretRightFilled /></Radio.Button>
-          </Radio.Group>
+          </DirectionRadioGroup>
         </Space>
+        {linkedPrefab && <Flex align="center" gap={6} wrap="wrap"><Tag color="purple">{t('prefabs.linkedTo', { name: linkedPrefab.name })}</Tag>{!object.prefabEventsDetached && <Tooltip title={t('prefabs.unlinkEvents')}><Button size="small" type="text" icon={<ArrowRightOutlined />} aria-label={t('prefabs.unlinkEvents')} onClick={unlinkPrefabEvents} /></Tooltip>}</Flex>}
         <Divider style={{ margin: '12px 0' }} />
         <Flex gap={8} style={{ width: '100%' }}>
           <Space direction="vertical" size={2} style={{ flex: 1, minWidth: 0 }}>
@@ -298,45 +621,103 @@ const { scenes, setScenes, setElementSelected, spriteResources, settingUtils } =
           </Space>
         </Flex>
         <Content>
-          <Typography.Text>Sprite Sheet</Typography.Text>
-          <Select title="Select actor sprite sheet" placeholder="Select sprite" allowClear showSearch optionFilterProp="title" filterOption={(input, option) => {
-            const data = (option as any)?.data ?? option;
-            const searchableText = data?.title ?? data?.value ?? '';
-            return String(searchableText).toLowerCase().includes(input.trim().toLowerCase());
-          }} style={{ width: '100%' }} value={(object as any).spriteId} onChange={spriteId => update({ spriteId })}>
-            {spriteResources.map(sprite => {
-              const file = availableSprites.find(item => item.id === sprite.id);
-              const filename = sprite.filename ?? file?.name;
-              const imagePath = file?.path ?? '';
-              const searchText = `${sprite.name} ${sprite.id} ${filename ?? ''}`;
-              return <Select.Option key={sprite.id} value={sprite.id} title={searchText} label={searchText}>
-                <PlayerSpriteOption name={sprite.name} path={imagePath} />
-              </Select.Option>;
-            })}
-          </Select>
+          <fieldset disabled={!!linkedPrefab && object.prefabEditable !== true} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}><ActorSpriteSheetPicker tilesets={availableTilesets} spriteFiles={availableSprites} warning={hasAssetReferenceWarning(effectiveObject, 'spriteId')} spriteId={effectiveObject.spriteId} onSpriteSelected={spriteId => update({ spriteId })} /></fieldset>
         </Content>
       </>}
       {type === 'actor' ? (
-        <Typography.Text type="secondary">Size: 16 × 8 px</Typography.Text>
+        <Checkbox checked={(object as ISceneActor).showCollider === true} onChange={event => update({ showCollider: event.target.checked })}>{t('events.actor.showColliders')}</Checkbox>
       ) : (
         <>
           <Typography.Paragraph style={{ margin: '8px 0' }}>Size</Typography.Paragraph>
           <Flex gap={8}>
-            <InputNumber addonBefore="W" min={8} max={triggerMaxWidth} step={8} value={object.width} onChange={value => update({ width: dimension(value, 8, triggerMaxWidth) })} style={{ flex: 1, minWidth: 0 }} />
-            <InputNumber addonBefore="H" min={8} max={triggerMaxHeight} step={8} value={object.height} onChange={value => update({ height: dimension(value, 8, triggerMaxHeight) })} style={{ flex: 1, minWidth: 0 }} />
+            <InputNumber addonBefore="W" min={8} max={triggerMaxWidth} step={8} value={object.width} onChange={value => update({ width: dimension(typeof value === 'number' ? value : null, 8, triggerMaxWidth) })} style={{ flex: 1, minWidth: 0 }} />
+            <InputNumber addonBefore="H" min={8} max={triggerMaxHeight} step={8} value={object.height} onChange={value => update({ height: dimension(typeof value === 'number' ? value : null, 8, triggerMaxHeight) })} style={{ flex: 1, minWidth: 0 }} />
           </Flex>
         </>
       )}
-      {type === 'actor' && <Tabs size="small" items={[
-        { key: 'interact', label: 'On Interact', children: <><CollapseEventManager scripts={(object as any).onInteractScript ?? []} onScriptsChange={events => update({ onInteractScript: events })} /><SelectNewEvent compact showFlowButton={false} onEventCreated={event => update({ onInteractScript: [...((object as any).onInteractScript ?? []), event] })} /></> },
-        { key: 'init', label: 'On Init', children: <><CollapseEventManager scripts={(object as any).onInitScript ?? []} onScriptsChange={events => update({ onInitScript: events })} /><SelectNewEvent compact showFlowButton={false} onEventCreated={event => update({ onInitScript: [...((object as any).onInitScript ?? []), event] })} /></> },
-        { key: 'update', label: 'On Update', children: <><CollapseEventManager scripts={(object as any).onUpdateScript ?? []} onScriptsChange={events => update({ onUpdateScript: events })} /><SelectNewEvent compact showFlowButton={false} onEventCreated={event => update({ onUpdateScript: [...((object as any).onUpdateScript ?? []), event] })} /></> },
-      ]} />}
-      {type === 'trigger' && <><Checkbox checked={object.enabled !== false} onChange={event => update({ enabled: event.target.checked })}>Enabled</Checkbox><Tabs size="small" items={[
-        { key: 'enter', label: 'On Enter', children: <Space direction="vertical" size="small" style={{ width: '100%' }}><CollapseEventManager scripts={object.onEnterScript} onScriptsChange={events => update({ onEnterScript: events })} /><div style={{ paddingTop: 8 }}><SelectNewEvent compact showFlowButton={false} onEventCreated={event => update({ onEnterScript: [...(object.onEnterScript ?? []), event] })} /></div></Space> },
-        { key: 'leave', label: 'On Leave', children: <Space direction="vertical" size="small" style={{ width: '100%' }}><CollapseEventManager scripts={object.onLeaveScript} onScriptsChange={events => update({ onLeaveScript: events })} /><div style={{ paddingTop: 8 }}><SelectNewEvent compact showFlowButton={false} onEventCreated={event => update({ onLeaveScript: [...(object.onLeaveScript ?? []), event] })} /></div></Space> },
-      ]} /></>}
+      {type === 'actor' && <fieldset {...{ inert: prefabEventsLocked ? '' : undefined }} aria-disabled={prefabEventsLocked} disabled={prefabEventsLocked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}><Tabs key={settingUtils.referenceTarget?.requestId ?? objectId} defaultActiveKey={settingUtils.referenceTarget?.tab ?? 'interact'} size="small" items={[
+        { key: 'interact', label: scriptTabLabel('On Interact', getEventList(effectiveObject.onInteractScript)), children: <><CollapseEventManager storageKey="onInteractScript" scripts={getEventList(effectiveObject.onInteractScript)} onScriptsChange={events => update({ onInteractScript: events })} /><SelectNewEvent compact showFlowButton={false} onEventCreated={event => update({ onInteractScript: [...getEventList(effectiveObject.onInteractScript), event] })} /></> },
+        { key: 'init', label: scriptTabLabel('On Init', getEventList(effectiveObject.onInitScript)), children: <><CollapseEventManager storageKey="onInitScript" scripts={getEventList(effectiveObject.onInitScript)} onScriptsChange={events => update({ onInitScript: events })} /><SelectNewEvent compact showFlowButton={false} onEventCreated={event => update({ onInitScript: [...getEventList(effectiveObject.onInitScript), event] })} /></> },
+        { key: 'update', label: scriptTabLabel('On Update', getEventList(effectiveObject.onUpdateScript)), children: <><ActorOffscreenControl value={effectiveObject.keepRunningWhileOffscreen} onChange={keepRunningWhileOffscreen => update({ keepRunningWhileOffscreen })} /><CollapseEventManager storageKey="onUpdateScript" scripts={getEventList(effectiveObject.onUpdateScript)} onScriptsChange={events => update({ onUpdateScript: events })} /><SelectNewEvent compact showFlowButton={false} onEventCreated={event => update({ onUpdateScript: [...getEventList(effectiveObject.onUpdateScript), event] })} /></> },
+      ]} /></fieldset>}
+      {type === 'trigger' && <><Checkbox checked={object.enabled !== false} onChange={event => update({ enabled: event.target.checked })}>{t('prefabs.enabled')}</Checkbox>{linkedPrefab && <Flex align="center" gap={6}><Tag color="purple">{t('prefabs.linkedTo', { name: linkedPrefab.name })}</Tag>{!object.prefabEventsDetached && <Button size="small" type="text" icon={<ArrowRightOutlined />} aria-label={t('prefabs.unlinkEvents')} title={t('prefabs.unlinkEvents')} onClick={unlinkPrefabEvents} />}</Flex>}<fieldset {...{ inert: prefabEventsLocked ? '' : undefined }} aria-disabled={prefabEventsLocked} disabled={prefabEventsLocked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}><Tabs key={settingUtils.referenceTarget?.requestId ?? objectId} defaultActiveKey={settingUtils.referenceTarget?.tab ?? 'enter'} size="small" items={[
+        { key: 'enter', label: scriptTabLabel('On Enter', getEventList(effectiveObject.onEnterScript)), children: <Space direction="vertical" size="small" style={{ width: '100%' }}><CollapseEventManager storageKey="onEnterScript" scripts={getEventList(effectiveObject.onEnterScript)} onScriptsChange={events => update({ onEnterScript: events })} /><div style={{ paddingTop: 8 }}><SelectNewEvent compact showFlowButton={false} onEventCreated={event => update({ onEnterScript: [...getEventList(effectiveObject.onEnterScript), event] })} /></div></Space> },
+        { key: 'leave', label: scriptTabLabel('On Leave', getEventList(effectiveObject.onLeaveScript)), children: <Space direction="vertical" size="small" style={{ width: '100%' }}><CollapseEventManager storageKey="onLeaveScript" scripts={getEventList(effectiveObject.onLeaveScript)} onScriptsChange={events => update({ onLeaveScript: events })} /><div style={{ paddingTop: 8 }}><SelectNewEvent compact showFlowButton={false} onEventCreated={event => update({ onLeaveScript: [...getEventList(effectiveObject.onLeaveScript), event] })} /></div></Space> },
+      ]} /></fieldset></>}
+      <AdditionalEventWarnings visibleFields={type === 'actor' ? ['onInteractScript', 'onInitScript', 'onUpdateScript'] : ['onEnterScript', 'onLeaveScript']} value={effectiveObject} onChange={update} />
     </Space>
+  </Content>;
+};
+
+const PrefabSettingsForm: React.FC<{ prefab: IPrefabDefinition; availableSprites: any[]; availableTilesets: any[] }> = ({ prefab, availableSprites, availableTilesets }) => {
+  const [prefabNameDraft, setPrefabNameDraft] = useState<string | null>(null);
+  const cancelPrefabNameOnBlur = useRef(false);
+  const { prefabs, setPrefabs, scenes, setScenes, setElementSelected } = useAppContexts();
+  const { t } = useI18n();
+  const { modal } = App.useApp();
+  const data: any = (prefab.type === 'actor' ? prefab.actor : prefab.trigger) ?? {};
+  const update = (changes: Record<string, unknown>) => {
+    const { name, folderId, ...dataChanges } = changes;
+    const next = { ...prefab, name: typeof name === 'string' ? name : prefab.name,
+      ...(folderId !== undefined ? { folderId: folderId as string | null } : {}),
+      ...(prefab.type === 'actor' ? { actor: { ...prefab.actor, ...dataChanges } } : { trigger: { ...prefab.trigger, ...dataChanges } }) };
+    setPrefabs(previous => ({ ...previous, prefabs: previous.prefabs.map(item => item.id === prefab.id ? next : item), _saved: false }));
+    const sharedKeys = prefab.type === 'actor' ? ['spriteId', 'keepRunningWhileOffscreen', 'onInteractScript', 'onInitScript', 'onUpdateScript'] : ['onEnterScript', 'onLeaveScript', 'onInteractScript', 'onInitScript', 'onUpdateScript'];
+    const sharedChanges = Object.fromEntries(Object.entries(dataChanges).filter(([key]) => sharedKeys.includes(key)));
+    if (Object.keys(sharedChanges).length) setScenes(previous => {
+      const collection = prefab.type === 'actor' ? 'actors' : 'triggers';
+      let changed = false;
+      const nextScenes = previous.map(scene => {
+        const instances = (scene as any)[collection] ?? [];
+        if (!instances.some((instance: any) => instance.prefabId === prefab.id)) return scene;
+        let sceneChanged = false;
+        const values = instances.map((instance: any) => {
+          if (instance.prefabId !== prefab.id) return instance;
+          const instanceChanges = Object.fromEntries(Object.entries(sharedChanges).filter(([key]) => !key.endsWith('Script') || !instance.prefabEventsDetached));
+          if (!Object.keys(instanceChanges).some(key => !Object.is(instance[key], instanceChanges[key]))) return instance;
+          sceneChanged = true;
+          return { ...instance, ...instanceChanges };
+        });
+        if (!sceneChanged) return scene;
+        changed = true;
+        return { ...scene, [collection]: values, _saved: false };
+      });
+      return changed ? nextScenes : previous;
+    });
+    setElementSelected({ ...next, _resourceType: 'prefab' });
+  };
+  const deletePrefab = () => modal.confirm({ title: t('prefabs.deleteTitle'), content: t('prefabs.deleteConfirm', { name: prefab.name }), okText: t('common.delete'), okButtonProps: { danger: true }, onOk: () => {
+    const sharedKeys = prefab.type === 'actor' ? ['spriteId', 'keepRunningWhileOffscreen', 'onInteractScript', 'onInitScript', 'onUpdateScript'] : ['onEnterScript', 'onLeaveScript', 'onInteractScript', 'onInitScript', 'onUpdateScript'];
+    setScenes(previous => previous.map(scene => {
+      const collection = prefab.type === 'actor' ? 'actors' : 'triggers';
+      const values = ((scene as any)[collection] ?? []).map((instance: any) => {
+        if (instance.prefabId !== prefab.id) return instance;
+        const detached = { ...instance, ...Object.fromEntries(sharedKeys.filter(key => key === 'spriteId' || !instance.prefabEventsDetached).filter(key => (data as any)[key] !== undefined).map(key => [key, (data as any)[key]])) };
+        delete detached.prefabId; delete detached.prefabEditable; delete detached.prefabEventsDetached;
+        return detached;
+      });
+      return { ...scene, [collection]: values, _saved: false };
+    }));
+    setPrefabs(previous => ({ ...previous, prefabs: previous.prefabs.filter(item => item.id !== prefab.id), _saved: false }));
+    setElementSelected(null);
+  } });
+  const events = (key: string) => Array.isArray((data as any)[key]) ? (data as any)[key] as IScriptsElement[] : [];
+  const eventTab = (key: string, label: string) => ({ key, label: attentionLabel(label, countEventAttention(events(key))), children: <>{prefab.type === 'actor' && key === 'onUpdateScript' && <ActorOffscreenControl value={data.keepRunningWhileOffscreen} onChange={keepRunningWhileOffscreen => update({ keepRunningWhileOffscreen })} />}<CollapseEventManager storageKey={key} scripts={events(key)} onScriptsChange={items => update({ [key]: items })} /><div style={{ paddingTop: 8 }}><SelectNewEvent compact showFlowButton={false} onEventCreated={item => update({ [key]: [...events(key), item] })} /></div></> });
+  return <Content style={{ padding: 10 }}>
+    <Flex align="center" justify="space-between"><Typography.Title level={5} style={{ marginTop: 0 }}>{prefab.type === 'actor' ? t('prefabs.actorTitle') : t('prefabs.triggerTitle')}</Typography.Title><Tooltip title={t('prefabs.delete')}><Button type="text" danger aria-label={t('prefabs.delete')} icon={<DeleteOutlined />} onClick={deletePrefab} /></Tooltip></Flex>
+    <Input aria-label={t('prefabs.name')} value={prefabNameDraft ?? prefab.name} onFocus={() => setPrefabNameDraft(prefab.name)} onChange={event => setPrefabNameDraft(event.target.value)} onBlur={() => { if (cancelPrefabNameOnBlur.current) { cancelPrefabNameOnBlur.current = false; setPrefabNameDraft(null); return; } if (prefabNameDraft !== null && prefabNameDraft !== prefab.name) update({ name: prefabNameDraft }); setPrefabNameDraft(null); }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancelPrefabNameOnBlur.current = true; setPrefabNameDraft(null); event.currentTarget.blur(); } }} onPressEnter={event => event.currentTarget.blur()} />
+    <Divider style={{ margin: '12px 0' }} />
+    {prefab.type === 'actor' ? <>
+      <Typography.Text>{t('prefabs.sprite')}</Typography.Text>
+      <ActorSpriteSheetPicker tilesets={availableTilesets} spriteFiles={availableSprites} warning={hasAssetReferenceWarning(data, 'spriteId')} spriteId={data.spriteId} onSpriteSelected={spriteId => update({ spriteId })} />
+      <Tabs size="small" items={[eventTab('onInteractScript', 'On Interact'), eventTab('onInitScript', 'On Init'), eventTab('onUpdateScript', 'On Update')]} />
+    </> : <>
+      <Checkbox checked={data.enabled !== false} onChange={event => update({ enabled: event.target.checked })}>{t('prefabs.enabled')}</Checkbox>
+      <Typography.Text>{t('prefabs.size')}</Typography.Text>
+      <Flex gap={8}><InputNumber addonBefore="W" min={8} step={8} value={data.width ?? 32} onChange={width => update({ width: width ?? 32 })} /><InputNumber addonBefore="H" min={8} step={8} value={data.height ?? 32} onChange={height => update({ height: height ?? 32 })} /></Flex>
+      <Tabs size="small" items={[eventTab('onEnterScript', 'On Enter'), eventTab('onLeaveScript', 'On Leave'), eventTab('onInteractScript', 'On Interact')]} />
+    </>}
+    <AdditionalEventWarnings visibleFields={prefab.type === 'actor' ? ['onInteractScript', 'onInitScript', 'onUpdateScript'] : ['onEnterScript', 'onLeaveScript', 'onInteractScript']} value={data} onChange={update} />
   </Content>;
 };
 
@@ -344,13 +725,12 @@ interface IRightPanelProps {
   controllerView: any;
 }
 
-const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
+const SceneRightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
   const { t } = useI18n();
   const { token } = useToken();
-  const { scenes, setScenes, elementSelected, setElementSelected, settings, setSettings, settingUtils, setSettingUtils, palettes, userSettings, setUserSettings } = useAppContexts();
+  const { scenes, setScenes, elementSelected, setElementSelected, settings, setSettings, settingUtils, setSettingUtils, palettes, backgrounds, userSettings, setUserSettings } = useAppContexts();
   const isEditingTiles = Boolean(settingUtils.tileEditSceneId);
 
-  const [isEditingTitle, setIsEditingTitle ] = useState(false);
   const [availableTilesets, setAvailableTilesets] = useState<any[]>([]);
   const [availableAutoTiles, setAvailableAutoTiles] = useState<any[]>([]);
   const [availablePlayerSprites, setAvailablePlayerSprites] = useState<any[]>([]);
@@ -365,13 +745,13 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
   const [tilesetViewMode, setTilesetViewMode] = useState<'tileset' | 'autoTiles'>('tileset');
   const [autoTileConfigSignal, setAutoTileConfigSignal] = useState(0);
   const modifiedAutoTileSlotsRef = useRef(new Set<number>());
-  const [showSceneCombatConfig, setShowSceneCombatConfig] = useState(false);
-  const [showSceneShooterConfig, setShowSceneShooterConfig] = useState(false);
-
-  useEffect(() => {
-    setShowSceneCombatConfig(false);
-    setShowSceneShooterConfig(false);
-  }, [elementSelected?.id, elementSelected?.sceneType]);
+  // TODO(restore-shooter-game): restore these state declarations and reset effect with the Shooter config controls below.
+  // const [showSceneCombatConfig, setShowSceneCombatConfig] = useState(false);
+  // const [showSceneShooterConfig, setShowSceneShooterConfig] = useState(false);
+  // useEffect(() => {
+  //   setShowSceneCombatConfig(false);
+  //   setShowSceneShooterConfig(false);
+  // }, [elementSelected?.id, elementSelected?.sceneType]);
 
   const TILE_SIZE = 8;
   const editingTilesetLayerId = settingUtils.tileEditLayerId ?? elementSelected?.backgrounds?.[0]?.layerId ?? 0;
@@ -446,7 +826,11 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
   const backgroundLayers = [0, 1, 2, 3];
   const isSingleLayerScene = elementSelected?.sceneType === ETypeScene.LOGO || elementSelected?.sceneType === ETypeScene.POINTNCLICK;
   const editableLayerIds = isSingleLayerScene ? [2] : backgroundLayers;
+  const backgroundPanelLayerIds = [...new Set([...editableLayerIds, ...(elementSelected?.backgrounds ?? []).filter(layer => hasAssetReferenceWarning(layer, 'backgroundId')).map(layer => layer.layerId)])];
   const isEventsLayer = settingUtils.tileEditLayerId === EVENTS_LAYER_ID;
+  const sceneForEventsLayer = scenes.find(scene => scene.id === elementSelected?.id) ?? elementSelected;
+  const eventsLayerAttentionCount = [...(sceneForEventsLayer?.actors ?? []), ...(sceneForEventsLayer?.triggers ?? [])]
+    .reduce((total, object) => total + countObjectAttention(object), 0);
   const selectedSceneIds = settingUtils.selectedSceneIds ?? (elementSelected?.id ? [elementSelected.id] : []);
   const selectedScenes = scenes.filter(scene => selectedSceneIds.includes(scene.id) && !scene._deleted);
   const moveSelectedScenes = (deltaX: number, deltaY: number) => {
@@ -545,8 +929,8 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
       });
     };
 
-    document.addEventListener('wheel', handleTilesetWheel, { capture: true, passive: false });
-    return () => document.removeEventListener('wheel', handleTilesetWheel, true);
+    viewport.addEventListener('wheel', handleTilesetWheel, { capture: true, passive: false });
+    return () => viewport.removeEventListener('wheel', handleTilesetWheel, true);
   }, [activeTilesetId, setUserSettings, tilesetViewMode]);
 
   // Load available tilesets
@@ -649,33 +1033,11 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
     ));
   };
 
-  const handleTitleClick = () => {
-    setIsEditingTitle(true);
-    // setNewTitle(elementSelected?.name || '');
-
-  };
-
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (elementSelected) {
-      const sceneToUpdate = scenes.find(scene => scene.id === elementSelected.id);
-      console.log('..: RightPanel sceneToUpdate:', sceneToUpdate);
-
-      const updatedElement = { ...sceneToUpdate, name: e.target.value? e.target.value : `SCENE_${sceneToUpdate?._index}` };
-      setElementSelected(updatedElement);
-      console.log('..: RightPanel updated element:', elementSelected);
-
-      setScenes(prevScenes => prevScenes.map(scene => 
-        scene.id === updatedElement.id 
-          ? { ...scene, ...updatedElement, _saved: false }
-          : scene
-      ));
-      console.log('..: RightPanel updated array:', scenes)
-      // window.electronAPI.updateSettings('scene', updatedElement);
-    }
-  };
-
-  const handleTitleBlur = () => {
-    setIsEditingTitle(false);
+  const handleSceneNameChange = (name: string) => {
+    const scene = scenes.find(item => item.id === elementSelected.id);
+    if (!scene) return;
+    setElementSelected({ ...scene, name, _saved: false });
+    setScenes(previous => previous.map(item => item.id === scene.id ? { ...item, name, _saved: false } : item));
   };
 
   const handleMapSizeChange = (dimension: 'width' | 'height', value: number, elementId: string) => {
@@ -689,24 +1051,26 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
     const clampedValue = Math.max(minTiles, Math.min(maxTiles, Math.floor(value / tileSize)));
     const pixelValue = clampedValue * tileSize;
     
+    const latestScene = scenes.find(scene => scene.id === elementId) ?? elementSelected;
+    if (!latestScene) return;
     if (dimension === 'width') {
       setMapWidth(clampedValue);
-      const updatedElement = { ...elementSelected, width: pixelValue };
+      const updatedElement = { ...latestScene, width: pixelValue };
       setElementSelected(updatedElement);
       setScenes(prevScenes => prevScenes.map(scene => {
-        if (scene.id === updatedElement.id) {
-          return { ...scene, ...updatedElement, _saved: false };
+        if (scene.id === elementId) {
+          return { ...scene, width: pixelValue, _saved: false };
         }
           return scene;
         })
       );
     } else {
       setMapHeight(clampedValue);
-      const updatedElement = { ...elementSelected, height: pixelValue };
+      const updatedElement = { ...latestScene, height: pixelValue };
       setElementSelected(updatedElement);
       setScenes(prevScenes => prevScenes.map(scene => {
-        if (scene.id === updatedElement.id) {
-          return { ...scene, ...updatedElement, _saved: false };
+        if (scene.id === elementId) {
+          return { ...scene, height: pixelValue, _saved: false };
         }
           return scene;
         })
@@ -719,7 +1083,8 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
     { label: 'Top Down', value: ETypeScene.TOPDOWN },
     { label: 'Platformer', value: ETypeScene.PLATFORM },
     { label: 'Adventure', value: ETypeScene.ADVENTURE },
-    { label: 'Shooter', value: ETypeScene.SHOOTER },
+    // TODO(restore-shooter-game): uncomment to let users create/edit Shooter scenes.
+    // { label: 'Shooter', value: ETypeScene.SHOOTER },
     { label: 'Point Click', value: ETypeScene.POINTNCLICK },
     { label: 'Logo', value: ETypeScene.LOGO }
   ];
@@ -730,7 +1095,9 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
   ];
 
   const tilesets = availableTilesets;
-  const paletteOptions = palettes.palettes.length ? palettes.palettes : loadPaletteLibrary();
+  const paletteLibrary = palettes.palettes.length ? palettes.palettes : loadPaletteLibrary();
+  const paletteOptions = getPreviewPalettes(paletteLibrary, settings?.colorPaletteIds);
+  const selectablePaletteSlots = getPaletteSlotOptions(paletteLibrary, settings?.colorPaletteIds);
   const fallbackColorizePaletteIds = [...new Set(
     (elementSelected?.backgrounds ?? [])
       .flatMap(layer => layer.tilePaletteIds ?? [])
@@ -1248,14 +1615,8 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
   };
   
   useEffect(() => {
-    // Se a aba atual ficar desabilitada, volta para a default
-    const isDisabled =
-      (activeLayerKey !== "2" && elementSelected?.sceneType == ETypeScene.LOGO) || elementSelected?.sceneType == ETypeScene.POINTNCLICK;
-
-    if (isDisabled) {
-      setActiveLayerKey("2");
-    }
-  }, [activeLayerKey, elementSelected?.sceneType]);
+    if (!backgroundPanelLayerIds.includes(Number(activeLayerKey))) setActiveLayerKey(String(backgroundPanelLayerIds[0] ?? 2));
+  }, [activeLayerKey, elementSelected?.sceneType, elementSelected?.backgrounds]);
 
   if (!elementSelected) {
     return (
@@ -1293,40 +1654,21 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
     return <ScriptSettingsForm script={elementSelected as IScriptDefinition} />;
   }
 
+  if (elementSelected._resourceType === 'prefab') {
+    return <PrefabSettingsForm prefab={elementSelected as IPrefabDefinition} availableSprites={availablePlayerSprites} availableTilesets={availableTilesets} />;
+  }
+
   if (settingUtils.activeSceneObject) {
     return <SceneObjectSettingsForm
       sceneId={settingUtils.activeSceneObject.sceneId}
       type={settingUtils.activeSceneObject.type}
       objectId={settingUtils.activeSceneObject.id}
       availableSprites={availablePlayerSprites}
+      availableTilesets={availableTilesets}
     />;
   }
 
   const getSceneScripts = scenes.find(scene => scene.id === elementSelected.id)?.script?.map((script) => script);
-  const fadeInEvent = getSceneScripts?.find(script => script.command === EEvents.FADE_IN);
-  const hasEnabledFadeIn = Boolean(fadeInEvent && !fadeInEvent.args?.__comment);
-
-  const enableFadeIn = () => {
-    const scene = scenes.find(item => item.id === elementSelected.id);
-    if (!scene) return;
-
-    const currentScript = [...(scene.script ?? [])];
-    const existingFadeIndex = currentScript.findIndex(script => script.command === EEvents.FADE_IN);
-    if (existingFadeIndex >= 0) {
-      const existingFade = currentScript[existingFadeIndex];
-      currentScript[existingFadeIndex] = {
-        ...existingFade,
-        args: { ...existingFade.args, __comment: false },
-      };
-    } else {
-      currentScript.unshift({ id: uuidv4(), command: EEvents.FADE_IN, args: { ...FadeEvent.defaultValue(), __automatic: true } });
-    }
-
-    const updatedScene = { ...scene, script: currentScript, _saved: false };
-    setScenes(previous => previous.map(item => item.id === updatedScene.id ? updatedScene : item));
-    setElementSelected(updatedScene);
-  };
-
   const getPlayerHitScripts = (groupKey: string): IScriptsElement[] | undefined => {
     const scene = scenes.find(s => s.id === elementSelected.id);
     if (!scene) return;
@@ -1345,36 +1687,21 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
 
   return (
     <Content>
-      <Space direction="vertical" style={{ width: '100%', zIndex: 50, padding: 10 }}>
-        {isEditingTitle ? (
-          <Input
-            autoFocus
-            variant="borderless"
-            value={elementSelected.name}
-            onChange={handleTitleChange}
-            onBlur={handleTitleBlur}
-            onPressEnter={handleTitleBlur}
-          />
-        ) : (
-          <Typography.Title level={5} onClick={handleTitleClick} style={{ margin: 0, cursor: 'pointer' }}>
-            {elementSelected.name}
-          </Typography.Title>
-        )}
-        <Divider style={{ margin: `${token.margin}px 0` }} />
-        {/* <Form.Item name="startSceneId" label="Starting Scene" style={{ flex: 1, textAlign: 'center' }}> */}
-        {/* TODO lista de imagens para escolher */}
-        {/* </Form.Item> */}
+      <Space direction="vertical" size={0} style={{ width: '100%', minWidth: 0, alignItems: 'stretch' }}>
+        <ResourceNameInput name={elementSelected.name || ''} defaultName={`SCENE_${elementSelected._index}`} label={t('scene.name')} onChange={handleSceneNameChange} />
+        <Divider style={{ margin: 0 }} />
       </Space>
       <Space direction="vertical" style={{ width: '100%' }}>
         {isEditingTiles ? (
           // Tiles Editor Mode - Scene properties + tileset selector
           <Space direction="vertical" style={{ width: '100%', padding: 10 }}>
             <Tabs
+              className="gba-background-tabs"
               type="card"
               size="small"
               animated={false}
               activeKey={String(settingUtils.tileEditLayerId ?? elementSelected.backgrounds?.[0]?.layerId ?? 0)}
-              items={[...editableLayerIds.map(layerId => ({ key: String(layerId), label: `Layer ${layerId}`, disabled: isSingleLayerScene })), { key: String(EVENTS_LAYER_ID), label: 'Events' }]}
+              items={[...editableLayerIds.map(layerId => ({ key: String(layerId), label: `Layer ${layerId}`, disabled: isSingleLayerScene })), { key: String(EVENTS_LAYER_ID), label: attentionLabel('Events', eventsLayerAttentionCount) }]}
               onChange={layerId => setSettingUtils(previous => ({
                 ...previous,
                 tileEditLayerId: Number(layerId),
@@ -1585,7 +1912,11 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
             />
             <Select
               placeholder="Palette for tile painting"
-              value={elementSelected.backgrounds?.find(layer => layer.layerId === (settingUtils.tileEditLayerId ?? elementSelected.backgrounds?.[0]?.layerId ?? 0))?.paintPaletteId ?? '__default__'}
+              value={(() => {
+                const id = elementSelected.backgrounds?.find(layer => layer.layerId === (settingUtils.tileEditLayerId ?? elementSelected.backgrounds?.[0]?.layerId ?? 0))?.paintPaletteId;
+                const slotId = id?.startsWith('__slot__:') ? id : selectablePaletteSlots.find(palette => settings?.colorPaletteIds?.[Number(palette.id.slice(9))] === id)?.id;
+                return id ? (selectablePaletteSlots.some(palette => palette.id === slotId) ? slotId : undefined) : '__default__';
+              })()}
               onChange={paletteId => {
                 const layerId = settingUtils.tileEditLayerId ?? elementSelected.backgrounds?.[0]?.layerId ?? 0;
                 const backgrounds = elementSelected.backgrounds?.some(layer => layer.layerId === layerId)
@@ -1595,7 +1926,7 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
                 setElementSelected(updated);
                 setScenes(previous => previous.map(scene => scene.id === updated.id ? updated : scene));
               }}
-              options={[{ value: '__default__', label: 'Default (Settings)' }, ...paletteOptions.map(palette => ({ value: palette.id, label: palette.name }))]}
+              options={[{ value: '__default__', label: 'Default (Settings)' }, ...selectablePaletteSlots.map(palette => ({ value: palette.id, label: palette.name }))]}
             />
             <Space direction="vertical" size={4} style={{ width: '100%' }}>
               <Typography.Text type="secondary">Scene Colorize palette slots ({colorizeUsedSlots}/16)</Typography.Text>
@@ -1606,7 +1937,7 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
                   const palette = paletteOptions.find(item => item.id === paletteId);
                   return <Tooltip key={String(paletteId ?? `reserved-${index}`)} title={isOriginalReservation ? 'Reserved by original layer colors' : (palette?.name ?? 'Empty slot')} placement="left">
                     <span aria-label={palette ? `Colorize slot ${index + 1}: ${palette.name}` : isOriginalReservation ? `Colorize slot ${index + 1}: reserved by original colors` : `Empty colorize slot ${index + 1}`} style={{ width: 26, height: 26, border: '1px solid #777', borderRadius: 2, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'repeat(4, 1fr)', overflow: 'hidden', opacity: palette || isOriginalReservation ? 1 : .35, background: palette ? undefined : '#222' }}>
-                      {palette?.colors.slice(0, 16).map((color, colorIndex) => <i key={colorIndex} style={{ background: color }} />) ?? (isOriginalReservation && Array.from({ length: 16 }, (_, colorIndex) => <i key={colorIndex} style={{ background: colorIndex % 2 ? '#555' : '#333' }} />))}
+                      {palette?.colors?.slice(0, 16).map((color, colorIndex) => <i key={colorIndex} style={{ background: color }} />) ?? (isOriginalReservation && Array.from({ length: 16 }, (_, colorIndex) => <i key={colorIndex} style={{ background: colorIndex % 2 ? '#555' : '#333' }} />))}
                     </span>
                   </Tooltip>;
                 })}
@@ -1639,7 +1970,8 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
                 style={{ width: '100%' }}
                 options={sceneTypes.map(ts => ({ label: ts.label, value: ts.value }))}
               />
-              {elementSelected.sceneType === ETypeScene.SHOOTER && (
+              {/* TODO(restore-shooter-game): restore this Shooter/Combat configuration block when Shooter scenes are re-enabled.
+              {(elementSelected.sceneType === ETypeScene.SHOOTER || (settings?.startSceneId === elementSelected.id && hasAssetReferenceWarning(settings?.shooterConfig, 'projectileSpriteId'))) && (
                 <>
                   <Button block onClick={() => setShowSceneCombatConfig(value => !value)}>
                     {showSceneCombatConfig ? 'Hide Combat Config' : 'Combat Config'}
@@ -1648,9 +1980,10 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
                   <Button block onClick={() => setShowSceneShooterConfig(value => !value)}>
                     {showSceneShooterConfig ? 'Hide Shooter Config' : 'Shooter Config'}
                   </Button>
-                  {showSceneShooterConfig && <ShooterConfigEditor settings={settings} setSettings={setSettings} />}
+                  {(showSceneShooterConfig || (settings?.startSceneId === elementSelected.id && hasAssetReferenceWarning(settings?.shooterConfig, 'projectileSpriteId'))) && <ShooterConfigEditor settings={settings} setSettings={setSettings} />}
                 </>
               )}
+              */}
               <Typography.Text>Camera View</Typography.Text>
               <Checkbox 
                 defaultChecked={elementSelected.showCamera} 
@@ -1677,47 +2010,79 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
               <Divider style={{ margin: `${token.margin}px 0` }} />
               <Typography.Text>Backgrounds</Typography.Text>
               <Tabs 
+                className="gba-background-tabs"
                 activeKey={activeLayerKey}
                 onChange={setActiveLayerKey}
                 type="card"
                 size={'small'}
-                items={editableLayerIds.map(key => ({
+                items={backgroundPanelLayerIds.map(key => {
+                  const layerId = Number(key);
+                  const layer = elementSelected.backgrounds?.find(item => item.layerId === layerId);
+                  const layerBackground = backgrounds.find(item => !item._deleted && item.id === layer?.backgroundId);
+                  const backgroundAnimationAssets = layerBackground ? [{
+                    id: layerBackground.id,
+                    name: layerBackground.name,
+                    path: joinLocalAssetPath(layerBackground.hd ? settingUtils.localImagePathHD : settingUtils.localImagePath, layerBackground.filename),
+                  }] : [];
+                  const tileMap = layer?.tileMap ?? (layerId === 0 ? elementSelected.tileMap : undefined) ?? [];
+                  const tilesetIds = new Set<string>();
+                  tileMap.forEach((row, rowIndex) => row.forEach((tile, colIndex) => {
+                    if (tile < 0) return;
+                    const tilesetId = layer?.tileMapTilesetIds?.[rowIndex]?.[colIndex] ?? layer?.selectedTilesetId ?? elementSelected.selectedTilesetId;
+                    if (tilesetId && !tilesetId.startsWith('auto-tile:')) tilesetIds.add(tilesetId);
+                  }));
+                  return {
                   key: String(key),
-                  label: `Layer ${key}`,
+                  label: attentionLabel(`Layer ${key}`, hasAssetReferenceWarning(layer, 'backgroundId') ? 1 : 0),
                   children: (
-                    <BackgroundSelector
-                      selectedElementId={elementSelected.id}
-                      layerKey={key}
-                      showPreviewVisibilityToggle
-                    />
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <BackgroundSelector
+                        selectedElementId={elementSelected.id}
+                        layerKey={layerId}
+                        showPreviewVisibilityToggle
+                        tilesetAssets={[...availableTilesets, ...availableAutoTiles.map((asset: any) => ({ id: toAutoTileSourceKey(asset.id), name: asset.name, path: asset.path }))]}
+                        hasTilesetTag={tilesetIds.size > 0}
+                      />
+                      <TileAnimationEditor
+                        scene={elementSelected}
+                        layerId={layerId}
+                        tileset={tileset}
+                        tilesetAssets={availableTilesets}
+                        backgroundAssets={backgroundAnimationAssets}
+                        paletteOptions={paletteOptions}
+                        hiddenAnimationIds={(userSettings.hiddenTileAnimations ?? []).filter(key => key.startsWith(`${elementSelected.id}:`)).map(key => key.slice(`${elementSelected.id}:`.length))}
+                        onToggleAnimation={id => setUserSettings(previous => {
+                          const key = `${elementSelected.id}:${id}`;
+                          const hidden = previous.hiddenTileAnimations ?? [];
+                          return { ...previous, hiddenTileAnimations: hidden.includes(key) ? hidden.filter(item => item !== key) : [...hidden, key] };
+                        })}
+                        onSceneChange={updated => {
+                          setElementSelected(updated);
+                          setScenes(previous => previous.map(scene => scene.id === updated.id ? updated : scene));
+                        }}
+                        onChange={tileAnimations => {
+                          const updated = { ...elementSelected, tileAnimations, _saved: false };
+                          setElementSelected(updated);
+                          setScenes(previous => previous.map(scene => scene.id === updated.id ? updated : scene));
+                        }}
+                      />
+                    </Space>
                   ),
-                  }))
+                  };
+                  })
                 }
               />
               <Divider variant="solid" style={{ margin: `${token.margin}px 0` }} />
 
-              <TileAnimationEditor
-                scene={elementSelected}
-                tileset={tileset}
-                paletteOptions={paletteOptions}
-                onSceneChange={updated => {
-                  setElementSelected(updated);
-                  setScenes(previous => previous.map(scene => scene.id === updated.id ? updated : scene));
-                }}
-                onChange={tileAnimations => {
-                  const updated = { ...elementSelected, tileAnimations, _saved: false };
-                  setElementSelected(updated);
-                  setScenes(previous => previous.map(scene => scene.id === updated.id ? updated : scene));
-                }}
-              />
-
-              { (elementSelected.sceneType !== ETypeScene.LOGO) && (
+              { (elementSelected.sceneType !== ETypeScene.LOGO || hasAssetReferenceWarning(settings, 'playerSpriteId')) && (
                 <Content>
                 <Typography.Text>Player Sprite Sheet</Typography.Text>
+                <WarningField warning={hasAssetReferenceWarning(settings, 'playerSpriteId')} message={t('events.missingReference')}>
                 <Select
                   title="Select player sprite sheet"
                   placeholder="Select player sprite"
                   allowClear
+                  status={hasAssetReferenceWarning(settings, 'playerSpriteId') ? 'warning' : undefined}
                   value={settings?.playerSpriteId ?? undefined}
                   options={availablePlayerSprites.map(sprite => ({
                     value: sprite.id,
@@ -1726,36 +2091,31 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
                   onChange={(value) => setSettings(prev => ({ ...prev, playerSpriteId: value ?? null, _saved: false }))}
                   style={{ width: '100%' }}
                 />
+                </WarningField>
                 </Content>
               )}
               
             </Space>
 
+            <AdditionalEventWarnings visibleFields={['script', 'playerHit1Script', 'playerHit2Script', 'playerHit3Script']} value={scenes.find(scene => scene.id === elementSelected.id) ?? elementSelected} onChange={patch => {
+              const updated = { ...(scenes.find(scene => scene.id === elementSelected.id) ?? elementSelected), ...patch, _saved: false };
+              setElementSelected(updated);
+              setScenes(previous => previous.map(scene => scene.id === updated.id ? updated : scene));
+            }} />
             <Tabs 
+              key={settingUtils.referenceTarget?.requestId ?? elementSelected?.id}
               // activeKey={'oninit'}
               // onChange={setActiveLayerKey}
-              defaultActiveKey='1'
+              defaultActiveKey="1"
               type="line"
               size={'small'}
               items={
                 [
                   {
                     key: '1',
-                    label: '  On Init  ',
+                    label: attentionLabel(<span style={{ paddingLeft: 8 }}>On Init</span>, countEventAttention(getSceneScripts ?? [])),
                     children: (
                       <Content>
-                        {!hasEnabledFadeIn && (
-                          <Alert
-                            type="warning"
-                            showIcon
-                            style={{ marginBottom: 10 }}
-                            message="Fade In necessário"
-                            description={fadeInEvent
-                              ? 'O Fade In está comentado. Sem ele, a cena não aparecerá na tela.'
-                              : 'Esta cena não possui Fade In. Sem ele, a cena não aparecerá na tela.'}
-                            action={<Button size="small" type="primary" onClick={enableFadeIn}>{fadeInEvent ? 'Habilitar Fade In' : 'Inserir Fade In'}</Button>}
-                          />
-                        )}
                         <CollapseEventManager scripts={getSceneScripts} />
                         <SelectNewEvent tabIndex={'1'}/>
                       </Content>
@@ -1763,20 +2123,24 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
                   },
                   {
                     key: '2',
-                    label: 'On Player Hit',
+                    label: attentionLabel('On Player Hit', groupEvents.reduce((total, group) => total + countEventAttention(getPlayerHitScripts(group.key) ?? []), 0)),
                     disabled: true,
                     children: (
                       <Tabs
-                        defaultActiveKey='1'
+                        defaultActiveKey={settingUtils.referenceTarget?.tab?.startsWith('hit') ? settingUtils.referenceTarget.tab.slice(-1) : '1'}
                         type="card"
                         size={'small'}
                         items={ groupEvents.map((groupEvent) => (
                           {
                             key: groupEvent.key,
-                            label: groupEvent.label,
+                            label: attentionLabel(groupEvent.label, countEventAttention(getPlayerHitScripts(groupEvent.key) ?? [])),
                             children: (
                               <Content>
-                                <CollapseEventManager scripts={getPlayerHitScripts(groupEvent.key)} />
+                                <CollapseEventManager storageKey={`hit:${groupEvent.key}`} scripts={getPlayerHitScripts(groupEvent.key)} onScriptsChange={events => {
+                                  const updatedScene = { ...elementSelected, [groupEvent.key]: events, _saved: false };
+                                  setElementSelected(updatedScene);
+                                  setScenes(previous => previous.map(scene => scene.id === updatedScene.id ? { ...scene, [groupEvent.key]: events, _saved: false } : scene));
+                                }} />
                                 <SelectNewEvent subTabIndex={groupEvent.key}/>
                               </Content>
                             )
@@ -1794,5 +2158,336 @@ const RightPanel: React.FC<IRightPanelProps> = ({ controllerView }) => {
     </Content>
   );
 };
+
+function MusicEditorRightPanel() {
+  const { token } = theme.useToken();
+  const { message } = App.useApp();
+  const { t } = useI18n();
+  const { assets, selectedAssetId, setSelectedAssetId, editorInfo, noteSelection, selectedEditorItem } = useMusicEditorWorkspace();
+  const selectedAsset = assets.find(asset => asset.id === selectedAssetId);
+  const selectionKind = selectedEditorItem?.kind ?? (noteSelection ? 'note' : 'file');
+  const [patternNameDraft, setPatternNameDraft] = useState(editorInfo?.patternName ?? '');
+  const [patternRowsDraft, setPatternRowsDraft] = useState(editorInfo?.patternRows ?? 64);
+  const [assetNameDraft, setAssetNameDraft] = useState((selectedAsset?.projectSource ? selectedAsset.name.split(/[\\/]/).pop() : selectedAsset?.name)?.replace(/\.[^/.]+$/, '') ?? '');
+  const [assetNameFocused, setAssetNameFocused] = useState(false);
+  const [artistFocused, setArtistFocused] = useState(false);
+  const [instrumentColorOpen, setInstrumentColorOpen] = useState(false);
+  const sampleAudioInputRef = useRef<HTMLInputElement>(null);
+  const [artistDraft, setArtistDraft] = useState('');
+  const [instrumentNameDraft, setInstrumentNameDraft] = useState('');
+  const renderInstrumentChoice = (id: number, label: React.ReactNode) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, maxWidth: '100%' }}>
+    <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: '50%', flex: 'none', background: trackerInstrumentHierarchyColor(id, editorInfo?.instrumentCategories ?? {}, editorInfo?.channelInstrumentTypes?.[String(editorInfo?.selectedChannel)], editorInfo?.instrumentConfigs ?? {}, editorInfo?.instrumentPresetColors ?? {}) }} />
+    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+  </span>;
+  const [channelNameDraft, setChannelNameDraft] = useState('');
+  useEffect(() => { setChannelNameDraft(editorInfo?.channelSettings?.[String(editorInfo.selectedChannel)]?.name ?? ''); }, [editorInfo?.selectedChannel, editorInfo?.channelSettings]);
+  const [instrumentTab, setInstrumentTab] = useState('settings');
+  const [notePanDraft, setNotePanDraft] = useState(0);
+  const [noteVolumeDraft, setNoteVolumeDraft] = useState(100);
+  const [notePitchDraft, setNotePitchDraft] = useState(noteSelection?.note ?? 49);
+  const [noteLengthDraft, setNoteLengthDraft] = useState(noteSelection?.length ?? 1);
+  const [tempoDraft, setTempoDraft] = useState(editorInfo?.tempo ?? 125);
+  const [ticksDraft, setTicksDraft] = useState(editorInfo?.speed ?? 6);
+  useEffect(() => { setTempoDraft(editorInfo?.tempo ?? 125); }, [editorInfo?.tempo, selectedAsset?.id]);
+  useEffect(() => { setTicksDraft(editorInfo?.speed ?? 6); }, [editorInfo?.speed, selectedAsset?.id]);
+
+  useEffect(() => setAssetNameDraft((selectedAsset?.projectSource ? selectedAsset.name.split(/[\\/]/).pop() : selectedAsset?.name)?.replace(/\.[^/.]+$/, '') ?? ''), [selectedAsset?.id, selectedAsset?.name]);
+  useEffect(() => setArtistDraft(editorInfo?.artist ?? ''), [editorInfo?.artist, selectedAsset?.id]);
+  useEffect(() => { setInstrumentNameDraft(editorInfo?.instrumentNames?.[String(editorInfo.selectedInstrument)] ?? editorInfo?.instrumentSample?.name ?? ''); }, [editorInfo?.selectedInstrument, editorInfo?.instrumentSample?.name, editorInfo?.instrumentNames?.[String(editorInfo?.selectedInstrument ?? 0)]]);
+  useEffect(() => { setInstrumentTab('settings'); }, [editorInfo?.format]);
+  useEffect(() => { setNotePanDraft(quantizeTrackerNotePan(noteSelection?.pan ?? 0)); }, [noteSelection?.row, noteSelection?.note, noteSelection?.pan]);
+  useEffect(() => { setNoteVolumeDraft(noteSelection?.volume ?? 100); }, [noteSelection?.row, noteSelection?.note, noteSelection?.volume]);
+  useEffect(() => { setNotePitchDraft(noteSelection?.note ?? 49); }, [noteSelection?.row, noteSelection?.note]);
+  useEffect(() => { setNoteLengthDraft(noteSelection?.length ?? 1); }, [noteSelection?.row, noteSelection?.note, noteSelection?.length]);
+  const defaultMusicAssetName = sanitizeMusicAssetName((selectedAsset?.name.split(/[\\/]/).pop() ?? '').replace(/\.[^/.]+$/, '')) || 'new-beat';
+  const commitAssetName = async () => {
+    if (!selectedAsset) return;
+    const extensionSource = selectedAsset.projectSource ? selectedAsset.name.split(/[\\/]/).pop() ?? selectedAsset.name : selectedAsset.name;
+    const baseName = sanitizeMusicAssetName(assetNameDraft.trim()) || defaultMusicAssetName;
+    setAssetNameDraft(baseName);
+    const nextLeaf = `${baseName}${extensionSource.match(/\.[^/.]+$/)?.[0] ?? ''}`;
+    const parent = selectedAsset.projectSource ? selectedAsset.name.split(/[\\/]/).slice(0, -1).join('/') : '';
+    const nextName = parent ? `${parent}/${nextLeaf}` : nextLeaf;
+    if (nextName === selectedAsset.name) return;
+    const result = selectedAsset.projectSource
+      ? await window.electronAPI.renameTrackerProject(selectedAsset.name, nextName)
+      : await window.electronAPI.renameAsset('musics', selectedAsset.name, nextName);
+    if (result?.status !== 'success') { message.error(t('music.rename.failed')); setAssetNameDraft(extensionSource.replace(/\.[^/.]+$/, '')); return; }
+    const savedName = result.filename ?? nextName;
+    setSelectedAssetId(selectedAsset.projectSource ? `project:${savedName}` : `0:${savedName}`);
+    setAssetNameDraft(nextLeaf.replace(/\.[^/.]+$/, ''));
+    window.dispatchEvent(new CustomEvent('gba-studio:assets-reloaded'));
+  };
+  const commitArtist = () => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-set-artist', { detail: { artist: artistDraft } }));
+  useEffect(() => setPatternNameDraft(editorInfo?.patternName ?? ''), [editorInfo?.patternName, editorInfo?.selectedPattern]);
+  useEffect(() => setPatternRowsDraft(editorInfo?.patternRows ?? 64), [editorInfo?.patternRows, editorInfo?.selectedPattern]);
+  const editNote = (detail: { row?: number; transpose?: number; note?: number; length?: number; instrument?: number; volume?: number; pan?: number; effect?: number; parameter?: number }) =>
+    window.dispatchEvent(new CustomEvent('gba-studio:music-editor-edit-note', { detail }));
+  const editSample = (detail: { name?: string; volume?: number; loopStart?: number; loopEnd?: number; rootNote?: number; fineTune?: number; panning?: number }) =>
+    window.dispatchEvent(new CustomEvent('gba-studio:music-editor-set-sample', { detail }));
+  const commitPatternName = () => {
+    if (editorInfo?.patternNameEditable && patternNameDraft !== editorInfo.patternName) {
+      window.dispatchEvent(new CustomEvent('gba-studio:music-editor-set-pattern', { detail: { name: patternNameDraft } }));
+    }
+  };
+  const commitPatternRows = () => {
+    if (editorInfo?.patternNameEditable && patternRowsDraft !== editorInfo.patternRows) {
+      window.dispatchEvent(new CustomEvent('gba-studio:music-editor-set-pattern', { detail: { rows: patternRowsDraft } }));
+    }
+  };
+  const transposeNote = (amount: number) => {
+    if (noteSelection) editNote({ transpose: amount });
+  };
+  const instrumentCategory = editorInfo?.instrumentCategories?.[String(editorInfo.selectedInstrument)]
+    ?? (editorInfo?.format === 'MOD' ? editorInfo.channelInstrumentTypes?.[String(editorInfo.selectedChannel)] ?? 'Duty' : '');
+  const instrumentHierarchyNumber = trackerInstrumentHierarchyNumber(editorInfo?.selectedInstrument ?? 1, editorInfo?.instrumentCategories ?? {});
+  const pitchName = noteSelection ? `${['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'][(noteSelection.note - 1) % 12]}${Math.floor((noteSelection.note - 1) / 12) + 1}` : '';
+  const instrumentSamplePan = editorInfo?.instrumentSample
+    ? editorInfo.instrumentSample.panning <= 128
+      ? (editorInfo.instrumentSample.panning - 128) / 128
+      : (editorInfo.instrumentSample.panning - 128) / 127
+    : 0;
+  return <div style={{ height: '100%', minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', padding: 12, background: token.colorBgBase, color: token.colorText }}>
+    {selectedAsset && <>
+      <NameInput className="music-file-name-input" aria-label={t('music.inspector.fileName')} placeholder={defaultMusicAssetName} value={assetNameDraft} onChange={event => setAssetNameDraft(sanitizeMusicAssetName(event.target.value))} onFocus={() => setAssetNameFocused(true)} onBlur={() => { setAssetNameFocused(false); void commitAssetName(); }} onPressEnter={event => event.currentTarget.blur()} style={{ border: `1px solid ${assetNameFocused ? token.colorPrimary : 'transparent'}`, background: assetNameFocused ? token.colorBgContainer : 'transparent', boxShadow: 'none', marginBottom: 6, fontWeight: 600 }} />
+      <NameInput aria-label={t('music.inspector.artist')} placeholder={t('music.inspector.artist')} value={artistDraft} onChange={event => setArtistDraft(event.target.value)} onFocus={() => setArtistFocused(true)} onBlur={() => { setArtistFocused(false); commitArtist(); }} onPressEnter={event => event.currentTarget.blur()} maxLength={120} style={{ border: `1px solid ${artistFocused ? token.colorPrimary : 'transparent'}`, background: artistFocused ? token.colorBgContainer : 'transparent', boxShadow: 'none', marginBottom: 10, fontWeight: 600 }} />
+    </>}
+    {editorInfo ? <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', flex: 1, minHeight: 0 }}>
+      <Typography.Text type="secondary" style={{ display: 'block', width: '100%', paddingBottom: 6, borderBottom: `1px solid ${token.colorBorderSecondary}` }}>{t('music.inspector.properties')}</Typography.Text>
+      <Descriptions size="small" column={1}>
+        <Descriptions.Item label={t('music.inspector.format')}>{editorInfo.format}</Descriptions.Item>
+        <Descriptions.Item>
+          <Flex gap={24} justify="center" style={{ width: '100%' }}>
+            <Flex vertical align="center" gap={6} style={{ flex: 1, minWidth: 0 }}>
+              <Typography.Text>{t('music.inspector.tempo')}</Typography.Text>
+              <Flex align="center" justify="center" style={{ height: 80 }}><MusicDial label={t('music.inspector.tempo')} min={32} max={255} step={1} value={tempoDraft} valueText={`${tempoDraft} BPM`} disabled={!editorInfo.capabilities.tempo} onChange={setTempoDraft} onChangeComplete={value => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-set-tempo', { detail: { value } }))} /></Flex>
+              <Typography.Text type="secondary">{tempoDraft} BPM</Typography.Text>
+            </Flex>
+            <Flex vertical align="center" gap={6} style={{ flex: 1, minWidth: 0 }}>
+              <Typography.Text>{t('music.inspector.ticksPerRow')}</Typography.Text>
+              <Flex align="center" justify="center" style={{ height: 80 }}><MusicDial label={t('music.inspector.ticksPerRow')} min={1} max={31} step={1} value={ticksDraft} valueText={`${ticksDraft} ${t('music.inspector.ticks')}`} disabled={!editorInfo.speedEditable} onChange={setTicksDraft} onChangeComplete={value => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-set-speed', { detail: { value } }))} /></Flex>
+              <Typography.Text type="secondary">{ticksDraft} {t('music.inspector.ticks')}</Typography.Text>
+            </Flex>
+          </Flex>
+        </Descriptions.Item>
+        <Descriptions.Item label={t('music.inspector.channels')}>{editorInfo.channels}</Descriptions.Item>
+        <Descriptions.Item label={t('music.inspector.patterns')}>{editorInfo.patterns}</Descriptions.Item>
+        <Descriptions.Item label={t('music.inspector.instruments')}>{editorInfo.instruments}</Descriptions.Item>
+      </Descriptions>
+      {selectionKind === 'pattern' && <section style={{ borderTop: `1px solid ${token.colorBorderSecondary}`, paddingTop: 10 }}>
+        <Typography.Text type="secondary">{t('music.inspector.pattern')}</Typography.Text>
+        <Descriptions size="small" column={1} style={{ marginTop: 6 }}>
+          <Descriptions.Item label={t('music.inspector.patternName')}>
+            <Tooltip title={editorInfo.patternNameEditable ? '' : t('music.inspector.readOnlyFormat', { format: editorInfo.format })}>
+              <span style={{ display: 'block' }}><Input aria-label={t('music.inspector.patternName')} maxLength={48} value={patternNameDraft} disabled={!editorInfo.patternNameEditable} onChange={event => setPatternNameDraft(event.target.value)} onBlur={commitPatternName} onPressEnter={event => event.currentTarget.blur()} /></span>
+            </Tooltip>
+          </Descriptions.Item>
+          <Descriptions.Item label={t('music.inspector.patternRows')}>
+            <Tooltip title={editorInfo.patternLengthEditable ? '' : t('music.inspector.readOnlyFormat', { format: editorInfo.format })}>
+              <span style={{ display: 'block' }}><InputNumber aria-label={t('music.inspector.patternRows')} min={editorInfo.patternMinimumRows} max={256} value={patternRowsDraft} disabled={!editorInfo.patternLengthEditable} onChange={value => value !== null && value !== undefined && setPatternRowsDraft(Number(value))} onBlur={commitPatternRows} onPressEnter={event => event.currentTarget.blur()} /></span>
+            </Tooltip>
+          </Descriptions.Item>
+          <Descriptions.Item label={t('music.inspector.patternEvents')}>{editorInfo.patternEvents}</Descriptions.Item>
+        </Descriptions>
+      </section>}
+      {noteSelection && selectionKind === 'note' && <section style={{ borderTop: `1px solid ${token.colorBorderSecondary}`, paddingTop: 10, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <Typography.Text type="secondary">{t('music.inspector.note')}</Typography.Text>
+        {noteSelection.count > 1 && <Typography.Text style={{ display: 'block', margin: '5px 0 8px' }}>{t('music.inspector.notesSelected', { count: noteSelection.count })}</Typography.Text>}
+        {noteSelection.count > 1 && <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>{t('music.inspector.focusedNoteHint')}</Typography.Text>}
+        <Flex vertical gap={10}>
+          <Divider orientation="left" plain style={{ margin: '8px 0' }}>{t('music.inspector.instrument')}</Divider>
+          <label><Select aria-label={t('music.inspector.instrument')} showSearch optionFilterProp="label" optionRender={option => renderInstrumentChoice(Number(option.value), option.label)} labelRender={option => renderInstrumentChoice(Number(option.value), option.label)} value={noteSelection.instrument} style={{ width: '100%' }} options={trackerInstrumentOptions(editorInfo.instrumentNames && Object.keys(editorInfo.instrumentNames).length ? editorInfo.instrumentNames : Object.fromEntries(Array.from({ length: editorInfo.instruments }, (_, index) => [String(index + 1), ''])), editorInfo.instrumentCategories ?? {}, editorInfo.channelSettings ?? {}, editorInfo.selectedChannel, t)} onChange={value => editNote({ instrument: value })} /></label>
+          <Divider orientation="left" plain style={{ margin: '8px 0' }}>{t('music.inspector.position')}</Divider>
+          {noteSelection.count === 1 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Typography.Text>{`${pitchName} · ${t('music.inspector.row', { row: noteSelection.row + 1 })}`}</Typography.Text>
+            <Flex justify="space-between" align="center"><Typography.Text>{t('music.inspector.rowLabel')}</Typography.Text><Typography.Text type="secondary">{noteSelection.row + 1}</Typography.Text></Flex>
+            <Slider className="gba-music-fader gba-sample-volume-fader" aria-label={t('music.inspector.rowLabel')} min={1} max={editorInfo.patternRows} step={1} value={noteSelection.row + 1} onChange={value => editNote({ row: Number(value) - 1 })} style={{ width: '100%', margin: 0, '--music-accent': token.colorPrimary } as React.CSSProperties} />
+          </div>}
+          <Flex gap={12} align="stretch">
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <Typography.Text>{t('music.inspector.pitch')}</Typography.Text>
+              <Slider className="gba-music-fader gba-sample-volume-fader" aria-label={t('music.inspector.pitch')} vertical min={1} max={96} step={1} value={notePitchDraft} onChange={value => {
+                const note = Number(value); setNotePitchDraft(note);
+                window.dispatchEvent(new CustomEvent('gba-studio:music-editor-preview-note-pitch', { detail: { note } }));
+              }} onChangeComplete={value => {
+                const note = Number(value); setNotePitchDraft(note); editNote({ note });
+                window.dispatchEvent(new CustomEvent('gba-studio:music-editor-preview-note-pitch', { detail: { clear: true } }));
+              }} style={{ height: 112, margin: 0, '--music-accent': token.colorPrimary } as React.CSSProperties} />
+              <Typography.Text type="secondary">{pitchName}</Typography.Text>
+            </div>
+            <Flex vertical justify="center" align="center" gap={12} style={{ flex: 1, minWidth: 0 }}>
+              <Flex vertical align="center" gap={4} style={{ width: '100%' }}><Typography.Text>{t('music.inspector.semitone')}</Typography.Text><Space.Compact><Tooltip title={t('music.inspector.lowerSemitone')}><Button aria-label={t('music.inspector.lowerSemitone')} style={{ width: 40 }} disabled={(noteSelection.minNote ?? noteSelection.note) <= 1} onClick={() => transposeNote(-1)}>-</Button></Tooltip><Tooltip title={t('music.inspector.raiseSemitone')}><Button aria-label={t('music.inspector.raiseSemitone')} style={{ width: 40 }} disabled={(noteSelection.maxNote ?? noteSelection.note) >= 96} onClick={() => transposeNote(1)}>+</Button></Tooltip></Space.Compact></Flex>
+              <Flex vertical align="center" gap={4} style={{ width: '100%' }}><Typography.Text>{t('music.inspector.octave')}</Typography.Text><Space.Compact><Tooltip title={t('music.inspector.lowerOctave')}><Button aria-label={t('music.inspector.lowerOctave')} style={{ width: 40 }} disabled={(noteSelection.minNote ?? noteSelection.note) <= 12} onClick={() => transposeNote(-12)}>-</Button></Tooltip><Tooltip title={t('music.inspector.raiseOctave')}><Button aria-label={t('music.inspector.raiseOctave')} style={{ width: 40 }} disabled={(noteSelection.maxNote ?? noteSelection.note) >= 85} onClick={() => transposeNote(12)}>+</Button></Tooltip></Space.Compact></Flex>
+            </Flex>
+          </Flex>
+          {noteSelection.count === 1 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><Flex justify="space-between" align="center"><Typography.Text>{t('music.inspector.length')}</Typography.Text><Typography.Text type="secondary">{noteLengthDraft}</Typography.Text></Flex><Slider className="gba-music-fader gba-sample-volume-fader" aria-label={t('music.inspector.length')} min={1} max={Math.max(1, editorInfo.patternRows - noteSelection.row)} step={1} value={Math.min(noteLengthDraft, Math.max(1, editorInfo.patternRows - noteSelection.row))} onChange={value => { const length = Number(value); setNoteLengthDraft(length); window.dispatchEvent(new CustomEvent('gba-studio:music-editor-preview-note-length', { detail: { length } })); }} onChangeComplete={value => { const length = Number(value); setNoteLengthDraft(length); editNote({ length }); window.dispatchEvent(new CustomEvent('gba-studio:music-editor-preview-note-length', { detail: { clear: true } })); }} style={{ width: '100%', margin: 0, '--music-accent': token.colorPrimary } as React.CSSProperties} /></div>}
+          <Divider orientation="left" plain style={{ margin: '8px 0' }}>{t('music.inspector.sound')}</Divider>
+          <Flex gap={24} justify="center">
+            <Flex vertical align="center" gap={8} style={{ flex: 1 }}>
+              <Typography.Text>{t('music.inspector.volume')}</Typography.Text>
+              <Tooltip title={noteSelection.volumeEditable === false ? t('music.inspector.readOnlyFormat', { format: editorInfo.format }) : ''}>
+                <Flex align="center" justify="center" style={{ height: 80 }}><MusicDial label={t('music.inspector.noteVolumeAria')} min={0} max={100} step={1} value={noteVolumeDraft} valueText={`${noteVolumeDraft}%`} disabled={noteSelection.volumeEditable === false} onChange={setNoteVolumeDraft} onChangeComplete={volume => editNote({ volume })} /></Flex>
+              </Tooltip>
+              <Typography.Text type="secondary">{noteVolumeDraft}%</Typography.Text>
+            </Flex>
+            <Flex vertical align="center" gap={8} style={{ flex: 1 }}>
+              <Typography.Text>Pan</Typography.Text>
+              <Tooltip title={noteSelection.panEditable === false ? t('music.inspector.panConflict') : t('music.inspector.panSnap')}>
+                <span><MusicDial panScale label={t('music.inspector.panAria')} min={-1} max={1} step={0.25} value={notePanDraft} disabled={noteSelection.panEditable === false} onChange={value => setNotePanDraft(quantizeTrackerNotePan(value))} onChangeComplete={value => editNote({ pan: quantizeTrackerNotePan(value) })} /></span>
+              </Tooltip>
+              <Typography.Text type="secondary">{notePanDraft === 0 ? t('music.inspector.center') : `${notePanDraft < 0 ? 'L' : 'R'} ${Math.abs(Math.round(notePanDraft * 100))}%`}</Typography.Text>
+            </Flex>
+          </Flex>
+        </Flex>
+      </section>}
+      {selectionKind === 'channel' && <section style={{ borderTop: `1px solid ${token.colorBorderSecondary}`, paddingTop: 10 }}>
+        <Space direction="vertical" style={{ display: 'flex', marginBottom: 10 }}>
+          <label>{t('music.channels.name')}<Input aria-label={t('music.channels.name')} value={channelNameDraft} maxLength={64} placeholder={t('music.channels.defaultName', { number: editorInfo.selectedChannel + 1 })} onChange={event => setChannelNameDraft(event.target.value)} onBlur={() => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-set-channel-settings', { detail: { channel: editorInfo.selectedChannel, name: channelNameDraft } }))} onPressEnter={event => event.currentTarget.blur()} /></label>
+          <label>{t('music.channels.allowedType')}<Select aria-label={t('music.channels.allowedType')} value={editorInfo.channelSettings?.[String(editorInfo.selectedChannel)]?.instrumentType ?? 'Any'} options={['Any', 'Duty', 'Wave', 'Noise', 'Other'].map(value => ({ value, label: value === 'Any' ? t('music.channels.anyType') : value === 'Other' ? t('music.instruments.other') : value }))} onChange={instrumentType => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-set-channel-settings', { detail: { channel: editorInfo.selectedChannel, instrumentType } }))} style={{ width: '100%' }} /></label>
+        </Space>
+        <Typography.Text type="secondary">CHANNEL {editorInfo.selectedChannel + 1} MIXER</Typography.Text>
+        <Space direction="vertical" style={{ display: 'flex', marginTop: 8 }}>
+          <Flex gap={12} align="center" justify="center">
+            <Flex vertical align="center" gap={8} style={{ flex: 1 }}>
+              <Typography.Text>{t('music.inspector.volume')}</Typography.Text>
+              <Flex align="center" justify="center" style={{ height: 80 }}><MusicDial label="Music channel volume dial" min={0} max={100} step={1} value={Math.round(editorInfo.channelVolume * 100)} valueText={`${Math.round(editorInfo.channelVolume * 100)}%`} onChange={value => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-set-channel', { detail: { kind: 'volume', value: Number(value) / 100 } }))} /></Flex>
+              <Typography.Text type="secondary">{Math.round(editorInfo.channelVolume * 100)}%</Typography.Text>
+            </Flex>
+            <Tooltip title={t(editorInfo.channelMuted ? 'music.channels.unmute' : 'music.channels.mute')}><Button type="default" danger={editorInfo.channelMuted} aria-label={t(editorInfo.channelMuted ? 'music.channels.unmute' : 'music.channels.mute')} aria-pressed={editorInfo.channelMuted} icon={editorInfo.channelMuted ? <AudioMutedOutlined /> : <SoundOutlined />} onClick={() => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-set-channel', { detail: { kind: 'toggle-mute' } }))} /></Tooltip>
+            <Flex vertical align="center" gap={8} style={{ flex: 1 }}>
+              <Typography.Text>Pan</Typography.Text>
+              <MusicDial panScale step={0.25} label="Music channel pan dial" value={editorInfo.channelPan} valueText={`${editorInfo.channelPan < 0 ? 'L' : editorInfo.channelPan > 0 ? 'R' : 'C'} ${Math.round(Math.abs(editorInfo.channelPan) * 100)}%`} onChange={value => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-set-channel', { detail: { kind: 'pan', value: quantizeTrackerNotePan(value) } }))} />
+              <Typography.Text type="secondary">{editorInfo.channelPan === 0 ? t('music.inspector.center') : `${editorInfo.channelPan < 0 ? 'L' : 'R'} ${Math.round(Math.abs(editorInfo.channelPan) * 100)}%`}</Typography.Text>
+            </Flex>
+          </Flex>
+        </Space>
+      </section>}
+      {selectionKind === 'instrument' && <section style={{ borderTop: `1px solid ${token.colorBorderSecondary}`, paddingTop: 10 }}>
+        <Typography.Text type="secondary">{t('music.instruments.instrumentNumber', { number: String(instrumentHierarchyNumber).padStart(2, '0') })}{instrumentCategory ? ` · ${instrumentCategory}` : ''}</Typography.Text>
+        {editorInfo.instrumentSample && <Space direction="vertical" size={8} style={{ display: 'flex', marginTop: 8 }}>
+          <Space.Compact block>
+            <ColorPicker onOpenChange={setInstrumentColorOpen} disabledAlpha rootClassName="gba-palette-color-picker" value={editorInfo.instrumentConfig?.color?.startsWith('#') ? editorInfo.instrumentConfig.color : editorInfo.instrumentPresetColors?.[String(editorInfo.selectedInstrument)] ?? ['#68c9b4', '#74a9ff', '#d995ff', '#ffbd68', '#fb8295', '#a9d275'][(editorInfo.selectedInstrument - 1) % 6]} onChange={value => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-set-instrument', { detail: { index: editorInfo.selectedInstrument - 1, type: editorInfo.instrumentCategories?.[String(editorInfo.selectedInstrument)] ?? editorInfo.channelInstrumentTypes?.[String(editorInfo.selectedChannel)] ?? 'Duty', color: value.toHexString() } }))}>
+              <Button className="gba-instrument-color-trigger" aria-label={t('music.instruments.color')} data-picker-open={instrumentColorOpen} style={{ width: 32, minWidth: 32, height: 32, padding: 0, border: `1px solid ${token.colorBorder}`, '--input-focus-border': token.colorPrimary, '--input-focus-shadow': `0 0 0 ${token.controlOutlineWidth}px ${token.controlOutline}`, background: editorInfo.instrumentConfig?.color ?? editorInfo.instrumentPresetColors?.[String(editorInfo.selectedInstrument)] ?? ['#68c9b4', '#74a9ff', '#d995ff', '#ffbd68', '#fb8295', '#a9d275'][(editorInfo.selectedInstrument - 1) % 6] } as React.CSSProperties} />
+            </ColorPicker>
+            <Input aria-label={t('music.instruments.name')} placeholder={t('music.instruments.namePlaceholder')} value={instrumentNameDraft} maxLength={editorInfo.canonicalProject ? 64 : editorInfo.format === 'MOD' ? 22 : undefined} disabled={!editorInfo.canonicalProject && editorInfo.format !== 'MOD'} onChange={event => setInstrumentNameDraft(event.target.value)} onBlur={() => { if (editorInfo.canonicalProject && instrumentNameDraft !== editorInfo.instrumentNames?.[String(editorInfo.selectedInstrument)]) window.dispatchEvent(new CustomEvent('gba-studio:music-editor-action', { detail: { kind: 'set-instrument-name', name: instrumentNameDraft } })); else if (editorInfo.format === 'MOD' && instrumentNameDraft !== editorInfo.instrumentSample?.name) editSample({ name: instrumentNameDraft }); }} onPressEnter={event => event.currentTarget.blur()} style={{ minWidth: 0 }} />
+          </Space.Compact>
+          <Tabs key={editorInfo.format} size="small" activeKey={instrumentTab} onChange={setInstrumentTab} items={[
+            { key: 'settings', label: t('music.instruments.settings'), children: <><Descriptions size="small" column={2}>
+          <Descriptions.Item label="Sample" span={2}>{editorInfo.instrumentSample.name || 'Unnamed sample'}</Descriptions.Item>
+          <Descriptions.Item>
+            <Tooltip title={!editorInfo.instrumentSampleEditable ? t('music.inspector.readOnlyFormat', { format: editorInfo.format }) : editorInfo.format === 'XM' ? t('music.inspector.xmSampleVolumeGbaPreview') : ''}>
+              <Flex vertical align="center" gap={6} style={{ width: '100%' }}>
+                <Typography.Text>{t('music.inspector.sampleVolume')}</Typography.Text>
+              <Flex align="center" justify="center" style={{ height: 80 }}><MusicDial label={t('music.inspector.sampleVolume')} min={0} max={100} step={1} value={Math.round((editorInfo.instrumentSample.volume ?? 64) / 64 * 100)} valueText={`${Math.round((editorInfo.instrumentSample.volume ?? 64) / 64 * 100)}%`} disabled={!editorInfo.instrumentSampleEditable} onChange={value => editSample({ volume: Math.round(value / 100 * 64) })} /></Flex>
+              <Typography.Text type="secondary">{Math.round((editorInfo.instrumentSample.volume ?? 64) / 64 * 100)}%</Typography.Text>
+              </Flex>
+            </Tooltip>
+          </Descriptions.Item>
+          {editorInfo.instrumentSampleTuningEditable && <Descriptions.Item>
+            <Flex vertical align="center" gap={6} style={{ width: '100%' }}>
+              <Typography.Text>{t('music.inspector.samplePan')}</Typography.Text>
+              <Tooltip title={t('music.inspector.panSnap')}>
+                <span><MusicDial panScale label={t('music.inspector.samplePan')} min={-1} max={1} step={0.25} value={instrumentSamplePan} valueText={instrumentSamplePan === 0 ? t('music.inspector.center') : `${instrumentSamplePan < 0 ? 'L' : 'R'} ${Math.abs(Math.round(instrumentSamplePan * 100))}%`} onChange={value => {
+                  const pan = quantizeTrackerNotePan(value);
+                  editSample({ panning: pan < 0 ? Math.round(128 + pan * 128) : Math.round(128 + pan * 127) });
+                }} /></span>
+              </Tooltip>
+              <Typography.Text type="secondary">{instrumentSamplePan === 0 ? t('music.inspector.center') : `${instrumentSamplePan < 0 ? 'L' : 'R'} ${Math.abs(Math.round(instrumentSamplePan * 100))}%`}</Typography.Text>
+            </Flex>
+          </Descriptions.Item>}
+          {editorInfo.instrumentSampleEditable ? <>
+            <Descriptions.Item label={t('music.inspector.loopStart')}>
+              <InputNumber aria-label={t('music.inspector.loopStart')} min={0} max={editorInfo.instrumentSample.length} step={editorInfo.format === 'MOD' ? 2 : 1} value={editorInfo.instrumentSample.loopStart} onChange={value => value !== null && value !== undefined && editSample({ loopStart: Number(value) })} />
+            </Descriptions.Item>
+            <Descriptions.Item label={t('music.inspector.loopEnd')}>
+              <InputNumber aria-label={t('music.inspector.loopEnd')} min={editorInfo.instrumentSample.loopStart} max={editorInfo.instrumentSample.length} step={editorInfo.format === 'MOD' ? 2 : 1} value={editorInfo.instrumentSample.loopEnd} onChange={value => value !== null && value !== undefined && editSample({ loopEnd: Number(value) })} />
+            </Descriptions.Item>
+          </> : <>
+            <Descriptions.Item label={t('music.inspector.loopStart')}>
+              <Tooltip title={t('music.inspector.readOnlyFormat', { format: editorInfo.format })}>
+                <span style={{ display: 'inline-block' }}><InputNumber aria-label={t('music.inspector.loopStart')} min={0} max={editorInfo.instrumentSample.length} value={editorInfo.instrumentSample.loopStart} disabled /></span>
+              </Tooltip>
+            </Descriptions.Item>
+            <Descriptions.Item label={t('music.inspector.loopEnd')}>
+              <Tooltip title={t('music.inspector.readOnlyFormat', { format: editorInfo.format })}>
+                <span style={{ display: 'inline-block' }}><InputNumber aria-label={t('music.inspector.loopEnd')} min={0} max={editorInfo.instrumentSample.length} value={editorInfo.instrumentSample.loopEnd} disabled /></span>
+              </Tooltip>
+            </Descriptions.Item>
+          </>}
+          {editorInfo.instrumentSampleTuningEditable && <>
+            <Descriptions.Item label={t('music.inspector.rootNote')}>
+              <InputNumber aria-label={t('music.inspector.rootNote')} min={-80} max={175} value={editorInfo.instrumentSample.rootNote} onChange={value => value !== null && value !== undefined && editSample({ rootNote: Number(value) })} />
+            </Descriptions.Item>
+          </>}
+          <Descriptions.Item label={t(editorInfo.format === 'MOD' ? 'music.inspector.fineTuneMod' : 'music.inspector.fineTune')}>
+            <Tooltip title={editorInfo.instrumentSampleFineTuneEditable ? '' : t('music.inspector.readOnlyFormat', { format: editorInfo.format })}>
+              <span style={{ display: 'inline-block' }}><InputNumber aria-label={t(editorInfo.format === 'MOD' ? 'music.inspector.fineTuneMod' : 'music.inspector.fineTune')} min={editorInfo.format === 'MOD' ? -8 : -128} max={editorInfo.format === 'MOD' ? 7 : 127} step={1} value={editorInfo.instrumentSample.fineTune} disabled={!editorInfo.instrumentSampleFineTuneEditable} onChange={value => value !== null && value !== undefined && editSample({ fineTune: Number(value) })} /></span>
+            </Tooltip>
+          </Descriptions.Item>
+          {!editorInfo.instrumentSampleTuningEditable && <Descriptions.Item label={t('music.inspector.sampleTuning')}><Typography.Text type="secondary">{t('music.inspector.sampleTuningReadOnly', { format: editorInfo.format })}</Typography.Text></Descriptions.Item>}
+            </Descriptions>
+            <Divider style={{ margin: '12px 0' }} />
+            <Typography.Text strong>{t('music.instruments.testInstrument')}</Typography.Text>
+            <Space.Compact block style={{ marginTop: 8 }}>
+              {Array.from({ length: 7 }, (_, index) => index + 2).map(octave => {
+                const testNote = () => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-test-instrument', { detail: { note: (octave - 1) * 12 + 1 } }));
+                return <Button key={octave} size="middle" style={{ flex: 1, minWidth: 0, height: 32, minHeight: 32, maxHeight: 32, paddingInline: 4 }} aria-label={t('music.instruments.testNote', { note: `C${octave}` })} onPointerDown={event => { if (event.button === 0) testNote(); }} onClick={event => { if (event.detail === 0) testNote(); }}>{`C${octave}`}</Button>;
+              })}
+            </Space.Compact></> },
+            { key: 'sample', label: t('music.instruments.sample'), children: <Space direction="vertical" size={8} style={{ display: 'flex' }}>
+              {editorInfo.capabilities.importWavSample && <Flex gap={6} wrap="wrap">
+                <Button size="small" onClick={() => sampleAudioInputRef.current?.click()}>{t('music.instruments.replaceSampleAudio')}</Button>
+                <Button size="small" icon={<AudioOutlined />} onClick={() => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-action', { detail: { kind: 'record-microphone' } }))}>{t('music.instruments.recordMicrophone')}</Button>
+                <input ref={sampleAudioInputRef} type="file" accept="audio/*,.wav" aria-label="Music sample audio file" hidden onChange={event => {
+                  const file = event.currentTarget.files?.[0];
+                  event.currentTarget.value = '';
+                  if (file) window.dispatchEvent(new CustomEvent('gba-studio:music-editor-action', { detail: { kind: 'import-sample', file, replaceSelected: true } }));
+                }} />
+              </Flex>}
+              {editorInfo.instrumentSample.pcmEditable && <Button size="small" onClick={() => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-action', { detail: { kind: 'open-sample-editor' } }))}>{t('music.sample.editorOpen')}</Button>}
+              {editorInfo.instrumentSample.waveform && <button type="button" aria-label={t('music.sample.editorOpen')} disabled={!editorInfo.instrumentSample.pcmEditable} onClick={() => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-action', { detail: { kind: 'open-sample-editor' } }))} style={{ display: 'block', width: '100%', padding: 0, border: 0, borderRadius: 5, background: 'transparent', cursor: editorInfo.instrumentSample.pcmEditable ? 'pointer' : 'default' }}><svg role="img" aria-label={t('music.sample.editorWaveform')} viewBox="0 0 640 64" preserveAspectRatio="none" style={{ display: 'block', width: '100%', height: 56, background: token.colorFillTertiary, borderRadius: 5 }}>
+                <line x1="0" y1="32" x2="640" y2="32" stroke={token.colorBorderSecondary} strokeWidth="1" />
+                <polyline points={editorInfo.instrumentSample.waveform.map((value, index) => `${index * 5},${32 - value * 28}`).join(' ')} fill="none" stroke={token.colorPrimary} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+              </svg></button>}
+              {editorInfo.instrumentSample.pcmEditable && <>
+                <Typography.Text type="secondary">{t('music.sample.edit.warning')}</Typography.Text>
+                <Flex gap={4} wrap="wrap">
+                  {(['normalize', 'remove-dc', 'reverse', 'fade-out'] as const).map(operation => <Button key={operation} size="small" onClick={() => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-edit-sample-pcm', { detail: { operation } }))}>{t(`music.sample.edit.${operation === 'remove-dc' ? 'removeDc' : operation === 'fade-out' ? 'fadeOut' : operation}`)}</Button>)}
+                </Flex>
+              </>}
+              <Descriptions size="small" column={1}>
+              <Descriptions.Item label={t('music.instruments.sampleLength')}>{editorInfo.instrumentSample.length} bytes</Descriptions.Item>
+              <Descriptions.Item label={t('music.instruments.sampleFormat')}>{editorInfo.format}{editorInfo.format === 'MOD' ? ' · 8-bit signed PCM' : ''}</Descriptions.Item>
+              <Descriptions.Item label={t('music.instruments.sampleLoop')}>{editorInfo.instrumentSample.loopEnd > editorInfo.instrumentSample.loopStart ? `${editorInfo.instrumentSample.loopStart}–${editorInfo.instrumentSample.loopEnd}` : t('music.inspector.noEffect')}</Descriptions.Item>
+              </Descriptions>
+            </Space> },
+            { key: 'envelopes', label: t('music.envelope.title'), disabled: !editorInfo.canonicalProject, children: <MusicInstrumentEnvelopeEditor
+              volume={editorInfo.instrumentEnvelopes?.volume ?? { points: [{ tick: 0, value: 1 }], sustainStart: 0, sustainEnd: 0, loopStart: 0, loopEnd: 0, enabled: false, sustainEnabled: false, loopEnabled: false }}
+              panning={editorInfo.instrumentEnvelopes?.panning ?? { points: [{ tick: 0, value: 0.5 }], sustainStart: 0, sustainEnd: 0, loopStart: 0, loopEnd: 0, enabled: false, sustainEnabled: false, loopEnabled: false }}
+              fadeout={editorInfo.instrumentEnvelopes?.fadeout ?? 0}
+              enabled={editorInfo.canonicalProject}
+              editable={editorInfo.canonicalProject && editorInfo.format === 'XM'}
+              onChange={(envelopeType, envelope, nextFadeout) => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-action', { detail: { kind: 'set-instrument-envelope', envelopeType, envelope, fadeout: nextFadeout } }))}
+            /> },
+            { key: 'zones', label: t('music.zones.title'), disabled: !editorInfo.canonicalProject, children: <MusicInstrumentZoneEditor
+              zones={editorInfo.instrumentZones?.zones ?? []}
+              samples={editorInfo.instrumentZones?.samples ?? []}
+              editable={editorInfo.canonicalProject}
+              onChange={zones => window.dispatchEvent(new CustomEvent('gba-studio:music-editor-action', { detail: { kind: 'set-instrument-zones', zones } }))}
+            /> },
+          ]} />
+        </Space>}
+        {!editorInfo.instrumentSample && <Typography.Text type="secondary" style={{ display: 'block', marginTop: 6 }}>No sample data available.</Typography.Text>}
+        {editorInfo.instrumentSample?.zones.map(zone => <Typography.Text key={zone} type="secondary" style={{ display: 'block', fontSize: 11 }}>{zone}</Typography.Text>)}
+      </section>}
+    </div> : selectedAsset ? <Space direction="vertical" style={{ width: '100%' }}>
+      <Tag>{selectedAsset.extension}</Tag>
+      <Typography.Text type="secondary">{t('music.inspector.fileInfo')}</Typography.Text>
+    </Space> : <Typography.Text type="secondary">{t('music.inspector.selectFile')}</Typography.Text>}
+  </div>;
+}
+
+const RightPanel: React.FC<IRightPanelProps & { musicEditorMode?: boolean }> = ({ musicEditorMode = false, ...props }) =>
+  musicEditorMode ? <MusicEditorRightPanel /> : <SceneRightPanel {...props} />;
 
 export default RightPanel;

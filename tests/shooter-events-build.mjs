@@ -16,7 +16,7 @@ try {
     { id: 'spawn-wave', command: 'EVENT_SHOOTER_SPAWN_WAVE', args: { waveId: 'wave_02' } },
     { id: 'load-stage', command: 'EVENT_SHOOTER_LOAD_STAGE', args: { waveId: 'wave_03', musicId: 'stage_music', musicVolume: 80, backgroundId: 'stage_bg', backgroundLayer: 1 } },
     { id: 'background-mode', command: 'EVENT_SHOOTER_SET_BACKGROUND_MODE', args: { layerId: 2, visible: false, scrollX: 12, scrollY: -8, parallaxX: 75, parallaxY: 125 } },
-    { id: 'ui-score', command: 'EVENT_UI_SET_TEXT', args: { text: 'SCORE 0010', x: -96, y: -72, font: 'fixed8x8' } },
+    { id: 'ui-score', command: 'EVENT_UI_SET_TEXT', args: { text: 'SCORE 0010', x: 24, y: 8, font: 'fixed8x8' } },
     { id: 'ui-value', command: 'EVENT_UI_SET_VALUE', args: { label: 'HP', value: 3, x: -112, y: -60, font: 'fixed8x8' } },
     { id: 'ui-animate', command: 'EVENT_UI_ANIMATE', args: { uiId: 'ui-score', animation: 'move', x: 80, y: 60, speed: 2 } },
     { id: 'sprite-effect', command: 'EVENT_SPRITE_EFFECT', args: { actorId: 'player', rotation: 15, scale: 125, visible: true, fadeColor: 'white', fadeIntensity: 40, durationFrames: 30 } },
@@ -37,9 +37,10 @@ try {
   assert.match(header, /stage_music/);
   assert.match(header, /stage_bg/);
   assert.match(header, /ShooterBackgroundModeEventData/);
-  assert.match(header, /background-mode/);
+  assert.match(header, /EVENT_SHOOTER_SET_BACKGROUND_MODE/);
   assert.match(header, /UiSetTextEventData/);
   assert.match(header, /SCORE 0010/);
+  assert.match(header, /"SCORE 0010", 24, 8, "fixed8x8"/);
   assert.match(header, /UiSetValueEventData/);
   assert.match(header, /HP/);
   assert.match(header, /UiAnimateEventData/);
@@ -60,5 +61,6 @@ try {
   assert.throws(() => builder.processResourceObject({ _resourceType: 'scene', id: 'bad', backgrounds: [], script: [{ id: 'bad', command: 'EVENT_SHOOTER_PAUSE', args: {} }] }), /paused is required/);
   console.log('Shooter events build contract passed.');
 } finally {
+  assert.ok(path.resolve(temp).startsWith(path.resolve(os.tmpdir()) + path.sep) && path.basename(temp).startsWith('gba-studio-shooter-events-'));
   fs.rmSync(temp, { recursive: true, force: true });
 }

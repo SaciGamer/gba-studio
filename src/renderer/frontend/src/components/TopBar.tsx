@@ -1,4 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { WarningField } from './WarningIndicator';
+import { getEditorAttention } from '@/utils/editorAttention';
+import { loadPaletteLibrary } from './resourceEditors/paletteLibrary';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AutoComplete, Dropdown, Input, Button, Tooltip, Flex, Typography, message } from 'antd';
 import { DownOutlined, FolderOpenOutlined, ExportOutlined, PlaySquareOutlined, CloseCircleOutlined, ToolFilled, CloseOutlined, LoadingOutlined } from '@ant-design/icons';
 import { AntdToken } from '../components/common/AntDToken';
@@ -7,6 +10,7 @@ import useAppContexts from '@/providers/contexts/AppContexts';
 import { useI18n } from '@/i18n/I18n';
 import { EDITORS, getEditor } from './pages/engine/editorRegistry';
 import { ZOOM_STEPS } from '@/utils/zoom';
+import { sceneSearchAfterSelection } from '@/utils/sceneSearch';
 
 interface TopBarProps {
   contenView: number;
@@ -25,8 +29,14 @@ interface SearchResult {
 const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerView }) => {
   const { token } = AntdToken();
   const { t } = useI18n();
-  const { settings, userSettings, setUserSettings, setSettingUtils, setElementSelected, scenes, scripts, variables, palettes, spriteResources, backgrounds } = useAppContexts();
+  const context = useAppContexts();
+  const { settings, userSettings, setUserSettings, settingUtils, setSettingUtils, setElementSelected, scenes, scripts, variables, palettes, spriteResources, backgrounds } = context;
   const [isBuildButtonHovered, setIsBuildButtonHovered] = useState(false);
+  const [editorMenuOpen, setEditorMenuOpen] = useState(false);
+  const [editorMenuOffset, setEditorMenuOffset] = useState<[number, number]>([0, 0]);
+  const [editorMenuPlacement, setEditorMenuPlacement] = useState<'bottomLeft' | 'bottomRight' | 'topLeft' | 'topRight'>('bottomLeft');
+  const editorMenuTrigger = useRef<HTMLButtonElement | null>(null);
+  const lastPointerPosition = useRef({ x: window.innerWidth / 2, y: 42 });
   const zoomSteps = ZOOM_STEPS;
 
   const resetZoom = () => {
@@ -61,9 +71,57 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
   };
 
   const [searchValue, setSearchValue] = useState<string>('');
+  const isWorldSearch = Number(contenView) === 1;
+  const updateSearch = (value: string) => {
+    if (isWorldSearch) setSettingUtils(previous => ({ ...previous, worldSceneSearch: value }));
+    else setSearchValue(value);
+  };
+  useEffect(() => {
+    setSettingUtils(previous => previous.worldSceneSearch ? { ...previous, worldSceneSearch: '' } : previous);
+  }, [settingUtils.projectPathFile]);
   const [assetFiles, setAssetFiles] = useState<Array<{ folder: string; filename: string; view: number }>>([]);
   const [selectedKey, setSelectedKey] = useState<number>(1);
   const { isBuilding, isRunning, setBuilding } = useBuildState();
+
+  useEffect(() => {
+    const trackPointer = (event: PointerEvent) => { lastPointerPosition.current = { x: event.clientX, y: event.clientY }; };
+    const openEditorMenuAtPointer = (event: KeyboardEvent) => {
+      if (editorMenuOpen && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (event.key !== 'Tab' || !event.ctrlKey || event.altKey || event.metaKey) return;
+      if (editorMenuOpen) {
+        event.preventDefault();
+        event.stopPropagation();
+        setEditorMenuOpen(false);
+        return;
+      }
+      const trigger = editorMenuTrigger.current;
+      if (!trigger) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const bounds = trigger.getBoundingClientRect();
+      const { x, y } = lastPointerPosition.current;
+      const popupWidth = 220;
+      const popupHeight = Math.min(420, menuItems.length * 34 + 12);
+      const openLeft = x + popupWidth > window.innerWidth;
+      const openAbove = y + popupHeight > window.innerHeight;
+      setEditorMenuPlacement(`${openAbove ? 'top' : 'bottom'}${openLeft ? 'Right' : 'Left'}` as 'bottomLeft' | 'bottomRight' | 'topLeft' | 'topRight');
+      setEditorMenuOffset([
+        x - (openLeft ? bounds.right : bounds.left),
+        y - (openAbove ? bounds.top : bounds.bottom),
+      ]);
+      setEditorMenuOpen(true);
+    };
+    window.addEventListener('pointermove', trackPointer, true);
+    window.addEventListener('keydown', openEditorMenuAtPointer, true);
+    return () => {
+      window.removeEventListener('pointermove', trackPointer, true);
+      window.removeEventListener('keydown', openEditorMenuAtPointer, true);
+    };
+  }, [editorMenuOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,11 +177,11 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
     controllerView(result.view);
     if (result.type === 'scene') {
       setElementSelected({ ...result.value, _recenter: true });
-      setSettingUtils(previous => ({ ...previous, selectedSceneIds: [result.value.id], activeSceneObject: null, activeTriggerId: null }));
+      setSettingUtils(previous => ({ ...previous, worldSceneSearch: sceneSearchAfterSelection(previous.worldSceneSearch, result.value), selectedSceneIds: [result.value.id], activeSceneObject: null, activeTriggerId: null }));
     } else if (result.type === 'actor' || result.type === 'trigger') {
       const { scene, [result.type]: object } = result.value;
-      setElementSelected({ ...scene, _recenter: true });
-      setSettingUtils(previous => ({ ...previous, selectedSceneIds: [scene.id], tileEditSceneId: scene.id, tileEditLayerId: 4, activeSceneObject: { sceneId: scene.id, type: result.type, id: object.id }, activeTriggerId: result.type === 'trigger' ? object.id : null }));
+      setElementSelected({ ...scene, _recenter: true, _recenterTarget: { type: result.type, id: object.id } });
+      setSettingUtils(previous => ({ ...previous, worldSceneSearch: sceneSearchAfterSelection(previous.worldSceneSearch, scene), selectedSceneIds: [scene.id], tileEditSceneId: scene.id, tileEditLayerId: 4, activeSceneObject: { sceneId: scene.id, type: result.type, id: object.id }, activeTriggerId: result.type === 'trigger' ? object.id : null }));
     } else if (result.type === 'script' || result.type === 'variable') {
       setElementSelected({ ...result.value, _resourceType: result.type === 'script' ? 'script' : 'variables' } as any);
       setSettingUtils(previous => ({ ...previous, selectedSceneIds: [], tileEditSceneId: null, tileEditLayerId: null, activeSceneObject: null, activeTriggerId: null }));
@@ -139,6 +197,7 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
   };
 
   const handleMenuClick = (item: any) => {
+    setEditorMenuOpen(false);
     setSelectedKey(item.key);
    
     controllerView(item.key);
@@ -165,13 +224,15 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
     }
   }
   
-  const menuItems = EDITORS.map(editor => ({ key: String(editor.id), label: t(editor.labelKey) }));
+  const editorAttention = getEditorAttention(context, palettes.palettes.length ? palettes.palettes : loadPaletteLibrary());
+  const menuItems = EDITORS.map(editor => ({ key: String(editor.id), label: <WarningField overlay warning={Boolean(editorAttention[editor.id])} message={t('events.hierarchyWarning')} style={{ paddingRight: 12 }}>{t(editor.labelKey)}</WarningField> }));
   const activeEditor = getEditor(Number(selectedKey));
 
   const menu = {
     items: menuItems,
+    defaultActiveFirst: false,
     onClick: (event: any) => { handleMenuClick(menu.items.find(item => item.key == event.key)), console.log('..: handleMenuClick dropdown'); },
-  };
+  } as any;
 
   useEffect(() => {
     const menuItem = menu.items.find(item => item.key === contenView.toString());
@@ -186,7 +247,7 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
   useEffect(() => {}, [isBuilding, isRunning]);
 
   return (
-    <Flex style={{ 
+    <Flex data-preview-topbar style={{
       width: '100%',
       height: '100%',
       boxSizing: 'border-box',
@@ -197,8 +258,8 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
       justifyContent: 'space-between',
       position: 'relative',
     }}>
-      <Dropdown menu={menu} placement="bottomLeft" trigger={['click']}>
-        <Button style={{ width: 'fit-content', minWidth: 150, maxWidth: 280, display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+      <Dropdown menu={menu} placement={editorMenuPlacement} trigger={['click']} open={editorMenuOpen} onOpenChange={setEditorMenuOpen} align={{ offset: editorMenuOffset }} autoFocus={false}>
+        <Button ref={editorMenuTrigger} onClick={() => { setEditorMenuPlacement('bottomLeft'); setEditorMenuOffset([0, 0]); }} style={{ width: 'fit-content', minWidth: 150, maxWidth: 280, display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
             {t(activeEditor.labelKey)}
           </span>
@@ -221,10 +282,12 @@ const TopBar: React.FC<TopBarProps> = ({ contenView, setContentView: controllerV
       <Flex style={{ gap: 8, alignItems: 'center' }}>
         <Input.Search 
           placeholder={t('common.search')}
+          aria-label={t('common.search')}
+          data-testid="topbar-search"
           allowClear
-          value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
-          onSearch={(value) => setSearchValue(value)}
+          value={isWorldSearch ? settingUtils.worldSceneSearch ?? '' : searchValue}
+          onChange={(e) => updateSearch(e.target.value)}
+          onSearch={updateSearch}
           disabled={!activeEditor.supportsSearch}
         />
         <Tooltip title={t('topbar.openFolder')} >

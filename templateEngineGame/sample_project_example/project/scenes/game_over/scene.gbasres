@@ -4,21 +4,26 @@
   "_index": 8,
   "_deleted": false,
   "name": "Game_Over",
-  "backgroundId": "2fcd4f90-d996-47fb-98cc-2125ba155f37",
   "background": "local://E:/VisualStudio/GBAStudioProject/gba-studio/templateEngineGame/sample_project_example/assets/backgrounds\\background.png",
   "backgrounds": [
     {
       "layerId": 0,
-      "backgroundId": "688cd1ca-7a51-4a76-8f2b-995e54175bb6",
+      "backgroundId": "1523219e-e9a3-4c6b-b2df-bab18ecd93f7",
       "name": "",
       "path": "",
-      "y": 0
+      "y": 0,
+      "__referenceWarnings": {
+        "backgroundId": "Resource reference was removed. Select a replacement."
+      }
     },
     {
       "layerId": 1,
-      "backgroundId": "b508d1ce-a1ca-4e23-b346-63128fd90412",
+      "backgroundId": "e0aec5a4-432f-4fa6-9de3-361854e64e68",
       "name": "",
-      "path": ""
+      "path": "",
+      "__referenceWarnings": {
+        "backgroundId": "Resource reference was removed. Select a replacement."
+      }
     },
     {
       "layerId": 2,
@@ -43,6 +48,29 @@
   },
   "script": [
     {
+      "id": "3554e8f3-0bb8-43f4-b2fc-d715c3800a6a",
+      "version": 1,
+      "command": "EVENT_STOP_MUSIC",
+      "args": {
+        "__collapse": false
+      }
+    },
+    {
+      "id": "359ebcb5-cb58-4e11-a353-a62be63a8748",
+      "version": 1,
+      "command": "EVENT_VARIABLE",
+      "args": {
+        "variableId": "aa7333a7-5485-42bb-9951-321e569a3063",
+        "variableSymbol": "variable_0",
+        "value": {
+          "kind": "literal",
+          "type": "boolean",
+          "value": false
+        },
+        "__collapse": false
+      }
+    },
+    {
       "id": "e994a749-f584-452e-ae6d-0ada4476b2a4",
       "version": 1,
       "command": "EVENT_FADE_OPTIONS",
@@ -56,7 +84,7 @@
       "version": 1,
       "command": "EVENT_HIDE_ALL_SPRITES",
       "args": {
-        "__collapse": true
+        "__collapse": false
       }
     },
     {
@@ -64,13 +92,15 @@
       "command": "EVENT_FADE_IN",
       "args": {
         "speed": 2,
-        "__automatic": true,
-        "__collapse": false
-      }
+        "__collapse": false,
+        "__comment": false,
+        "__automatic": true
+      },
+      "version": 1
     },
     {
       "id": "d749dcb3-03be-44d8-b2e3-52a8ed279fdf",
-      "version": 2,
+      "version": 1,
       "command": "EVENT_FOR",
       "args": {
         "variableId": "f9bb5b28-5973-4192-9053-7b974a8ee7a2",
@@ -111,6 +141,19 @@
       }
     },
     {
+      "id": "a2e60b0f-4f8a-45ee-a040-6aee11b4b15c",
+      "version": 1,
+      "command": "EVENT_VARIABLES_SAVE",
+      "args": {
+        "slot": 7,
+        "allVariables": false,
+        "variableIds": [
+          "4a1e1435-d1c2-497d-b677-5799af71b940"
+        ],
+        "__collapse": false
+      }
+    },
+    {
       "id": "ebfdbe41-e786-4927-ab11-96bb7f79fe01",
       "version": 1,
       "command": "EVENT_WAIT",
@@ -137,10 +180,11 @@
         },
         "direction": "right",
         "fadeSpeed": 2,
-        "__collapse": true
+        "__collapse": false
       }
     }
   ],
   "_recenter": true,
-  "showCamera": true
+  "showCamera": true,
+  "actors": []
 }

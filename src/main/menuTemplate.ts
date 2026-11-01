@@ -1,7 +1,7 @@
 import { app, ipcMain, Menu, MenuItem, MenuItemConstructorOptions, shell } from 'electron';
 import { updatePreferences, getPreferences } from './handlers/preferenceHandlers';
 import { changeTheme, createAboutWindow, createLauncherWindow, packageJson, windows } from './main'
-import { requestSaveChanges } from './services/saveSettingsService';
+import { refreshWindowTitle, requestSaveChanges } from './services/saveSettingsService';
 import { createMainTranslator } from './mainI18n';
 import { checkForUpdates } from './services/updateService';
 
@@ -75,7 +75,8 @@ function menuTemplate(): MenuItemConstructorOptions[] {
                 { label: 'Cut', accelerator: 'CmdOrCtrl+X', click: () => windows.main?.webContents.send('scene-cut') },
                 { label: 'Copy', accelerator: 'CmdOrCtrl+C', click: () => windows.main?.webContents.send('scene-copy') },
                 { label: 'Paste', accelerator: 'CmdOrCtrl+V', click: () => windows.main?.webContents.send('scene-paste') },
-                { label: 'Delete', accelerator: 'Delete', click: () => windows.main?.webContents.send('scene-delete') },
+                { label: 'Duplicate', accelerator: 'CmdOrCtrl+D', click: () => windows.main?.webContents.send('scene-duplicate') },
+                { label: 'Delete', accelerator: 'Delete', click: () => windows.main?.webContents.send('editor-delete') },
                 { label: 'Select All', accelerator: 'CmdOrCtrl+A', click: () => windows.main?.webContents.send('scene-select-all') },
                 { type: 'separator' },
                 // {
@@ -275,6 +276,7 @@ function updateLanguage(menuItem: MenuItem, language: string): void {
     console.log('..: Mudando idioma para: ', language);
 
     updatePreferences('language', language);
+    refreshWindowTitle();
 
     // Envia evento para todas as janelas abertas
     if (windows.main) {
@@ -283,8 +285,25 @@ function updateLanguage(menuItem: MenuItem, language: string): void {
     if (windows.launcher) {
         windows.launcher.webContents.send('change-language', language);
     }
+    if (windows.emulator && !windows.emulator.isDestroyed()) {
+        windows.emulator.webContents.send('change-language', language);
+    }
+    if (windows.runtimeMonitor && !windows.runtimeMonitor.isDestroyed()) {
+        windows.runtimeMonitor.webContents.send('change-language', language);
+    }
 
     Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate()));
+
+    // Rebuild first, then clear per-window menus. Applying the application menu
+    // afterward can restore Electron's default menu on auxiliary windows.
+    if (windows.emulator && !windows.emulator.isDestroyed()) {
+        windows.emulator.setMenu(null);
+        windows.emulator.setMenuBarVisibility(false);
+    }
+    if (windows.runtimeMonitor && !windows.runtimeMonitor.isDestroyed()) {
+        windows.runtimeMonitor.setMenu(null);
+        windows.runtimeMonitor.setMenuBarVisibility(false);
+    }
 
 }
 

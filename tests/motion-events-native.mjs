@@ -21,6 +21,8 @@ try {
       bool apply_script_actor_state(const char*,const actor_motion::State& next,actor_motion::Action){state=next;return true;}
       void stop_script_actor_motion(const char*){++stops;}
       int read_numeric_actor_property(const char*,int)const{return animation_speed;}
+      bool script_actor_blocked(const char*,const Sprites&,int,int)const{return false;}
+      int script_actor_minimum_distance(const char*,const Sprites&,int,int)const{return 0;}
       bool set_actor_animation_speed(const char*,int speed){animation_speed=speed;return true;}
     };`;
   fs.writeFileSync(path.join(temp,'graphics_manager.h'),graphics);
@@ -46,24 +48,45 @@ try {
       CameraEventData instant{44,55};assert(CameraEventHandler::execute_status(&instant,camera_state)==EventStatus::completed&&camera.x==44&&camera.y==55);
       auto& graphics=GraphicsManager::instance();graphics.scene.scene_type="Top Down";graphics.scene.scene_width=160;graphics.scene.scene_height=128;
       graphics.body.frame_width=16;graphics.body.frame_height=16;graphics.body.collision_x=-4;graphics.body.collision_y=-4;graphics.body.collision_width=8;graphics.body.collision_height=8;
-      SceneCollision wall{"wall",64,0,8,96,"solid"};graphics.scene.collisions=&wall;graphics.scene.collisions_count=1;graphics.state.x=32;graphics.state.y=64;
+      SceneCollision wall{64,0,8,96,"solid"};graphics.scene.collisions=&wall;graphics.scene.collisions_count=1;graphics.state.x=32;graphics.state.y=64;
       auto& motion=ActorMotionManager::instance();MotionEventState actor_state;ActorMoveEventData move{"__PLAYER__",112,64,true,256,8};
-      assert(motion.advance(move,actor_state)==EventStatus::running);assert(motion.controls_player());
+      assert(motion.advance(move,actor_state)==EventStatus::running);assert(motion.controls_player());assert(motion.controls_actor("__PLAYER__") && !motion.controls_actor("other"));
       assert(graphics.animation_speed==8);
       frames=0;EventStatus result=EventStatus::running;
       while(result==EventStatus::running){result=motion.advance(move,actor_state);assert(++frames<5000);}
       assert(result==EventStatus::completed&&graphics.state.x==112&&graphics.state.y==64&&!motion.controls_player()&&!actor_state.active);
       assert(graphics.animation_speed==6);
       move.x=68;frames=0;do{result=motion.advance(move,actor_state);assert(++frames<5000);}while(result==EventStatus::running);
-      assert(result==EventStatus::failed&&!motion.controls_player()&&!actor_state.active);
+      assert(result==EventStatus::completed&&graphics.state.x==76&&graphics.state.y==64&&!motion.controls_player()&&!actor_state.active);
       move.x=32;assert(motion.advance(move,actor_state)==EventStatus::running);motion.cancel(&actor_state);assert(!motion.controls_player()&&!actor_state.active);
       assert(graphics.animation_speed==6);
       assert(motion.advance(move,actor_state)==EventStatus::running);++graphics.revision;assert(motion.advance(move,actor_state)==EventStatus::failed&&!motion.controls_player());
       move.actor_id="missing";assert(motion.advance(move,actor_state)==EventStatus::failed);
       move.actor_id="__PLAYER__";move.x=999;move.y=999;graphics.scene.collisions=nullptr;graphics.scene.collisions_count=0;
       frames=0;do{result=motion.advance(move,actor_state);assert(++frames<5000);}while(result==EventStatus::running);
-      assert(result==EventStatus::completed&&graphics.state.x==144&&graphics.state.y==112);
-      std::cout<<"Motion events: camera interpolation and exact completion, actor detours, failed destinations, cancellation and scene changes passed.\\n";
+      assert(result==EventStatus::completed&&graphics.state.x==156&&graphics.state.y==124);
+      // fase_01: door origin Y=428 becomes tile Y=26 (416 pixels),
+      // above the player's supported origin Y=428 on the floor at Y=432.
+      graphics.scene.scene_type="Platformer";graphics.scene.scene_width=256;graphics.scene.scene_height=512;
+      SceneCollision floor{160,432,96,16,"solid"};graphics.scene.collisions=&floor;graphics.scene.collisions_count=1;
+      graphics.body.canvas_origin_x=8;graphics.body.canvas_origin_y=12;
+      graphics.body.collision_x=-7;graphics.body.collision_y=-10;graphics.body.collision_width=14;graphics.body.collision_height=14;
+      for(const int requested_y : {416,428}) {
+        graphics.state={};graphics.state.x=224;graphics.state.y=428;
+        move.x=240;move.y=requested_y;move.speed_q8=256;frames=0;
+        do { const int previous_x=graphics.state.x;result=motion.advance(move,actor_state);
+          assert(++frames<24);assert(graphics.state.x>=previous_x);assert(graphics.state.y==428);
+        } while(result==EventStatus::running);
+        assert(result==EventStatus::completed&&graphics.state.x==240&&graphics.state.y==428);
+      }
+      graphics.state.x=100;graphics.state.y=64;graphics.scene.scene_type="Adventure";move.actor_id="__PLAYER__";move.x=32;move.y=64;
+      MotionEventState stopped;
+      assert(motion.advance(move,stopped)==EventStatus::running);
+      const int stoppedX=graphics.state.x;
+      motion.stop_actor("__PLAYER__");
+      assert(stopped.stopped && !motion.controls_player());
+      assert(motion.advance(move,stopped)==EventStatus::completed && graphics.state.x==stoppedX && !stopped.stopped);
+      std::cout<<"Motion events: camera interpolation and exact completion, actor detours, nearest blocked destinations, cancellation and scene changes passed.\\n";
     }
   `);
   const executable=path.join(temp,'test.exe');

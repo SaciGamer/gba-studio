@@ -14,7 +14,10 @@ export default defineConfig({
   base: './',
   build: {
     outDir: '../../../dist/renderer',
-    emptyOutDir: true,
+    // The main TypeScript build emits tracker helpers imported by AssetBuilder
+    // under dist/renderer/frontend. Keep those files when Vite writes its UI.
+    // The root build cleans dist before building, so stale output is still removed.
+    emptyOutDir: false,
     rollupOptions: {
       external: ['electron', 'path', 'fs'], 
     },

@@ -1,3 +1,4 @@
+import { isModalOpen } from '@/utils/isModalOpen';
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { LayoutFilled } from '@ant-design/icons';
 import { Dropdown, FloatButton, Popover, Row, Tooltip } from 'antd';
@@ -102,6 +103,7 @@ const FloatButttons: React.FC<IFloatButttons> = ({ actions, onResetPanelSize, on
   useEffect(() => {
     const getShortcut = (tooltip?: string) => tooltip?.match(/\(([^)]+)\)/)?.[1]?.toLowerCase();
     const onKeyDown = (event: KeyboardEvent) => {
+      if (isModalOpen()) return;
       if (event.ctrlKey || event.metaKey || event.altKey || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
       const key = event.key.toLowerCase();
       for (const action of actions) {
@@ -131,8 +133,8 @@ const FloatButttons: React.FC<IFloatButttons> = ({ actions, onResetPanelSize, on
     insetInlineEnd: 'auto', // Alinha ao final do Inline
     ...(floatingPosition ? {
       position: 'fixed' as const,
-      insetBlockStart: floatingPosition.top,
-      insetInlineStart: floatingPosition.left,
+      insetBlockStart: `var(--gba-world-top, ${floatingPosition.top}px)`,
+      insetInlineStart: `var(--gba-world-left, ${floatingPosition.left}px)`,
     } : {}),
   };
 
@@ -158,9 +160,9 @@ const FloatButttons: React.FC<IFloatButttons> = ({ actions, onResetPanelSize, on
 
   const subMenuStyle: CSSProperties = {
     position: floatingPosition ? 'fixed' : 'absolute',
-    insetBlockStart: floatingPosition ? floatingPosition.top : 15,
+    insetBlockStart: floatingPosition ? `var(--gba-world-top, ${floatingPosition.top}px)` : 15,
     insetBlockEnd: 'auto',
-    insetInlineStart: floatingPosition ? floatingPosition.left + FLOAT_SUBMENU_OFFSET : 15 + FLOAT_SUBMENU_OFFSET,
+    insetInlineStart: floatingPosition ? `calc(var(--gba-world-left, ${floatingPosition.left}px) + ${FLOAT_SUBMENU_OFFSET}px)` : 15 + FLOAT_SUBMENU_OFFSET,
     insetInlineEnd: 'auto',
     flexDirection: 'row',  // Menu em Horizontal
   };

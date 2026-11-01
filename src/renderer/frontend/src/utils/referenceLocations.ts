@@ -9,6 +9,8 @@ export interface ReferenceLocation {
   script?: string;
   variable?: string;
   event?: string;
+  eventId?: string;
+  tab?: string;
 }
 
 const eventLabel = (event: IScriptsElement) => event.args?.__name || event.command;
@@ -32,7 +34,10 @@ const walkEvents = (
     const matches = kind === 'script'
       ? event.command === 'EVENT_CALL_SCRIPT' && (event.args as { scriptId?: string } | undefined)?.scriptId === targetId
       : containsVariableReference(event, targetId);
-    if (matches) result.push({ ...location, event: eventLabel(event) });
+    if (matches) result.push({ ...location, event: eventLabel(event), eventId: event.id,
+      tab: location.sceneObject?.type === 'actor' ? location.script?.endsWith('On Init') ? 'init' : location.script?.endsWith('On Update') ? 'update' : 'interact'
+        : location.sceneObject?.type === 'trigger' ? location.script?.endsWith('On Leave') ? 'leave' : 'enter'
+          : location.script?.startsWith('Player Hit ') ? `hit${location.script.slice(-1)}` : '1' });
     walkEvents(event.children?.then, location, targetId, kind, result);
     walkEvents(event.children?.else, location, targetId, kind, result);
   }

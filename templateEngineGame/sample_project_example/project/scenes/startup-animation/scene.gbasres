@@ -1,0 +1,169 @@
+{
+  "id": "bbe8da5c-1630-44cb-8321-ff4488a69fee",
+  "_resourceType": "scene",
+  "_index": 3,
+  "_deleted": false,
+  "name": "Startup - Animation",
+  "background": "local://E:/VisualStudio/GBAStudioProject/gba-studio/templateEngineGame/sample_project_example/assets/backgrounds\\background.bmp",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": null,
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 2,
+      "backgroundId": null,
+      "name": "",
+      "path": "",
+      "x": 0
+    }
+  ],
+  "x": 266,
+  "y": -126,
+  "width": 240,
+  "height": 160,
+  "cameraPosition": {
+    "x": 0,
+    "y": 0
+  },
+  "sceneType": "Logo",
+  "editorPosition": {
+    "x": 266,
+    "y": -126
+  },
+  "renderMode": "direct_bitmap",
+  "imageType": "dp_direct_bitmap_bg",
+  "script": [
+    {
+      "id": "a9ea69bd-e2fa-4525-95e4-72de6e286cea",
+      "version": 1,
+      "command": "EVENT_HIDE_ACTOR",
+      "args": {
+        "actorId": "__PLAYER__",
+        "__collapse": false
+      }
+    },
+    {
+      "id": "2b883488-47be-4d4a-9fce-dead6eebd8e4",
+      "version": 1,
+      "command": "EVENT_ACTOR_SET_STATE",
+      "args": {
+        "actorId": "__PLAYER__",
+        "stateId": "state-1791400556442",
+        "__collapse": false
+      }
+    },
+    {
+      "id": "42839de5-16c1-4391-bb6f-c1c0e973227f",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 1,
+        "__automatic": true,
+        "__collapse": true
+      },
+      "version": 1
+    },
+    {
+      "id": "b7fb2d42-11e6-4171-aeeb-218cea4eddbe",
+      "version": 1,
+      "command": "EVENT_SHOW_ACTOR",
+      "args": {
+        "actorId": "__PLAYER__",
+        "__collapse": false
+      }
+    },
+    {
+      "id": "0731c7fb-fc41-42f9-9c59-75190734cb7b",
+      "version": 1,
+      "command": "EVENT_MOVE_ACTOR",
+      "args": {
+        "collideWalls": true,
+        "collideActors": false,
+        "lockDirection": "none",
+        "movementType": "horizontal-first",
+        "animated": true,
+        "speed": 1,
+        "actorId": "__PLAYER__",
+        "x": 13,
+        "y": 125,
+        "xUnit": "tiles",
+        "yUnit": "pixels",
+        "__collapse": false
+      }
+    },
+    {
+      "id": "61cff2e5-78f5-44b0-8bf0-6085225196fe",
+      "version": 1,
+      "command": "EVENT_ACTOR_SET_DIRECTION",
+      "args": {
+        "actorId": "__PLAYER__",
+        "direction": "down",
+        "__collapse": true
+      }
+    },
+    {
+      "id": "100c67dd-4f03-4c01-8217-b8154aa616ea",
+      "version": 1,
+      "command": "EVENT_BACKGROUND_ANIMATE",
+      "args": {
+        "layerId": 2,
+        "backgroundId": "f89d1930-3dcd-4828-a9f3-bdd9738beb0d",
+        "direction": "horizontal",
+        "frameWidth": 0,
+        "frameHeight": 0,
+        "step": 240,
+        "frameCount": 0,
+        "startFrame": 1,
+        "endFrame": 0,
+        "reverse": true,
+        "durationFrames": 2,
+        "loop": false,
+        "__backgroundCompatibility": {
+          "issues": [],
+          "affine": false,
+          "image": "gba_studio_anim"
+        },
+        "__collapse": false,
+        "customSpeed": true,
+        "speedUnit": "frames"
+      }
+    },
+    {
+      "id": "2d00db8d-0001-4d45-8e77-e8efa2ec623b",
+      "version": 1,
+      "command": "EVENT_WAIT",
+      "args": {
+        "units": "time",
+        "time": 3,
+        "frames": 0,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "6f260386-8644-4ca2-b74b-9dd7c3e19b1c",
+      "version": 1,
+      "command": "EVENT_CHANGE_SCENE",
+      "args": {
+        "sceneId": "738ec3e3-374f-44a8-8bda-8a027cce1d08",
+        "x": {
+          "type": "number",
+          "value": 0
+        },
+        "y": {
+          "type": "number",
+          "value": 0
+        },
+        "xUnit": "tiles",
+        "yUnit": "tiles",
+        "direction": "right",
+        "fadeSpeed": 2,
+        "__collapse": false
+      }
+    }
+  ],
+  "showCamera": false,
+  "_recenter": true,
+  "actors": []
+}

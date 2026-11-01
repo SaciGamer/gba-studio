@@ -1,0 +1,93 @@
+{
+  "id": "abad4acb-f49c-4c4f-bb65-9bd2eec66aab",
+  "_resourceType": "scene",
+  "_index": 11,
+  "_deleted": false,
+  "name": "Loading1",
+  "background": "local://E:/VisualStudio/GBAStudioProject/gba-studio/templateEngineGame/sample_project_example/assets/backgrounds\\background.bmp",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": "1523219e-e9a3-4c6b-b2df-bab18ecd93f7",
+      "__referenceWarnings": {
+        "backgroundId": "Resource reference was removed. Select a replacement."
+      },
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 1,
+      "backgroundId": null,
+      "name": "",
+      "path": "",
+      "x": 0
+    }
+  ],
+  "x": 666,
+  "y": 114,
+  "width": 256,
+  "height": 256,
+  "cameraPosition": {
+    "x": 8,
+    "y": 40
+  },
+  "sceneType": "Top Down",
+  "editorPosition": {
+    "x": 666,
+    "y": 114
+  },
+  "tileAnimations": [],
+  "showCamera": true,
+  "script": [
+    {
+      "id": "86a30ae0-99c6-4600-a24c-5aad6107548d",
+      "version": 1,
+      "command": "EVENT_HIDE_ACTOR",
+      "args": {
+        "actorId": "__PLAYER__",
+        "__collapse": true
+      }
+    },
+    {
+      "id": "fdbe093a-c060-4366-835b-bad63451c636",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 1,
+        "__automatic": true,
+        "__collapse": true
+      },
+      "version": 1
+    },
+    {
+      "id": "f966e940-7eac-4f71-aa92-1afe98dc07ee",
+      "version": 1,
+      "command": "EVENT_WAIT",
+      "args": {
+        "units": "time",
+        "time": 1,
+        "frames": 0,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "044cb7f6-2683-48fe-9a2b-98916ff5acbe",
+      "version": 1,
+      "command": "EVENT_CALL_SCRIPT",
+      "args": {
+        "scriptId": "ce738717-d102-4bf5-9254-63af2eeefb45",
+        "arguments": [
+          {
+            "parameterId": "__PARAM__:A",
+            "value": {
+              "kind": "variable",
+              "variableId": "50944154-9406-4b71-bb85-ce08e53d85be"
+            }
+          }
+        ],
+        "__collapse": true
+      }
+    }
+  ],
+  "actors": [],
+  "_recenter": true
+}

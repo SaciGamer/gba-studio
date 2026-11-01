@@ -5,7 +5,7 @@ import fs from 'fs';
 import os from 'os';
 import isDev from 'electron-is-dev';
 import { CompileOptions, CompileResult } from '../types/BuildTypes';
-import { windows } from '@/main';
+import { sendMainWindowMessage } from '@/main';
 import { locateCompiledOutput } from './compiledOutput';
 
 let activeCompileProcess: ChildProcess | null = null;
@@ -75,9 +75,7 @@ const compileGBA = (options: CompileOptions | { cwd?: string }): Promise<Compile
     }
 
     // Helper to broadcast progress/errors to all renderer windows
-    const broadcast = (channel: string, payload: any) => {
-      windows.main?.webContents.send(channel, payload);
-    };
+    const broadcast = (channel: string, payload: any) => sendMainWindowMessage(channel, payload);
 
     // Notify renderer that compilation started
     broadcast('compile-progress', {

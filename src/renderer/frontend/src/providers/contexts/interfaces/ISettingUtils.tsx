@@ -17,6 +17,7 @@ interface IZoom {
 }
 
 export interface ISettingUtils extends IBaseSettings, IActiveButtons, IImages, IZoom {
+    referenceTarget?: { eventId?: string; tab?: string; requestId: number };
     _resourceType: string;
     projectPathFile: string | null;
     projectDirectory: string | null;
@@ -42,8 +43,12 @@ export interface ISettingUtils extends IBaseSettings, IActiveButtons, IImages, I
     /** Trigger selected while editing the active tile layout. */
     activeTriggerId?: string | null;
     activeSceneObject?: { sceneId: string; type: 'actor' | 'trigger'; id: string } | null;
+    /** Prefab currently following the pointer for placement in a scene. */
+    pendingPrefabPlacement?: string | null;
     /** Scene IDs selected in the world graph; the last one is the active scene. */
     selectedSceneIds?: string[];
+    /** Transient scene-name filter for the central Game World view. */
+    worldSceneSearch?: string;
 }
 
 export interface SettingUtilsContextType {

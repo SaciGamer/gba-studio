@@ -6,10 +6,16 @@ const source = fs.readFileSync('src/renderer/frontend/src/utils/runtimeMonitor.t
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const context = { exports: {} }; vm.runInNewContext(code, context);
 const { parseRuntimeSnapshot: parse, memoryLevel, resourceLevel } = context.exports;
-const message = '[libretro INFO] [GBAS_MONITOR:1]120,14000,512,1024,17000,64000,1000,180000,160000,12,116,100,924,2,30,12,100,2;';
+const message = '[libretro INFO] [GBAS_MONITOR:1]120,14000,512,1024,17000,64000,1000,180000,160000,12,116,100,924,2,30,12,100,2,0,16000;';
 const snapshot = parse(message);
+const current = message.replace(',16000;', ',16000,125,250;');
+assert.equal(parse(current).cpuAveragePercent, 12.5);
+assert.equal(parse(current).cpuPeakPercent, 25);
+assert.equal(parse(current.replace('GBAS_MONITOR:1', 'GBAS_MONITOR:2')), null);
 assert.equal(snapshot.frame, 120); assert.equal(snapshot.iwramStatic, 14000); assert.equal(snapshot.heapFree, 180000);
 assert.equal(snapshot.bgBlocksFree, 30);
+assert.equal(snapshot.iwramFree, 16000);
+assert.equal(parse(message.replace(',16000;', ',-32;')).iwramFree, -32);
 assert.equal(parse(message + 'old debug buffer contents').frame, 120);
 for (const invalid of [null, '[GBAS_MONITOR:2]1,2;', '[GBAS_MONITOR:1]1,,2;', message.replace('180000', '999999'), message.replace(',512,', ',-1,'), 'normal game log']) assert.equal(parse(invalid), null);
 assert.equal(parse(message.replace(',17000,', ',-32,')).iwramMinFree, -32);

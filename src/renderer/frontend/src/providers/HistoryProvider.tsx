@@ -1,5 +1,7 @@
+import { isModalOpen } from '@/utils/isModalOpen';
+import { createHistorySnapshotCache } from './historySnapshot';
 import React, { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { BackgroundContext, ElementContext, PalettesContext, ProjectContext, SceneContext, ScriptsContext, SettingsContext, SettingsUtilsContext, SpriteContext, VariablesContext } from './Providers';
+import { BackgroundContext, ElementContext, PalettesContext, PrefabsContext, ProjectContext, SceneContext, ScriptsContext, SettingsContext, SettingsUtilsContext, SpriteContext, VariablesContext } from './Providers';
 
 type Snapshot = {
   project: unknown;
@@ -9,6 +11,7 @@ type Snapshot = {
   sprites: unknown;
   scripts: unknown;
   palettes: unknown;
+  prefabs: unknown;
   variables: unknown;
   selected: unknown;
   selectedSceneIds: unknown;
@@ -26,16 +29,6 @@ type HistoryContextValue = {
 export const HistoryContext = createContext<HistoryContextValue | undefined>(undefined);
 
 const clone = <T,>(value: T): T => value === undefined ? value : JSON.parse(JSON.stringify(value)) as T;
-
-const withoutTransientFields = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(withoutTransientFields);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value as Record<string, unknown>)
-      .filter(([key]) => key !== '_saved')
-      .map(([key, item]) => [key, withoutTransientFields(item)]));
-  }
-  return value;
-};
 
 const nextId = () => crypto.randomUUID();
 
@@ -93,6 +86,7 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
   const sprites = useContext(SpriteContext)!;
   const scripts = useContext(ScriptsContext)!;
   const palettes = useContext(PalettesContext)!;
+  const prefabs = useContext(PrefabsContext)!;
   const variables = useContext(VariablesContext)!;
   const element = useContext(ElementContext)!;
   const settingsUtils = useContext(SettingsUtilsContext)!;
@@ -100,10 +94,10 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
   const [redoStack, setRedoStack] = useState<Snapshot[]>([]);
   const [limit, setLimit] = useState(50);
   const previousRef = useRef<Snapshot | null>(null);
-  const previousSignatureRef = useRef('');
+  const [snapshotCache] = useState(createHistorySnapshotCache);
   const restoringRef = useRef(false);
 
-  const snapshot = useMemo<Snapshot>(() => ({
+  const snapshot = useMemo<Snapshot>(() => snapshotCache.capture({
     project: project.project,
     settings: settings.settings,
     scenes: scene.scenes,
@@ -111,24 +105,12 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
     sprites: sprites.spriteResources,
     scripts: scripts.scripts,
     palettes: palettes.palettes,
+    prefabs: prefabs.prefabs,
     variables: variables.variables,
     selected: element.elementSelected,
     selectedSceneIds: settingsUtils.settingUtils.selectedSceneIds ?? [],
-  }), [project.project, settings.settings, scene.scenes, backgrounds.backgrounds, sprites.spriteResources, scripts.scripts, palettes.palettes, variables.variables, element.elementSelected, settingsUtils.settingUtils.selectedSceneIds]);
-  // Selection is part of navigation history too, so undo always restores the
-  // exact editing context as well as the changed resource.
-  const signature = useMemo(() => JSON.stringify(withoutTransientFields({
-    project: snapshot.project,
-    settings: snapshot.settings,
-    scenes: snapshot.scenes,
-    backgrounds: snapshot.backgrounds,
-    sprites: snapshot.sprites,
-    scripts: snapshot.scripts,
-    palettes: snapshot.palettes,
-    variables: snapshot.variables,
-    selected: snapshot.selected,
-    selectedSceneIds: snapshot.selectedSceneIds,
-  })), [snapshot]);
+  }), [snapshotCache, project.project, settings.settings, scene.scenes, backgrounds.backgrounds, sprites.spriteResources, scripts.scripts, palettes.palettes, prefabs.prefabs, variables.variables, element.elementSelected, settingsUtils.settingUtils.selectedSceneIds]);
+  // Navigation remains undoable, but unchanged resource trees are shared.
 
   useEffect(() => {
     void window.electronAPI.loadPreferences?.().then((preferences: { historyLimit?: number }) => {
@@ -151,14 +133,12 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!previousRef.current) {
-      previousRef.current = clone(snapshot);
-      previousSignatureRef.current = signature;
+      previousRef.current = snapshot;
       return;
     }
     if (restoringRef.current) {
       restoringRef.current = false;
-      previousRef.current = clone(snapshot);
-      previousSignatureRef.current = signature;
+      previousRef.current = snapshot;
       return;
     }
     // Resource loading starts from empty providers. It is the initial baseline,
@@ -166,53 +146,50 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
     if (!previousRef.current.project && snapshot.project) {
       setUndoStack([]);
       setRedoStack([]);
-      previousRef.current = clone(snapshot);
-      previousSignatureRef.current = signature;
+      previousRef.current = snapshot;
       return;
     }
-    if (signature === previousSignatureRef.current) {
-      previousRef.current = clone(snapshot);
+    if (snapshot === previousRef.current) {
+      previousRef.current = snapshot;
       return;
     }
     const previous = previousRef.current;
     setUndoStack(stack => [...stack, previous].slice(-limit));
     setRedoStack([]);
-    previousRef.current = clone(snapshot);
-    previousSignatureRef.current = signature;
-  }, [limit, signature, snapshot]);
+    previousRef.current = snapshot;
+  }, [limit, snapshot]);
 
   const restore = useCallback((next: Snapshot) => {
     restoringRef.current = true;
-    project.setProject(clone(next.project) as any);
-    settings.setSettings(clone(next.settings) as any);
-    scene.setScenes(clone(next.scenes) as any);
-    backgrounds.setBackgrounds(clone(next.backgrounds) as any);
-    sprites.setSpriteResources(clone(next.sprites) as any);
-    scripts.setScripts(clone(next.scripts) as any);
-    palettes.setPalettes(clone(next.palettes) as any);
-    variables.setVariables(previous => {
-      const restored = clone(next.variables) as any;
-      const variableList = Array.isArray(restored)
-        ? restored
-        : Array.isArray(restored?.variables)
-          ? restored.variables
-          : [];
-      // Older snapshots stored the complete variables resource, whereas new
-      // snapshots store its list. Normalize both forms before restoring.
-      return {
-        ...(Array.isArray(previous) ? { _resourceType: 'variables', _version: '1.0', _saved: false, _deleted: false } : previous),
-        variables: variableList,
-      } as any;
+    const current = previousRef.current ?? snapshot;
+    const restoreField = <K extends keyof Snapshot>(key: K, setter: (value: any) => void) => {
+      if (next[key] !== current[key]) setter((value: any) => snapshotCache.restore(next[key], value));
+    };
+    restoreField('project', project.setProject);
+    restoreField('settings', settings.setSettings);
+    restoreField('scenes', scene.setScenes);
+    restoreField('backgrounds', backgrounds.setBackgrounds);
+    restoreField('sprites', sprites.setSpriteResources);
+    restoreField('scripts', scripts.setScripts);
+    restoreField('palettes', palettes.setPalettes);
+    restoreField('prefabs', prefabs.setPrefabs);
+    if (next.variables !== current.variables) variables.setVariables(previous => {
+      const restored = next.variables as any;
+      const variableList = Array.isArray(restored) ? restored : restored?.variables ?? [];
+      return { ...previous, variables: snapshotCache.restore(variableList, previous.variables), _saved: false } as any;
     });
-    element.setElementSelected(clone(next.selected) as any);
-    settingsUtils.setSettingUtils(previous => ({ ...previous, selectedSceneIds: clone(next.selectedSceneIds) as string[] }));
-  }, [backgrounds, element, palettes, project, scene, scripts, settings, settingsUtils, sprites, variables]);
+    restoreField('selected', element.setElementSelected);
+    if (next.selectedSceneIds !== current.selectedSceneIds) settingsUtils.setSettingUtils(previous => ({
+      ...previous,
+      selectedSceneIds: snapshotCache.restore(next.selectedSceneIds, previous.selectedSceneIds) as string[],
+    }));
+  }, [snapshot, snapshotCache, backgrounds, element, palettes, prefabs, project, scene, scripts, settings, settingsUtils, sprites, variables]);
 
   const undo = useCallback(() => {
     const previous = undoStack.at(-1);
     if (!previous) return;
     setUndoStack(stack => stack.slice(0, -1));
-    setRedoStack(stack => [...stack, clone(snapshot)].slice(-limit));
+    setRedoStack(stack => [...stack, snapshot].slice(-limit));
     restore(previous);
   }, [limit, restore, snapshot, undoStack]);
 
@@ -220,7 +197,7 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
     const next = redoStack.at(-1);
     if (!next) return;
     setRedoStack(stack => stack.slice(0, -1));
-    setUndoStack(stack => [...stack, clone(snapshot)].slice(-limit));
+    setUndoStack(stack => [...stack, snapshot].slice(-limit));
     restore(next);
   }, [limit, redoStack, restore, snapshot]);
 
@@ -377,31 +354,94 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (isModalOpen()) return;
       if (event.key === 'Escape') {
         clearSceneClipboard();
         return;
       }
+      if (event.key === 'Delete' && document.querySelector('[data-asset-kind="palettes"]')) {
+        const target = event.target as HTMLElement | null;
+        if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable
+          || target?.closest('[role="slider"], [role="combobox"], [role="spinbutton"]')) return;
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent('gba-studio:palette-delete-request'));
+        return;
+      }
+      if (event.key === 'Delete' && document.querySelector('[data-asset-kind="sounds"]')) {
+        const target = event.target as HTMLElement | null;
+        if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable
+          || target?.closest('[role="slider"], [role="combobox"], [role="spinbutton"]')) return;
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent('gba-studio:sound-delete-request'));
+        return;
+      }
+      if (event.key === 'Delete' && document.querySelector('[data-editor-history="music"], [data-music-workspace="true"]')) {
+        if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || (event.target as HTMLElement | null)?.isContentEditable) return;
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent('gba-studio:music-delete-request'));
+        return;
+      }
       if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || (event.target as HTMLElement | null)?.isContentEditable) return;
+      const target = event.target as HTMLElement | null;
+      const targetInput = target instanceof HTMLInputElement ? target : target?.closest('input');
+      const isTextInput = targetInput instanceof HTMLInputElement
+        && !targetInput.closest('[role="spinbutton"], [role="combobox"]')
+        && ['text', 'search', 'email', 'url', 'tel', 'password'].includes(targetInput.type);
+      const inMusicFxEditor = Boolean(target?.closest('.gba-music-fx-config'));
+      if (isTextInput || target instanceof HTMLTextAreaElement || target?.isContentEditable
+        || !inMusicFxEditor && target?.closest('[contenteditable="true"], [role="textbox"], [role="combobox"]')) return;
+      if (document.querySelector('[data-editor-history="music"]')
+        || (event.target as HTMLElement | null)?.closest?.('[data-editor-history="music"]')
+        || document.querySelector('.gba-sample-editor-modal [data-editor-history="music"]')) {
+        const key = event.key.toLowerCase();
+        const action = key === 'z' && event.shiftKey
+          ? 'gba-studio:editor-redo'
+          : key === 'z' ? 'gba-studio:editor-undo'
+            : ({ c: 'copy', x: 'cut', v: 'paste', d: 'duplicate' } as Record<string, string>)[key];
+        if (action) {
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+          if (action.startsWith('gba-studio:')) window.dispatchEvent(new CustomEvent(action));
+          else window.dispatchEvent(new CustomEvent('gba-studio:music-edit-command', { detail: { command: action } }));
+          return;
+        }
+      }
+      // Tile editing owns its own clipboard. Let the scene canvas handle
+      // Ctrl+C/X/V so these shortcuts copy tile selections instead of scenes.
+      if (settingsUtils.settingUtils.tileEditSceneId && ['c', 'x', 'v'].includes(event.key.toLowerCase())) return;
       const key = event.key.toLowerCase();
       if (key === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); }
-      else if (key === 'y') { event.preventDefault(); redo(); }
       else if (key === 'c') { event.preventDefault(); copySelectedScene(); }
       else if (key === 'v') { event.preventDefault(); pasteScene(); }
       else if (key === 'x') { event.preventDefault(); cutSelectedScene(); }
     };
     const onUndo = () => undo();
     const onRedo = () => redo();
-    const onCopy = () => copySelectedScene();
-    const onPaste = () => pasteScene();
-    const onCut = () => cutSelectedScene();
+    const routeMusicCommand = (command: string, fallback: () => void) => {
+      if (document.querySelector('[data-editor-history="music"]')) {
+        window.dispatchEvent(new CustomEvent('gba-studio:music-edit-command', { detail: { command } }));
+      } else fallback();
+    };
+    const onCopy = () => routeMusicCommand('copy', copySelectedScene);
+    const onPaste = () => routeMusicCommand('paste', pasteScene);
+    const onCut = () => routeMusicCommand('cut', cutSelectedScene);
+    const onDuplicate = () => routeMusicCommand('duplicate', () => { copySelectedScene(); pasteScene(); });
+    const onDelete = () => {
+      if (isModalOpen()) return;
+      if (document.querySelector('[data-asset-kind="palettes"]')) window.dispatchEvent(new CustomEvent('gba-studio:palette-delete-request'));
+      else if (document.querySelector('[data-asset-kind="sounds"]')) window.dispatchEvent(new CustomEvent('gba-studio:sound-delete-request'));
+      else if (document.querySelector('[data-editor-history="music"], [data-music-workspace="true"]')) window.dispatchEvent(new CustomEvent('gba-studio:music-delete-request'));
+      else window.dispatchEvent(new CustomEvent('gba-studio:scene-delete'));
+    };
     const onClearClipboard = () => clearSceneClipboard();
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, true);
     window.addEventListener('gba-studio:undo', onUndo);
     window.addEventListener('gba-studio:redo', onRedo);
     window.addEventListener('gba-studio:scene-copy', onCopy);
     window.addEventListener('gba-studio:scene-paste', onPaste);
     window.addEventListener('gba-studio:scene-cut', onCut);
+    window.addEventListener('gba-studio:scene-duplicate', onDuplicate);
     window.addEventListener('gba-studio:clear-scene-clipboard', onClearClipboard);
     const unsubscribe = [
       window.electronAPI?.subscribe?.('history-undo', onUndo),
@@ -409,18 +449,21 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
       window.electronAPI?.subscribe?.('scene-copy', onCopy),
       window.electronAPI?.subscribe?.('scene-paste', onPaste),
       window.electronAPI?.subscribe?.('scene-cut', onCut),
+      window.electronAPI?.subscribe?.('scene-duplicate', onDuplicate),
+      window.electronAPI?.subscribe?.('editor-delete', onDelete),
     ].filter((cancel): cancel is () => void => typeof cancel === 'function');
     return () => {
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('gba-studio:undo', onUndo);
       window.removeEventListener('gba-studio:redo', onRedo);
       window.removeEventListener('gba-studio:scene-copy', onCopy);
       window.removeEventListener('gba-studio:scene-paste', onPaste);
       window.removeEventListener('gba-studio:scene-cut', onCut);
+      window.removeEventListener('gba-studio:scene-duplicate', onDuplicate);
       window.removeEventListener('gba-studio:clear-scene-clipboard', onClearClipboard);
       unsubscribe.forEach(cancel => cancel());
     };
-  }, [clearSceneClipboard, copySelectedScene, cutSelectedScene, pasteScene, redo, undo]);
+  }, [clearSceneClipboard, copySelectedScene, cutSelectedScene, pasteScene, redo, settingsUtils.settingUtils.tileEditSceneId, undo]);
 
   return <HistoryContext.Provider value={{ undo, redo, clearHistory, canUndo: undoStack.length > 0, canRedo: redoStack.length > 0, limit }}>{children}</HistoryContext.Provider>;
 };

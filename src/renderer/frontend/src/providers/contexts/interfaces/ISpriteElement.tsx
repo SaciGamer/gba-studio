@@ -3,6 +3,8 @@ import { ISpriteAnimation, ISpriteAnimationState } from './ISettingElement';
 
 export interface ISpriteSettings extends IResourceSettings {
     _resourceType: 'sprite';
+    /** Keep newly generated sprites while the asset catalog catches up. */
+    _pendingAssetRefresh?: boolean;
     imageWidth: number;
     imageHeight: number;
     playerAnimationStripOrientation?: 'horizontal' | 'vertical';

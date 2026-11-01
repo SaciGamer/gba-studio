@@ -1,3 +1,4 @@
+import { isModalOpen } from '@/utils/isModalOpen';
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { ISceneSettings, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { useI18n } from '@/i18n/I18n';
@@ -31,11 +32,13 @@ import {
 import '@xyflow/react/dist/style.css';
 import { App, Badge, Card, Flex, Tag, theme, Typography } from 'antd';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { v4 as uuidv4 } from 'uuid';
 import FloatButtons, { IActions, SubMenuType } from '../FloatButtons';
 import { joinLocalAssetPath, toLocalAssetUrl } from '@/utils/localAssetUrl';
 import { EEvents } from '../events/interfaces/IEvents';
-import FadeEvent from '../events/FadeEvent';
+import { createSceneFadeIn } from '@/utils/createSceneFadeIn';
+import { clearDeletedSceneReferences } from '../../../../../shared/events/sceneReferenceCleanup';
 
 interface SceneNodeData extends Record<string, unknown> {
   scene: ISceneSettings;
@@ -151,7 +154,7 @@ function WorldGraphCanvas({ resetPanelSize, setShowFloatButton, showFloatButton,
   const { token } = theme.useToken();
   const { message, modal } = App.useApp();
   const { t } = useI18n();
-  const { scenes, setScenes, backgrounds, settingUtils, setSettingUtils, elementSelected, setElementSelected, userSettings, setUserSettings } = useAppContexts();
+  const { scenes, setScenes, scripts, setScripts, backgrounds, settingUtils, setSettingUtils, elementSelected, setElementSelected, userSettings, setUserSettings } = useAppContexts();
   const [instance, setInstance] = useState<ReactFlowInstance<SceneFlowNode, TransitionEdge> | null>(null);
   const [showConnections, setShowConnections] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(true);
@@ -246,7 +249,7 @@ function WorldGraphCanvas({ resetPanelSize, setShowFloatButton, showFloatButton,
       spawnPoints: [{ id: uuidv4(), name: 'Default', x: 0, y: 0, direction: 'right' }],
       // A scene begins with a black screen in Butano until it fades in.
       // Keep this as the first event so newly-created scenes are immediately visible.
-      script: [{ id: uuidv4(), command: EEvents.FADE_IN, args: { ...FadeEvent.defaultValue(), __automatic: true } }],
+      script: [createSceneFadeIn()],
     };
     setScenes(previous => [...previous, scene]);
     setElementSelected(scene);
@@ -284,16 +287,32 @@ function WorldGraphCanvas({ resetPanelSize, setShowFloatButton, showFloatButton,
       okText: t('common.delete'),
       cancelText: t('common.cancel'),
       onOk: () => {
-        setScenes(previous => previous.map(scene => scene.id === elementSelected.id ? { ...scene, _saved: false, _deleted: true } : scene));
+        const deletedIds = new Set([elementSelected.id]);
+        setScenes(previous => previous.map(scene => {
+          const cleared = clearDeletedSceneReferences(scene, deletedIds);
+          if (scene.id === elementSelected.id) return { ...cleared.value, _saved: false, _deleted: true };
+          return cleared.changed ? { ...cleared.value, _saved: false } : scene;
+        }));
+        setScripts(previous => {
+          let changed = false;
+          const nextScripts = previous.scripts.map(script => {
+            const cleared = clearDeletedSceneReferences(script, deletedIds);
+            if (!cleared.changed) return script;
+            changed = true;
+            return { ...cleared.value, _saved: false };
+          });
+          return changed ? { ...previous, scripts: nextScripts, _saved: false } : previous;
+        });
         setElementSelected(null);
         setSettingUtils(previous => ({ ...previous, selectedSceneIds: [] }));
         message.success(t('world.sceneDeleted', { name: elementSelected.name }));
       },
     });
-  }, [elementSelected, message, modal, setElementSelected, setScenes, setSettingUtils, t]);
+  }, [elementSelected, message, modal, setElementSelected, setScenes, setScripts, setSettingUtils, t]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (isModalOpen()) return;
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
       if (event.key.toLowerCase() === 'v') setSettingUtils(previous => ({ ...previous, activeButton: 'select', activeSubButton: '' }));
       if (event.key.toLowerCase() === 's') setSettingUtils(previous => ({ ...previous, activeButton: 'add', activeSubButton: 'Scene' }));
@@ -358,7 +377,10 @@ function WorldGraphCanvas({ resetPanelSize, setShowFloatButton, showFloatButton,
   return (
     <div ref={wrapperRef} style={{ width: '100%', height: '100%', minHeight: 400, position: 'relative' }} onMouseMove={event => setPointer({ x: event.clientX, y: event.clientY })} onMouseLeave={() => setPointer(null)}>
       <FloatButtons actions={actions} onResetPanelSize={resetPanelSize} onShowFloatButton={setShowFloatButton} showFloatButton={showFloatButton} />
-      {settingUtils.activeSubButton === 'Scene' && pointer && <div style={{ position: 'fixed', left: pointer.x + 12, top: pointer.y + 12, width: 135, height: 90, border: `2px dashed ${token.colorPrimary}`, background: token.colorPrimaryBg, borderRadius: token.borderRadius, pointerEvents: 'none', zIndex: 2000 }} />}
+      {settingUtils.activeSubButton === 'Scene' && pointer && createPortal(
+        <div style={{ position: 'fixed', left: pointer.x, top: pointer.y, width: 135, height: 90, border: `2px dashed ${token.colorPrimary}`, background: token.colorPrimaryBg, borderRadius: token.borderRadius, pointerEvents: 'none', zIndex: 2000 }} />,
+        document.body,
+      )}
       <ReactFlow<SceneFlowNode, TransitionEdge>
         nodes={nodes}
         edges={edges}

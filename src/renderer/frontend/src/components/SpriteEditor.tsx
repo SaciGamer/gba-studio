@@ -1,8 +1,10 @@
 import useAppContexts from '@/providers/contexts/AppContexts';
+import ActorColliderOverlay from './ActorColliderOverlay';
+import ActorOriginOverlay from './ActorOriginOverlay';
 import { useI18n } from '@/i18n/I18n';
 import { IMainSettings, ISpriteAnimation, ISpriteAnimationState, ISpriteCanvasFrame, ISpriteFramePiece } from '@/providers/contexts/interfaces/ISettingElement';
 import { ISpriteSettings } from '@/providers/contexts/interfaces/ISpriteElement';
-import { AimOutlined, CaretRightOutlined, CopyOutlined, DeleteOutlined, PlusOutlined, SearchOutlined, TableOutlined, ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons';
+import { AimOutlined, ArrowDownOutlined, ArrowUpOutlined, BorderInnerOutlined, CaretRightOutlined, CopyOutlined, DeleteOutlined, PlusOutlined, SearchOutlined, TableOutlined, VerticalAlignBottomOutlined, VerticalAlignTopOutlined, ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons';
 import { App, Button, Checkbox, Tree, Divider, Empty, Flex, Input, List, Popconfirm, Select, Slider, Space, Spin, Splitter, theme, Tooltip, Typography } from 'antd';
 import StepInputNumber, { InputNumber } from './StepInputNumber';
 import { PauseOutlined, PlaySquareOutlined, StepBackwardOutlined, StepForwardOutlined } from '@ant-design/icons';
@@ -10,8 +12,11 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { loadPaletteTransparentImage, clearPaletteTransparentImageCache, getPaletteIndexZeroColor } from '@/utils/paletteTransparency';
 import { composeAnimationCanvas, getAnimationCanvasFrameSize } from '@/utils/spriteAnimationCanvas';
 import { getNextZoomStep } from '@/utils/zoom';
+import { NAVIGATION_HEADER_HEIGHT } from '@/utils/workspaceLayout';
+import type { SpriteCenterLayout } from '@/providers/contexts/interfaces/IUserSettings';
 import ResourceDropSurface from './resourceEditors/ResourceDropSurface';
 import ResourceEditorShell from './resourceEditors/ResourceEditorShell';
+import NameInput from './NameHover';
 
 const ANIMATION_SPEED_OPTIONS = [
   { value: 0, label: 'None', fps: 0 },
@@ -128,11 +133,14 @@ const SpriteEditor: React.FC = () => {
   const [canvasFramePreviews, setCanvasFramePreviews] = useState<Record<string, string>>({});
   const [selectedCanvasFrameId, setSelectedCanvasFrameId] = useState<string | null>(null);
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
+  const [selectedPieceIds, setSelectedPieceIds] = useState<string[]>([]);
+  const [selectionMarquee, setSelectionMarquee] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [isReplacingPiece, setIsReplacingPiece] = useState(false);
   const [draggedCanvasFrameId, setDraggedCanvasFrameId] = useState<string | null>(null);
   const [canvasDragOrder, setCanvasDragOrder] = useState<string[] | null>(null);
   const [draggedIndexedFramePosition, setDraggedIndexedFramePosition] = useState<number | null>(null);
   const [hoveredFrameKey, setHoveredFrameKey] = useState<string | null>(null);
+  const isDraggingFrame = draggedCanvasFrameId !== null || draggedIndexedFramePosition !== null;
   const [animationCanvasBackground, setAnimationCanvasBackground] = useState<string | null>(null);
   const [animationCanvasPreview, setAnimationCanvasPreview] = useState<{ source: string; width: number; height: number } | null>(null);
   const [sourceSelectionPreview, setSourceSelectionPreview] = useState<string | null>(null);
@@ -141,29 +149,60 @@ const SpriteEditor: React.FC = () => {
   const [expandedStateIds, setExpandedStateIds] = useState<string[]>([]);
   const stateTreeContainerRef = useRef<HTMLDivElement>(null);
   const [stateTreeHeight, setStateTreeHeight] = useState(0);
+  const savedCenter = userSettingsRef?.current.spriteCenterLayout;
+  const centerLayoutRef = useRef<SpriteCenterLayout | undefined>(savedCenter);
+  const [tilesPanelExpanded, setTilesPanelExpanded] = useState(savedCenter?.sections.tiles ?? true);
+  const [framesPanelExpanded, setFramesPanelExpanded] = useState(savedCenter?.sections.frames ?? true);
+  const [spriteCenterResizing, setSpriteCenterResizing] = useState(false);
+  const [spriteCenterHeight, setSpriteCenterHeight] = useState(0);
+  const [tilesPanelSize, setTilesPanelSize] = useState<number | string>(savedCenter?.sizes[0] ?? 190);
+  const [framesPanelSize, setFramesPanelSize] = useState<number | string>(savedCenter?.sizes[1] ?? 170);
+  const tilesPanelHeightRef = useRef(savedCenter?.expandedSizes[0] ?? 190);
+  const framesPanelHeightRef = useRef(savedCenter?.expandedSizes[1] ?? 170);
+  const spriteCenterRef = useRef<HTMLDivElement>(null);
+  const tilesPanelRef = useRef<HTMLDivElement>(null);
+  const framesPanelRef = useRef<HTMLDivElement>(null);
 
   const savedSidebar = userSettingsRef?.current.spriteSidebarLayout;
   const [sidebarSections, setSidebarSections] = useState(savedSidebar?.sections ?? { sprites: true, states: true });
   const [sidebarSizes, setSidebarSizes] = useState<Array<number | string>>(savedSidebar?.sizes ?? ['48%', '52%']);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const spriteNavigationProjectId = encodeURIComponent((settingUtils?.projectPathFile || 'unsaved-project').replace(/\\/g, '/').toLowerCase());
-  const persistSpriteNavigation = (patch: { layout?: { sizes: [number, number]; sections: typeof sidebarSections }; expandedStates?: Record<string, string[]> }) => {
+  const persistSpriteNavigation = (patch: { layout?: { sizes: [number, number]; sections: typeof sidebarSections }; expandedStates?: Record<string, string[]>; centerLayout?: SpriteCenterLayout }) => {
     window.electronAPI?.saveLastPositionSplitters?.({ projectId: spriteNavigationProjectId, spriteNavigation: {
       layout: patch.layout ?? userSettingsRef?.current.spriteSidebarLayout,
       expandedStates: patch.expandedStates ?? userSettingsRef?.current.spriteStateExpandedKeys ?? {},
+      centerLayout: patch.centerLayout ?? centerLayoutRef.current,
     } });
   };
   useEffect(() => {
     let cancelled = false;
     window.electronAPI?.loadLastPositionSplitters?.(spriteNavigationProjectId).then(saved => {
       if (cancelled || !saved?.spriteNavigation) return;
-      const { layout, expandedStates } = saved.spriteNavigation;
+      const { layout, expandedStates, centerLayout } = saved.spriteNavigation;
       if (layout) { setSidebarSizes(layout.sizes); setSidebarSections(layout.sections); }
-      if (setUserSettings) setUserSettings(previous => ({ ...previous, ...(layout ? { spriteSidebarLayout: layout } : {}), ...(expandedStates ? { spriteStateExpandedKeys: expandedStates } : {}) }));
+      if (centerLayout?.sizes?.length === 2 && centerLayout.sizes.every((size: number) => Number.isFinite(size) && size >= NAVIGATION_HEADER_HEIGHT)
+        && centerLayout.expandedSizes?.length === 2 && centerLayout.expandedSizes.every((size: number) => Number.isFinite(size) && size > NAVIGATION_HEADER_HEIGHT)
+        && typeof centerLayout.sections?.tiles === 'boolean' && typeof centerLayout.sections?.frames === 'boolean') {
+        centerLayoutRef.current = centerLayout;
+        setTilesPanelSize(centerLayout.sizes[0]); setFramesPanelSize(centerLayout.sizes[1]);
+        setTilesPanelExpanded(centerLayout.sections.tiles); setFramesPanelExpanded(centerLayout.sections.frames);
+        tilesPanelHeightRef.current = centerLayout.expandedSizes[0]; framesPanelHeightRef.current = centerLayout.expandedSizes[1];
+      }
+      if (setUserSettings) setUserSettings(previous => ({ ...previous, ...(layout ? { spriteSidebarLayout: layout } : {}), ...(expandedStates ? { spriteStateExpandedKeys: expandedStates } : {}), ...(centerLayoutRef.current ? { spriteCenterLayout: centerLayoutRef.current } : {}) }));
       if (selectedId && expandedStates?.[selectedId]) setExpandedStateIds(expandedStates[selectedId]);
     }).catch(error => console.error('Failed to load sprite navigation:', error));
     return () => { cancelled = true; };
   }, [spriteNavigationProjectId]);
+  const saveSpriteCenter = (sizes: [number, number], sections: SpriteCenterLayout['sections']) => {
+    const centerLayout: SpriteCenterLayout = {
+      sizes: sizes.map(Math.round) as [number, number], sections,
+      expandedSizes: [Math.round(tilesPanelHeightRef.current), Math.round(framesPanelHeightRef.current)],
+    };
+    centerLayoutRef.current = centerLayout;
+    setUserSettings?.(previous => ({ ...previous, spriteCenterLayout: centerLayout, _saved: false }));
+    persistSpriteNavigation({ centerLayout });
+  };
   const saveSidebar = (sizes: number[], sections: typeof sidebarSections) => {
     if (!setUserSettings) return;
     setUserSettings(previous => ({ ...previous, spriteSidebarLayout: { sizes: sizes.map(Math.round) as [number, number], sections }, _saved: false }));
@@ -196,13 +235,16 @@ const SpriteEditor: React.FC = () => {
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [sourceZoom, setSourceZoom] = useState(200);
   const [previewZoom, setPreviewZoom] = useState(800);
+  const [snapToGrid, setSnapToGrid] = useState(true);
   const [previewPanOffset, setPreviewPanOffset] = useState({ x: 0, y: 0 });
   const [tilesPanOffset, setTilesPanOffset] = useState({ x: 0, y: 0 });
   const previewViewportRef = useRef<HTMLDivElement | null>(null);
   const previewCanvasRef = useRef<HTMLDivElement | null>(null);
   const sourceSelectionRef = useRef<HTMLDivElement | null>(null);
   const sourcePointerId = useRef<number | null>(null);
-  const pieceDrag = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
+  const pieceDrag = useRef<{ ids: string[]; startX: number; startY: number; positions: Map<string, { x: number; y: number }>; offsetX: number; offsetY: number } | null>(null);
+  const marqueeStart = useRef<{ x: number; y: number } | null>(null);
+  const marqueeDidMove = useRef(false);
   const tilesViewportRef = useRef<HTMLDivElement | null>(null);
   const viewportPan = useRef(new Map<HTMLElement, {
     pointerId: number;
@@ -235,7 +277,7 @@ const SpriteEditor: React.FC = () => {
       const target = event.target;
       if (!(target instanceof Element)) return;
       if (target.closest('[data-preview-viewport="true"], [data-sprite-edit-controls="true"], [data-sprite-source="true"]')) return;
-      setSelectedPieceId(null);
+      setSelectedPieceId(null); setSelectedPieceIds([]);
       setIsReplacingPiece(false);
     };
     document.addEventListener('pointerdown', clearSelectionOutsideCanvas, true);
@@ -273,12 +315,12 @@ const SpriteEditor: React.FC = () => {
   const collisionWidth = selectedSpriteResource?.playerCollisionWidth ?? settings?.playerCollisionWidth ?? frameWidth;
   const collisionHeight = selectedSpriteResource?.playerCollisionHeight ?? settings?.playerCollisionHeight ?? Math.max(1, Math.floor(frameHeight / 2));
   const defaultAnimations: ISpriteAnimation[] = [
-    { id: 'idle-right', name: 'Idle Right', type: 'idle', frames: [0] },
-    { id: 'idle-up', name: 'Idle Up', type: 'idle', frames: [0] },
-    { id: 'idle-down', name: 'Idle Down', type: 'idle', frames: [0] },
-    { id: 'moving-right', name: 'Moving Right', type: 'movement', frames: [0, 1] },
-    { id: 'moving-up', name: 'Moving Up', type: 'movement', frames: [0, 1] },
-    { id: 'moving-down', name: 'Moving Down', type: 'movement', frames: [0, 1] },
+    { id: 'idle-right', name: 'Idle Right', type: 'idle', frames: [], canvasFrames: [{ id: 'canvas-idle-right', width: frameWidth, height: frameHeight, pieces: [] }] },
+    { id: 'idle-up', name: 'Idle Up', type: 'idle', frames: [], canvasFrames: [{ id: 'canvas-idle-up', width: frameWidth, height: frameHeight, pieces: [] }] },
+    { id: 'idle-down', name: 'Idle Down', type: 'idle', frames: [], canvasFrames: [{ id: 'canvas-idle-down', width: frameWidth, height: frameHeight, pieces: [] }] },
+    { id: 'moving-right', name: 'Moving Right', type: 'movement', frames: [], canvasFrames: [{ id: 'canvas-moving-right', width: frameWidth, height: frameHeight, pieces: [] }] },
+    { id: 'moving-up', name: 'Moving Up', type: 'movement', frames: [], canvasFrames: [{ id: 'canvas-moving-up', width: frameWidth, height: frameHeight, pieces: [] }] },
+    { id: 'moving-down', name: 'Moving Down', type: 'movement', frames: [], canvasFrames: [{ id: 'canvas-moving-down', width: frameWidth, height: frameHeight, pieces: [] }] },
   ];
   const spriteAnimationStates = Array.isArray(selectedSpriteResource?.playerAnimationStates)
     ? selectedSpriteResource.playerAnimationStates.filter(state => state && typeof state.id === 'string' && state.id.length > 0 && Array.isArray(state.animations))
@@ -293,7 +335,7 @@ const SpriteEditor: React.FC = () => {
     ? spriteAnimationStates
     : settingsAnimationStates.length > 0 ? settingsAnimationStates : [{
     id: 'player',
-    name: 'Player',
+    name: 'Default',
     type: animationPreset,
     animations: legacyAnimations,
   }];
@@ -303,8 +345,41 @@ const SpriteEditor: React.FC = () => {
   const selectedAnimation = animations.find(animation => animation.id === selectedAnimationId) ?? animations[0];
   const canvasFrames = selectedAnimation?.canvasFrames ?? emptyCanvasFrames;
   const frameCount = (selectedAnimation?.frames.length ?? 0) + canvasFrames.length;
+  const indexedAnimationFramesSignature = selectedAnimation?.frames.join(',') ?? '';
+  const editableAnimationFramesSignature = canvasFrames.map(frame => frame.id).join(',');
+  const animationPreviewFrames = useMemo(() => [
+    ...(selectedAnimation?.frames ?? []).map((frame, index) => ({ kind: 'tile' as const, key: `tile-${index}`, frame })),
+    ...canvasFrames.map(frame => ({ kind: 'canvas' as const, key: frame.id, frameId: frame.id })),
+  ], [selectedAnimation?.id, indexedAnimationFramesSignature, editableAnimationFramesSignature]);
   const selectedCanvasFrame = canvasFrames.find(frame => frame.id === selectedCanvasFrameId) ?? null;
   const selectedPiece = selectedCanvasFrame?.pieces.find(piece => piece.id === selectedPieceId) ?? null;
+  const selectedPieces = selectedCanvasFrame?.pieces.filter(piece => selectedPieceIds.includes(piece.id)) ?? [];
+  const selectedGroupBounds = selectedPieces.length > 1 ? {
+    x: Math.min(...selectedPieces.map(piece => piece.x)),
+    y: Math.min(...selectedPieces.map(piece => piece.y)),
+    right: Math.max(...selectedPieces.map(piece => piece.x + piece.width)),
+    bottom: Math.max(...selectedPieces.map(piece => piece.y + piece.height)),
+  } : null;
+
+  const changeSelectedPieceLayer = (action: 'back' | 'front' | 'down' | 'up') => {
+    if (!selectedCanvasFrame || selectedPieces.length === 0) return;
+    const pieces = [...selectedCanvasFrame.pieces];
+    const selectedIds = new Set(selectedPieces.map(piece => piece.id));
+    if (action === 'back' || action === 'front') {
+      const selected = pieces.filter(piece => selectedIds.has(piece.id));
+      const remaining = pieces.filter(piece => !selectedIds.has(piece.id));
+      pieces.splice(0, pieces.length, ...(action === 'back' ? [...selected, ...remaining] : [...remaining, ...selected]));
+    } else if (action === 'up') {
+      for (let index = pieces.length - 2; index >= 0; index--) {
+        if (selectedIds.has(pieces[index].id) && !selectedIds.has(pieces[index + 1].id)) [pieces[index], pieces[index + 1]] = [pieces[index + 1], pieces[index]];
+      }
+    } else {
+      for (let index = 1; index < pieces.length; index++) {
+        if (selectedIds.has(pieces[index].id) && !selectedIds.has(pieces[index - 1].id)) [pieces[index], pieces[index - 1]] = [pieces[index - 1], pieces[index]];
+      }
+    }
+    updateCanvasFrames(canvasFrames.map(frame => frame.id === selectedCanvasFrame.id ? { ...frame, pieces } : frame));
+  };
 
   useEffect(() => {
     if (!selectedPieceId) return;
@@ -313,22 +388,28 @@ const SpriteEditor: React.FC = () => {
       const target = event.target;
       if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, [contenteditable="true"]'))) return;
       const frame = canvasFrames.find(item => item.id === selectedCanvasFrameId);
-      if (!frame || !frame.pieces.some(piece => piece.id === selectedPieceId)) return;
+      if (!frame || !frame.pieces.some(piece => selectedPieceIds.includes(piece.id))) return;
       event.preventDefault();
       updateCanvasFrames(canvasFrames.map(item => item.id === frame.id
-        ? { ...item, pieces: item.pieces.filter(piece => piece.id !== selectedPieceId) }
+        ? { ...item, pieces: item.pieces.filter(piece => !selectedPieceIds.includes(piece.id)) }
         : item));
       setSelectedPieceId(null);
+      setSelectedPieceIds([]);
       setIsReplacingPiece(false);
     };
     document.addEventListener('keydown', deleteSelectedPiece);
     return () => document.removeEventListener('keydown', deleteSelectedPiece);
-  }, [selectedPieceId, selectedCanvasFrameId, canvasFrames]);
+  }, [selectedPieceId, selectedPieceIds, selectedCanvasFrameId, canvasFrames]);
 
   const selectedSprite = useMemo(
     () => sprites.find(sprite => sprite.id === selectedId) ?? null,
     [selectedId, sprites]
   );
+  useEffect(() => {
+    if (!loading && selectedId && !sprites.some(sprite => sprite.id === selectedId)) {
+      setSelectedId(sprites[0]?.id ?? null);
+    }
+  }, [loading, selectedId, sprites]);
   useEffect(() => {
     setPreviewPanOffset({ x: 0, y: 0 });
     setTilesPanOffset({ x: 0, y: 0 });
@@ -353,19 +434,27 @@ const SpriteEditor: React.FC = () => {
     const nextState = stateIsValid ? animationStates.find(state => state.id === selectedStateId)! : firstState;
     if (!stateIsValid) setSelectedStateId(nextState.id);
     const firstAnimation = nextState.animations?.[0];
-    if (firstAnimation && !nextState.animations.some(animation => animation.id === selectedAnimationId)) {
+    const animationIsValid = nextState.animations?.some(animation => animation.id === selectedAnimationId) ?? false;
+    const activeAnimation = animationIsValid
+      ? nextState.animations.find(animation => animation.id === selectedAnimationId)
+      : firstAnimation;
+    if (firstAnimation && !animationIsValid) {
       setSelectedAnimationId(firstAnimation.id);
       setSelectedFrame(firstAnimation.frames?.[0] ?? 0);
       setSelectedCanvasFrameId(firstAnimation.canvasFrames?.[0]?.id ?? null);
+    } else if (activeAnimation?.canvasFrames?.length && !activeAnimation.canvasFrames.some(frame => frame.id === selectedCanvasFrameId)) {
+      setSelectedCanvasFrameId(activeAnimation.canvasFrames[0].id);
+    } else if (activeAnimation && !activeAnimation.canvasFrames?.length && selectedCanvasFrameId !== null) {
+      setSelectedCanvasFrameId(null);
     }
-  }, [selectedId, selectedSpriteResource?.playerAnimationStates, animationStates, selectedStateId, selectedAnimationId]);
+  }, [selectedId, selectedSpriteResource?.playerAnimationStates, animationStates, selectedStateId, selectedAnimationId, selectedCanvasFrameId]);
 
   useEffect(() => {
     if (!selectedSprite || selectedSpriteResource) return;
     const legacyAnimations = settings?.playerAnimations ?? defaultAnimations;
     const legacyStates = settings?.playerAnimationStates ?? [{
       id: 'player',
-      name: 'Player',
+      name: 'Default',
       type: 'four-directions-movement',
       animations: legacyAnimations,
     }];
@@ -435,10 +524,12 @@ const SpriteEditor: React.FC = () => {
       return;
     }
     const response = await window.electronAPI.importDroppedAssets('sprites', compatible);
-    if (response?.status === 'success') {
+    if (response?.status === 'success' && response.files?.length > 0) {
       message.success(`${response.files.length} sprite(s) imported`);
+      window.dispatchEvent(new CustomEvent('gba-studio:assets-reloaded'));
       await loadSprites();
-    } else if (response?.status === 'error') message.error(response.message);
+    } else if (response?.status === 'success') message.error('No sprite files were imported. Check that the dropped files are accessible and supported.');
+    else if (response?.status === 'error') message.error(response.message);
   };
 
   useEffect(() => {
@@ -450,22 +541,29 @@ const SpriteEditor: React.FC = () => {
   }, [selectedSprite]);
 
   useEffect(() => {
-    if (!isPlaying || (framePreviews.length === 0 && canvasFrames.length === 0)) return;
+    if (!isPlaying || animationPreviewFrames.length === 0) return;
     const previewFps = ANIMATION_SPEED_OPTIONS[previewAnimationSpeed]?.fps ?? 0;
     if (previewFps <= 0) return;
     const timer = window.setInterval(() => {
-      if (canvasFrames.length > 0) {
-        const currentIndex = Math.max(0, canvasFrames.findIndex(frame => frame.id === selectedCanvasFrameId));
-        setSelectedCanvasFrameId(canvasFrames[(currentIndex + 1) % canvasFrames.length].id);
-        return;
+      const currentIndex = animationPreviewFrames.findIndex(frame => frame.kind === 'canvas'
+        ? frame.frameId === selectedCanvasFrameId
+        : selectedCanvasFrameId === null && frame.frame === selectedFrame);
+      const nextFrame = animationPreviewFrames[(currentIndex + 1 + animationPreviewFrames.length) % animationPreviewFrames.length];
+      if (nextFrame.kind === 'canvas') setSelectedCanvasFrameId(nextFrame.frameId);
+      else {
+        setSelectedCanvasFrameId(null);
+        setSelectedFrame(nextFrame.frame);
       }
-      const animationFrames = selectedAnimation?.frames ?? framePreviews.map((_, index) => index);
-      if (animationFrames.length === 0) return;
-      const currentIndex = Math.max(0, animationFrames.indexOf(selectedFrame));
-      setSelectedFrame(animationFrames[(currentIndex + 1) % animationFrames.length] ?? 0);
     }, Math.max(16, Math.round(1000 / previewFps)));
     return () => window.clearInterval(timer);
-  }, [canvasFrames, framePreviews.length, isPlaying, previewAnimationSpeed, selectedAnimation, selectedCanvasFrameId, selectedFrame]);
+  }, [animationPreviewFrames, isPlaying, previewAnimationSpeed, selectedCanvasFrameId, selectedFrame]);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    setSelectedPieceId(null);
+    setSelectedPieceIds([]);
+    setIsReplacingPiece(false);
+  }, [isPlaying]);
 
   useEffect(() => {
     if (!selectedSprite) {
@@ -502,7 +600,8 @@ const SpriteEditor: React.FC = () => {
         context.drawImage(image, tileX * frameWidth, tileY * frameHeight, frameWidth, frameHeight, 0, 0, frameWidth, frameHeight);
         return canvas.toDataURL('image/png');
       });
-      const directionFrames = Array.from({ length: Math.min(framesPerDirection, columns) }, (_, frame) => directionRows[direction] * columns + frame);
+      const directionRow = rows >= 4 ? directionRows[direction] : 0;
+      const directionFrames = Array.from({ length: Math.min(framesPerDirection, columns) }, (_, frame) => directionRow * columns + frame);
       setTilePreviews(tiles);
       setFramePreviews(directionFrames.map(tileIndex => tiles[tileIndex] ?? ''));
 
@@ -828,28 +927,47 @@ const SpriteEditor: React.FC = () => {
 
   const placeSelection = (anchorX = 0, anchorY = 0) => {
     if (!selectedCanvasFrame || !sourceSelection) return;
-    const piece: ISpriteFramePiece = {
-      id: `piece-${Date.now()}`,
-      sourceX: sourceSelection.x,
-      sourceY: sourceSelection.y,
-      width: sourceSelection.width,
-      height: sourceSelection.height,
-      x: Math.min(Math.max(0, selectedCanvasFrame.width - sourceSelection.width), anchorX),
-      y: Math.min(Math.max(0, selectedCanvasFrame.height - sourceSelection.height), anchorY),
-    };
+    const baseX = Math.min(Math.max(0, selectedCanvasFrame.width - sourceSelection.width), Math.max(0, anchorX));
+    const baseY = Math.min(Math.max(0, selectedCanvasFrame.height - sourceSelection.height), Math.max(0, anchorY));
+    const pieces: ISpriteFramePiece[] = [];
+    for (let dy = 0; dy < sourceSelection.height; dy += 16) for (let dx = 0; dx < sourceSelection.width; dx += 8) {
+      const width = Math.min(8, sourceSelection.width - dx);
+      const height = Math.min(16, sourceSelection.height - dy);
+      pieces.push({ id: `piece-${Date.now()}-${dy}-${dx}-${Math.random().toString(36).slice(2, 7)}`,
+        sourceX: sourceSelection.x + dx, sourceY: sourceSelection.y + dy, width, height,
+        x: Math.min(Math.max(0, selectedCanvasFrame.width - width), baseX + dx),
+        y: Math.min(Math.max(0, selectedCanvasFrame.height - height), baseY + dy) });
+    }
     updateCanvasFrames(canvasFrames.map(frame => frame.id === selectedCanvasFrame.id
-      ? { ...frame, pieces: [...frame.pieces, piece] }
+      ? { ...frame, pieces: [...frame.pieces, ...pieces] }
       : frame));
-    setSelectedPieceId(piece.id);
+    setSelectedPieceId(pieces[0]?.id ?? null);
+    setSelectedPieceIds(pieces.map(piece => piece.id));
     setIsPlacingPiece(false);
     setCanvasHoverPosition(null);
   };
 
   const updateSelectedPiece = (changes: Partial<ISpriteFramePiece>) => {
     if (!selectedCanvasFrame || !selectedPiece) return;
+    const selectedIds = new Set(selectedPieceIds.length ? selectedPieceIds : [selectedPiece.id]);
     updateCanvasFrames(canvasFrames.map(frame => frame.id === selectedCanvasFrame.id
-      ? { ...frame, pieces: frame.pieces.map(piece => piece.id === selectedPiece.id ? { ...piece, ...changes } : piece) }
+      ? { ...frame, pieces: frame.pieces.map(piece => selectedIds.has(piece.id) ? { ...piece, ...changes } : piece) }
       : frame));
+  };
+
+  const flipSelectedPieces = (axis: 'horizontal' | 'vertical') => {
+    if (!selectedCanvasFrame || selectedPieces.length === 0) return;
+    const minX = Math.min(...selectedPieces.map(piece => piece.x));
+    const minY = Math.min(...selectedPieces.map(piece => piece.y));
+    const maxX = Math.max(...selectedPieces.map(piece => piece.x + piece.width));
+    const maxY = Math.max(...selectedPieces.map(piece => piece.y + piece.height));
+    const ids = new Set(selectedPieces.map(piece => piece.id));
+    updateCanvasFrames(canvasFrames.map(frame => frame.id === selectedCanvasFrame.id ? {
+      ...frame,
+      pieces: frame.pieces.map(piece => !ids.has(piece.id) ? piece : axis === 'horizontal'
+        ? { ...piece, x: minX + maxX - piece.x - piece.width, flipX: !piece.flipX }
+        : { ...piece, y: minY + maxY - piece.y - piece.height, flipY: !piece.flipY }),
+    } : frame));
   };
 
   const replaceSelectedPieceSource = (selection: SpriteSourceSelection) => {
@@ -865,28 +983,48 @@ const SpriteEditor: React.FC = () => {
   };
 
   const beginPieceDrag = (event: React.MouseEvent<HTMLDivElement>, piece: ISpriteFramePiece) => {
-    if (!selectedCanvasFrame || !previewCanvasRef.current) return;
+    if (isPlaying || !selectedCanvasFrame || !previewCanvasRef.current) return;
     event.preventDefault();
     event.stopPropagation();
     const bounds = previewCanvasRef.current.getBoundingClientRect();
     const x = (event.clientX - bounds.left) * 100 / previewZoom;
     const y = (event.clientY - bounds.top) * 100 / previewZoom;
-    pieceDrag.current = { id: piece.id, offsetX: x - piece.x, offsetY: y - piece.y };
+    const ids = selectedPieceIds.includes(piece.id) ? selectedPieceIds : [piece.id];
+    const moving = selectedCanvasFrame.pieces.filter(item => ids.includes(item.id));
+    pieceDrag.current = { ids, startX: x, startY: y, positions: new Map(moving.map(item => [item.id, { x: item.x, y: item.y }])), offsetX: x - piece.x, offsetY: y - piece.y };
     setSelectedPieceId(piece.id);
+    setSelectedPieceIds(ids);
     const finishPieceDrag = (upEvent: MouseEvent) => {
       const drag = pieceDrag.current;
       const canvas = previewCanvasRef.current;
       pieceDrag.current = null;
       if (!drag || !canvas || !selectedCanvasFrame) return;
       const bounds = canvas.getBoundingClientRect();
-      const releasedOutside = upEvent.clientX < bounds.left || upEvent.clientX >= bounds.right ||
-        upEvent.clientY < bounds.top || upEvent.clientY >= bounds.bottom;
-      if (releasedOutside) {
-        updateCanvasFrames(canvasFrames.map(frame => frame.id === selectedCanvasFrame.id
-          ? { ...frame, pieces: frame.pieces.filter(item => item.id !== drag.id) }
-          : frame));
-        setSelectedPieceId(null);
+      const rawDx = ((upEvent.clientX - bounds.left) * 100 / previewZoom) - drag.startX;
+      const rawDy = ((upEvent.clientY - bounds.top) * 100 / previewZoom) - drag.startY;
+      const movedPieces = selectedCanvasFrame.pieces.filter(item => drag.positions.has(item.id));
+      const initialPositions = movedPieces.map(item => ({ ...item, ...drag.positions.get(item.id)! }));
+      let dx = Math.round(rawDx), dy = Math.round(rawDy);
+      if (snapToGrid && initialPositions.length) {
+        const minX = Math.min(...initialPositions.map(item => item.x));
+        const minY = Math.min(...initialPositions.map(item => item.y));
+        dx = Math.round((minX + rawDx) / 8) * 8 - minX;
+        dy = Math.round((minY + rawDy) / 8) * 8 - minY;
       }
+      const moved = selectedCanvasFrame.pieces.map(item => {
+        const origin = drag.positions.get(item.id);
+        return origin ? { ...item, x: origin.x + dx, y: origin.y + dy } : item;
+      });
+      const keptIds = new Set(drag.ids.filter(id => {
+        const piece = moved.find(item => item.id === id);
+        return piece && piece.x + piece.width > 0 && piece.y + piece.height > 0 && piece.x < selectedCanvasFrame.width && piece.y < selectedCanvasFrame.height;
+      }));
+      const remainingIds = drag.ids.filter(id => keptIds.has(id));
+      updateCanvasFrames(canvasFrames.map(frame => frame.id === selectedCanvasFrame.id
+        ? { ...frame, pieces: moved.filter(piece => !drag.ids.includes(piece.id) || keptIds.has(piece.id)) }
+        : frame));
+      setSelectedPieceIds(remainingIds);
+      if (!remainingIds.includes(selectedPieceId ?? '')) setSelectedPieceId(remainingIds[0] ?? null);
     };
     window.addEventListener('mouseup', finishPieceDrag, { once: true, capture: true });
   };
@@ -894,26 +1032,33 @@ const SpriteEditor: React.FC = () => {
   const placeSelectionAtCanvasPosition = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isPlacingPiece || !selectedCanvasFrame || !sourceSelection) return;
     const bounds = event.currentTarget.getBoundingClientRect();
-    const x = Math.floor(((event.clientX - bounds.left) * 100 / previewZoom) / 8) * 8;
-    const y = Math.floor(((event.clientY - bounds.top) * 100 / previewZoom) / 8) * 8;
+    const x = snapCanvasCoordinate((event.clientX - bounds.left) * 100 / previewZoom);
+    const y = snapCanvasCoordinate((event.clientY - bounds.top) * 100 / previewZoom);
     placeSelection(x, y);
   };
 
   const updateCanvasHoverPosition = (event: React.MouseEvent<HTMLDivElement>) => {
     if (pieceDrag.current && selectedCanvasFrame && previewCanvasRef.current) {
       const bounds = previewCanvasRef.current.getBoundingClientRect();
-      const x = Math.floor((((event.clientX - bounds.left) * 100 / previewZoom) - pieceDrag.current.offsetX) / 8) * 8;
-      const y = Math.floor((((event.clientY - bounds.top) * 100 / previewZoom) - pieceDrag.current.offsetY) / 8) * 8;
-      const piece = selectedCanvasFrame.pieces.find(item => item.id === pieceDrag.current?.id);
-      if (piece) {
-        const position = {
-          x: Math.min(Math.max(0, selectedCanvasFrame.width - piece.width), Math.max(0, x)),
-          y: Math.min(Math.max(0, selectedCanvasFrame.height - piece.height), Math.max(0, y)),
-        };
-        updateCanvasFrames(canvasFrames.map(frame => frame.id === selectedCanvasFrame.id
-          ? { ...frame, pieces: frame.pieces.map(item => item.id === piece.id ? { ...item, ...position } : item) }
-          : frame));
+      const rawDx = ((event.clientX - bounds.left) * 100 / previewZoom) - pieceDrag.current.startX;
+      const rawDy = ((event.clientY - bounds.top) * 100 / previewZoom) - pieceDrag.current.startY;
+      const drag = pieceDrag.current;
+      const moving = selectedCanvasFrame.pieces.filter(item => drag.positions.has(item.id));
+      const initialPositions = moving.map(item => ({ ...item, ...drag.positions.get(item.id)! }));
+      let dx = Math.round(rawDx);
+      let dy = Math.round(rawDy);
+      if (moving.length) {
+        if (snapToGrid) {
+          const minX = Math.min(...initialPositions.map(item => item.x));
+          const minY = Math.min(...initialPositions.map(item => item.y));
+          dx = Math.round((minX + rawDx) / 8) * 8 - minX;
+          dy = Math.round((minY + rawDy) / 8) * 8 - minY;
+        }
       }
+      updateCanvasFrames(canvasFrames.map(frame => frame.id === selectedCanvasFrame.id ? { ...frame, pieces: frame.pieces.map(item => {
+        const origin = drag.positions.get(item.id); if (!origin) return item;
+        return { ...item, x: origin.x + dx, y: origin.y + dy };
+      }) } : frame));
       return;
     }
     if (!isPlacingPiece || !selectedCanvasFrame || !sourceSelection) {
@@ -921,12 +1066,40 @@ const SpriteEditor: React.FC = () => {
       return;
     }
     const bounds = event.currentTarget.getBoundingClientRect();
-    const rawX = Math.floor(((event.clientX - bounds.left) * 100 / previewZoom) / 8) * 8;
-    const rawY = Math.floor(((event.clientY - bounds.top) * 100 / previewZoom) / 8) * 8;
+    const rawX = snapCanvasCoordinate((event.clientX - bounds.left) * 100 / previewZoom);
+    const rawY = snapCanvasCoordinate((event.clientY - bounds.top) * 100 / previewZoom);
     setCanvasHoverPosition({
       x: Math.min(Math.max(0, selectedCanvasFrame.width - sourceSelection.width), Math.max(0, rawX)),
       y: Math.min(Math.max(0, selectedCanvasFrame.height - sourceSelection.height), Math.max(0, rawY)),
     });
+  };
+
+  const beginPieceMarquee = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (isPlaying || !selectedCanvasFrame || !previewCanvasRef.current || isPlacingPiece || (event.target as HTMLElement).closest('[data-canvas-piece="true"]')) return;
+    const bounds = previewCanvasRef.current.getBoundingClientRect();
+    const point = { x: (event.clientX - bounds.left) * 100 / previewZoom, y: (event.clientY - bounds.top) * 100 / previewZoom };
+    marqueeStart.current = point;
+    marqueeDidMove.current = false;
+    setSelectionMarquee({ x: point.x, y: point.y, width: 0, height: 0 });
+    setSelectedPieceId(null); setSelectedPieceIds([]);
+  };
+
+  const finishPieceMarquee = () => { marqueeStart.current = null; setSelectionMarquee(null); };
+
+  const updatePieceMarquee = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!marqueeStart.current || !selectedCanvasFrame || !previewCanvasRef.current) return;
+    const bounds = previewCanvasRef.current.getBoundingClientRect();
+    const point = { x: (event.clientX - bounds.left) * 100 / previewZoom, y: (event.clientY - bounds.top) * 100 / previewZoom };
+    const x = Math.min(marqueeStart.current.x, point.x), y = Math.min(marqueeStart.current.y, point.y);
+    const width = Math.abs(point.x - marqueeStart.current.x), height = Math.abs(point.y - marqueeStart.current.y);
+    if (width > 0 || height > 0) marqueeDidMove.current = true;
+    setSelectionMarquee({ x, y, width, height });
+    const edgeTolerance = 1;
+    const ids = selectedCanvasFrame.pieces.filter(piece =>
+      piece.x < x + width + edgeTolerance && piece.x + piece.width > x - edgeTolerance &&
+      piece.y < y + height + edgeTolerance && piece.y + piece.height > y - edgeTolerance
+    ).map(piece => piece.id);
+    setSelectedPieceIds(ids); setSelectedPieceId(ids[0] ?? null);
   };
 
   const decreaseTilesZoom = () => {
@@ -940,6 +1113,8 @@ const SpriteEditor: React.FC = () => {
   const changePreviewZoom = (change: number) => {
     setPreviewZoom(value => getNextZoomStep(value, change));
   };
+
+  const snapCanvasCoordinate = (value: number) => snapToGrid ? Math.floor(value / 8) * 8 : Math.round(value);
 
   const beginViewportPan = (event: React.PointerEvent<HTMLElement>) => {
     if (event.button !== 1) return;
@@ -984,7 +1159,7 @@ const SpriteEditor: React.FC = () => {
     const bounds = event.currentTarget.getBoundingClientRect();
     return {
       x: Math.min(Math.max(0, imageSize.width - 8), Math.floor(((event.clientX - bounds.left) / bounds.width * imageSize.width) / 8) * 8),
-      y: Math.min(Math.max(0, imageSize.height - 8), Math.floor(((event.clientY - bounds.top) / bounds.height * imageSize.height) / 8) * 8),
+      y: Math.min(Math.max(0, Math.floor((imageSize.height - minimumSelectionHeight) / minimumSelectionHeight) * minimumSelectionHeight), Math.floor(((event.clientY - bounds.top) / bounds.height * imageSize.height) / minimumSelectionHeight) * minimumSelectionHeight),
     };
   };
 
@@ -1005,7 +1180,7 @@ const SpriteEditor: React.FC = () => {
     const x = Math.min(selectionStart.x, point.x);
     const y = Math.min(selectionStart.y, point.y);
     const width = Math.min(imageSize.width - x, Math.max(8, Math.abs(point.x - selectionStart.x) + 8));
-    const height = Math.min(imageSize.height - y, Math.max(minimumSelectionHeight, Math.abs(point.y - selectionStart.y) + 8));
+    const height = Math.min(imageSize.height - y, Math.max(minimumSelectionHeight, Math.ceil((Math.abs(point.y - selectionStart.y) + minimumSelectionHeight) / minimumSelectionHeight) * minimumSelectionHeight));
     setSourceSelection({ x, y, width, height });
   };
 
@@ -1072,25 +1247,36 @@ const SpriteEditor: React.FC = () => {
       message.warning('Não foi possível carregar as dimensões do spritesheet.');
       return;
     }
-    const generatedFrameSize = imageSize.width;
-    const columns = Math.floor(imageSize.width / generatedFrameSize);
-    const rows = Math.floor(imageSize.height / generatedFrameSize);
+    const generatedFrameWidth = Math.max(1, Math.floor(frameWidth));
+    const generatedFrameHeight = Math.max(1, Math.floor(frameHeight));
+    const columns = Math.floor(imageSize.width / generatedFrameWidth);
+    const rows = Math.floor(imageSize.height / generatedFrameHeight);
     if (columns <= 0 || rows <= 0) {
-      message.warning('A altura do spritesheet não comporta um frame quadrado com a largura da imagem.');
+      message.warning('O spritesheet é menor que o tamanho de frame configurado.');
       return;
+    }
+    if (imageSize.width % generatedFrameWidth !== 0 || imageSize.height % generatedFrameHeight !== 0) {
+      message.warning('O spritesheet não é divisível exatamente pelo tamanho de frame configurado; os pixels restantes serão ignorados.');
     }
     const generatedCanvasFrames = Array.from({ length: columns * rows }, (_, frameIndex) => {
       const row = Math.floor(frameIndex / columns);
       const column = frameIndex % columns;
-      if ((column + 1) * generatedFrameSize > imageSize.width || (row + 1) * generatedFrameSize > imageSize.height) return null;
-      const pieceId = `piece-autogen-${Date.now()}-${frameIndex}`;
+      const sourceX = column * generatedFrameWidth;
+      const sourceY = row * generatedFrameHeight;
+      const pieces: ISpriteFramePiece[] = [];
+      for (let y = 0; y < generatedFrameHeight; y += 16) for (let x = 0; x < generatedFrameWidth; x += 8) {
+        const width = Math.min(8, generatedFrameWidth - x);
+        const height = Math.min(16, generatedFrameHeight - y);
+        pieces.push({ id: `piece-autogen-${Date.now()}-${frameIndex}-${x}-${y}`, sourceX: sourceX + x, sourceY: sourceY + y,
+          width, height, x, y });
+      }
       return {
         id: `canvas-frame-autogen-${Date.now()}-${frameIndex}`,
-        width: generatedFrameSize,
-        height: generatedFrameSize,
-        pieces: [{ id: pieceId, sourceX: column * generatedFrameSize, sourceY: row * generatedFrameSize, width: generatedFrameSize, height: generatedFrameSize, x: 0, y: 0 }],
+        width: generatedFrameWidth,
+        height: generatedFrameHeight,
+        pieces,
       };
-    }).filter((frame): frame is NonNullable<typeof frame> => frame !== null);
+    });
     if (!generatedCanvasFrames.length) {
       message.warning('Não foi possível gerar frames válidos a partir deste spritesheet.');
       return;
@@ -1102,22 +1288,80 @@ const SpriteEditor: React.FC = () => {
     const nextStates = animationStates.map(state => state.id === selectedState?.id
       ? { ...state, animations: nextAnimations }
       : state);
-    updateSettings({ playerFrameWidth: generatedFrameSize, playerFrameHeight: generatedFrameSize, playerAnimationStates: nextStates, playerAnimations: nextAnimations });
+    updateSettings({ playerFrameWidth: generatedFrameWidth, playerFrameHeight: generatedFrameHeight, playerAnimationStates: nextStates, playerAnimations: nextAnimations });
     setSelectedCanvasFrameId(generatedCanvasFrames[0].id);
     setSelectedPieceId(null);
+    setSelectedPieceIds([]);
     setSelectedFrame(0);
     setIsPlaying(false);
   };
 
   const stepFrame = (offset: -1 | 1) => {
-    if (selectedCanvasFrame && canvasFrames.length > 0) {
-      const currentIndex = Math.max(0, canvasFrames.findIndex(frame => frame.id === selectedCanvasFrame.id));
-      const nextIndex = (currentIndex + offset + canvasFrames.length) % canvasFrames.length;
-      setSelectedCanvasFrameId(canvasFrames[nextIndex].id);
+    if (animationPreviewFrames.length > 0) {
+      const currentIndex = animationPreviewFrames.findIndex(frame => frame.kind === 'canvas'
+        ? frame.frameId === selectedCanvasFrameId
+        : selectedCanvasFrameId === null && frame.frame === selectedFrame);
+      const nextIndex = (Math.max(0, currentIndex) + offset + animationPreviewFrames.length) % animationPreviewFrames.length;
+      const nextFrame = animationPreviewFrames[nextIndex];
+      if (nextFrame.kind === 'canvas') setSelectedCanvasFrameId(nextFrame.frameId);
+      else {
+        setSelectedCanvasFrameId(null);
+        setSelectedFrame(nextFrame.frame);
+      }
       return;
     }
     chooseFrame(Math.min(tilePreviews.length - 1, Math.max(0, selectedFrame + offset)));
   };
+
+  const toggleSpritePanel = (panel: 'tiles' | 'frames') => {
+    const expanded = panel === 'tiles' ? tilesPanelExpanded : framesPanelExpanded;
+    const setExpanded = panel === 'tiles' ? setTilesPanelExpanded : setFramesPanelExpanded;
+    const heightRef = panel === 'tiles' ? tilesPanelHeightRef : framesPanelHeightRef;
+    if (expanded) {
+      const panelElement = panel === 'tiles' ? tilesPanelRef.current : framesPanelRef.current;
+      if (panelElement && panelElement.clientHeight > NAVIGATION_HEADER_HEIGHT) heightRef.current = panelElement.clientHeight;
+    }
+    const remembered = panel === 'tiles' ? tilesPanelHeightRef : framesPanelHeightRef;
+    const setter = panel === 'tiles' ? setTilesPanelSize : setFramesPanelSize;
+    const availableHeight = spriteCenterRef.current?.clientHeight;
+    const nextSize = expanded ? NAVIGATION_HEADER_HEIGHT : Math.min(availableHeight ? availableHeight / 2 : remembered.current, remembered.current);
+    setter(nextSize);
+    setExpanded(!expanded);
+    saveSpriteCenter([
+      panel === 'tiles' ? nextSize : tilesPanelExpanded ? Number(tilesPanelSize) : NAVIGATION_HEADER_HEIGHT,
+      panel === 'frames' ? nextSize : framesPanelExpanded ? Number(framesPanelSize) : NAVIGATION_HEADER_HEIGHT,
+    ], { tiles: panel === 'tiles' ? !expanded : tilesPanelExpanded, frames: panel === 'frames' ? !expanded : framesPanelExpanded });
+  };
+  const resizeSpriteCenter = (sizes: number[], save = false) => {
+    if (sizes.length < 3) return;
+    const updatePanel = (size: number, expanded: boolean, setExpanded: (value: boolean) => void,
+      setSize: (value: number) => void, remembered: React.MutableRefObject<number>) => {
+      if (size <= NAVIGATION_HEADER_HEIGHT + 8) {
+        if (expanded) setExpanded(false);
+        setSize(NAVIGATION_HEADER_HEIGHT);
+        return;
+      }
+      if (!expanded) setExpanded(true);
+      remembered.current = size;
+      setSize(size);
+    };
+    updatePanel(sizes[1], tilesPanelExpanded, setTilesPanelExpanded, setTilesPanelSize, tilesPanelHeightRef);
+    updatePanel(sizes[2], framesPanelExpanded, setFramesPanelExpanded, setFramesPanelSize, framesPanelHeightRef);
+    if (save) {
+      const sections = { tiles: sizes[1] > NAVIGATION_HEADER_HEIGHT + 8, frames: sizes[2] > NAVIGATION_HEADER_HEIGHT + 8 };
+      saveSpriteCenter([sections.tiles ? sizes[1] : NAVIGATION_HEADER_HEIGHT, sections.frames ? sizes[2] : NAVIGATION_HEADER_HEIGHT], sections);
+    }
+  };
+
+  useLayoutEffect(() => {
+    const center = spriteCenterRef.current;
+    if (!center) return;
+    const measure = () => setSpriteCenterHeight(center.clientHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(center);
+    return () => observer.disconnect();
+  }, [loading, selectedSprite?.id]);
 
   if (loading) {
     return <Flex align="center" justify="center" style={{ height: '100%' }}><Spin size="large" /></Flex>;
@@ -1142,10 +1386,16 @@ const SpriteEditor: React.FC = () => {
           placeholder="Search sprites"
           value={spriteSearch}
           onChange={event => setSpriteSearch(event.target.value)}
-          style={{ margin: '8px 16px', width: 'calc(100% - 32px)', background: token.colorBgBase }}
+          style={{ margin: '8px 16px', width: 'calc(100% - 32px)', background: token.colorBgBase, border: `1px solid ${token.colorBorder}` }}
         />}
-        {sidebarSections.sprites && <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingInline: 16, paddingTop: 8, boxSizing: 'border-box' }}>{sprites.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No sprites found" />
+        {sidebarSections.sprites && <div onClick={event => {
+          const target = event.target as HTMLElement;
+          if (target.closest('.ant-list-item, input, button, [role="button"], .ant-input-affix-wrapper')) return;
+          setSelectedId(null);
+          setSelectedStateId('');
+          setSelectedAnimationId('');
+        }} style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingInline: 16, paddingTop: 8, boxSizing: 'border-box' }}>{sprites.length === 0 ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('resources.emptyHint')} />
         ) : (
           <List
             size="small"
@@ -1183,7 +1433,7 @@ const SpriteEditor: React.FC = () => {
             <Tooltip title={t('sprites.searchStates')}><Button type="text" size="small" aria-label={t('sprites.searchStates')} aria-pressed={stateSearchOpen} icon={<SearchOutlined />} style={{ padding: 4, borderRadius: token.borderRadius, background: stateSearchOpen ? token.colorPrimary : 'transparent' }} onClick={() => { setStateSearchOpen(value => !value); setStateSearch(''); }} /></Tooltip>
           </Flex>
         </Flex>
-        {sidebarSections.states && stateSearchOpen && <Input autoFocus aria-label={t('sprites.searchStates')} placeholder={t('sprites.searchStates')} value={stateSearch} allowClear onChange={event => setStateSearch(event.target.value)} style={{ margin: '4px 8px', width: 'calc(100% - 16px)', background: token.colorBgBase }} />}
+        {sidebarSections.states && stateSearchOpen && <Input autoFocus aria-label={t('sprites.searchStates')} placeholder={t('sprites.searchStates')} value={stateSearch} allowClear onChange={event => setStateSearch(event.target.value)} style={{ margin: '4px 8px', width: 'calc(100% - 16px)', background: token.colorBgBase, border: `1px solid ${token.colorBorder}` }} />}
         <div ref={stateTreeContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '8px 16px 0', boxSizing: 'border-box', display: sidebarSections.states ? undefined : 'none' }}><Tree
           className="custom-tree"
           height={stateTreeHeight}
@@ -1252,13 +1502,23 @@ const SpriteEditor: React.FC = () => {
 
       {selectedSprite && (
       <Splitter.Panel min={360}>
-      <ResourceDropSurface onFiles={handleDroppedSprites} hint="Drop a sprite image here">
-      <Flex vertical style={{ width: '100%', height: '100%', minWidth: 0, background: token.colorBgContainer, overflow: 'hidden' }}>
+      <ResourceDropSurface onFiles={handleDroppedSprites} onAssetPath={path => handleDroppedSprites([path])} hint="Drop a sprite image here">
+      <Flex vertical style={{ width: '100%', height: '100%', minWidth: 0, background: token.colorBgBase, overflow: 'hidden' }}>
         <Flex gap={8} align="center" justify="space-between" wrap="wrap" style={{ padding: 8, background: token.colorBorder, borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
           <Flex gap={8} align="center" style={{ flex: 1, minWidth: 300 }}>
             <Typography.Text strong style={{ color: '#fff', whiteSpace: 'nowrap' }}>PREVIEW</Typography.Text>
             <Tooltip title="Previous frame"><Button size="small" icon={<StepBackwardOutlined />} onClick={() => stepFrame(-1)} /></Tooltip>
-            <Tooltip title={isPlaying ? 'Pause' : 'Play'}><Button size="small" icon={isPlaying ? <PauseOutlined /> : <PlaySquareOutlined />} onClick={() => setIsPlaying(value => !value)} /></Tooltip>
+            <Tooltip title={isPlaying ? 'Pause' : 'Play'}><Button size="small" icon={isPlaying ? <PauseOutlined /> : <PlaySquareOutlined />} onClick={() => {
+              if (!isPlaying) {
+                setSelectedPieceId(null);
+                setSelectedPieceIds([]);
+                setIsReplacingPiece(false);
+                setIsPlacingPiece(false);
+                setSelectionStart(null);
+                setCanvasHoverPosition(null);
+              }
+              setIsPlaying(value => !value);
+            }} /></Tooltip>
             <Tooltip title="Next frame"><Button size="small" icon={<StepForwardOutlined />} onClick={() => stepFrame(1)} /></Tooltip>
             <Typography.Text style={{ color: '#fff', whiteSpace: 'nowrap' }}>Speed</Typography.Text>
             <Tooltip title="Preview speed uses the same animation speed levels as actors and settings.">
@@ -1282,17 +1542,19 @@ const SpriteEditor: React.FC = () => {
           </Flex>
         </Flex>
 
-        <Splitter layout="vertical" style={{ flex: 1, minHeight: 0 }}>
-        <Splitter.Panel defaultSize="55%" min={180}>
+        <div ref={spriteCenterRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <Splitter layout="vertical" style={{ height: '100%', minHeight: 0 }} onResizeStart={() => setSpriteCenterResizing(true)} onResize={resizeSpriteCenter} onResizeEnd={sizes => { resizeSpriteCenter(sizes, true); setSpriteCenterResizing(false); }}>
+        <Splitter.Panel size={spriteCenterHeight > 0 ? Math.max(180, spriteCenterHeight - (tilesPanelExpanded ? Number(tilesPanelSize) : NAVIGATION_HEADER_HEIGHT) - (framesPanelExpanded ? Number(framesPanelSize) : NAVIGATION_HEADER_HEIGHT)) : undefined} min={180}>
         <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 180, overflow: 'hidden' }}>
         <Flex
           data-preview-viewport="true"
           align="center"
           justify="center"
           onClick={event => {
+            if (marqueeDidMove.current) { marqueeDidMove.current = false; event.preventDefault(); return; }
             const target = event.target as HTMLElement;
             if (!target.closest('[data-canvas-piece="true"]') && !target.closest('[data-canvas-preview="true"]')) {
-              setSelectedPieceId(null);
+              setSelectedPieceId(null); setSelectedPieceIds([]);
               setIsReplacingPiece(false);
             }
           }}
@@ -1301,27 +1563,32 @@ const SpriteEditor: React.FC = () => {
             event.preventDefault();
             changePreviewZoom(event.deltaY < 0 ? 1 : -1);
           }}
+          onMouseDown={beginPieceMarquee}
+          onMouseMove={updatePieceMarquee}
+          onMouseUp={finishPieceMarquee}
+          onMouseLeave={finishPieceMarquee}
           ref={previewViewportRef}
           onPointerDown={beginViewportPan}
           onPointerMove={moveViewportPan}
           onPointerUp={endViewportPan}
           onPointerCancel={endViewportPan}
-          style={{ position: 'absolute', inset: 0, overflow: 'hidden', cursor: 'default', touchAction: 'none' }}
+          style={{ position: 'absolute', inset: 0, overflow: 'hidden', cursor: isPlaying ? 'not-allowed' : 'default', touchAction: 'none' }}
         >
           {displayedPreview ? (
             <div style={{ position: 'relative', flex: 'none', width: '100%', height: '100%' }}>
             <Flex vertical align="center" justify="center" style={{ position: 'absolute', inset: 0, transform: `translate(${previewPanOffset.x}px, ${previewPanOffset.y}px)` }}>
             <Flex vertical={stripOrientation === 'horizontal'} align="center" gap={12}>
-              <div style={{ display: 'inline-block', lineHeight: 0, background: 'repeating-conic-gradient(#d9d9d9 0% 25%, #fff 0% 50%) 50% / 16px 16px' }}>
+              <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0, overflow: 'visible', background: 'repeating-conic-gradient(#d9d9d9 0% 25%, #fff 0% 50%) 50% / 16px 16px' }}>
                 <div
                   data-canvas-preview="true"
                   ref={previewCanvasRef}
                   draggable={false}
                   onDragStart={event => event.preventDefault()}
                   onClick={event => {
+                    if (marqueeDidMove.current) { marqueeDidMove.current = false; event.preventDefault(); event.stopPropagation(); return; }
                     if ((event.target as HTMLElement).closest('[data-canvas-piece="true"]')) return;
                     if (selectedPieceId) {
-                      setSelectedPieceId(null);
+                      setSelectedPieceId(null); setSelectedPieceIds([]);
                       setIsReplacingPiece(false);
                       return;
                     }
@@ -1336,10 +1603,11 @@ const SpriteEditor: React.FC = () => {
                   title={selectedCanvasFrame && sourceSelection && isPlacingPiece ? 'Click to place the selected source region · Esc to cancel' : undefined}
                   style={{
                     position: 'relative',
+                    zIndex: 1,
                     width: displayedFrameWidth * previewZoom / 100,
                     height: displayedFrameHeight * previewZoom / 100,
-                    cursor: selectedCanvasFrame && sourceSelection && isPlacingPiece ? 'crosshair' : 'default',
-                    overflow: 'hidden',
+                    cursor: isPlaying ? 'not-allowed' : selectedCanvasFrame && sourceSelection && isPlacingPiece ? 'crosshair' : 'default',
+                    overflow: 'visible',
                   }}
                 >
                   <img src={displayedPreview} alt="Selected sprite frame" width={displayedFrameWidth * previewZoom / 100} height={displayedFrameHeight * previewZoom / 100} style={{ imageRendering: 'pixelated', display: 'block' }} />
@@ -1349,13 +1617,20 @@ const SpriteEditor: React.FC = () => {
                       data-canvas-piece="true"
                       aria-label={`Tile at ${piece.x}, ${piece.y}`}
                       onMouseDown={event => beginPieceDrag(event, piece)}
-                      onClick={event => { event.preventDefault(); event.stopPropagation(); setSelectedPieceId(piece.id); }}
+                      onClick={event => { event.preventDefault(); event.stopPropagation(); if (isPlaying) return; if (!selectedPieceIds.includes(piece.id)) { setSelectedPieceId(piece.id); setSelectedPieceIds([piece.id]); } }}
                       style={{ position: 'absolute', left: piece.x * previewZoom / 100, top: piece.y * previewZoom / 100,
                         width: piece.width * previewZoom / 100, height: piece.height * previewZoom / 100,
-                        boxSizing: 'border-box', border: `2px solid ${piece.id === selectedPieceId ? token.colorPrimary : 'rgba(255,255,255,.35)'}`,
-                        background: piece.id === selectedPieceId ? 'rgba(22,119,255,.12)' : 'transparent', cursor: 'move', zIndex: 5 }}
+                        boxSizing: 'border-box', border: selectedPieces.length <= 1 && piece.id === selectedPieceId ? `2px solid ${token.colorPrimary}` : 'none',
+                        background: selectedPieces.length <= 1 && piece.id === selectedPieceId ? 'rgba(22,119,255,.12)' : 'transparent', cursor: isPlaying ? 'not-allowed' : 'move', zIndex: 5 }}
                     />
                   ))}
+                  {selectedGroupBounds && <div
+                    aria-label={`${selectedPieces.length} tiles selected`}
+                    style={{ position: 'absolute', left: selectedGroupBounds.x * previewZoom / 100, top: selectedGroupBounds.y * previewZoom / 100,
+                      width: (selectedGroupBounds.right - selectedGroupBounds.x) * previewZoom / 100, height: (selectedGroupBounds.bottom - selectedGroupBounds.y) * previewZoom / 100,
+                      border: `2px solid ${token.colorPrimary}`, boxSizing: 'border-box', background: 'rgba(22,119,255,.06)', pointerEvents: 'none', zIndex: 6 }}
+                  />}
+                  {selectionMarquee && <div style={{ position: 'absolute', left: selectionMarquee.x * previewZoom / 100, top: selectionMarquee.y * previewZoom / 100, width: selectionMarquee.width * previewZoom / 100, height: selectionMarquee.height * previewZoom / 100, border: `1px solid ${token.colorPrimary}`, background: 'rgba(22,119,255,.15)', pointerEvents: 'none', zIndex: 7 }} />}
                   {selectedCanvasFrame && sourceSelection && sourceSelectionPreview && canvasHoverPosition && isPlacingPiece && (
                     <img
                       src={sourceSelectionPreview}
@@ -1383,28 +1658,13 @@ const SpriteEditor: React.FC = () => {
                       backgroundSize: `${8 * previewZoom / 100}px ${8 * previewZoom / 100}px`,
                     }} />
                   )}
-                  {isCollisionSettingsHovered && (
-                    <span style={{ position: 'absolute', pointerEvents: 'none', zIndex: 4, left: (canvasOriginX + collisionX) * previewZoom / 100, top: (canvasOriginY + collisionY) * previewZoom / 100, width: collisionWidth * previewZoom / 100, height: collisionHeight * previewZoom / 100, border: `1px solid ${token.colorInfo}`, background: token.colorInfoBg, opacity: 0.55 }} />
-                  )}
-                  <span
-                    aria-label="Canvas origin 16x8 preview"
-                    style={{
-                      position: 'absolute',
-                      pointerEvents: 'none',
-                      zIndex: 4,
-                      left: (canvasOriginX - 8) * previewZoom / 100,
-                      top: (canvasOriginY - 4) * previewZoom / 100,
-                      width: 16 * previewZoom / 100,
-                      height: 8 * previewZoom / 100,
-                      border: `1px dashed ${token.colorWarning}`,
-                      background: token.colorWarningBg,
-                      opacity: 0.45,
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  <span style={{ position: 'absolute', pointerEvents: 'none', zIndex: 4, left: canvasOriginX * previewZoom / 100 - 5, top: canvasOriginY * previewZoom / 100 - 1, width: 10, height: 2, background: token.colorError }} />
-                  <span style={{ position: 'absolute', pointerEvents: 'none', zIndex: 4, left: canvasOriginX * previewZoom / 100 - 1, top: canvasOriginY * previewZoom / 100 - 5, width: 2, height: 10, background: token.colorError }} />
                 </div>
+                {isCollisionSettingsHovered && (
+                  <ActorColliderOverlay left={(canvasOriginX + collisionX) * previewZoom / 100} top={(canvasOriginY + collisionY) * previewZoom / 100} width={collisionWidth * previewZoom / 100} height={collisionHeight * previewZoom / 100} />
+                )}
+                <ActorOriginOverlay testId="sprite-origin-canvas" left={(canvasOriginX - 8) * previewZoom / 100} top={(canvasOriginY - 4) * previewZoom / 100} width={16 * previewZoom / 100} height={8 * previewZoom / 100} />
+                <span style={{ position: 'absolute', pointerEvents: 'none', zIndex: 7, left: canvasOriginX * previewZoom / 100 - 5, top: canvasOriginY * previewZoom / 100 - 1, width: 10, height: 2, background: token.colorError }} />
+                <span style={{ position: 'absolute', pointerEvents: 'none', zIndex: 7, left: canvasOriginX * previewZoom / 100 - 1, top: canvasOriginY * previewZoom / 100 - 5, width: 2, height: 10, background: token.colorError }} />
               </div>
               {animationCanvasPreview && (
                 <Flex vertical align="center" gap={4}>
@@ -1416,7 +1676,7 @@ const SpriteEditor: React.FC = () => {
             </Flex>
             </div>
           ) : (
-            <Empty description={selectedSprite ? 'Unable to read sprite frame' : 'Select a sprite sheet'} />
+            <Empty description={selectedSprite ? 'Unable to read sprite frame' : t('resources.emptyHint')} />
           )}
         </Flex>
           <Flex gap={4} align="center" style={{ position: 'absolute', zIndex: 10, top: 8, right: 8, padding: 4, borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadow }}>
@@ -1424,37 +1684,46 @@ const SpriteEditor: React.FC = () => {
           <Tooltip title="Zoom out preview"><Button size="small" aria-label="Zoom out preview" icon={<ZoomOutOutlined />} onClick={() => changePreviewZoom(-1)} /></Tooltip>
           <Typography.Text onClick={() => setPreviewZoom(100)} title="Reset preview zoom to 100%" style={{ width: 44, textAlign: 'center', cursor: 'pointer' }}>{previewZoom}%</Typography.Text>
           <Tooltip title="Zoom in preview"><Button size="small" aria-label="Zoom in preview" icon={<ZoomInOutlined />} onClick={() => changePreviewZoom(1)} /></Tooltip>
+          <Tooltip title={snapToGrid ? t('sprites.snapOn') : t('sprites.snapOff')}>
+            <Button size="small" aria-label={snapToGrid ? t('sprites.snapOn') : t('sprites.snapOff')} aria-pressed={snapToGrid}
+              type={snapToGrid ? 'primary' : 'default'} icon={<BorderInnerOutlined />} onClick={() => setSnapToGrid(value => !value)} />
+          </Tooltip>
         </Flex>
-        {displayedPreview && <Typography.Text
+        {displayedPreview && selectedCanvasFrame && <Typography.Text
           type="secondary"
           ellipsis
           style={{ position: 'absolute', zIndex: 10, left: '50%', bottom: 8, maxWidth: 'calc(100% - 24px)', transform: 'translateX(-50%)', padding: '4px 8px', borderRadius: token.borderRadius, background: token.colorBgElevated, pointerEvents: 'none', textAlign: 'center' }}
         >
-          {selectedCanvasFrame
-            ? `Editable frame · ${selectedCanvasFrame.width}×${selectedCanvasFrame.height} · ${selectedCanvasFrame.pieces.length} placed region(s)`
-            : `Tile ${selectedFrame + 1} of ${tilePreviews.length}, row ${Math.floor(selectedFrame / Math.max(1, Math.floor(imageSize.width / frameWidth))) + 1}`}
+          {`Editable frame · ${selectedCanvasFrame.width}×${selectedCanvasFrame.height} · ${selectedCanvasFrame.pieces.length} tiles`}
         </Typography.Text>}
         </div>
         </Splitter.Panel>
 
-        <Splitter.Panel defaultSize={190} min={90}>
-        <Flex vertical style={{ height: '100%', background: token.colorBgBase, overflow: 'hidden' }}>
-          <Flex align="center" justify="space-between" style={{ height: 40, padding: '0 12px', background: token.colorBorder, color: '#fff' }}>
-            <Space size={8}>
-              <Typography.Text strong style={{ color: '#fff' }}>TILES</Typography.Text>
-            </Space>
-            <Space size={4}>
-              <Tooltip title="Recenter tiles"><Button size="small" aria-label="Recenter tiles" icon={<AimOutlined />} onClick={() => setTilesPanOffset({ x: 0, y: 0 })} /></Tooltip>
+        <Splitter.Panel size={tilesPanelExpanded ? tilesPanelSize : NAVIGATION_HEADER_HEIGHT} defaultSize={190} min={NAVIGATION_HEADER_HEIGHT} max={tilesPanelExpanded || spriteCenterResizing ? '50%' : NAVIGATION_HEADER_HEIGHT} style={{ minHeight: 0, overflow: 'hidden' }}>
+        <Flex ref={tilesPanelRef} vertical style={{ height: '100%', background: token.colorBgBase, overflow: 'hidden' }}>
+          <Flex align="center" justify="space-between" style={{ height: 40, flex: '0 0 40px', padding: '0 12px', background: token.colorBorder, color: '#fff' }}>
+            <Flex align="center" role="button" tabIndex={0} aria-label="Tiles" aria-expanded={tilesPanelExpanded}
+              onClick={() => toggleSpritePanel('tiles')}
+              onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleSpritePanel('tiles'); } }}
+              style={{ minWidth: 0, cursor: 'pointer' }}>
+              <CaretRightOutlined rotate={tilesPanelExpanded ? 90 : 0} style={{ marginRight: 8, color: '#fff' }} />
+              <Typography.Text strong style={{ color: '#fff', whiteSpace: 'nowrap' }}>TILES</Typography.Text>
+            </Flex>
+            {tilesPanelExpanded && <Space size={4} style={{ flex: 'none' }}>
+              <Tooltip title="Recenter tiles"><Button type="text" size="small" aria-label="Recenter tiles" icon={<AimOutlined />} style={{ padding: 4, borderRadius: token.borderRadius, color: '#fff', background: 'transparent' }} onClick={() => setTilesPanOffset({ x: 0, y: 0 })} /></Tooltip>
               <Tooltip title="Zoom out tiles">
-                <Button size="small" icon={<ZoomOutOutlined />} onClick={decreaseTilesZoom} />
+                <Button type="text" size="small" icon={<ZoomOutOutlined />} style={{ padding: 4, borderRadius: token.borderRadius, color: '#fff', background: 'transparent' }} onClick={decreaseTilesZoom} />
               </Tooltip>
-              <Typography.Text onClick={() => setSourceZoom(100)} style={{ width: 44, textAlign: 'center', cursor: 'pointer' }} title="Reset tiles zoom to 100%">{sourceZoom}%</Typography.Text>
+              <span onClick={() => setSourceZoom(100)} title="Reset tiles zoom to 100%" style={{ width: 52, minWidth: 52, maxWidth: 52, flex: '0 0 52px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                <Typography.Text style={{ flex: 'none', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: '#fff' }}>{sourceZoom}%</Typography.Text>
+              </span>
               <Tooltip title="Zoom in tiles">
-                <Button size="small" icon={<ZoomInOutlined />} onClick={increaseTilesZoom} />
+                <Button type="text" size="small" icon={<ZoomInOutlined />} style={{ padding: 4, borderRadius: token.borderRadius, color: '#fff', background: 'transparent' }} onClick={increaseTilesZoom} />
               </Tooltip>
-              <Button size="small" onClick={() => placeSelection()} disabled={!selectedCanvasFrame || !sourceSelection}>Place at 0,0</Button>
-            </Space>
+              <Button type="text" size="small" style={{ padding: 4, borderRadius: token.borderRadius, color: '#fff', background: 'transparent' }} onClick={() => placeSelection()} disabled={!selectedCanvasFrame || !sourceSelection}>Place at 0,0</Button>
+            </Space>}
           </Flex>
+          {tilesPanelExpanded && <>
           <Typography.Text type="secondary" style={{ padding: '0 12px 8px' }}>
             Drag a box over the original image, then click the editable canvas to place it once. Press Esc to cancel.
           </Typography.Text>
@@ -1531,7 +1800,7 @@ const SpriteEditor: React.FC = () => {
                 )}
               </div>
             ) : (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Select a sprite sheet" />
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('resources.emptyHint')} />
             )}
             </Flex>
             </Flex>
@@ -1545,22 +1814,32 @@ const SpriteEditor: React.FC = () => {
               Sheet: {imageSize.width} × {imageSize.height}
             </Typography.Text>
           </Flex>
+          </>}
         </Flex>
         </Splitter.Panel>
 
-        <Splitter.Panel defaultSize={170} min={90}>
-        <Flex vertical style={{ height: '100%', minHeight: 0, background: token.colorBgBase, overflow: 'hidden' }}>
+        <Splitter.Panel size={framesPanelExpanded ? framesPanelSize : NAVIGATION_HEADER_HEIGHT} defaultSize={170} min={NAVIGATION_HEADER_HEIGHT} max={framesPanelExpanded || spriteCenterResizing ? '50%' : NAVIGATION_HEADER_HEIGHT} style={{ minHeight: 0, overflow: 'hidden' }}>
+        <Flex ref={framesPanelRef} vertical style={{ height: '100%', minHeight: 0, background: token.colorBgBase, overflow: 'hidden' }}>
           <Flex align="center" justify="space-between" style={{ height: 40, flex: '0 0 40px', padding: '0 12px', background: token.colorBorder, color: '#fff' }}>
-            <Typography.Text strong style={{ color: '#fff' }}>FRAMES: {selectedAnimation?.name ?? direction.toUpperCase()}</Typography.Text>
-            <Tooltip title="Auto-generate animation frames from the sprite sheet">
+            <Flex align="center" role="button" tabIndex={0} aria-label="Frames" aria-expanded={framesPanelExpanded}
+              onClick={() => toggleSpritePanel('frames')}
+              onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleSpritePanel('frames'); } }}
+              style={{ minWidth: 0, cursor: 'pointer' }}>
+              <CaretRightOutlined rotate={framesPanelExpanded ? 90 : 0} style={{ marginRight: 8, color: '#fff' }} />
+              <Typography.Text strong ellipsis style={{ color: '#fff', whiteSpace: 'nowrap' }}>FRAMES: {selectedAnimation?.name ?? direction.toUpperCase()}</Typography.Text>
+            </Flex>
+            {framesPanelExpanded && <Tooltip title="Auto-generate animation frames from the sprite sheet">
               <Button
+                type="text"
                 size="small"
                 aria-label="Auto-generate animation frames"
                 icon={<PlusOutlined />}
+                style={{ padding: 4, borderRadius: token.borderRadius, color: '#fff', background: 'transparent' }}
                 onClick={autoGenerateAnimationFrames}
               />
-            </Tooltip>
+            </Tooltip>}
           </Flex>
+          {framesPanelExpanded && <>
           <Flex gap={8} wrap="wrap" style={{ flex: 1, minHeight: 0, overflow: 'auto', alignContent: 'flex-start', padding: '12px 12px 12px' }}>
             {(selectedAnimation?.frames ?? []).map((frameIndex, index) => {
               const frame = tilePreviews[frameIndex];
@@ -1569,15 +1848,15 @@ const SpriteEditor: React.FC = () => {
               <div
                 key={`${frameIndex}-${index}`}
                 draggable
-                onMouseEnter={() => setHoveredFrameKey(`indexed-${index}`)}
+                onMouseEnter={() => { if (!isDraggingFrame) setHoveredFrameKey(`indexed-${index}`); }}
                 onMouseLeave={() => setHoveredFrameKey(null)}
-                onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-gba-studio-frame', 'indexed'); setFrameDragImage(event); setDraggedIndexedFramePosition(index); }}
+                onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-gba-studio-frame', 'indexed'); setFrameDragImage(event); setHoveredFrameKey(null); setDraggedIndexedFramePosition(index); }}
                 onDragEnd={() => setDraggedIndexedFramePosition(null)}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={(event) => { event.preventDefault(); event.stopPropagation(); if (draggedIndexedFramePosition !== null) reorderIndexedFrames(draggedIndexedFramePosition, index); setDraggedIndexedFramePosition(null); }}
                 style={{ position: 'relative', cursor: 'grab', opacity: draggedIndexedFramePosition === index ? 0.55 : 1 }}
               >
-                <Button aria-pressed={selectedCanvasFrameId === null && frameIndex === selectedFrame} type={selectedCanvasFrameId === null && frameIndex === selectedFrame ? 'primary' : 'default'} onClick={() => chooseFrame(frameIndex)} style={{ width: 72, height: 72, boxSizing: 'border-box', padding: 4, background: '#fff', borderWidth: 3, borderColor: selectedCanvasFrameId === null && frameIndex === selectedFrame ? token.colorPrimary : 'transparent' }}>
+                <Button aria-pressed={selectedCanvasFrameId === null && frameIndex === selectedFrame} type={selectedCanvasFrameId === null && frameIndex === selectedFrame ? 'primary' : 'default'} onClick={() => chooseFrame(frameIndex)} style={{ width: 72, height: 72, boxSizing: 'border-box', padding: 4, background: '#fff', borderWidth: 3, borderColor: selectedCanvasFrameId === null && frameIndex === selectedFrame ? token.colorPrimary : 'transparent', pointerEvents: isDraggingFrame ? 'none' : undefined }}>
                   <img
                     src={frame}
                     alt={`Frame ${frameIndex + 1}`}
@@ -1599,9 +1878,9 @@ const SpriteEditor: React.FC = () => {
               <div
                 key={frame.id}
                 draggable
-                onMouseEnter={() => setHoveredFrameKey(`canvas-${frame.id}`)}
+                onMouseEnter={() => { if (!isDraggingFrame) setHoveredFrameKey(`canvas-${frame.id}`); }}
                 onMouseLeave={() => setHoveredFrameKey(null)}
-                onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-gba-studio-frame', 'canvas'); setFrameDragImage(event); setDraggedCanvasFrameId(frame.id); setCanvasDragOrder(canvasFrames.map(item => item.id)); }}
+                onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-gba-studio-frame', 'canvas'); setFrameDragImage(event); setHoveredFrameKey(null); setDraggedCanvasFrameId(frame.id); setCanvasDragOrder(canvasFrames.map(item => item.id)); }}
                 onDragEnd={() => { setDraggedCanvasFrameId(null); setCanvasDragOrder(null); }}
                 onDragOver={(event) => { event.preventDefault(); previewCanvasFrameOrder(frame.id); }}
                 onDrop={(event) => { event.preventDefault(); event.stopPropagation(); commitCanvasFrameOrder(); setDraggedCanvasFrameId(null); setCanvasDragOrder(null); }}
@@ -1610,8 +1889,8 @@ const SpriteEditor: React.FC = () => {
                 <Button
                   aria-pressed={frame.id === selectedCanvasFrameId}
                   type={frame.id === selectedCanvasFrameId ? 'primary' : 'default'}
-                  onClick={() => { setSelectedCanvasFrameId(frame.id); setSelectedPieceId(null); setIsPlaying(false); }}
-                  style={{ width: 72, height: 72, minWidth: 72, maxWidth: 72, boxSizing: 'border-box', padding: 4, background: '#fff', borderWidth: 3, borderColor: frame.id === selectedCanvasFrameId ? token.colorPrimary : 'transparent' }}
+                  onClick={() => { setSelectedCanvasFrameId(frame.id); setSelectedPieceId(null); setSelectedPieceIds([]); setIsPlaying(false); }}
+                  style={{ width: 72, height: 72, minWidth: 72, maxWidth: 72, boxSizing: 'border-box', padding: 4, background: '#fff', borderWidth: 3, borderColor: frame.id === selectedCanvasFrameId ? token.colorPrimary : 'transparent', pointerEvents: isDraggingFrame ? 'none' : undefined }}
                 >
                   {canvasFramePreviews[frame.id] && (
                     <img
@@ -1638,9 +1917,11 @@ const SpriteEditor: React.FC = () => {
               />
             </Tooltip>
           </Flex>
+          </>}
         </Flex>
         </Splitter.Panel>
         </Splitter>
+        </div>
       </Flex>
       </ResourceDropSurface>
       </Splitter.Panel>
@@ -1648,7 +1929,7 @@ const SpriteEditor: React.FC = () => {
       {!selectedSprite && (
         <Splitter.Panel min={360}>
           <Flex align="center" justify="center" style={{ width: '100%', height: '100%', background: token.colorBgContainer }}>
-            <Empty description="Select a sprite sheet to preview its tiles and frames" />
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('common.noItems')} />
           </Flex>
         </Splitter.Panel>
       )}
@@ -1657,60 +1938,67 @@ const SpriteEditor: React.FC = () => {
       <Splitter.Panel defaultSize={330} min={260} collapsible={false}>
         <Flex data-sprite-edit-controls="true" vertical gap={12} style={{ width: '100%', height: '100%', padding: 12, background: token.colorBgBase, overflow: 'auto' }}>
         {selectedCanvasFrame && selectedPiece ? <>
-          <Typography.Text strong>EDIT TILE</Typography.Text>
+          <Typography.Text strong>{selectedPieces.length > 1 ? `EDIT ${selectedPieces.length} TILES` : 'EDIT TILE'}</Typography.Text>
           <Typography.Text type="secondary">Canvas {selectedCanvasFrame.width} × {selectedCanvasFrame.height}</Typography.Text>
           <Typography.Text type="secondary">Origin X {canvasOriginX} · Y {canvasOriginY}</Typography.Text>
           <Divider style={{ margin: '2px 0' }} />
+          {selectedPieces.length <= 1 && <>
           <Typography.Text type="secondary">Tile position</Typography.Text>
           <Flex gap={8} style={{ width: '100%' }}>
-            <InputNumber addonBefore="X" min={0} max={Math.max(0, selectedCanvasFrame.width - selectedPiece.width)} step={8} value={selectedPiece.x} onChange={value => updateSelectedPiece({ x: value ?? 0 })} style={{ flex: 1, minWidth: 0 }} />
-            <InputNumber addonBefore="Y" min={0} max={Math.max(0, selectedCanvasFrame.height - selectedPiece.height)} step={8} value={selectedPiece.y} onChange={value => updateSelectedPiece({ y: value ?? 0 })} style={{ flex: 1, minWidth: 0 }} />
+            <InputNumber addonBefore="X" min={0} max={Math.max(0, selectedCanvasFrame.width - selectedPiece.width)} step={snapToGrid ? 8 : 1} value={selectedPiece.x} onChange={value => updateSelectedPiece({ x: value ?? 0 })} style={{ flex: 1, minWidth: 0 }} />
+            <InputNumber addonBefore="Y" min={0} max={Math.max(0, selectedCanvasFrame.height - selectedPiece.height)} step={snapToGrid ? 8 : 1} value={selectedPiece.y} onChange={value => updateSelectedPiece({ y: value ?? 0 })} style={{ flex: 1, minWidth: 0 }} />
           </Flex>
           <Typography.Text type="secondary">Source region · {selectedPiece.width} × {selectedPiece.height}</Typography.Text>
+          </>}
+          <Typography.Text type="secondary">{t('sprites.layers')}</Typography.Text>
+          <Flex style={{ width: '100%', alignSelf: 'stretch' }}>
+          <Space.Compact block style={{ width: '100%', display: 'flex' }}>
+            {([
+              ['back', <VerticalAlignBottomOutlined />, t('sprites.layerSendToBack')],
+              ['down', <ArrowDownOutlined />, t('sprites.layerDown')],
+              ['up', <ArrowUpOutlined />, t('sprites.layerUp')],
+              ['front', <VerticalAlignTopOutlined />, t('sprites.layerBringToFront')],
+            ] as const).map(([action, icon, label]) => <Tooltip key={action} title={label}><span style={{ display: 'flex', flex: 1, minWidth: 0 }}><Button aria-label={label} icon={icon} onClick={() => changeSelectedPieceLayer(action)} style={{ width: '100%', flex: 1 }} /></span></Tooltip>)}
+          </Space.Compact>
+          </Flex>
+          {selectedPieces.length <= 1 && <>
           <Button block type={isReplacingPiece ? 'primary' : 'default'} onClick={() => setIsReplacingPiece(value => !value)}>
             {isReplacingPiece ? 'Choose replacement in tiles…' : 'Replace Tile'}
           </Button>
           {isReplacingPiece && <Typography.Text type="secondary">Select a region in the source image to replace this tile.</Typography.Text>}
+          </>}
           <Flex gap={8}>
-            <Button block type={selectedPiece.flipX ? 'primary' : 'default'} onClick={() => updateSelectedPiece({ flipX: !selectedPiece.flipX })}>Flip H</Button>
-            <Button block type={selectedPiece.flipY ? 'primary' : 'default'} onClick={() => updateSelectedPiece({ flipY: !selectedPiece.flipY })}>Flip V</Button>
+            <Button block type={selectedPieces.every(piece => piece.flipX) ? 'primary' : 'default'} onClick={() => flipSelectedPieces('horizontal')}>Flip H</Button>
+            <Button block type={selectedPieces.every(piece => piece.flipY) ? 'primary' : 'default'} onClick={() => flipSelectedPieces('vertical')}>Flip V</Button>
           </Flex>
-          <Typography.Text type="secondary">Press Del to remove this tile.</Typography.Text>
+          <Typography.Text type="secondary">Press Del to remove {selectedPieces.length > 1 ? 'these tiles' : 'this tile'}.</Typography.Text>
         </> : <>
         <Flex vertical gap={4}>
-          <Typography.Text type="secondary">Tile Name</Typography.Text>
-          {isSpriteNameEditing ? <Input
-            autoFocus
-            variant="borderless"
+          <NameInput
+            aria-label={t('sprites.tileName')}
             value={spriteNameInput}
             placeholder={selectedSprite.name.replace(/\.[^/.]+$/, '')}
             onChange={event => setSpriteNameInput(event.target.value)}
+            onFocus={() => setIsSpriteNameEditing(true)}
             onBlur={() => {
               setIsSpriteNameEditing(false);
               renameSelectedSprite();
             }}
             onPressEnter={event => event.currentTarget.blur()}
-            style={{ paddingInline: 0 }}
-          /> : <Typography.Text
-            onClick={() => setIsSpriteNameEditing(true)}
-            style={{ cursor: 'text', paddingInline: 0 }}
-          >{spriteNameInput || selectedSprite.name.replace(/\.[^/.]+$/, '')}</Typography.Text>}
-          <Typography.Text type="secondary" style={{ marginTop: 4 }}>State Name</Typography.Text>
-          {isStateNameEditing ? <Input
-            autoFocus
-            variant="borderless"
+            style={{ border: `1px solid ${isSpriteNameEditing ? token.colorPrimary : 'transparent'}`, background: isSpriteNameEditing ? token.colorBgContainer : 'transparent', boxShadow: 'none', marginBottom: 6, fontWeight: 600 }}
+          />
+          <NameInput
+            aria-label={t('sprites.stateName')}
             value={selectedState?.name ?? ''}
             placeholder={defaultStateName}
+            onFocus={() => setIsStateNameEditing(true)}
             onBlur={event => { commitStateName(event.target.value); setIsStateNameEditing(false); }}
             onPressEnter={event => event.currentTarget.blur()}
             onChange={event => updateSettings({
               playerAnimationStates: animationStates.map(state => state.id === selectedState?.id ? { ...state, name: event.target.value } : state),
             })}
-            style={{ paddingInline: 0 }}
-          /> : <Typography.Text
-            onClick={() => setIsStateNameEditing(true)}
-            style={{ cursor: 'text', paddingInline: 0 }}
-          >{selectedState?.name?.trim() || defaultStateName}</Typography.Text>}
+            style={{ border: `1px solid ${isStateNameEditing ? token.colorPrimary : 'transparent'}`, background: isStateNameEditing ? token.colorBgContainer : 'transparent', boxShadow: 'none', marginBottom: 6, fontWeight: 600 }}
+          />
         </Flex>
         <Divider style={{ margin: '0' }} />
         <Typography.Text strong>SPRITE SETTINGS</Typography.Text>
@@ -1771,8 +2059,8 @@ const SpriteEditor: React.FC = () => {
           ]}
           onChange={changeAnimationType}
         />
-        {imageSize.width > 0 && (imageSize.width % frameWidth !== 0 || imageSize.height < frameHeight * 4) && (
-          <Typography.Text type="danger">The sheet dimensions do not match the configured frame grid.</Typography.Text>
+        {imageSize.width > 0 && (imageSize.width % frameWidth !== 0 || imageSize.height % frameHeight !== 0) && (
+          <Typography.Text type="danger">{t('sprites.invalidGrid')}</Typography.Text>
         )}
         </>}
       </Flex>

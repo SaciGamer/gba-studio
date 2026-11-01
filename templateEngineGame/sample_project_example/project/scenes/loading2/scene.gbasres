@@ -1,0 +1,95 @@
+{
+  "id": "b35ba84c-8c98-4555-9da3-916925209810",
+  "_resourceType": "scene",
+  "_index": 3,
+  "_deleted": false,
+  "name": "Loading2",
+  "background": "local://E:/VisualStudio/GBAStudioProject/gba-studio/templateEngineGame/sample_project_example/assets/backgrounds\\background.bmp",
+  "backgrounds": [
+    {
+      "layerId": 0,
+      "backgroundId": "1523219e-e9a3-4c6b-b2df-bab18ecd93f7",
+      "__referenceWarnings": {
+        "backgroundId": "Resource reference was removed. Select a replacement."
+      },
+      "name": "",
+      "path": ""
+    },
+    {
+      "layerId": 1,
+      "backgroundId": "453161fd-8ff3-4489-9834-e2a84f863f5a",
+      "name": "",
+      "path": "",
+      "__referenceWarnings": {
+        "backgroundId": "Resource reference was removed. Select a replacement."
+      }
+    }
+  ],
+  "x": 954,
+  "y": 114,
+  "width": 256,
+  "height": 256,
+  "cameraPosition": {
+    "x": 8,
+    "y": 40
+  },
+  "sceneType": "Top Down",
+  "editorPosition": {
+    "x": 954,
+    "y": 114
+  },
+  "tileAnimations": [],
+  "_recenter": true,
+  "showCamera": true,
+  "script": [
+    {
+      "id": "99ebf5a5-6ccc-41c1-a9ad-03fb7e8c9ba7",
+      "version": 1,
+      "command": "EVENT_HIDE_ACTOR",
+      "args": {
+        "actorId": "__PLAYER__",
+        "__collapse": false
+      }
+    },
+    {
+      "id": "fece5de3-a117-4a89-becf-4dc437acb86a",
+      "command": "EVENT_FADE_IN",
+      "args": {
+        "speed": 1,
+        "__automatic": true,
+        "__collapse": false
+      },
+      "version": 1
+    },
+    {
+      "id": "ec5208ab-5fb1-44bd-834d-46c327463272",
+      "version": 1,
+      "command": "EVENT_WAIT",
+      "args": {
+        "units": "time",
+        "time": 1,
+        "frames": 0,
+        "__collapse": true
+      }
+    },
+    {
+      "id": "1f53c221-339a-4157-a635-e5f71a23e7ce",
+      "version": 1,
+      "command": "EVENT_CALL_SCRIPT",
+      "args": {
+        "scriptId": "ce738717-d102-4bf5-9254-63af2eeefb45",
+        "arguments": [
+          {
+            "parameterId": "__PARAM__:A",
+            "value": {
+              "kind": "variable",
+              "variableId": "50944154-9406-4b71-bb85-ce08e53d85be"
+            }
+          }
+        ],
+        "__collapse": false
+      }
+    }
+  ],
+  "actors": []
+}

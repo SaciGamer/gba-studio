@@ -11,12 +11,12 @@ void require(bool condition, const char* message) {
 }
 
 const ScriptCommandData programs[2] = {
-    {"a", "TEST", nullptr, 0, 1, -1, -1, -1},
-    {"b", "TEST", nullptr, 0, 1, -1, -1, -1}
+    {"TEST", nullptr, -1, -1, -1},
+    {"TEST", nullptr, -1, -1, -1}
 };
 
 ScriptTrigger make_trigger(TriggerActivation activation, int index = 0) {
-    return {"trigger", 0, 0, 10, 10, activation, true, false, 0,
+    return {0, 0, 10, 10, activation, true, false, 0,
             &programs[index], 1, &programs[index], 1};
 }
 
@@ -35,6 +35,23 @@ void tick(ScriptTriggerManager& manager, const Scenes& scene, bool inside = true
 
 int main() {
     auto& scheduler = ScriptCommand::instance();
+    {
+        scheduler = ScriptCommand();
+        ScriptTriggerManager manager;
+        auto trigger = make_trigger(TriggerActivation::enter);
+        trigger.enabled = false;
+        const auto scene = make_scene(&trigger);
+        tick(manager, scene);
+        require(scheduler.records.empty(), "Initially disabled trigger must not activate");
+        trigger.enabled = true;
+        tick(manager, scene);
+        require(scheduler.records[programs].starts == 1, "Enabling inside the region must count as entry");
+        trigger.enabled = false;
+        tick(manager, scene); tick(manager, scene);
+        require(scheduler.records[programs].completions == 1, "Disabling must let an already running program finish");
+        tick(manager, scene);
+        require(scheduler.records[programs].starts == 1, "Disabled trigger must prevent new activations");
+    }
     {
         scheduler = ScriptCommand();
         ScriptTriggerManager manager;

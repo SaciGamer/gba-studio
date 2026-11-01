@@ -1,100 +1,23 @@
+import { INPUT_MAP_SCENE_TYPES, sceneInputActions, resolveSceneInputMap } from '../../../../shared/inputMap';
+import { WarningField } from './WarningIndicator';
+import { hasAssetReferenceWarning } from '../../../../shared/events/sceneReferenceCleanup';
+import { useI18n } from '@/i18n/I18n';
+import DirectionRadioGroup from './DirectionRadioGroup';
 import { MOVEMENT_SPEED_OPTIONS, ANIMATION_SPEED_OPTIONS } from '@/utils/movementSpeedOptions';
-import imgPlaceholder from '@/img/placeholder.png';
-import { joinLocalAssetPath } from '@/utils/localAssetUrl';
-import { loadPaletteTransparentImage } from '@/utils/paletteTransparency';
+import SceneLayersThumbnail from './SceneLayersThumbnail';
 import useAppContexts from "@/providers/contexts/AppContexts";
 import { IProjectSettings } from "@/providers/contexts/interfaces/IProjectElement";
 import { ISceneSettings } from "@/providers/contexts/interfaces/ISceneElement";
-import { EColorMode, IMainSettings } from "@/providers/contexts/interfaces/ISettingElement";
-import { CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { IMainSettings } from "@/providers/contexts/interfaces/ISettingElement";
+import { CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled } from "@ant-design/icons";
 import { Button, Checkbox, Divider, Flex, Form, Input, Radio, Select, Space, theme, Typography } from "antd";
 import StepInputNumber, { InputNumber } from './StepInputNumber';
 import { Content } from "antd/es/layout/layout";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
+// TODO: Restore these imports with the custom logical-action editor.
+// import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 const { useToken } = theme;
-
-interface SceneBackgroundLayer {
-  key: string;
-  path: string;
-  width: number;
-  height: number;
-  x: number;
-  y: number;
-}
-
-const SceneLayersThumbnail: React.FC<{
-  layers: SceneBackgroundLayer[];
-  alt: string;
-  canvasWidth: number;
-  canvasHeight: number;
-  cameraPosition?: ISceneSettings['cameraPosition'];
-}> = ({ layers, alt, canvasWidth, canvasHeight, cameraPosition }) => {
-  const [transparentSources, setTransparentSources] = useState<Record<string, string>>({});
-  const layerSignature = useMemo(() => layers.map(layer => `${layer.key}:${layer.path}`).join('|'), [layers]);
-  // Camera coordinates are the world-space top-left of the 240x160 view.
-  const cropX = Number.isFinite(cameraPosition?.x) ? Number(cameraPosition!.x) : 0;
-  const cropY = Number.isFinite(cameraPosition?.y) ? Number(cameraPosition!.y) : 0;
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all(layers.map(async layer => {
-      const image = await loadPaletteTransparentImage(layer.path);
-      return [layer.key, image?.toDataURL() ?? layer.path] as const;
-    })).then(entries => {
-      if (!cancelled) setTransparentSources(Object.fromEntries(entries));
-    });
-    return () => { cancelled = true; };
-  }, [layerSignature]);
-
-  return (
-    <span
-      role="img"
-      aria-label={alt}
-      style={{
-        position: 'relative',
-        display: 'block',
-        boxSizing: 'border-box',
-        width: 36,
-        height: 24,
-        flex: '0 0 36px',
-        overflow: 'hidden',
-        verticalAlign: 'middle',
-        background: '#111',
-      }}
-    >
-      <span
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: 240,
-          height: 160,
-          overflow: 'hidden',
-          transform: 'scale(0.15)',
-          transformOrigin: 'top left',
-        }}
-      >
-        {layers.length > 0 ? layers.map(layer => (
-          <img
-            key={layer.key}
-            src={transparentSources[layer.key] ?? layer.path}
-            alt=""
-            style={{
-              position: 'absolute',
-              top: layer.y - cropY,
-              left: layer.x - cropX,
-              display: 'block',
-              imageRendering: 'pixelated',
-            }}
-          />
-        )) : (
-          <img src={imgPlaceholder} alt="" style={{ display: 'block', width: 240, height: 160, objectFit: 'cover' }} />
-        )}
-      </span>
-    </span>
-  );
-};
 
 const UserSettingsForm: React.FC = () => {
   const [form] = Form.useForm();
@@ -177,10 +100,6 @@ interface IGameSettingsForm {
   controllerView: (value: number) => void
 }
 
-const DEFAULT_INPUT_MAP: Record<string, string[]> = {
-  move_left: ['LEFT'], move_right: ['RIGHT'], move_up: ['UP'], move_down: ['DOWN'],
-  confirm: ['A'], cancel: ['B'], shoot: ['B'], pause: ['START'], menu: ['SELECT'],
-};
 const INPUT_BUTTON_OPTIONS = ['A', 'B', 'L', 'R', 'START', 'SELECT', 'UP', 'DOWN', 'LEFT', 'RIGHT']
   .map(button => ({ value: button, label: button }));
 
@@ -188,40 +107,49 @@ export const InputMapEditor: React.FC<{
   settings: IMainSettings;
   setSettings: React.Dispatch<React.SetStateAction<IMainSettings>>;
 }> = ({ settings, setSettings }) => {
-  const inputMap = settings.inputMap ?? DEFAULT_INPUT_MAP;
-  const [newAction, setNewAction] = useState('');
+  const { t } = useI18n();
+  const [sceneType, setSceneType] = useState<string>('Top Down');
+  const inputMap = resolveSceneInputMap(sceneType, settings.inputMapsBySceneType, settings.inputMap);
+  // TODO: Resume custom logical actions when their editor workflow is ready.
+  // const [newAction, setNewAction] = useState('');
   const updateMap = (nextMap: Record<string, string[]>) => {
-    setSettings(previous => ({ ...previous, inputMap: nextMap, _saved: false }));
+    setSettings(previous => ({ ...previous, inputMapsBySceneType: { ...previous.inputMapsBySceneType, [sceneType]: Object.fromEntries(sceneInputActions(sceneType).map(action => [action, nextMap[action]])) }, _saved: false }));
   };
   const updateAction = (action: string, buttons: string[]) => {
     updateMap({ ...inputMap, [action]: buttons });
   };
-  const addAction = () => {
-    const action = newAction.trim();
-    if (!/^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(action) || INPUT_BUTTON_OPTIONS.some(option => option.value === action) || inputMap[action] || Object.keys(inputMap).length >= 32) return;
-    updateMap({ ...inputMap, [action]: ['A'] });
-    setNewAction('');
-  };
-  const removeAction = (action: string) => {
-    const nextMap = { ...inputMap };
-    delete nextMap[action];
-    updateMap(nextMap);
-  };
+  // TODO: Resume creation/removal of custom actions. Standard actions are fixed.
+//   const addAction = () => {
+//     const action = newAction.trim();
+//     if (!/^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(action) || INPUT_BUTTON_OPTIONS.some(option => option.value === action) || inputMap[action] || Object.keys(inputMap).length >= 32) return;
+//     updateMap({ ...inputMap, [action]: ['A'] });
+//     setNewAction('');
+//   };
+//   const removeAction = (action: string) => {
+//     const nextMap = { ...inputMap };
+//     delete nextMap[action];
+//     updateMap(nextMap);
+//   };
   return <Space direction="vertical" style={{ width: '100%' }}>
-    <Typography.Title level={5} style={{ margin: 0 }}>Controls</Typography.Title>
-    <Typography.Text strong>Input Map</Typography.Text>
-    <Typography.Text type="secondary">Project wide logical actions used by scenes, events, and shooter controls.</Typography.Text>
+    <Typography.Title level={5} style={{ margin: 0 }}>{t('controls.map')}</Typography.Title>
+    <Typography.Text type="secondary">{t('controls.description')}</Typography.Text>
+    {/* TODO: Resume the New action input and Add button.
     <Space.Compact style={{ width: '100%' }}>
       <Input aria-label="New logical input action" placeholder="New action (e.g. fire_special)" value={newAction}
         onChange={event => setNewAction(event.target.value)} onPressEnter={addAction} />
       <Button aria-label="Add logical input action" icon={<PlusOutlined />} onClick={addAction} />
     </Space.Compact>
-    {Object.entries(inputMap).map(([action, buttons]) => (
+    */}
+    <Select aria-label={t('controls.sceneType')} value={sceneType} onChange={setSceneType} size="small" style={{ width: '100%' }} options={INPUT_MAP_SCENE_TYPES.map(type => ({ value: type, label: type }))} />
+    {sceneInputActions(sceneType).map(action => (
       <Flex key={action} align="center" gap={8}>
-        <Typography.Text style={{ width: 110 }}>{action}</Typography.Text>
-        <Select mode="multiple" style={{ flex: 1 }} value={buttons} options={INPUT_BUTTON_OPTIONS}
-          onChange={next => updateAction(action, next)} maxTagCount="responsive" />
+        <Typography.Text style={{ flex: 1, minWidth: 0 }}>{t(`controls.action.${action}`)}</Typography.Text>
+        <Select aria-label={t(`controls.action.${action}`)} size="small" mode="multiple" style={{ width: 180, maxWidth: '55%' }} value={inputMap[action]}
+          options={INPUT_BUTTON_OPTIONS.map(option => ({ ...option, disabled: inputMap[action].length === 1 && inputMap[action][0] === option.value }))}
+          onChange={next => { if (next.length) updateAction(action, next); }} maxCount={8} maxTagCount="responsive" />
+        {/* TODO: Resume removing custom actions.
         <Button aria-label={`Remove logical input action ${action}`} icon={<DeleteOutlined />} type="text" danger onClick={() => removeAction(action)} />
+        */}
       </Flex>
     ))}
   </Space>;
@@ -264,6 +192,7 @@ export const ShooterConfigEditor: React.FC<{
   settings: IMainSettings;
   setSettings: React.Dispatch<React.SetStateAction<IMainSettings>>;
 }> = ({ settings, setSettings }) => {
+  const { t } = useI18n();
   const config = settings.shooterConfig ?? {};
   const updateNumber = (field: 'playerHitPoints' | 'defaultDamage' | 'bossHitPoints', value: number | null) => {
     setSettings(previous => ({ ...previous, shooterConfig: { ...(previous.shooterConfig ?? {}), [field]: value ?? 0 }, _saved: false }));
@@ -277,8 +206,10 @@ export const ShooterConfigEditor: React.FC<{
     <Form.Item label="Default wave" style={{ marginBottom: 8 }}>
       <Input aria-label="Default shooter wave" value={config.defaultWaveId ?? ''} placeholder="wave_01" onChange={event => updateWave(event.target.value)} />
     </Form.Item>
-    <Form.Item label="Projectile sprite" style={{ marginBottom: 8 }}>
-      <Input aria-label="Shooter projectile sprite" value={config.projectileSpriteId ?? ''} placeholder="bullet" onChange={event => setSettings(previous => ({ ...previous, shooterConfig: { ...(previous.shooterConfig ?? {}), projectileSpriteId: event.target.value }, _saved: false }))} />
+    <Form.Item label="Projectile sprite" validateStatus={hasAssetReferenceWarning(config, 'projectileSpriteId') ? 'warning' : undefined} style={{ marginBottom: 8 }}>
+      <WarningField warning={hasAssetReferenceWarning(config, 'projectileSpriteId')} message={t('events.missingReference')}>
+      <Input status={hasAssetReferenceWarning(config, 'projectileSpriteId') ? 'warning' : undefined} aria-label="Shooter projectile sprite" value={config.projectileSpriteId ?? ''} placeholder="bullet" onChange={event => setSettings(previous => ({ ...previous, shooterConfig: { ...(previous.shooterConfig ?? {}), projectileSpriteId: event.target.value }, _saved: false }))} />
+      </WarningField>
     </Form.Item>
     <Flex wrap="wrap" gap={8}>
       <Flex vertical style={{ minWidth: 108, flex: '1 1 108px' }}>
@@ -307,36 +238,41 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
 
   const { 
     settings, setSettings,
-    scenes, backgrounds, settingUtils,
+    scenes, spriteResources,
   } = useAppContexts();
+  const [positionSnap, setPositionSnap] = useState<8 | 16>(8);
+  useEffect(() => {
+    let active = true;
+    const apply = (preferences: any) => setPositionSnap(preferences?.sceneObjectSnapSize === 16 ? 16 : 8);
+    void window.electronAPI.loadPreferences?.().then(preferences => { if (active) apply(preferences); });
+    const changed = (event: Event) => apply((event as CustomEvent).detail);
+    window.addEventListener('gba-studio:game-world-preferences', changed);
+    return () => { active = false; window.removeEventListener('gba-studio:game-world-preferences', changed); };
+  }, []);
+  const positionBounds = (scene: ISceneSettings | undefined, axis: 'width' | 'height') => {
+    const sprite = spriteResources.find(item => item.id === settings.playerSpriteId);
+    const size = Number(axis === 'width' ? sprite?.playerFrameWidth ?? 16 : sprite?.playerFrameHeight ?? 16);
+    const origin = Number(axis === 'width' ? sprite?.playerCanvasOriginX ?? 0 : sprite?.playerCanvasOriginY ?? 8);
+    const min = origin / 16;
+    const max = (Math.max(0, (scene?.[axis] ?? 240) - size) + origin) / 16;
+    return { min, max };
+  };
   const optionsMoveSpeed = MOVEMENT_SPEED_OPTIONS;
   const customSpeed = customSpeedRequested || !optionsMoveSpeed.some(option => option.value === settings?.startMoveSpeed);
   const optionsAnimSpeed = ANIMATION_SPEED_OPTIONS;
 
   const clampPlayerPosition = (settings: IMainSettings, scene: ISceneSettings) => {
-    const maxX = Math.floor(scene.width / 16) - 2;
-    const maxY = Math.floor(scene.height / 16) - 2;
+    const maxX = positionBounds(scene, 'width').max;
+    const maxY = positionBounds(scene, 'height').max;
 
     return {
       ...settings,
-      startX: Math.max(0, Math.min(settings.startX, maxX)),
-      startY: Math.max(0, Math.min(settings.startY, maxY)),
+      startX: Math.max(positionBounds(scene, 'width').min, Math.min(settings.startX, maxX)),
+      startY: Math.max(positionBounds(scene, 'height').min, Math.min(settings.startY, maxY)),
     };
   }
 
   const handleValuesChange = (changedValues: Partial<IMainSettings>, allValues: IMainSettings) => {
-    if ('colorMode' in changedValues) {
-      const updatedColorMode = changedValues.colorMode
-        ? EColorMode.Mixed
-        : EColorMode.Mono;
-
-      allValues.colorMode = updatedColorMode;
-
-      console.log("..: Updated Color Mode Enum:", updatedColorMode);
-    } else {
-      allValues.colorMode = settings.colorMode;
-    }
-
     if ('startSceneId' in changedValues) {
       allValues = clampPlayerPosition(allValues, scenes.find(s => s.id === changedValues.startSceneId)!);
     }
@@ -367,18 +303,9 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
       try {
         console.log('..: UserSettingsForm loaded: ', settings);
 
-        // Converter colorMode para boolean
-        const transformedSettings = {
-          ...settings,
-          colorMode: settings?.colorMode === 'mixed',
-        };
+        const normalizedSettings = { ...settings };
 
 
-        const normalizedSettings = {
-          ...transformedSettings,
-        };
-
-        console.log('..: GameSettingsForm customSpeed %s, convertendo colorModo após loading: ', customSpeed, normalizedSettings);
 
         form.setFieldsValue(normalizedSettings);
         // setLoading(settings ? false : true);
@@ -395,30 +322,9 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
   //   return <Spin />;
   // }
 
-  const getSceneBackgroundLayers = (scene: ISceneSettings) => (
-    [...(scene.backgrounds ?? [])]
-      .sort((left, right) => left.layerId - right.layerId)
-      .flatMap(layer => {
-        const background = backgrounds.find(item => !item._deleted && item.id === layer.backgroundId);
-        if (!background) return [];
-
-        return [{
-          key: `${layer.layerId}-${background.id}`,
-          path: joinLocalAssetPath(
-            background.hd ? settingUtils.localImagePathHD : settingUtils.localImagePath,
-            background.filename,
-          ),
-          width: background.imageWidth,
-          height: background.imageHeight,
-          x: Number(layer.x) || 0,
-          y: Number(layer.y) || 0,
-        }];
-      })
-  );
-
-  function getSceneMax(startSceneId: string, maxDefault: number) {
+  function getSceneMax(startSceneId: string, maxDefault: number, axis: 'width' | 'height') {
     const scene = scenes.find(s => s.id === startSceneId);
-    return scene ? (scene.width / 16) - 2 : maxDefault;
+    return scene ? positionBounds(scene, axis).max : maxDefault;
   }
 
   return (
@@ -445,11 +351,8 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
             return (
               <span style={{ display: 'inline-flex', width: '100%', minHeight: 36, alignItems: 'center', justifyContent: 'flex-start', gap: 8, lineHeight: 1 }}>
                 <SceneLayersThumbnail
-                  layers={getSceneBackgroundLayers(scene)}
+                  scene={scene}
                   alt={scene.name}
-                  canvasWidth={Math.max(240, scene.width || 0)}
-                  canvasHeight={Math.max(160, scene.height || 0)}
-                  cameraPosition={scene.cameraPosition}
                 />
                 <span>{scene.name}</span>
               </span>
@@ -461,11 +364,8 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
             return (
               <span style={{ display: 'inline-flex', width: '100%', height: 40, boxSizing: 'border-box', alignItems: 'center', justifyContent: 'flex-start', gap: 8, lineHeight: 1, textAlign: 'left' }}>
                 <SceneLayersThumbnail
-                  layers={getSceneBackgroundLayers(scene)}
+                  scene={scene}
                   alt={scene.name}
-                  canvasWidth={Math.max(240, scene.width || 0)}
-                  canvasHeight={Math.max(160, scene.height || 0)}
-                  cameraPosition={scene.cameraPosition}
                 />
                 <span>{scene.name}</span>
               </span>
@@ -476,13 +376,8 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
         </Select>
       </Form.Item>
       
-      {/* Checkbox and More Settings */}
-      <Space style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Form.Item name="colorMode" valuePropName="checked" style={{ marginBottom: 0 }}>
-          <Checkbox>
-            Enable Color Mode
-          </Checkbox>
-        </Form.Item>
+      {/* More Settings */}
+      <Space style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
         <Button type="default" onClick={handleMoreSettings}>
           More Settings
         </Button>
@@ -492,7 +387,7 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
 
       {/* Direction */}
       <Form.Item name="startDirection" label="Direction">
-        <Radio.Group buttonStyle="solid" style={{ width: '100%', display: "flex" }}>
+        <DirectionRadioGroup buttonStyle="solid" style={{ width: '100%', display: "flex" }}>
           <Radio.Button value="left" style={{ flex: 1, textAlign: 'center' }}>
             <CaretLeftFilled />
           </Radio.Button>
@@ -505,17 +400,17 @@ const GameSettingsForm: React.FC<IGameSettingsForm> = ({ controllerView }) => {
           <Radio.Button value="right" style={{ flex: 1, textAlign: 'center' }}>
             <CaretRightFilled />
           </Radio.Button>
-        </Radio.Group>
+        </DirectionRadioGroup>
       </Form.Item>
       
       {/* Start Position */}
       <Typography.Paragraph >Start Position</Typography.Paragraph>
       <Flex gap={8}>
         <Form.Item name={"startX"} noStyle style={{ flex: 1, minWidth: 0 }}>
-          <InputNumber addonBefore="X" min={0} max={getSceneMax(settings.startSceneId, 15)} style={{ width: '100%' }}/>
+          <InputNumber addonBefore="X" step={positionSnap / 16} min={positionBounds(scenes.find(scene => scene.id === settings.startSceneId), 'width').min} max={getSceneMax(settings.startSceneId, 15, 'width')} style={{ width: '100%' }}/>
         </Form.Item>
         <Form.Item name={"startY"} noStyle style={{ flex: 1, minWidth: 0 }}>
-          <InputNumber addonBefore="Y" min={0} max={getSceneMax(settings.startSceneId, 10)} style={{ width: '100%' }}/>
+          <InputNumber addonBefore="Y" step={positionSnap / 16} min={positionBounds(scenes.find(scene => scene.id === settings.startSceneId), 'height').min} max={getSceneMax(settings.startSceneId, 10, 'height')} style={{ width: '100%' }}/>
         </Form.Item>
       </Flex>
 

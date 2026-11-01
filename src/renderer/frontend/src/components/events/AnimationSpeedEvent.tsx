@@ -4,6 +4,7 @@ import { Form, Select } from 'antd';
 import StepInputNumber, { InputNumber } from '../StepInputNumber';
 import NumericEventInput from '../NumericEventInput';
 import React from 'react';
+import useActorSelf from './useActorSelf';
 
 interface AnimationSpeedEventProps {
   event: IScriptsElement;
@@ -12,8 +13,9 @@ interface AnimationSpeedEventProps {
 
 const AnimationSpeedEvent: React.FC<AnimationSpeedEventProps> = ({ event, onValueChange }) => {
   const { elementSelected } = useAppContexts();
+  const self = useActorSelf();
   const args: any = event.args ?? {};
-  const actors = [{ value: '__PLAYER__', label: 'Player' }, ...(elementSelected?.actors ?? [])
+  const actors = [...self.options, { value: '__PLAYER__', label: 'Player' }, ...(elementSelected?.actors ?? [])
     .filter(actor => Boolean(actor.id))
     .map(actor => ({ value: actor.id, label: actor.name ?? actor.actorId ?? actor.id }))];
   const update = (patch: Record<string, unknown>) => onValueChange(event.id, { ...args, ...patch });

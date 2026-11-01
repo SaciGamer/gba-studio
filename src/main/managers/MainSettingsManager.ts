@@ -1,3 +1,4 @@
+import { withDefaultInputMap } from '../../shared/inputMap';
 import { IMainSettings } from '@/interfaces/MainSettingsInterface';
 import { BaseManager as BaseManager } from './BaseManager';
 
@@ -9,12 +10,8 @@ const defaultMainSettings: IMainSettings = {
     startMoveSpeed: 1,
     startAnimSpeed: 4,
     startDirection: 'right',
-    colorMode: 'mono',
     fadeDirection: 0,
-    inputMap: {
-        move_left: ['LEFT'], move_right: ['RIGHT'], move_up: ['UP'], move_down: ['DOWN'],
-        confirm: ['A'], cancel: ['B'], jump: ['B'], shoot: ['B'], pause: ['START'], menu: ['SELECT'],
-    },
+    inputMap: withDefaultInputMap(),
     demoAudioVolume: 1,
     demoAudioMuted: false,
     playerSpriteId: null,
@@ -69,9 +66,5 @@ export class MainSettingsManager extends BaseManager<IMainSettings> {
         return response ? response.startDirection : '';
     }
 
-    public getColorMode(): string {
-        let response = this.getData();
-        return response ? response.colorMode : '';
-    }
     
 }

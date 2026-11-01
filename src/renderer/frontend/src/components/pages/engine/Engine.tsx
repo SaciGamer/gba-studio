@@ -1,5 +1,12 @@
+import { LOCAL_VARIABLES } from '../../../../../../shared/localVariables';
+import { hasDeletedProjectEntries, pruneDeletedProjectEntries } from '../../../../../../shared/projectCollectionEntries';
+import { usePanelResizeHandlers } from '@/utils/panelResize';
+import { normalizeSceneResource } from '../../../../../../shared/sceneResource';
+import { cacheWorkspaceLayout, loadWorkspaceLayout, workspaceLayoutKey } from '@/utils/workspaceLayout';
+import useBackgroundCompatibilityValidation from '@/utils/useBackgroundCompatibilityValidation';
 import { App as AntDApp, Flex, FloatButton, Layout, Spin, Splitter, Typography, notification } from 'antd';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { sceneSearchAfterSelection } from '../../../utils/sceneSearch';
 
 import BottomPanel, { COMPILER_STATUS_HEADER_HEIGHT } from '../../BottomPanel';
 import LeftPanel from '../../LeftPanel';
@@ -21,6 +28,7 @@ import { ISceneSettings } from '@/providers/contexts/interfaces/ISceneElement';
 import { IMainSettings } from '@/providers/contexts/interfaces/ISettingElement';
 import { ISpriteSettings } from '@/providers/contexts/interfaces/ISpriteElement';
 import { ISettingUtils } from '@/providers/contexts/interfaces/ISettingUtils';
+import { createEmptyPrefabs, normalizePrefabs } from '@/providers/contexts/interfaces/IPrefabElement';
 import { migrateBlob47Parts } from '@/utils/blobAutoTile';
 import { LayoutOutlined } from '@ant-design/icons';
 import ErrorBoundary from 'antd/es/alert/ErrorBoundary';
@@ -38,11 +46,13 @@ import { clearSceneCanvasCache } from '@/utils/sceneRenderCache';
 import { loadPaletteLibrary } from '../../resourceEditors/paletteLibrary';
 import { preloadSceneVisualAssets } from '@/utils/preloadSceneVisualAssets';
 import { shareInFlightRequest } from '@/utils/inFlightRequest';
+import { clearMissingAssetReferences, clearMissingSceneReferences, disableMissingActorReferences, clearMissingEventReferences, repairCallScriptArguments } from '../../../../../../shared/events/sceneReferenceCleanup';
 
 // The menu event can be delivered to more than one mounted Engine listener.
 // Keep this lock at module scope so all listeners share the same export state.
 let exportDialogInProgress = false;
 import { useI18n } from '@/i18n/I18n';
+import { MusicEditorWorkspaceProvider, useMusicEditorWorkspace } from '../../resourceEditors/MusicEditorWorkspace';
 
 const { Content } = Layout;
 
@@ -53,6 +63,23 @@ const baseLayoutStyle = {
   overflow: 'hidden' 
 };
 
+function MusicEditorWorkspaceLayout({ setContentView }: { setContentView: (value: number) => void }) {
+  const { selectedAssetId } = useMusicEditorWorkspace();
+  return <Layout style={baseLayoutStyle}>
+    <Splitter style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <Splitter.Panel defaultSize="22%" min={210} max="32%" style={{ minWidth: 0, overflow: 'hidden' }}>
+        <LeftPanel musicEditorMode />
+      </Splitter.Panel>
+      <Splitter.Panel min={520} style={{ minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
+        <AssetLibraryEditor kind="music" musicWorkspaceMode />
+      </Splitter.Panel>
+      {selectedAssetId && <Splitter.Panel defaultSize="25%" min={250} max="35%" style={{ minWidth: 0, overflow: 'hidden' }}>
+        <RightPanelScroll><RightPanel controllerView={setContentView} musicEditorMode /></RightPanelScroll>
+      </Splitter.Panel>}
+    </Splitter>
+  </Layout>;
+}
+
 const Engine: React.FC = () => {
   const { token } = AntdToken();
   const { t } = useI18n();
@@ -60,7 +87,14 @@ const Engine: React.FC = () => {
   const location = useLocation();
   const [contentView, setContentView] = useState<number>(1);
   const [loading, setLoading] = useState(true);
+  useBackgroundCompatibilityValidation(loading);
+  const layoutProjectPath = new URLSearchParams(location.search).get('path') || undefined;
+  const layoutProjectKey = workspaceLayoutKey(layoutProjectPath);
+  const [readyLayoutProject, setReadyLayoutProject] = useState<string | null>(null);
   const [centerWorkspaceSizes, setCenterWorkspaceSizes] = useState<Array<number | string>>(['75%', '25%']);
+  const centerWorkspaceRef = useRef<HTMLDivElement>(null);
+  const expandedCompilerHeightRef = useRef(160);
+  const compilerExpanded = typeof centerWorkspaceSizes[1] !== 'number' || centerWorkspaceSizes[1] > COMPILER_STATUS_HEADER_HEIGHT;
   const loadedProjectPathRef = useRef<string | null>(null);
   const loadGenerationRef = useRef(0);
 
@@ -80,15 +114,114 @@ const Engine: React.FC = () => {
     settingUtils, setSettingUtils, settingUtilsRef,
     elementSelected, setElementSelected,
     userSettings, setUserSettings, userSettingsRef, ignoredFieldsUserSettings
-    , variables, setVariables, variablesRef, ignoredFieldsVariables, scripts, setScripts, scriptsRef, ignoredFieldsScripts, palettes, setPalettes, palettesRef, ignoredFieldsPalettes
+    , variables, setVariables, variablesRef, ignoredFieldsVariables, scripts, setScripts, scriptsRef, ignoredFieldsScripts, palettes, setPalettes, palettesRef, ignoredFieldsPalettes,
+    prefabs, setPrefabs, prefabsRef, ignoredFieldsPrefabs
   } = useAppContexts();
+
+  const [availableMusic, setAvailableMusic] = useState<ReadonlySet<string>>();
+  useEffect(() => {
+    if (loading) return;
+    let generation = 0;
+    let cancelled = false;
+    const reload = async () => {
+      const request = ++generation;
+      setAvailableMusic(undefined);
+      try {
+        const [music, projects] = await Promise.all([
+          window.electronAPI.fetchImages('musics'), window.electronAPI.listTrackerProjects(),
+        ]);
+        const noMusicDirectory = music?.status === 'error' && music.message === '>> Directory not found.';
+        if (cancelled || request !== generation || (music?.status !== 'success' && !noMusicDirectory) || projects?.status !== 'success') return;
+        setAvailableMusic(new Set([
+          ...(music.fileImages ?? []).map((file: string) => file.replace(/\.[^/.]+$/, '')),
+          ...(projects.projects ?? []).map((project: { id: string }) => project.id),
+        ]));
+      } catch { /* Keep references intact when the catalog cannot be read. */ }
+    };
+    void reload();
+    window.addEventListener('gba-studio:assets-reloaded', reload);
+    return () => { cancelled = true; window.removeEventListener('gba-studio:assets-reloaded', reload); };
+  }, [loading, settingUtils.projectPathFile]);
+
+  useEffect(() => {
+    if (loading) return;
+    const activeScenes = scenes.filter(scene => !scene._deleted);
+    const available = {
+      scenes: new Set(activeScenes.map(scene => scene.id)),
+      actors: new Set(activeScenes.flatMap(scene => (scene.actors ?? []).flatMap(actor => actor.id ? [actor.id] : []))),
+      triggers: new Set(activeScenes.flatMap(scene => (scene.triggers ?? []).map(trigger => trigger.id))),
+      scripts: new Set(scripts.scripts.filter(script => !(script as any)._deleted).map(script => script.id)),
+      variables: new Set([...variables.variables.filter(variable => !(variable as any)._deleted).map(variable => variable.id), ...LOCAL_VARIABLES.map(variable => variable.id)]),
+      music: availableMusic,
+      backgrounds: new Set(backgrounds.filter(resource => !resource._deleted).map(resource => resource.id)),
+      sprites: new Set(spriteResources.filter(resource => !resource._deleted).map(resource => resource.id)),
+    };
+    const definitions = new Map(scripts.scripts.map(script => [script.id, script.parameters ?? []]));
+    const variableTypes = new Map(variables.variables.filter(variable => !(variable as any)._deleted).map(variable => [variable.id, variable.type]));
+    const ownerVariableTypes = new Map([...variableTypes, ...LOCAL_VARIABLES.map(variable => [variable.id, variable.type] as [string, string])]);
+    let scenesChanged = false;
+    const nextScenes = scenes.map(scene => {
+      if (scene._deleted) return scene;
+      const result = clearMissingEventReferences(scene, { ...available,
+        actors: new Set((scene.actors ?? []).map(actor => actor.id)),
+        triggers: new Set((scene.triggers ?? []).map(trigger => trigger.id)), parameterIds: new Set<string>(),
+      });
+      const assets = clearMissingAssetReferences(result.value, available);
+      let changed = result.changed || assets.changed;
+      const base = assets.value;
+      const sceneDomain = { actors: ['__PLAYER__', ...(base.actors ?? []).map(actor => actor.id)], triggers: (base.triggers ?? []).map(trigger => trigger.id), scene: true, variables: variableTypes };
+      const repair = <T,>(value: T, domain: typeof sceneDomain): T => {
+        const cleared = clearMissingEventReferences(value, { ...available,
+          actors: new Set((base.actors ?? []).map(actor => actor.id)), triggers: new Set((base.triggers ?? []).map(trigger => trigger.id)),
+          variables: new Set(domain.variables.keys()), parameterIds: new Set<string>(), selfAllowed: domain.actors.includes('__SELF__'),
+        });
+        const checked = repairCallScriptArguments(cleared.value, definitions, domain);
+        changed ||= cleared.changed || checked.changed;
+        return checked.value;
+      };
+      const repaired = { ...base,
+        script: repair(base.script, sceneDomain),
+        playerHit1Script: repair(base.playerHit1Script, sceneDomain), playerHit2Script: repair(base.playerHit2Script, sceneDomain), playerHit3Script: repair(base.playerHit3Script, sceneDomain),
+        eventGraphs: repair(base.eventGraphs, sceneDomain),
+        actors: base.actors?.map(actor => repair(actor, { actors: ['__SELF__', actor.id], triggers: [], scene: false, variables: ownerVariableTypes })),
+        triggers: base.triggers?.map(trigger => repair(trigger, { actors: [], triggers: [trigger.id], scene: false, variables: ownerVariableTypes })),
+      };
+      if (!changed) return scene;
+      scenesChanged = true;
+      return { ...repaired, _saved: false };
+    });
+    if (scenesChanged) {
+      setScenes(nextScenes);
+      setElementSelected(previous => {
+        const updated = previous?._resourceType === 'scene' ? nextScenes.find(scene => scene.id === previous.id) : undefined;
+        return updated ? { ...previous, ...updated } : previous;
+      });
+    }
+    let scriptsChanged = false;
+    const nextScripts = scripts.scripts.map(script => {
+      const parameters = script.parameters ?? [];
+      const result = clearMissingEventReferences(script, { ...available, variables: new Set(variableTypes.keys()), actors: new Set<string>(), triggers: new Set<string>(), parameterIds: new Set(parameters.map(parameter => parameter.id)), selfAllowed: false });
+      const checked = repairCallScriptArguments(result.value, definitions, { actors: [], triggers: [], scene: false,
+        variables: new Map([...variableTypes, ...parameters.map(parameter => [parameter.id, parameter.type] as [string, string])]),
+      });
+      if (!result.changed && !checked.changed) return script;
+      scriptsChanged = true;
+      return { ...checked.value, _saved: false };
+    });
+    if (scriptsChanged) setScripts(previous => ({ ...previous, scripts: nextScripts, _saved: false }));
+    const prefabEvents = clearMissingEventReferences(prefabs, { ...available, selfAllowed: true });
+    const prefabAssets = clearMissingAssetReferences(prefabEvents.value, available);
+    if (prefabEvents.changed || prefabAssets.changed) setPrefabs({ ...prefabAssets.value, _saved: false });
+    const settingsAssets = clearMissingAssetReferences(settings, available);
+    if (settingsAssets.changed) setSettings({ ...settingsAssets.value, _saved: false });
+  }, [loading, scenes, backgrounds, spriteResources, settings, scripts.scripts, variables.variables, availableMusic, prefabs, setSettings, setPrefabs, setScenes, setScripts, setElementSelected]);
 
   const openDialogueScene = useCallback((sceneId: string) => {
     const scene = scenes.find(item => item.id === sceneId && !item._deleted);
     if (!scene) return;
     setContentView(1);
     setElementSelected({ ...scene, _recenter: true });
-    setSettingUtils(previous => ({ ...previous, selectedSceneIds: [scene.id], tileEditSceneId: null, tileEditLayerId: null, activeSceneObject: null, activeTriggerId: null }));
+    setSettingUtils(previous => ({ ...previous, worldSceneSearch: sceneSearchAfterSelection(previous.worldSceneSearch, scene), selectedSceneIds: [scene.id], tileEditSceneId: null, tileEditLayerId: null, activeSceneObject: null, activeTriggerId: null }));
   }, [scenes, setElementSelected, setSettingUtils]);
 
   // Update settings utils initialization
@@ -122,6 +255,7 @@ collisionSide: 'solid',
     </Flex>
   );
 
+  const panelResize = usePanelResizeHandlers();
   const [panelSizes, setPanelSizes] = useState<number[]>([]); // Tamanho inicial do painel
   const [showFloatButton, setShowFloatButton] = useState<boolean>(false);
   // const [isResizing, setIsResizing] = useState<boolean>(false);
@@ -134,10 +268,32 @@ collisionSide: 'solid',
     setPanelSizes(sizes);
   };
 
-  const handleCenterWorkspaceResize = (sizes: number[]) => setCenterWorkspaceSizes(sizes);
+  const handleCenterWorkspaceResize = (sizes: number[]) => {
+    const total = centerWorkspaceRef.current?.clientHeight ?? sizes[0] + sizes[1];
+    const maxCompilerHeight = Math.max(COMPILER_STATUS_HEADER_HEIGHT, total / 2);
+    const compilerHeight = Math.min(sizes[1], maxCompilerHeight);
+    const adjusted = compilerHeight === sizes[1] ? sizes : [total - compilerHeight, compilerHeight];
+    if (compilerHeight > COMPILER_STATUS_HEADER_HEIGHT) expandedCompilerHeightRef.current = compilerHeight;
+    setCenterWorkspaceSizes(adjusted);
+  };
   const handleCenterWorkspaceResizeEnd = (sizes: number[]) => {
-    setCenterWorkspaceSizes(sizes);
-    window.electronAPI.saveLastPositionSplitters({ centerWorkspace: sizes.map(Math.round) });
+    const total = centerWorkspaceRef.current?.clientHeight ?? sizes[0] + sizes[1];
+    const maxCompilerHeight = Math.max(COMPILER_STATUS_HEADER_HEIGHT, total / 2);
+    const compilerHeight = Math.max(COMPILER_STATUS_HEADER_HEIGHT, Math.min(sizes[1], maxCompilerHeight));
+    const adjusted = [total - compilerHeight, compilerHeight];
+    setCenterWorkspaceSizes(adjusted);
+    cacheWorkspaceLayout(layoutProjectPath, { centerWorkspace: adjusted.map(Math.round) });
+    window.electronAPI.saveLastPositionSplitters({ centerWorkspace: adjusted.map(Math.round) });
+  };
+  const toggleCompilerStatus = () => {
+    const total = centerWorkspaceRef.current?.clientHeight ?? window.innerHeight - 42;
+    if (compilerExpanded) {
+      const current = centerWorkspaceSizes[1];
+      expandedCompilerHeightRef.current = typeof current === 'number' ? current : total * 0.25;
+    }
+    const compilerHeight = compilerExpanded ? COMPILER_STATUS_HEADER_HEIGHT
+      : Math.max(COMPILER_STATUS_HEADER_HEIGHT + 1, Math.min(total / 2, expandedCompilerHeightRef.current));
+    handleCenterWorkspaceResizeEnd([Math.max(40, total - compilerHeight), compilerHeight]);
   };
 
   const handleResizeEnd = (sizes: number[]) => {
@@ -164,6 +320,7 @@ collisionSide: 'solid',
     let newSizesRound = newSizes.map(Math.round);
 
     setPanelSizes(newSizesRound);
+    cacheWorkspaceLayout(layoutProjectPath, { main: newSizesRound });
 
     // Salva preferencia dos paineis Splitter
     window.electronAPI.saveLastPositionSplitters(newSizesRound);
@@ -175,32 +332,29 @@ collisionSide: 'solid',
     handleResizeEnd(newSizes);
   };
 
-  // Loading Sizes Splitters
+  // Restore layout alongside project assets, before mounting the world or its
+  // splitters. The left navigation reads the same cached project preferences.
   useEffect(() => {
-    if (!window.electronAPI) {
-      console.error('window.electronAPI is undefined');
-      return;
-    }
-
-    const loadSizesSplitters = async () => {
-      const newSizesSplitter = await window.electronAPI.loadLastPositionSplitters();
-      console.log('>> Splitters: ', newSizesSplitter);
-      if (Array.isArray(newSizesSplitter)) {
-        handleResizeEnd(newSizesSplitter);
-      } else if (newSizesSplitter) {
-        if (Array.isArray(newSizesSplitter.main)) handleResizeEnd(newSizesSplitter.main);
-        if (Array.isArray(newSizesSplitter.centerWorkspace) && newSizesSplitter.centerWorkspace.length === 2) {
-          const [worldSize, compilerSize] = newSizesSplitter.centerWorkspace;
-          const restoredCompilerSize = Math.max(COMPILER_STATUS_HEADER_HEIGHT, compilerSize);
-          setCenterWorkspaceSizes([Math.max(40, worldSize + compilerSize - restoredCompilerSize), restoredCompilerSize]);
-        }
-      }
-      else
-        setPanelSizes([250, window.innerWidth - 500, 250]);
-    };
-
-    loadSizesSplitters();
-  }, []);
+    let cancelled = false;
+    void loadWorkspaceLayout(layoutProjectPath).then(saved => {
+      if (cancelled) return;
+      const main = saved.main;
+      const validMain = Array.isArray(main) && main.length === 3 && main.every(size => Number.isFinite(size) && size >= 0);
+      const left = validMain ? main[0] <= 140 ? 0 : Math.max(250, main[0]) : 250;
+      const right = validMain ? Math.max(365, main[2]) : 365;
+      setPanelSizes([left, Math.max(40, window.innerWidth - left - right), right]);
+      setShowFloatButton(left === 0);
+      const center = saved.centerWorkspace;
+      if (Array.isArray(center) && center.length === 2 && center.every(size => Number.isFinite(size) && size >= 0)) {
+        const total = center[0] + center[1];
+        const compiler = Math.max(COMPILER_STATUS_HEADER_HEIGHT, Math.min(total / 2, center[1]));
+        if (compiler > COMPILER_STATUS_HEADER_HEIGHT) expandedCompilerHeightRef.current = compiler;
+        setCenterWorkspaceSizes([Math.max(40, center[0] + center[1] - compiler), compiler]);
+      } else setCenterWorkspaceSizes(['75%', '25%']);
+      setReadyLayoutProject(layoutProjectKey);
+    });
+    return () => { cancelled = true; };
+  }, [layoutProjectKey]);
 
   // Loading Favorite Events
   // useLayoutEffect(() => {
@@ -237,6 +391,7 @@ collisionSide: 'solid',
           clearProjectAssetFileCache();
           clearSceneCanvasCache();
           loadedProjectPathRef.current = projectFilePath;
+          setPrefabs(createEmptyPrefabs());
         }
         // Initialize settings utils first
         console.log("..: Engine - File Path:", projectFilePath);
@@ -260,12 +415,13 @@ collisionSide: 'solid',
         }
 
         const categorized = file.reduce((acc, obj) => {
-          const objectJson = JSON.parse(obj);
+          const rawObject = JSON.parse(obj);
+          const objectJson = normalizeSceneResource(rawObject);
           const type = objectJson._resourceType;
 
           if (!acc[type]) acc[type] = [];
 
-          acc[type].push({ ...objectJson, _saved: true });
+          acc[type].push({ ...objectJson, _saved: objectJson === rawObject });
           
           return acc;
         }, {} as Record<string, any[]>);
@@ -278,6 +434,7 @@ collisionSide: 'solid',
         const userSettingsFromFile: IUserSettings | null = categorized.user_settings?.[0] || null;  // Assume apenas uma configuração
         const variablesFromFile = categorized.variables?.[0] || null;
         const scriptsFromFile = categorized.scripts?.[0] || null;
+        const prefabsFromFile = categorized.prefabs?.[0] || null;
         const migrateLegacyAutoTiles = Boolean(settingsFromFile && !Array.isArray(settingsFromFile.autoTileSlots)
           && loadedScenesFromFile.some(scene => scene.autoTileSlots?.length));
         const migratedAutoTileSlots: NonNullable<IMainSettings['autoTileSlots']> = [];
@@ -312,6 +469,26 @@ collisionSide: 'solid',
           });
           return migrated ? { ...scene, backgrounds, _saved: false } : scene;
         });
+        const availableActorIds = new Set(scenesFromFile.flatMap(scene =>
+          (scene.actors ?? []).map((actor, index) => String(actor.id ?? actor.actorId ?? index)),
+        ));
+        const scenesWithActorReferenceWarnings = scenesFromFile.map(scene => {
+          const result = disableMissingActorReferences(scene, availableActorIds);
+          return result.changed ? { ...result.value, _saved: false } : scene;
+        });
+        const scriptsResult = disableMissingActorReferences(scriptsFromFile, availableActorIds);
+        const scriptsWithActorReferenceWarnings = scriptsResult.changed
+          ? { ...scriptsResult.value, _saved: false }
+          : scriptsFromFile;
+        const availableSceneIds = new Set(scenesWithActorReferenceWarnings.filter(scene => !scene._deleted).map(scene => scene.id));
+        const scenesWithReferenceWarnings = scenesWithActorReferenceWarnings.map(scene => {
+          const result = clearMissingSceneReferences(scene, availableSceneIds);
+          return result.changed ? { ...result.value, _saved: false } : scene;
+        });
+        const scriptsWithReferenceWarningsResult = clearMissingSceneReferences(scriptsWithActorReferenceWarnings, availableSceneIds);
+        const scriptsWithReferenceWarnings = scriptsWithReferenceWarningsResult.changed
+          ? { ...scriptsWithReferenceWarningsResult.value, _saved: false }
+          : scriptsWithActorReferenceWarnings;
         const projectSettingsFromFile = migrateLegacyAutoTiles && settingsFromFile
           ? { ...settingsFromFile, autoTileSlots: migratedAutoTileSlots, _saved: false }
           : settingsFromFile;
@@ -325,7 +502,7 @@ collisionSide: 'solid',
           : projectSettingsFromFile;
         const palettesFromFile = categorized.palette || [];
         const visualPreload = preloadSceneVisualAssets({
-          scenes: scenesFromFile,
+          scenes: scenesWithReferenceWarnings,
           backgrounds: backgroundsFromFile,
           normalCatalog,
           hdCatalog,
@@ -336,11 +513,11 @@ collisionSide: 'solid',
         });
 
         // Atualize os estados de uma vez só:
-        if (scenesFromFile.length > 0 || projectChanged) {
+        if (scenesWithReferenceWarnings.length > 0 || projectChanged) {
           setScenes(prev => {
-            if (projectChanged) return scenesFromFile;
+            if (projectChanged) return scenesWithReferenceWarnings;
             const prevIds = prev.map(s => s.id);
-            const novos = scenesFromFile.filter(s => !prevIds.includes(s.id));
+            const novos = scenesWithReferenceWarnings.filter(s => !prevIds.includes(s.id));
             return [...prev, ...novos];
           });
         }
@@ -378,8 +555,9 @@ collisionSide: 'solid',
         if (variablesFromFile) {
           setVariables(variablesFromFile);
         }
-        if (scriptsFromFile) setScripts(scriptsFromFile);
-        if (palettesFromFile.length) setPalettes(previous => ({ ...previous, palettes: palettesFromFile }));
+        if (scriptsWithReferenceWarnings) setScripts(scriptsWithReferenceWarnings);
+        setPalettes(previous => ({ ...previous, palettes: palettesFromFile.length ? palettesFromFile : loadPaletteLibrary(), _saved: palettesFromFile.length > 0 }));
+        if (prefabsFromFile) setPrefabs({ ...normalizePrefabs(prefabsFromFile), _saved: true });
 
         setSettingUtils(previous => ({
           ...previous,
@@ -435,6 +613,7 @@ collisionSide: 'solid',
 
         if (variablesRef.current) files.push({ path: `project/variables.gbasres`, content: variablesRef.current });
         if (scriptsRef.current) files.push({ path: `project/scripts.gbasres`, content: scriptsRef.current });
+        if (prefabsRef.current) files.push({ path: `project/prefabs.gbasres`, content: prefabsRef.current });
         (palettesRef.current?.palettes ?? []).forEach((palette: any) => files.push({ path: `project/palettes/${palette.name.toLowerCase().replace(/ /g, '_')}/palette.gbasres`, content: { ...palette, _resourceType: 'palette' } }));
 
         // Collect assets from settingUtils localImagePath (scan assets folder)
@@ -521,7 +700,7 @@ collisionSide: 'solid',
       }
       console.log("..: IsNOTArray:", fields);
       return  Object.fromEntries(
-        Object.entries(fields).filter(([key]) => !ignoredFields.includes(key))
+        Object.entries(pruneDeletedProjectEntries(fields)).filter(([key]) => !ignoredFields.includes(key))
       );
     };
 
@@ -553,9 +732,10 @@ collisionSide: 'solid',
         userSettingsRef.current._saved === false ? prepareForBackend(userSettingsRef.current, ignoredFieldsUserSettings!) : null,
         prepareForBackend(backgroundsRef.current.filter(s => s._saved === false), ignoredFieldsBackgrounds!),
         prepareForBackend(spriteResourcesRef.current.filter(sprite => sprite._saved === false), ignoredFieldsSpriteResources!),
-        variablesRef.current._saved === false ? prepareForBackend(variablesRef.current, ignoredFieldsVariables!) : null,
-        scriptsRef.current._saved === false ? prepareForBackend(scriptsRef.current, ignoredFieldsScripts!) : null,
+        (variablesRef.current._saved === false || hasDeletedProjectEntries(variablesRef.current)) ? prepareForBackend(variablesRef.current, ignoredFieldsVariables!) : null,
+        (scriptsRef.current._saved === false || hasDeletedProjectEntries(scriptsRef.current)) ? prepareForBackend(scriptsRef.current, ignoredFieldsScripts!) : null,
         palettesRef.current._saved === false ? prepareForBackend(palettesRef.current, ignoredFieldsPalettes!) : null,
+        prefabsRef.current._saved === false ? prepareForBackend(prefabsRef.current, ignoredFieldsPrefabs!) : null,
         settingUtilsRef.current,
       ].filter(item => item != null && (!(Array.isArray(item)) || item.length > 0));
 
@@ -577,7 +757,7 @@ collisionSide: 'solid',
         // An edit made while IPC was in flight must remain dirty.
         const samePersistedData = (current: any, persisted: any, ignoredFields: string[]) => {
           const comparable = (value: any) => Object.fromEntries(
-            Object.entries(value).filter(([key]) => !ignoredFields.includes(key))
+            Object.entries(pruneDeletedProjectEntries(value)).filter(([key]) => !ignoredFields.includes(key))
           );
           return JSON.stringify(comparable(current)) === JSON.stringify(persisted);
         };
@@ -601,6 +781,7 @@ collisionSide: 'solid',
         setVariables(() => markResourceSaved(variablesRef.current, 'variables', ignoredFieldsVariables!));
         setScripts(() => markResourceSaved(scriptsRef.current, 'scripts', ignoredFieldsScripts!));
         setPalettes(() => markResourceSaved(palettesRef.current, 'palettes', ignoredFieldsPalettes!));
+        setPrefabs(() => markResourceSaved(prefabsRef.current, 'prefabs', ignoredFieldsPrefabs!));
         // setSettingUtils(settingUtils => ({ ...settingUtils, _saved: true }));
 
         console.log('..: Todos os itens agora estão com _saved = true.');
@@ -662,7 +843,8 @@ collisionSide: 'solid',
       || (userSettings && userSettings._saved === false)
       || (variables && variables._saved === false)
       || (scripts && scripts._saved === false)
-      || (palettes && palettes._saved === false);
+      || (palettes && palettes._saved === false)
+      || (prefabs && prefabs._saved === false);
 
     // Call Electron API to update title - isSaved: true se não tem nada para salvar
     window.electronAPI.updateTitle('GBA Studio', project?.name || '', !unsaved);
@@ -670,7 +852,7 @@ collisionSide: 'solid',
     if (unsaved) {
       console.log('..: Engine.tsx tem alguma atualização!');
     }
-  }, [scenes, project, settings, userSettings, backgrounds, spriteResources, settingUtils, variables, scripts, palettes]);
+  }, [scenes, project, settings, userSettings, backgrounds, spriteResources, settingUtils, variables, scripts, palettes, prefabs]);
 
   // useEffect(() => {
   //   const handleResize = () => {
@@ -711,7 +893,7 @@ collisionSide: 'solid',
   //   };
   // }, []);
 
-  if (loading) {
+  if (loading || readyLayoutProject !== layoutProjectKey) {
     return (
       <Layout style={{
         width: '100vw',
@@ -734,7 +916,8 @@ collisionSide: 'solid',
               <Layout style={ baseLayoutStyle }>
                 <Splitter
                   data-testid="engine-layout-splitter"
-                  onResizeEnd={handleResizeEnd}
+                  onResizeStart={panelResize.start}
+                  onResizeEnd={sizes => { panelResize.end(); handleResizeEnd(sizes); }}
                   onResize={handleResizePanel}
                 >
                   {/* PAINEL ESQUERDO */}
@@ -769,7 +952,8 @@ collisionSide: 'solid',
 
                   {/* CENTRO */}
                   <Splitter.Panel /*size={panelSizes[1]}*/>
-                    <Splitter layout="vertical" style={{ height: '100%', minHeight: 0, overflow: 'hidden' }} onResize={handleCenterWorkspaceResize} onResizeEnd={handleCenterWorkspaceResizeEnd}>
+                    <div ref={centerWorkspaceRef} style={{ height: '100%', minHeight: 0 }}>
+                    <Splitter layout="vertical" style={{ height: '100%', minHeight: 0, overflow: 'hidden' }} onResizeStart={panelResize.start} onResize={handleCenterWorkspaceResize} onResizeEnd={sizes => { panelResize.end(); handleCenterWorkspaceResizeEnd(sizes); }}>
                       <Splitter.Panel size={centerWorkspaceSizes[0]} min={40} style={{ minHeight: 0, overflow: 'hidden', backgroundColor: token.colorBgContainer }}>
                         <GameWorld
                           resetPanelSize={resetPanelSize}
@@ -777,12 +961,13 @@ collisionSide: 'solid',
                           showFloatButton={showFloatButton}
                         />
                       </Splitter.Panel>
-                      <Splitter.Panel size={centerWorkspaceSizes[1]} min={COMPILER_STATUS_HEADER_HEIGHT} max="90%" style={{ minHeight: 0, overflow: 'hidden' }}>
+                      <Splitter.Panel size={centerWorkspaceSizes[1]} min={COMPILER_STATUS_HEADER_HEIGHT} max="50%" style={{ minHeight: 0, overflow: 'hidden' }}>
                         {/* <Footer> */}
-                        <BottomPanel />
+                        <BottomPanel expanded={compilerExpanded} onToggle={toggleCompilerStatus} />
                         {/* </Footer> */}
                       </Splitter.Panel>
                     </Splitter>
+                    </div>
                   </Splitter.Panel>
 
                   {/* PAINEL DIREITO */}
@@ -803,9 +988,9 @@ collisionSide: 'solid',
               </Layout>
             )}
             {contentView == 5 && (
-              <Layout style={ baseLayoutStyle }>
-                <AssetLibraryEditor kind="music" />
-              </Layout>
+              <MusicEditorWorkspaceProvider>
+                <MusicEditorWorkspaceLayout setContentView={setContentView} />
+              </MusicEditorWorkspaceProvider>
             )}
             {contentView == 6 && (
               <Layout style={ baseLayoutStyle }>

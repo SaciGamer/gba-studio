@@ -11,8 +11,10 @@ try {
   fs.mkdirSync(path.join(temp, 'include'), { recursive: true });
   fs.mkdirSync(path.join(temp, 'src'), { recursive: true });
   const builder = new ResourceBuilder(temp, path.join(root, 'tools/butano/template'));
+  const trackerProjectId = 'c42d6a9c-87a5-4c13-976a-6b3fd11fb39b';
   const hbeSource = fs.readFileSync(path.join(root, 'tools/butano/template/src/hbe_manager.cpp'), 'utf8');
   const result = builder.processResourceObject({ _resourceType: 'scene', id: 'music', name: 'music', backgrounds: [], script: [
+    { id: 'tracker-project-music', command: 'EVENT_PLAY_MUSIC', args: { musicId: trackerProjectId, volume: 100 } },
     { id: 'sound', command: 'EVENT_PLAY_SOUND', args: { soundId: 'laser', volume: 75, speed: 125, panning: -40, priority: 12, group: 'ui' } },
     { id: 'rumble', command: 'EVENT_RUMBLE', args: { durationFrames: 12, intensity: 70 } },
     { id: 'legacy-sound', command: 'EVENT_PLAY_SOUND', args: { soundId: 'legacy' } },
@@ -29,7 +31,6 @@ try {
     { id: 'dialogue-show-alias', command: 'EVENT_DIALOGUE_SHOW', args: { text: 'Ready' } },
     { id: 'menu-open', command: 'EVENT_MENU_OPEN', args: { prompt: 'Title', optionA: 'Play', optionB: 'Exit', resultVariable: 'menu_result' } },
     { id: 'text-scroll', command: 'EVENT_TEXT_SCROLL', args: { text: 'Scrolling' } },
-    { id: 'credits', command: 'EVENT_CREDITS_PLAY', args: { text: 'Credits' } },
     { id: 'save-write', command: 'EVENT_SAVE_WRITE', args: { slot: 1, variableIds: ['score', 'rumble'], schema: 7 } },
     { id: 'save-load', command: 'EVENT_SAVE_LOAD', args: { slot: 1, variableIds: ['score', 'rumble'], schema: 7 } },
     { id: 'dialogue-close-alias', command: 'EVENT_DIALOGUE_CLOSE', args: {} },
@@ -41,6 +42,7 @@ try {
   assert.match(header, /\"laser\", 75, 125, -40, 12, \"ui\"/);
   assert.match(header, /\"legacy\", 100, 100, 0, 0/);
   assert.match(header, /PlayJingleEventData/);
+  assert.ok(header.includes(`"${trackerProjectId}", 100`), 'Music events preserve the .gbatracker UUID used to materialize the Butano module');
   assert.match(header, /\"coin\", 80/);
   assert.match(header, /MusicFadeEventData/);
   assert.match(header, /25, 40/);
@@ -54,10 +56,8 @@ assert.match(hbeSource, /bn::green_swap::set_enabled\(false\);/);
   assert.match(header, /EVENT_DIALOGUE_SHOW/);
   assert.match(header, /EVENT_MENU_OPEN/);
   assert.match(header, /EVENT_TEXT_SCROLL/);
-  assert.match(header, /EVENT_CREDITS_PLAY/);
-  assert.match(header, /"Credits".*"medium", true/);
-  assert.match(header, /SaveEventData/);
-  assert.match(header, /"score,rumble", 7/);
+  assert.match(header, /GameDataEventData/);
+  assert.match(header, /GameSavePoint/);
   assert.match(header, /EVENT_DIALOGUE_CLOSE/);
   assert.throws(() => builder.processResourceObject({ _resourceType: 'scene', id: 'bad', backgrounds: [], script: [{ id: 'bad', command: 'EVENT_MUSIC_FADE', args: { targetVolume: 101, durationFrames: 4 } }] }), /above 100/);
   console.log('Music events build contract passed.');

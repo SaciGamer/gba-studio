@@ -3,7 +3,7 @@ import NumericValueInput from './NumericValueInput';
 
 /** Adapt legacy literal fields while retaining the shared AST for variations. */
 export default function NumericEventInput({ value, onChange, ...props }: {
-  value: unknown; onChange: (value: any) => void; label?: string; min?: number; max?: number; style?: React.CSSProperties; renderNumber?: (value: number, onChange: (value: number) => void) => React.ReactNode;
+  value: unknown; onChange: (value: any) => void; label?: string; min?: number; max?: number; disabled?: boolean; style?: React.CSSProperties; renderNumber?: (value: number, onChange: (value: number) => void) => React.ReactNode;
 }) {
   return <NumericValueInput {...props} value={value} onChange={next => {
     if (next.kind === 'constant' && (next.constant === 'true' || next.constant === 'false') && value && typeof value === 'object' && 'kind' in value && value.kind === 'literal') {

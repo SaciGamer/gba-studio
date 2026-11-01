@@ -22,7 +22,7 @@ EventStatus run_wait_status(const WaitEventData& data, Wait& state)
     state.seconds = data.seconds;
     state.frames = data.frames;
     state.countInt = 0;
-    state.type = data.units && bn::string<8>(data.units) == "frames"
+    state.type = data.units && (bn::string<8>(data.units) == "frames" || bn::string<8>(data.units) == "ticks")
         ? WaitType::FRAMES : WaitType::TIME;
     if(state.type == WaitType::TIME)
     {

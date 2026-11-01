@@ -7,7 +7,7 @@ const empty=()=>Array.from({length:12},()=>Array(16).fill(-1));
 const map=empty(),autoTileMap=empty(),ids=Array.from({length:12},()=>Array(16).fill(null));
 autoTileMap[2][2]=0;for(let y=2;y<4;y++)for(let x=2;x<4;x++){map[y][x]=0;ids[y][x]='auto-tile:auto';}
 map[2][5]=0;ids[2][5]='tiles';
-const initial={id:'scene',name:'Mixed',x:40,y:40,width:128,height:96,gridSize:8,sceneType:'Top Down',backgrounds:[{layerId:0,tileMap:map,tileMapTilesetIds:ids,autoTileMap,tileMapCellOverrides:[{index:37,tileIndex:0,horizontalFlip:true}]}],actors:[],triggers:[],collisions:[]};
+const initial={id:'scene',name:'Mixed',script:[{id:'pending-event',command:'EVENT_CALL_SCRIPT',args:{scriptId:''}}],x:40,y:40,width:128,height:96,gridSize:8,sceneType:'Top Down',backgrounds:[{layerId:0,tileMap:map,tileMapTilesetIds:ids,autoTileMap,tileMapCellOverrides:[{index:37,tileIndex:0,horizontalFlip:true}]}],actors:[],triggers:[],collisions:[]};
 function Fixture(){const[scenes,setScenes]=useState([initial]);const[utils,setUtils]=useState({tileEditSceneId:'scene',tileEditLayerId:0,activeButton:'select',activeSubButton:'',localImagePath:location.origin,projectPathFile:'fixture'});
 window.scenes=scenes;window.reset=()=>setScenes([structuredClone(initial)]);
 window.testContext={backgrounds:[],spriteResources:[],variables:{variables:[]},palettes:{palettes:[]},settingUtils:utils,setSettingUtils:setUtils,settings:{autoTileSlots:[{autoTileId:'auto',tileSize:16,parts:Array(47).fill(0)}]},setSettings:()=>{},setScenes,setElementSelected:()=>{},userSettings:{zoom:100,showTileEditorGrid:true}};
@@ -21,6 +21,9 @@ try {
  const page=await browser.newPage({viewport:{width:800,height:600}}),errors=[];page.on('pageerror',error=>errors.push(error.message));
  await page.goto(`http://127.0.0.1:${server.address().port}`);
  const canvas=page.locator('canvas[data-scene-id="scene"]');await canvas.waitFor();await page.waitForFunction(()=>document.querySelector('canvas[data-scene-id]')?.width===128);
+ const warning=page.getByTestId('scene-pending-events');await warning.waitFor();
+ assert.equal(await warning.evaluate(node=>node.parentElement.parentElement===node.closest('.game-element')),true,'Scene warning is outside the isolated canvas stacking context');
+ assert.equal(await warning.locator('.ant-badge-count').evaluate(node=>{const r=node.getBoundingClientRect();return node.closest('[data-testid="scene-pending-events"]').contains(document.elementFromPoint(r.x+r.width/2,r.y+1));}),true,'Selected scene title must not cover the badge');
  const box=await canvas.boundingBox(),point=(col,row)=>({x:box.x+col*8+4,y:box.y+row*8+4});
  async function drag(a,b){await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:5});await page.mouse.up();}
  // Start the area directly on an occupied autotile, ending on a regular tile.

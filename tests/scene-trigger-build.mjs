@@ -19,7 +19,8 @@ try {
   });
   const output = result.headerContent.toString('utf8');
   assert.match(output, /static const ScriptTrigger SCENE_TRIGGER_SCENE_TRIGGERS\[\]/);
-  assert.match(output, /\"door\", 8, 16, 24, 8, TriggerActivation::interact, true, true, 12/);
+  assert.match(output, /\{ 8, 16, 24, 8, TriggerActivation::interact, true, true, 12/);
+  assert.match(output, /SCENE_TRIGGER_SCENE_TRIGGER_0_LEAVE_SCRIPTS_COUNT, "door"/);
   assert.match(output, /SCENE_TRIGGER_SCENE_TRIGGER_0_ENTER_SCRIPTS/);
   assert.match(output, /SCENE_TRIGGER_SCENE_TRIGGER_0_LEAVE_SCRIPTS/);
   assert.match(output, /SCENE_TRIGGER_SCENE_TRIGGER_0_LEAVE_SCRIPTS, SCENE_TRIGGER_SCENE_TRIGGER_0_LEAVE_SCRIPTS_COUNT/);
@@ -56,5 +57,6 @@ try {
   }
   console.log('Scene trigger build smoke test passed.');
 } finally {
+  assert.ok(path.resolve(tempDir).startsWith(path.resolve(os.tmpdir()) + path.sep) && path.basename(tempDir).startsWith('gba-studio-trigger-'));
   fs.rmSync(tempDir, { recursive: true, force: true });
 }

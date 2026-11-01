@@ -12,6 +12,7 @@ class ActorMotionManager {
         uint32_t scene_revision = 0;
         actor_motion::State state;
         const Sprites* body = nullptr;
+        actor_motion::Options options;
         int target_x = 0, target_y = 0, speed_q8 = 256;
         int original_animation_speed = -1;
         actor_motion::PathAction path[512];
@@ -24,6 +25,8 @@ public:
     static ActorMotionManager& instance();
     EventStatus advance(const ActorMoveEventData& data, MotionEventState& owner);
     bool controls_player() const;
+    bool controls_actor(const char* actor_id) const;
     void cancel(MotionEventState* owner = nullptr);
+    void stop_actor(const char* actor_id);
 };
 #endif

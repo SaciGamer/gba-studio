@@ -5,7 +5,9 @@
 
 import fs from 'fs';
 import path from 'path';
+import { createHash } from 'crypto';
 import { TemplateConfig, BuildConfig } from '../types/BuildTypes';
+import type { RuntimeFeatureManifest } from './RuntimeFeatureManifest';
 
 /** Make targets must be a single filename, without whitespace or make syntax. */
 export function makeTargetName(projectName?: string): string {
@@ -25,12 +27,12 @@ export class TemplateBuilder {
   /**
    * Initialize build directory from template
    */
-  public async initializeBuildDirectory(buildConfig: BuildConfig): Promise<void> {
+  public async initializeBuildDirectory(buildConfig: BuildConfig, options: { deferNativeFiles?: boolean } = {}): Promise<void> {
     // Create base directory structure
     this.ensureDirectories();
 
     // Copy template structure
-    await this.copyTemplateStructure();
+    await this.copyTemplateStructure(options.deferNativeFiles === true);
 
     // Update Makefile with project-specific settings
     await this.configureMakefile(buildConfig);
@@ -68,7 +70,7 @@ export class TemplateBuilder {
   /**
    * Copy template files to build directory
    */
-  private async copyTemplateStructure(): Promise<void> {
+  private async copyTemplateStructure(deferNativeFiles = false): Promise<void> {
     const structureToCopy = [
       { src: 'Makefile', dst: 'Makefile' },
       { src: 'include', dst: 'include' },
@@ -80,6 +82,7 @@ export class TemplateBuilder {
     ];
 
     for (const item of structureToCopy) {
+      if (deferNativeFiles && ['include', 'src'].includes(item.src)) continue;
       const srcPath = path.join(this.templateDir, item.src);
       const dstPath = path.join(this.buildDir, item.dst);
 
@@ -95,6 +98,53 @@ export class TemplateBuilder {
         fs.copyFileSync(srcPath, dstPath);
       }
     }
+  }
+
+  /** Copy an explicit native selection, retiring only files owned by this generator. */
+  public copyNativeRuntime(manifest: RuntimeFeatureManifest, featureHeader: string): void {
+    if (!manifest.selectionApplied) throw new Error('Native selection was not activated');
+    const known = new Set<string>();
+    for (const folder of ['src', 'include']) for (const file of fs.readdirSync(path.join(this.templateDir, folder))) {
+      if (/\.(cpp|h)$/.test(file)) known.add(`${folder}/${file}`);
+    }
+    const files = [...manifest.sourceFiles, ...manifest.headerFiles].sort();
+    const checked = (relative: string) => {
+      if (!/^(src\/[^/\\]+\.cpp|include\/[^/\\]+\.h)$/.test(relative) || !known.has(relative)) throw new Error(`Invalid native selection file: ${relative}`);
+      const absolute = path.resolve(this.buildDir, relative);
+      if (!absolute.startsWith(path.resolve(this.buildDir) + path.sep)) throw new Error(`Native file escapes build directory: ${relative}`);
+      return absolute;
+    };
+    const hash = createHash('sha256').update(`generator:${manifest.generatorVersion}\n${featureHeader}`);
+    for (const relative of files) {
+      checked(relative);
+      hash.update(relative).update(fs.readFileSync(path.join(this.templateDir, relative)));
+    }
+    const fingerprint = hash.digest('hex');
+    const marker = path.join(this.buildDir, '.native-files.json');
+    let previous: { files: string[]; fingerprint?: string } = { files: [...known] };
+    if (fs.existsSync(marker)) {
+      const parsed = JSON.parse(fs.readFileSync(marker, 'utf8'));
+      if (!Array.isArray(parsed.files) || parsed.files.some((file: unknown) => typeof file !== 'string')) throw new Error('Invalid previous native selection manifest');
+      previous = parsed;
+    }
+    const current = new Set(files);
+    for (const relative of previous.files) {
+      const destination = checked(relative);
+      if (!current.has(relative)) fs.rmSync(destination, { force: true });
+    }
+    if (previous.fingerprint !== fingerprint) {
+      // Objects are named after project sources by the Butano Makefile. This
+      // invalidates affected project code while preserving bn_* library cache.
+      for (const relative of new Set([...previous.files, ...files])) {
+        checked(relative);
+        if (!relative.startsWith('src/')) continue;
+        const stem = path.basename(relative, '.cpp');
+        for (const extension of ['.o', '.d']) fs.rmSync(path.join(this.buildDir, 'build', stem + extension), { force: true });
+      }
+    }
+    for (const relative of files) fs.copyFileSync(path.join(this.templateDir, relative), checked(relative));
+    fs.writeFileSync(path.join(this.buildDir, 'include/gba_studio_features.h'), featureHeader, 'utf8');
+    fs.writeFileSync(marker, JSON.stringify({ files, fingerprint }, null, 2) + '\n');
   }
 
   /**

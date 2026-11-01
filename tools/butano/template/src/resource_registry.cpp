@@ -9,7 +9,13 @@
 #include "bn_string.h"
 #include "resources.h"
 #include "resource_registry.h"
+#include "gba_studio_features.h"
+#if GBA_STUDIO_FEATURE_SAVE
+#include "game_save_state.h"
+#endif
+#if GBA_STUDIO_FEATURE_VARIABLES
 #include "variable_manager.h"
+#endif
 
 static constexpr int BACKGROUNDS_COUNT = {{BACKGROUNDS_COUNT}};
 static const Backgrounds BACKGROUNDS[{{BACKGROUNDS_ARRAY_SIZE}}] = {
@@ -34,9 +40,27 @@ static const Sprites SPRITES[{{SPRITES_ARRAY_SIZE}}] = {
 
 static const Settings SETTINGS = {{SETTINGS_CONSTANTS}};
 
+#if GBA_STUDIO_FEATURE_SAVE
+const Scenes* get_scene_by_save_key(uint32_t key) {
+    for(int index = 0; index < SCENES_COUNT; ++index) if(game_save_key(SCENES[index].id) == key) return &SCENES[index];
+    return nullptr;
+}
+const Sprites* get_sprite_by_save_key(uint32_t key) {
+    for(int index = 0; index < SPRITES_COUNT; ++index) if(game_save_key(SPRITES[index].id) == key) return &SPRITES[index];
+    return nullptr;
+}
+const GameSavePoint* get_game_save_point(uint32_t key) {
+{{GAME_SAVE_LOOKUPS}}
+    (void) key;
+    return nullptr;
+}
+#endif
+
 void initialize_variables()
 {
+#if GBA_STUDIO_FEATURE_VARIABLES
 {{VARIABLES_INITIALIZATION}}
+#endif
 }
 
 // Função auxiliar genérica para iterar sobre arrays de qualquer tipo

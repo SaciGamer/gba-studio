@@ -16,7 +16,7 @@ int main()
     const SpawnerTimeline timeline[] = {{"wave", entries, 3}};
     const CombatCollisionRule rules[] = {{"player_projectile", "enemy"}};
     const CombatConfig combat{2, 3, 1, 3, 1, rules, 1};
-    const ShooterConfig shooter{"wave", "", 3, 1, 8};
+    const ShooterConfig shooter{"wave", "", 1, 8};
     CombatManager::instance().configure(&combat);
     assert(CombatManager::instance().set_stat("player_hit_points", 7));
     assert(CombatManager::instance().add_stat("default_damage", 2));

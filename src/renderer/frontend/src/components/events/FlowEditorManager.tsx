@@ -1,8 +1,10 @@
+import WarningIndicator from '../WarningIndicator';
+import { eventWarningMessage } from './eventWarningMessage';
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { IArgs, IScriptGraph, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { useI18n } from '@/i18n/I18n';
 import { DeleteOutlined, DisconnectOutlined, HomeFilled, HomeOutlined } from '@ant-design/icons';
-import { addEdge, Background, Connection, Controls, Edge, Handle, MiniMap, Node, NodeProps, Position, ReactFlow, ReactFlowProvider, reconnectEdge, useEdgesState, useNodesState } from '@xyflow/react';
+import { addEdge, Background, Connection, Controls, Edge, Handle, MiniMap, Node, NodeProps, Position, ReactFlow, ReactFlowProvider, reconnectEdge, useEdgesState, useNodes, useNodesState } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Button, Drawer, Flex, Tag, Tooltip, Typography, theme } from 'antd';
 import React, { ReactElement, ReactNode, cloneElement, useCallback, useEffect, useMemo, useRef } from 'react';
@@ -11,6 +13,7 @@ import { getEventDepthColor } from './EventColors';
 import PanelEvents from './PanelEvents';
 import { graphToScripts, mergeNewScriptNodes, migrateScriptsToGraph, reachableNodeIds, validateScriptGraph, wouldCreateCycle } from './eventGraph';
 import { EEvents, getEventLabel } from './interfaces/IEvents';
+import { exposeScriptInputs } from '../../../../../shared/scriptParameters';
 
 export type ScriptKey = 'script' | 'playerHit1Script' | 'playerHit2Script' | 'playerHit3Script' | 'events';
 interface Props { open: boolean; onClose: () => void; scriptKey: ScriptKey; addEventControl: ReactNode }
@@ -23,14 +26,17 @@ function EventFlowNode({ data }: NodeProps<EventNode>) {
   const { token } = theme.useToken();
   const { t } = useI18n();
   const event = data.event, color = getEventDepthColor(0);
-  return <div style={{ width: 280, border: `1px solid ${data.reachable ? color : token.colorBorder}`, borderRadius: token.borderRadiusLG, background: event.args?.__comment ? token.colorSuccessBg : token.colorBgContainer, boxShadow: data.entry ? `0 0 0 2px ${token.colorPrimary}` : token.boxShadowSecondary, opacity: data.reachable ? 1 : .72, overflow: 'hidden' }}>
+  const events = useNodes<EventNode>().map(node => node.data.event);
+  const warning = eventWarningMessage(event, t, events);
+  return <div data-event-preview-area={event.id} style={{ width: 280, border: `1px solid ${data.reachable ? color : token.colorBorder}`, borderRadius: token.borderRadiusLG, background: event.args?.__comment ? token.colorSuccessBg : token.colorBgContainer, boxShadow: data.entry ? `0 0 0 2px ${token.colorPrimary}` : token.boxShadowSecondary, opacity: data.reachable ? 1 : .72, position: 'relative', overflow: 'visible' }}>
     <Handle id="input" type="target" position={Position.Left} isConnectable />
     <Flex align="center" justify="space-between" style={{ padding: '8px 10px', borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
-      <Flex align="center" gap={6}><Typography.Text strong style={{ color }}>{getEventLabel(event.command, t)}</Typography.Text>{!data.reachable && <Tag icon={<DisconnectOutlined />}>Draft</Tag>}{event.args?.__comment && <Tag color="success">{t('flow.disabled')}</Tag>}</Flex>
-      <Flex><Tooltip title="Set as entry"><Button size="small" type="text" icon={data.entry ? <HomeFilled /> : <HomeOutlined />} onClick={() => data.onSetEntry(event.id)} /></Tooltip><Button aria-label={`Delete ${getEventLabel(event.command, t)}`} size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => data.onDelete(event.id)} /></Flex>
+      <Flex align="center" gap={6} style={{ minWidth: 0, flex: 1 }}><Typography.Text strong ellipsis={{ tooltip: { title: getEventLabel(event.command, t), mouseEnterDelay: 0.6 } }} style={{ color, minWidth: 0, flex: 1 }}>{getEventLabel(event.command, t)}</Typography.Text>{!data.reachable && <Tag icon={<DisconnectOutlined />}>Draft</Tag>}{event.args?.__comment && <Tag color="success">{t('flow.disabled')}</Tag>}</Flex>
+      <Flex style={{ flexShrink: 0 }}><Tooltip title="Set as entry"><Button size="small" type="text" icon={data.entry ? <HomeFilled /> : <HomeOutlined />} onClick={() => data.onSetEntry(event.id)} /></Tooltip><Button aria-label={`Delete ${getEventLabel(event.command, t)}`} size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => data.onDelete(event.id)} /></Flex>
     </Flex>
+    {warning && <span style={{ position: 'absolute', top: 0, right: 0, zIndex: 5 }}><WarningIndicator message={warning} onClick={event.command === 'EVENT_FADE_IN' && event.args?.__comment ? () => data.onArgsChange(event.id, { ...event.args, __comment: false }) : undefined} /></span>}
     <div className="nodrag nopan" style={{ padding: 10, color }}><PanelEvents event={event} customTitle={() => undefined} onValueChange={(_, args) => data.onArgsChange(event.id, args)} /></div>
-    {event.command === EEvents.IF ? <><Handle id="then" type="source" position={Position.Right} style={{ top: '35%', background: '#52c41a' }} isConnectable /><Handle id="else" type="source" position={Position.Right} style={{ top: '70%', background: '#ff4d4f' }} isConnectable /></> : <Handle id="next" type="source" position={Position.Right} isConnectable />}
+    {event.command === EEvents.SAVE_WRITE || event.command === EEvents.SAVE_LOAD ? <><Handle id="then" type="source" position={Position.Right} style={{ top: '35%', background: '#52c41a' }} isConnectable /><Handle id="next" type="source" position={Position.Bottom} isConnectable /></> : event.command === EEvents.IF ? <><Handle id="then" type="source" position={Position.Right} style={{ top: '35%', background: '#52c41a' }} isConnectable /><Handle id="else" type="source" position={Position.Right} style={{ top: '70%', background: '#ff4d4f' }} isConnectable /></> : <Handle id="next" type="source" position={Position.Right} isConnectable />}
   </div>;
 }
 const nodeTypes = { event: EventFlowNode };
@@ -60,8 +66,10 @@ function FlowCanvas({ scriptKey, addEventControl }: Pick<Props, 'scriptKey' | 'a
   const persist = useCallback((graph: IScriptGraph) => {
     const selected = selectedRef.current;
     if (!selected) return;
+    const exposed = selected._resourceType === 'script' ? exposeScriptInputs(graph.nodes, selected.parameters) : null;
+    if (exposed) graph = { ...graph, nodes: exposed.events };
     const graphScripts = graphToScripts(graph);
-    const updated = { ...selected, eventGraphs: { ...(selected.eventGraphs ?? {}), [scriptKey]: graph }, [scriptKey]: graphScripts, ...(selected._resourceType === 'script' && scriptKey === 'script' ? { events: graphScripts } : {}), _saved: false };
+    const updated = { ...selected, eventGraphs: { ...(selected.eventGraphs ?? {}), [scriptKey]: graph }, [scriptKey]: graphScripts, ...(selected._resourceType === 'script' && scriptKey === 'script' ? { events: graphScripts, parameters: exposed?.parameters ?? selected.parameters } : {}), _saved: false };
     selectedRef.current = updated;
     setElementSelected(updated);
     if (selected._resourceType === 'script') setScripts(previous => ({ ...previous, scripts: previous.scripts.map(script => script.id === updated.id ? updated : script), _saved: false }));

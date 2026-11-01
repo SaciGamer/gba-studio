@@ -52,6 +52,7 @@ export class RuntimeMonitorWindow {
     this.window = monitor;
     this.options.onWindowChange?.(monitor);
     monitor.setMenu(null);
+    monitor.setMenuBarVisibility(false);
     monitor.once('ready-to-show', () => {
       if (!monitor.isDestroyed() && this.owner?.isVisible()) monitor.show();
     });
@@ -65,7 +66,7 @@ export class RuntimeMonitorWindow {
   }
 
   publish(sender: WebContents, message: unknown): void {
-    if (!this.fromEmulator(sender) || typeof message !== 'string' || message.length > 512 || !message.includes('[GBAS_MONITOR:1]')) return;
+    if (!this.fromEmulator(sender) || typeof message !== 'string' || message.length > 512 || !/\[GBAS_MONITOR:1\]/.test(message)) return;
     this.latestMessage = message;
     if (this.window && !this.window.isDestroyed()) this.window.webContents.send('runtime-monitor-metrics', message);
   }

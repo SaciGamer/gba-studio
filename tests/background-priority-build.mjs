@@ -17,14 +17,15 @@ try {
     { layerId: 1, backgroundId: 'front', priority: 2, zOrder: -12 },
   ] });
   const output = result.headerContent.toString('utf8');
-  assert.match(output, /\{ 0, "back", nullptr, nullptr, nullptr, 0, 0, 3, 0, nullptr, 0 \}/,
-    'legacy layers must receive priority 3 and a distinct default z-order');
-  assert.match(output, /\{ 1, "front", nullptr, nullptr, nullptr, 0, 0, 2, -12, nullptr, 0 \}/,
-    'explicit foreground priority and z-order must survive generation');
-  assert.match(graphics, /set_priority\(bn::clamp\(layer\.priority, 0, 3\)\)/);
+  assert.match(output, /\{ 0, "back", nullptr, 0, 0, 0, nullptr, 0 \}/,
+    'the first layer must receive the default z-order');
+  assert.match(output, /\{ 1, "front", nullptr, 0, 0, -12, nullptr, 0 \}/,
+    'the explicit z-order must survive generation');
+  assert.match(graphics, /set_priority\(3 - bn::clamp\(layer\.layerId, 0, 3\)\)/);
   assert.match(graphics, /set_z_order\(bn::clamp\(layer\.z_order, -32767, 32767\)\)/);
   assert.doesNotMatch(graphics, /const int priority = bn::clamp\(3 - layer\.layerId/);
   console.log('Background priority/z-order build contract passed.');
 } finally {
+  assert.ok(path.resolve(tempDir).startsWith(path.resolve(os.tmpdir()) + path.sep) && path.basename(tempDir).startsWith('gba-studio-background-priority-'));
   fs.rmSync(tempDir, { recursive: true, force: true });
 }

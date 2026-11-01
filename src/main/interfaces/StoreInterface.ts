@@ -7,6 +7,11 @@ export interface IPreferences {
     historyLimit?: number;
     gameWorldPanInertia?: boolean;
     gameWorldMovementMode?: 'free' | 'grid';
+    sceneObjectSnapSize?: 8 | 16;
+    gameWorldRecenterEnabled?: boolean;
+    gameWorldRecenterScenes?: boolean;
+    gameWorldRecenterActors?: boolean;
+    gameWorldRecenterTriggers?: boolean;
 }
 export interface IRecentProject {
     path: string;

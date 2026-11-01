@@ -46,6 +46,42 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [prefsOpen, setPrefsOpen] = useState(false);
 
+  useEffect(() => {
+    const hideButtonFocusRing = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') document.documentElement.setAttribute('data-hide-button-focus-ring', 'true');
+    };
+    const restoreButtonFocusRing = () => document.documentElement.removeAttribute('data-hide-button-focus-ring');
+    const handleFormTabNavigation = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') restoreButtonFocusRing();
+      if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (/^#\/engine(?:\/|$)/.test(window.location.hash)) return;
+      const active = document.activeElement as HTMLElement | null;
+      const scope = active?.closest<HTMLElement>('[role="dialog"], .ant-modal, .ant-drawer-content-wrapper') ?? document;
+      const controls = Array.from(scope.querySelectorAll<HTMLElement>(
+        'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not(:disabled), textarea:not(:disabled), select:not(:disabled), [contenteditable="true"], [role="combobox"], [role="checkbox"], [role="radio"], [role="switch"], [role="slider"]',
+      )).filter(control => control.tabIndex >= 0
+        && control.getAttribute('aria-disabled') !== 'true'
+        && !control.closest('[aria-hidden="true"], [inert]')
+        && control.getClientRects().length > 0);
+      event.preventDefault();
+      if (!controls.length) return;
+      const activeIndex = controls.findIndex(control => control === active || control.contains(active));
+      const nextIndex = activeIndex < 0
+        ? event.shiftKey ? controls.length - 1 : 0
+        : (activeIndex + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
+      controls[nextIndex].focus();
+    };
+    document.addEventListener('keydown', hideButtonFocusRing, true);
+    document.addEventListener('pointerdown', restoreButtonFocusRing, true);
+    document.addEventListener('keydown', handleFormTabNavigation, true);
+    return () => {
+      document.removeEventListener('keydown', hideButtonFocusRing, true);
+      document.removeEventListener('pointerdown', restoreButtonFocusRing, true);
+      document.removeEventListener('keydown', handleFormTabNavigation, true);
+      restoreButtonFocusRing();
+    };
+  }, []);
+
   const applyThemePreference = (preference: string) => {
     const resolvedTheme = preference === 'systemDefault'
       ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')

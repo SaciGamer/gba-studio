@@ -4,7 +4,6 @@
   "_index": 3,
   "_deleted": false,
   "name": "Credits",
-  "backgroundId": "original_butano_background",
   "backgrounds": [
     {
       "layerId": 0,
@@ -39,7 +38,8 @@
         "speed": 2,
         "__automatic": true,
         "__collapse": false
-      }
+      },
+      "version": 1
     },
     {
       "id": "5535bfef-ed7d-4ee7-8535-bfefed7dee7f",
@@ -48,21 +48,6 @@
       "args": {
         "musicId": "fruit",
         "volume": 70,
-        "__collapse": false
-      }
-    },
-    {
-      "id": "32d1c1e3-1947-4520-82d1-c1e319475203",
-      "version": 1,
-      "command": "EVENT_CREDITS_PLAY",
-      "args": {
-        "text": "BUTANO FIGHTER\\n\\nOriginal game and art\\nButano sample project\\n\\nReconstructed with GBA Studio events\\n\\nPress A after the credits to return.",
-        "dialogueFont": "fixed8x8",
-        "showFrame": false,
-        "horizontalAlign": "center",
-        "verticalAlign": "center",
-        "animate": true,
-        "animationSpeed": "slow",
         "__collapse": false
       }
     },

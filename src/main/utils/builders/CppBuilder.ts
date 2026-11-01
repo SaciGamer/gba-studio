@@ -31,7 +31,7 @@ export class CppBuilder {
   /**
    * Generate base C++ project structure
    */
-  public async generateProjectStructure(config: GameConfig): Promise<void> {
+  public async generateProjectStructure(config: GameConfig, nativeSourceFiles?: readonly string[]): Promise<void> {
     console.log('..: Generating C++ project structure for:', config.projectName);
 
     // Create main game class
@@ -48,7 +48,7 @@ export class CppBuilder {
       await this.generateThreadingSupport(config);
     }
 
-    if (config.useAudio) {
+    if (config.useAudio && (!nativeSourceFiles || nativeSourceFiles.includes('src/audio_manager.cpp'))) {
       await this.generateAudioSupport(config);
     }
 
@@ -58,8 +58,10 @@ export class CppBuilder {
       await this.generateGraphicsStateSupport(config);
 
       // Copy script commands manager class and state
-      await this.generateScriptCommandsManagerClassSupport(config);
-      await this.generateScriptCommandsStateSupport(config);
+      if (!nativeSourceFiles || nativeSourceFiles.includes('src/script_command_manager.cpp')) {
+        await this.generateScriptCommandsManagerClassSupport(config);
+        await this.generateScriptCommandsStateSupport(config);
+      }
       // await this.generateEventFadeSupport(config);
     }
 
@@ -364,6 +366,13 @@ public:
         }).join(' else ');
   }
 
+  private conditionalToShowAffineBackgroundsIfElse(graphicNames: string[]) {
+    return graphicNames.filter(file => file.startsWith('bn_affine_bg_items_')).map(file => {
+      const suffix = file.replace(/\.h$/, '').replace(/^bn_affine_bg_items_/, '');
+      return `if(name == bn::string<64>("${suffix}")) return bn::affine_bg_items::${suffix};`;
+    }).join('\n');
+  }
+
   private conditionalToShowSpritesIfElse(graphicNames: string[]) {
     return graphicNames.filter(file => file.startsWith('bn_sprite_items_'))
       .map(file => {
@@ -390,6 +399,7 @@ public:
           content = content.replace(/\{\{AUTHOR\}\}/g, config.authorName || '');
           content = content.replace(/\{\{VERSION\}\}/g, config.version || '1.0.0');
           content = content.replace(/\{\{BACKGROUND_CONDITIONALS_FROM_NAME\}\}/g, this.conditionalToShowBackgroundsIfElse(this.graphicHeadersGeneratedByButano || []));
+          content = content.replace(/\{\{AFFINE_BACKGROUND_CONDITIONALS_FROM_NAME\}\}/g, this.conditionalToShowAffineBackgroundsIfElse(this.graphicHeadersGeneratedByButano || []));
           content = content.replace(/\{\{BITMAP_BACKGROUND_CONDITIONALS_FROM_NAME\}\}/g, this.conditionalToShowBitmapBackgroundsIfElse(this.graphicHeadersGeneratedByButano || []));
           content = content.replace(/\{\{SPRITE_CONDITIONALS_FROM_NAME\}\}/g, this.conditionalToShowSpritesIfElse(this.graphicHeadersGeneratedByButano || []));
           fs.writeFileSync(graphicSrcPath, content, 'utf8');

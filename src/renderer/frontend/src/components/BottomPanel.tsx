@@ -8,11 +8,13 @@ import { Content } from 'antd/es/layout/layout';
 import Layout from 'antd/lib/layout/layout';
 import { useI18n } from '@/i18n/I18n';
 import { translateCompilerLog } from '@/utils/compilerLogTranslation';
+import { CaretRightOutlined } from '@ant-design/icons';
+import { NAVIGATION_HEADER_HEIGHT } from '@/utils/workspaceLayout';
 
 const { Text } = Typography;
-export const COMPILER_STATUS_HEADER_HEIGHT = 55;
+export const COMPILER_STATUS_HEADER_HEIGHT = NAVIGATION_HEADER_HEIGHT;
 
-const BottomPanel: React.FC = () => {
+const BottomPanel: React.FC<{ expanded: boolean; onToggle: () => void }> = ({ expanded, onToggle }) => {
   const { t } = useI18n();
   const translatorRef = useRef(t);
   translatorRef.current = t;
@@ -142,7 +144,11 @@ const BottomPanel: React.FC = () => {
       {notificationContextHolder}
       <Content style={{ flex: `0 0 ${COMPILER_STATUS_HEADER_HEIGHT}px`, height: COMPILER_STATUS_HEADER_HEIGHT, boxSizing: 'border-box', display: 'flex', alignItems: 'center', backgroundColor: token.colorBorder, zIndex: 1, padding: '0 24px', borderBottom: '1px solid #d9d9d9' }}>
         <Row justify="space-between" align="middle" style={{ width: '100%' }}>
-          <Typography.Text strong>{t('compiler.title')}</Typography.Text>
+          <Space role="button" tabIndex={0} aria-label={t('compiler.title')} aria-expanded={expanded} onClick={onToggle}
+            onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onToggle(); } }} style={{ cursor: 'pointer' }}>
+            <CaretRightOutlined rotate={expanded ? 90 : 0} />
+            <Typography.Text strong>{t('compiler.title')}</Typography.Text>
+          </Space>
           <Space>
             {isBuilding && <Spin size="small" />}
             <Typography.Text type={isBuilding ? 'warning' : 'secondary'}>
@@ -151,7 +157,7 @@ const BottomPanel: React.FC = () => {
           </Space>
         </Row>
       </Content>
-      <Content style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column' }}>
+      <Content style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: 0, display: expanded ? 'flex' : 'none', flexDirection: 'column' }}>
         <Content ref={logRef} style={{ flex: 1, overflow: 'auto', width: '100%', fontFamily: 'monospace', fontSize: '12px', backgroundColor: '#000', color: '#fff', padding: '8px', borderRadius: 0 }}>
           {statusLines.length === 0 ? (
             <Text type="secondary" style={{ color: '#666' }}>Aguardando ações do compilador...</Text>

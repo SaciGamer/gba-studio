@@ -1,0 +1,14 @@
+@container (max-width: 180px) {
+  .direction-radio-group {
+    width: 100% !important;
+  }
+  .direction-radio-group .ant-radio-button-wrapper {
+    flex: 1;
+    min-width: 0;
+    height: 24px;
+    padding-inline: 4px;
+    line-height: 22px;
+    text-align: center;
+    white-space: nowrap;
+  }
+}

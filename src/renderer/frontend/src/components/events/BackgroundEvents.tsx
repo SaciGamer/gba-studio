@@ -1,17 +1,48 @@
+import { WarningField } from '../WarningIndicator';
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { ETypeScene, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
-import { Button, Col, Form, Row, Segmented, Select, Switch, Tooltip } from 'antd';
+import { Button, Form, Segmented, Select, Switch, Tooltip } from 'antd';
 import { EEvents } from './interfaces/IEvents';
-import { IChangePaletteBackgroundArgs, IVisibleBackgroundArgs } from './interfaces/ILayer';
+import { IChangePaletteBackgroundArgs, IDefaultPalettesArgs, IVisibleBackgroundArgs } from './interfaces/ILayer';
 import { useEffect, useRef, useState } from 'react';
-import { loadPaletteLibrary } from '../resourceEditors/paletteLibrary';
+import { getConfiguredPalettes, getPaletteSlotOptions, loadPaletteLibrary } from '../resourceEditors/paletteLibrary';
+import { useI18n } from '@/i18n/I18n';
 
 interface BackgroundEventProps {
   event: IScriptsElement | undefined;
-  onValueChange: (eventId: string, eventArgs: IVisibleBackgroundArgs | IChangePaletteBackgroundArgs) => void;
+  onValueChange: (eventId: string, eventArgs: IVisibleBackgroundArgs | IChangePaletteBackgroundArgs | IDefaultPalettesArgs) => void;
 }
 
 const getLayerOptions = (singleLayer: boolean) => (singleLayer ? [2] : [0, 1, 2, 3]).map(value => ({ value, label: `Layer ${value}` }));
+
+export function ChangeDefaultPalettesEvent({ event, onValueChange }: BackgroundEventProps) {
+  const { palettes, settings } = useAppContexts();
+  const { t } = useI18n();
+  const library = palettes.palettes.length ? palettes.palettes : loadPaletteLibrary();
+  const available = getConfiguredPalettes(library, settings?.colorPaletteIds);
+  const ids = (event?.args as IDefaultPalettesArgs)?.paletteIds ?? [];
+  return <Form layout="vertical">
+    <Form.Item label={t('events.defaultPalettes.title')} extra={t('events.defaultPalettes.help')}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 48px)', gap: 8 }}>
+        {Array.from({ length: 16 }, (_, index) => {
+          const selected = available.find(palette => palette.id === (ids[index] ?? settings?.colorPaletteIds?.[index]));
+          const label = `${t('events.defaultPalettes.slot')} ${index}`;
+          const effectiveId = ids[index] ?? settings?.colorPaletteIds?.[index];
+          const missingPalette = Boolean(effectiveId && !library.some(palette => palette.id === effectiveId));
+          return <WarningField key={index} warning={missingPalette} message={t('settings.missingPalette', { id: effectiveId })}><Tooltip title={`${label}: ${selected?.name ?? t('events.defaultPalettes.empty')}`}>
+            <Select status={missingPalette ? 'warning' : undefined} className={`palette-slot-select${ids[index] ? '' : ' palette-slot-default'}`} aria-label={label} value={ids[index] ?? '__default__'} suffixIcon={null}
+              labelRender={() => selected ? <PaletteSwatch colors={selected.colors} /> : <EmptyPaletteSlot index={index} />}
+              placeholder={selected ? <PaletteSwatch colors={selected.colors} /> : <EmptyPaletteSlot index={index} />}
+              onChange={id => { const paletteIds = Array.from({ length: 16 }, (_, slot) => ids[slot] ?? null); paletteIds[index] = id === '__default__' ? null : id; onValueChange(event?.id!, { ...event?.args, paletteIds }); }}
+              options={[{ value: '__default__', label: t('events.defaultPalettes.useDefault'), title: '' }, ...available.map(palette => ({ value: palette.id, label: <PaletteSwatch colors={palette.colors} />, title: palette.name }))]}
+              optionRender={option => <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{option.label}{option.data.title}</span>}
+              popupMatchSelectWidth={240} style={{ width: 48, height: 48 }} />
+          </Tooltip></WarningField>;
+        })}
+      </div>
+    </Form.Item>
+  </Form>;
+}
 
 function GreenSwapThumbnail({ src, width, height, alt }: { src: string; width: number; height: number; alt: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -112,8 +143,9 @@ export function VisibleBackgroundEvent({ event, onValueChange }: BackgroundEvent
 }
 
 export function ChangePaletteBackgroundEvent({ event, onValueChange }: BackgroundEventProps) {
-  const { palettes, elementSelected, backgrounds, settingUtils } = useAppContexts();
-  const availablePalettes = palettes.palettes.length ? palettes.palettes : loadPaletteLibrary();
+  const { t } = useI18n();
+  const { palettes, settings, elementSelected, backgrounds, settingUtils } = useAppContexts();
+  const availablePalettes = getPaletteSlotOptions(palettes.palettes.length ? palettes.palettes : loadPaletteLibrary(), settings?.colorPaletteIds);
   const args = event?.args as IChangePaletteBackgroundArgs;
   const singleLayer = elementSelected?.sceneType === ETypeScene.LOGO || elementSelected?.sceneType === ETypeScene.POINTNCLICK;
   const layerId = singleLayer ? 2 : args?.layerId ?? 0;
@@ -172,13 +204,25 @@ export function ChangePaletteBackgroundEvent({ event, onValueChange }: Backgroun
         <Switch checked={restorePalette} onChange={value => update({ restorePaletteLayerDefault: value, paletteIds: value ? Array(16).fill(null) : (args?.paletteIds ?? Array(16).fill(null)) })} />
       </Form.Item>
       <Form.Item label={`Palette overrides (${paletteSlotCount} slots)`}>
-        <Row gutter={[8, 8]}>{Array.from({ length: 16 }, (_, index) => {
-        const paletteId = args?.paletteIds?.[index] ?? undefined;
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 48px)', gap: 8 }}>{Array.from({ length: 16 }, (_, index) => {
+        const savedId = args?.paletteIds?.[index];
+        const paletteId = savedId?.startsWith('__slot__:') ? availablePalettes.find(palette => palette.id === savedId)?.id : availablePalettes.find(palette => settings?.colorPaletteIds?.[Number(palette.id.slice(9))] === savedId)?.id;
         const unavailable = restorePalette || index >= paletteSlotCount;
-        const selectedPalette = availablePalettes.find(palette => palette.id === paletteId);
+        const missingPalette = Boolean(!restorePalette && savedId && !paletteId);
+        const selectedPalette = availablePalettes.find(palette => palette.id === (paletteId ?? `__slot__:${index}`));
         const tooltip = unavailable ? undefined : (selectedPalette?.name ?? 'Select Palette');
-        return <Col span={6} key={index}><Tooltip title={tooltip} placement="left"><div><Select disabled={unavailable} allowClear placeholder={unavailable ? <UnavailablePaletteSlot /> : <EmptyPaletteSlot index={index} />} value={paletteId} onChange={nextPaletteId => { const paletteIds = [...(args?.paletteIds ?? Array(16).fill(null))]; paletteIds[index] = nextPaletteId ?? null; update({ paletteIds }); }} options={availablePalettes.map(palette => ({ value: palette.id, label: <PaletteSwatch colors={palette.colors} /> }))} optionRender={option => { const palette = availablePalettes.find(item => item.id === option.value); return palette ? <Tooltip title={palette.name} placement="left"><div style={{ width: '100%', minHeight: 26, display: 'flex', alignItems: 'center' }}><PaletteSwatch colors={palette.colors} /></div></Tooltip> : option.label; }} style={{ width: '100%', height: 34 }} styles={{ root: { minHeight: 34, height: 34, display: 'flex', alignItems: 'center' } }} /></div></Tooltip></Col>;
-      })}</Row>
+        const label = `${t('events.defaultPalettes.slot')} ${index}`;
+        return <WarningField key={index} warning={missingPalette} message={t('settings.missingPalette', { id: savedId })}><Tooltip title={tooltip} placement="left">
+          <Select status={missingPalette ? 'warning' : undefined} disabled={unavailable}
+            className={`palette-slot-select${savedId ? '' : ' palette-slot-default'}`} aria-label={label}
+            suffixIcon={null} value={paletteId ?? '__default__'}
+            labelRender={() => unavailable ? <UnavailablePaletteSlot /> : selectedPalette ? <PaletteSwatch colors={selectedPalette.colors} /> : <EmptyPaletteSlot index={index} />}
+            onChange={nextPaletteId => { const paletteIds = Array.from({ length: 16 }, (_, slot) => args?.paletteIds?.[slot] ?? null); paletteIds[index] = nextPaletteId === '__default__' ? null : nextPaletteId; update({ paletteIds }); }}
+            options={[{ value: '__default__', label: t('events.defaultPalettes.useDefault'), title: '' }, ...availablePalettes.map(palette => ({ value: palette.id, label: <PaletteSwatch colors={palette.colors} />, title: palette.name }))]}
+            optionRender={option => <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{option.label}{option.data.title}</span>}
+            popupMatchSelectWidth={240} style={{ width: 48, height: 48 }} />
+        </Tooltip></WarningField>;
+      })}</div>
     </Form.Item>
   </Form>;
 }

@@ -1,9 +1,12 @@
+import DirectionRadioGroup from '../DirectionRadioGroup';
 import imgPlaceholder from '@/img/placeholder.png';
 import { joinLocalAssetPath } from '@/utils/localAssetUrl';
 import useAppContexts from "@/providers/contexts/AppContexts";
 import { ISceneSettings, IScriptsElement } from "@/providers/contexts/interfaces/ISceneElement";
 import { CaretDownFilled, CaretLeftFilled, CaretRightFilled, CaretUpFilled } from "@ant-design/icons";
-import { Flex, Form, Radio, Select, Space } from "antd";
+import { Button, Flex, Form, Radio, Select, Space, Typography } from "antd";
+import { useI18n } from '@/i18n/I18n';
+import useActorSelf from './useActorSelf';
 import StepInputNumber, { InputNumber } from '../StepInputNumber';
 import NumericEventInput from '../NumericEventInput';
 import { normalizeNumericValue, formatNumericValue } from '../../../../../shared/numericValues';
@@ -22,6 +25,8 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
   // const {backgrounds} = useSceneContext();
   // const {settingUtils} = useSettingsUtilsContext();
   const { scenes, backgrounds, settingUtils } = useAppContexts();
+  const { t } = useI18n();
+  const self = useActorSelf();
   const args = event?.args as IChangeScene;
 
   const optSpeed = [
@@ -76,9 +81,10 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
 
   const clampDestination = (value: number | null | undefined, limit: number) =>
     Math.max(0, Math.min(Math.max(0, Math.trunc(limit) - 1), Math.trunc(Number(value ?? 0))));
+  const axisLimit = (axis: 'x' | 'y', dimension: number) => args?.[axis === 'x' ? 'xUnit' : 'yUnit'] === 'pixels' ? dimension : Math.ceil(dimension / 16);
 
   const updateDestination = (field: 'x' | 'y', value: any) => {
-    const limit = field === 'x' ? defaultValues.sceneWidth : defaultValues.sceneHeight;
+    const limit = axisLimit(field, field === 'x' ? defaultValues.sceneWidth : defaultValues.sceneHeight);
     onValueChange(event?.id!, { ...event?.args as IChangeScene, [field]: value && typeof value === 'object' ? value : { type: 'number', value: clampDestination(value, limit) } });
   };
 
@@ -89,14 +95,15 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
     onValueChange(event?.id!, {
       ...event?.args as IChangeScene,
       sceneId,
-      x: normalizeNumericValue(defaultValues.x).kind === 'number' ? { type: 'number', value: clampDestination((normalizeNumericValue(defaultValues.x) as { value: number }).value, width) } : defaultValues.x,
-      y: normalizeNumericValue(defaultValues.y).kind === 'number' ? { type: 'number', value: clampDestination((normalizeNumericValue(defaultValues.y) as { value: number }).value, height) } : defaultValues.y,
+      x: normalizeNumericValue(defaultValues.x).kind === 'number' ? { type: 'number', value: clampDestination((normalizeNumericValue(defaultValues.x) as { value: number }).value, axisLimit('x', width)) } : defaultValues.x,
+      y: normalizeNumericValue(defaultValues.y).kind === 'number' ? { type: 'number', value: clampDestination((normalizeNumericValue(defaultValues.y) as { value: number }).value, axisLimit('y', height)) } : defaultValues.y,
     });
   };
 
   useEffect(() => {
-    customTitle(` To ${defaultValues.sceneName} At {${formatNumericValue(defaultValues.x)},${formatNumericValue(defaultValues.y)}}`);
-  }, [defaultValues.sceneName, defaultValues.x, defaultValues.y]);
+    const nameForId = (id: string) => id === '__SELF__' ? self.options[0]?.label ?? 'Self' : id?.slice(0, 8) || '?';
+    customTitle(` To ${defaultValues.sceneName} At {${formatNumericValue(defaultValues.x, nameForId)},${formatNumericValue(defaultValues.y, nameForId)}}`);
+  }, [defaultValues.sceneName, defaultValues.x, defaultValues.y, self.options[0]?.label]);
 
 	return (
     <Form layout="vertical">
@@ -107,6 +114,7 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
           style={{ height: 40 }}
           options={scenes.filter(sf => !sf._deleted).map(scene => ({
             value: scene.id, // ID único da cena
+            sceneName: scene.name || scene.id,
             label: (
               <Content style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8, minHeight: 36, lineHeight: 1 }}>
                 <img
@@ -118,6 +126,7 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
               </Content>
             ),
           }))}
+          filterOption={(input, option) => String((option as { sceneName?: string } | undefined)?.sceneName ?? '').toLowerCase().includes(input.trim().toLowerCase())}
           value={defaultValues.sceneId}
           onChange={selectDestinationScene}
         >
@@ -125,23 +134,27 @@ export function SceneEvent({ event, customTitle, onValueChange }: ChangeSceneEve
       </Form.Item>
 
       <Flex gap={8} style={{ width: '100%' }}>
-        <Form.Item style={{ flex: 1, minWidth: 0 }}><NumericEventInput label="X" value={defaultValues.x} min={0} max={Math.max(0, defaultValues.sceneWidth - 1)} onChange={value => updateDestination('x', value)} /></Form.Item>
-        <Form.Item style={{ flex: 1, minWidth: 0 }}><NumericEventInput label="Y" value={defaultValues.y} min={0} max={Math.max(0, defaultValues.sceneHeight - 1)} onChange={value => updateDestination('y', value)} /></Form.Item>
+        {(['x', 'y'] as const).map(axis => <Form.Item key={axis} style={{ flex: 1, minWidth: 0 }}>
+          <Flex align="center" gap={4}><Typography.Text style={{ fontSize: 12 }}>{axis.toUpperCase()}</Typography.Text>
+            <Button type="text" size="small" aria-label={t('events.actor.coordinateUnit', { axis: axis.toUpperCase() })} title={t('events.actor.tileUnitHint')} style={{ height: 20, paddingInline: 4, fontSize: 11 }} onClick={() => onValueChange(event?.id!, { ...event?.args as IChangeScene, [axis + 'Unit']: args?.[axis === 'x' ? 'xUnit' : 'yUnit'] === 'pixels' ? 'tiles' : 'pixels' })}>{args?.[axis === 'x' ? 'xUnit' : 'yUnit'] === 'pixels' ? 'px' : t('events.actor.tiles')}</Button>
+          </Flex>
+          <NumericEventInput value={defaultValues[axis]} min={0} max={Math.max(0, axisLimit(axis, axis === 'x' ? defaultValues.sceneWidth : defaultValues.sceneHeight) - 1)} onChange={value => updateDestination(axis, value)} />
+        </Form.Item>)}
       </Flex>
 
       <Flex>
-        <Form.Item label="Direction" >
-          <Radio.Group 
+        <Form.Item label="Direction" style={{ flex: 1, minWidth: 0 }}>
+          <DirectionRadioGroup
             optionType="button" 
             buttonStyle="solid" 
-            defaultValue={defaultValues.direction} 
+            value={defaultValues.direction}
             onChange={(e) => onValueChange(event?.id!, { ...event?.args as IChangeScene, direction: e.target.value })}
           >
               <Radio value="left" ><CaretLeftFilled /></Radio>
               <Radio value="right" ><CaretRightFilled /></Radio>
               <Radio value="up" ><CaretUpFilled /></Radio>
               <Radio value="down"><CaretDownFilled /></Radio>
-          </Radio.Group>
+          </DirectionRadioGroup>
         </Form.Item>
         <Form.Item label="Fade Speed"  style={{flex: 1, marginLeft: '10px' }}>
           <NumericEventInput value={defaultValues.fadeSpeed} min={1} max={6}
@@ -159,6 +172,8 @@ SceneEvent.defaultValue = (scenes: ISceneSettings[]): IChangeScene => ({
   sceneId: scenes[0]?.id || null,
   x: { type: 'number', value: 0 },
   y: { type: 'number', value: 0 },
+  xUnit: 'tiles',
+  yUnit: 'tiles',
   direction: 'right',
   fadeSpeed: 2,
 });

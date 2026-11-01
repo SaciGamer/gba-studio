@@ -41,5 +41,9 @@ assert.equal(catalogs.get('frFR').get('settings.connectedJoystick'), 'Joystick c
 for (const name of ['enUS', 'ptBR', 'esES', 'frFR']) {
   assert.ok(catalogs.get(name).get('settings.demoStartMuted').trimEnd().endsWith(':'));
   assert.ok(catalogs.get(name).get('settings.demoStartMutedHint'));
+  assert.ok(catalogs.get(name).get('music.warning.buildCoreItEffects')?.includes('{effects}'), `${name}: IT build-core warning must exist and preserve its interpolation placeholder`);
+  const xmSampleVolumeHelp = catalogs.get(name).get('music.inspector.xmSampleVolumeGbaPreview');
+  assert.ok(xmSampleVolumeHelp, `${name}: XM sample-volume preview behavior must be translated`);
+  assert.doesNotMatch(xmSampleVolumeHelp, /ignore|ignora|ignore/i, `${name}: XM sample-header volume must not be described as ignored by the preview`);
 }
-console.log(`Translation encoding passed (${checked} strings); Start muted labels include a colon in all four locales.`);
+console.log(`Translation encoding passed (${checked} strings); Start muted labels, IT build-core warnings, and XM sample-volume guidance are present in all four locales.`);

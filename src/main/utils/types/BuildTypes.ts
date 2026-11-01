@@ -31,6 +31,8 @@ export interface BuildConfig {
 }
 
 export interface TranscodeOptions {
+  /** Explicit complete-template diagnostic mode; selective analysis never falls back silently. */
+  runtimeMode?: 'selective' | 'full';
   parallel?: number;
   onProgress?: (message: string, messageKey?: string, messageParams?: Record<string, string | number>) => void;
   projectDir: string;
@@ -87,7 +89,7 @@ export interface GameConfig {
 
 export interface JsonResourceDefault {
   /** Only attached to the build copy; never serialized into project assets. */
-  __spriteCanvas?: { graphicsName: string; width: number; height: number; frameWidth: number; frameHeight: number; idleFrame: number; animations: CanvasAnimationPlan[] };
+  __spriteCanvas?: { graphicsName: string; width: number; height: number; frameWidth: number; frameHeight: number; canvasWidth: number; canvasHeight: number; partsColumns: number; partsRows: number; idleFrame: number; animations: CanvasAnimationPlan[] };
   playerAnimationStripOrientation?: 'horizontal' | 'vertical';
   _resourceType: string;
   _deleted?: boolean;
@@ -99,12 +101,9 @@ export interface JsonResourceDefault {
   width?: number;
   height?: number;
   cameraPosition?: { x?: number; y?: number };
-  tileMap?: number[][];
-  selectedTilesetId?: string;
-  imageType?: string;
+  sceneType?: string;
   backgrounds?: any[];
   script?: any[];
-  colorMode?: 'mono' | 'mixed' | undefined;
   fadeDirection?: 0 | 1;
   startAnimSpeed?: number;
   playerSpriteId?: string | null;
@@ -135,6 +134,8 @@ export interface JsonResourceDefault {
     animations: Array<{ id: string; name: string; frames: number[]; type?: string; canvasFrames?: SpriteCanvasFrame[] }>;
   }>;
   inputMap?: Record<string, string[]>;
+    inputMapsBySceneType?: import('../../../shared/inputMap').SceneInputMaps;
+    inputGroups?: import('../../../shared/inputGroups').InputGroups;
   combatConfig?: {
     maxProjectiles?: number;
     maxEnemies?: number;

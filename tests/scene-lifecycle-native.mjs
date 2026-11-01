@@ -10,12 +10,14 @@ const scenes = path.join(root, 'tests/native/scenes');
 const scheduler = path.join(root, 'tests/native/scheduler');
 const output = fs.mkdtempSync(path.join(os.tmpdir(), 'gba-studio-scene-test-'));
 try {
+  // This lifecycle harness has no SRAM/resource save registry.
+  fs.writeFileSync(path.join(output, 'native-features.h'), fs.readFileSync(path.join(template, 'include/gba_studio_features.h'), 'utf8').replace('#define GBA_STUDIO_FEATURE_SAVE 1', '#define GBA_STUDIO_FEATURE_SAVE 0'));
   // Materialize the real template header's project-name placeholder, as build does.
   fs.writeFileSync(path.join(output, 'game.h'), fs.readFileSync(path.join(template, 'include/game.h'), 'utf8')
     .replaceAll('{{PROJECT_NAME_UPPER}}', 'NATIVE_TEST'));
   const executable = path.join(output, process.platform === 'win32' ? 'scenes.exe' : 'scenes');
   const build = spawnSync(process.env.CXX || 'g++', [
-    '-std=c++17', '-Wall', '-Wextra', '-Werror', '-DGBA_STUDIO_NATIVE_SCENE_LIFECYCLE',
+    '-std=c++17', '-Wall', '-Wextra', '-Werror', '-DGBA_STUDIO_NATIVE_SCENE_LIFECYCLE', '-include', path.join(output, 'native-features.h'),
     '-I', output, '-I', scenes, '-I', scheduler, '-I', path.join(root, 'tests/native/support'), '-I', path.join(template, 'include'),
       ...['game.cpp', 'actor_manager.cpp', 'combat_manager.cpp', 'shooter_kit.cpp', 'spawner_timeline_manager.cpp', 'script_command_manager.cpp', 'event_wait.cpp', 'event_wait_input.cpp', 'variable_manager.cpp', 'script_trigger_manager.cpp', 'event_change_scene.cpp']
       .map(file => path.join(template, 'src', file)),

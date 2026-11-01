@@ -167,6 +167,11 @@ const Launcher = () => {
     window.electronAPI.removePreferences("recentProjects", removedProject);
   };
 
+  const handleClearRecentProjects = () => {
+    setRecentProjects([]);
+    window.electronAPI.removePreferences('recentProjects', []);
+  };
+
   const handleSelectProject = (projetctPath: string) => {
     console.log('..:: Selecionando projeto no recentes ::..');
     window.electronAPI.send('load-project-window', projetctPath);
@@ -258,7 +263,7 @@ const Launcher = () => {
             }}
           >
             {tabSelectedKey === "1" && <NewProjectForm />}
-            {tabSelectedKey === "2" && <RecentProjectList projects={recentProjects} handleRemoveProject={handleRemoveProject} handleSelectProject={handleSelectProject} />}
+            {tabSelectedKey === "2" && <RecentProjectList projects={recentProjects} handleRemoveProject={handleRemoveProject} handleSelectProject={handleSelectProject} handleClearRecentProjects={handleClearRecentProjects} />}
             {tabSelectedKey === "4" && <CreditsRoll color={token.colorText} accent={token.colorPrimary} sourceCredits={launcherCredits} />}
             {tabSelectedKey === "5"}
           </Content>

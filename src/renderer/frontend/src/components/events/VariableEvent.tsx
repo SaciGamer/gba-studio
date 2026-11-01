@@ -1,3 +1,4 @@
+import { isActiveProjectEntry } from '../../../../../shared/projectCollectionEntries';
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { IVariableBooleanArgs, IVariableLiteral, IVariableSetValueArgs, IVariableValue, IScriptsElement } from '@/providers/contexts/interfaces/ISceneElement';
 import { EVariableType, IVariableDefinition, VariableValue } from '@/providers/contexts/interfaces/IVariablesElement';
@@ -7,13 +8,15 @@ import NumericEventInput from '../NumericEventInput';
 import type { NumericValue } from '../../../../../shared/numericValues';
 import { useEffect, useState } from 'react';
 import { EEvents } from './interfaces/IEvents';
+import { useScriptParameterVariables } from './ScriptParameterContext';
+import { variableOptions, variableCascaderOptions, variableCascaderPath } from './variableOptions';
+import { useI18n } from '@/i18n/I18n';
 
 interface VariableEventProps {
   event: IScriptsElement | undefined;
   onValueChange: (eventId: string, eventArgs: any) => void;
 }
 
-const getScope = (variable: IVariableDefinition): string => variable.scope || 'GLOBAL';
 
 const valueForType = (type: EVariableType): VariableValue => type === 'number' ? 0 : type === 'boolean' ? false : '';
 
@@ -26,18 +29,17 @@ function VariableSelector({
   variables: IVariableDefinition[];
   onChange: (variable: IVariableDefinition) => void;
 }) {
+  const { t } = useI18n();
   return (
-    <Space.Compact block style={{ width: '100%' }}>
-      <Button type="text" style={{ width: 42, paddingInline: 0, fontWeight: 600 }}>$</Button>
+    <Space.Compact block style={{ width: 0, minWidth: 0, flex: '1 1 0' }}>
+      <Button type="text" style={{ width: 42, flex: '0 0 42px', paddingInline: 0, fontWeight: 600 }}>$</Button>
       <Select
         aria-label="Variable"
+        showSearch optionFilterProp="label"
         style={{ minWidth: 0, flex: 1 }}
         placeholder="Variable"
         value={value || undefined}
-        options={variables.map(variable => ({
-          value: variable.id,
-          label: `${getScope(variable)}: ${variable.name || variable.symbol}`,
-        }))}
+        options={variableOptions(variables, t)}
         onChange={(id: string) => {
           const variable = variables.find(item => item.id === id);
           if (variable) onChange(variable);
@@ -72,24 +74,25 @@ function ValueEditor({
   type: EVariableType;
   onChange: (value: IVariableValue) => void;
 }) {
+  const { t } = useI18n();
   const prefix = value.kind === 'variable' ? '$' : type === 'boolean' ? (value.value ? 'T' : 'F') : type === 'number' ? '#' : '""';
 
   return (
-    <Space.Compact block style={{ width: '100%' }}>
+    <Space.Compact block style={{ width: 0, minWidth: 0, flex: '1 1 0' }}>
       <Cascader
         aria-label="Value"
         allowClear={false}
-        style={{ width: 42 }}
-        value={value.kind === 'variable' ? ['Variables', value.variableId] : type === 'boolean' ? ['Boolean', String(value.value)] : [type === 'number' ? 'Number' : 'Text']}
+        style={{ width: 42, flex: '0 0 42px' }}
+        value={value.kind === 'variable' ? variableCascaderPath(value.variableId) : type === 'boolean' ? ['Boolean', String(value.value)] : [type === 'number' ? 'Number' : 'Text']}
         options={[
           { value: 'Number', label: 'Number' },
           { value: 'Text', label: 'Text' },
-          { value: 'Variables', label: 'Variables', children: variables.filter(variable => variable.type === type).map(variable => ({ value: variable.id, label: variable.name || variable.symbol })) },
+          { value: 'Variables', label: 'Variables', children: variableCascaderOptions(variables.filter(variable => variable.type === type), t) },
           { value: 'Boolean', label: 'Boolean', children: [{ value: 'true', label: 'True' }, { value: 'false', label: 'False' }] },
         ]}
         displayRender={() => prefix}
         onChange={(path) => {
-          const [category, selected] = path as string[];
+          const category = path[0], selected = path[path.length - 1] as string;
           if (category === 'Variables' && selected) {
             const variable = variables.find(item => item.id === selected);
             if (variable) onChange({ kind: 'variable', variableId: variable.id, symbol: variable.symbol, type: variable.type });
@@ -105,9 +108,9 @@ function ValueEditor({
       {value.kind === 'variable' ? (
         <Select
           aria-label="Value variable"
-          style={{ flex: 1 }}
+          style={{ flex: 1, minWidth: 0 }}
           value={value.variableId}
-          options={variables.filter(variable => variable.type === type).map(variable => ({ value: variable.id, label: variable.name || variable.symbol }))}
+          options={variableOptions(variables.filter(variable => variable.type === type), t)}
           onChange={(variableId: string) => {
             const variable = variables.find(item => item.id === variableId);
             if (variable) onChange({ kind: 'variable', variableId, symbol: variable.symbol, type: variable.type });
@@ -132,17 +135,18 @@ function ValueEditor({
 }
 
 export default function VariableEvent({ event, onValueChange }: VariableEventProps) {
-  const { variables } = useAppContexts();
+  const { t } = useI18n();
+  const { variables: globalVariables } = useAppContexts();
+  const parameters = useScriptParameterVariables();
+  const variables = { variables: [...parameters, ...globalVariables.variables].filter(isActiveProjectEntry) };
   const [variableId, setVariableId] = useState('');
   const [value, setValue] = useState<IVariableValue | NumericValue>({ kind: 'literal', type: 'number', value: 0 });
-  const [scope, setScope] = useState<'ALL' | 'GLOBAL' | 'LOCAL' | 'TEMP'>('ALL');
   const selectedVariable = variables.variables.find(variable => variable.id === variableId);
   const type = selectedVariable?.type || 'number';
 
   useEffect(() => {
-    const args = event?.args as Partial<IVariableSetValueArgs & IVariableBooleanArgs & { scope: typeof scope }> | undefined;
+    const args = event?.args as Partial<IVariableSetValueArgs & IVariableBooleanArgs> | undefined;
     setVariableId(args?.variableId || '');
-    setScope(args?.scope || 'ALL');
     if (args && 'value' in args && args.value) setValue(args.value);
   }, [event]);
 
@@ -151,21 +155,25 @@ export default function VariableEvent({ event, onValueChange }: VariableEventPro
     onValueChange(event.id, { ...event.args, ...patch });
   };
 
+  if (event?.command === EEvents.LOCAL_VARIABLE_RESET) {
+    return <Typography.Text type="secondary">{t('events.variables.resetLocalHelp')}</Typography.Text>;
+  }
   if (event?.command === EEvents.VARIABLE_RESET_ALL) {
-    return <Select aria-label="Reset scope" value={scope} options={['ALL', 'GLOBAL', 'LOCAL', 'TEMP'].map(item => ({ value: item, label: `Reset ${item} variables to default` }))} onChange={(next) => { setScope(next); update({ scope: next }); }} />;
+    return <Typography.Text type="secondary">{t('events.variables.resetAllHelp')}</Typography.Text>;
   }
 
   const selectVariable = (variable: IVariableDefinition) => {
     const nextValue = value.kind === 'literal'
       ? value.type === variable.type || (value.type === 'boolean' && variable.type !== 'string') ? value : { kind: 'literal' as const, type: variable.type, value: valueForType(variable.type) }
-      : variable.type === 'string' ? { kind: 'literal' as const, type: variable.type, value: '' } : value;
+      : variable.type === 'string' ? { kind: 'literal' as const, type: variable.type, value: '' }
+        : value.kind === 'variable' ? { kind: 'variable' as const, variableId: value.variableId } : value;
     setVariableId(variable.id);
     setValue(nextValue);
     update({ variableId: variable.id, variableSymbol: variable.symbol, ...(event?.command === EEvents.VARIABLE ? { value: nextValue } : {}) });
   };
 
   return (
-    <Space direction="vertical" style={{ width: '100%' }}>
+    <Flex vertical gap={8} style={{ width: '100%', minWidth: 0 }}>
       <Flex align="center" gap={8} style={{ width: '100%' }}>
         <Typography.Text style={{ width: 56, flex: '0 0 56px' }}>Variable</Typography.Text>
         <VariableSelector value={variableId} variables={variables.variables} onChange={selectVariable} />
@@ -174,10 +182,10 @@ export default function VariableEvent({ event, onValueChange }: VariableEventPro
         <Flex align="center" gap={8} style={{ width: '100%' }}>
           <Typography.Text style={{ width: 56, flex: '0 0 56px' }}>Value</Typography.Text>
           {type !== 'string'
-            ? <NumericEventInput renderNumber={type === 'boolean' ? (number, onChange) => <Select value={number !== 0} style={{ flex: 1, minWidth: 0 }} options={[{ value: true, label: 'True' }, { value: false, label: 'False' }]} onChange={value => onChange(value ? 1 : 0)} /> : undefined} value={value} onChange={next => { const operand = typeof next === 'number' ? { kind: 'literal' as const, type, value: type === 'boolean' ? next !== 0 : next } : next; setValue(operand); update({ value: operand }); }} />
+            ? <NumericEventInput style={{ flex: '1 1 0', width: 0, minWidth: 0 }} renderNumber={type === 'boolean' ? (number, onChange) => <Select value={number !== 0} style={{ flex: 1, minWidth: 0 }} options={[{ value: true, label: 'True' }, { value: false, label: 'False' }]} onChange={value => onChange(value ? 1 : 0)} /> : undefined} value={value} onChange={next => { const operand = typeof next === 'number' ? { kind: 'literal' as const, type, value: type === 'boolean' ? next !== 0 : next } : next; setValue(operand); update({ value: operand }); }} />
             : <ValueEditor value={value as IVariableValue} variables={variables.variables} type={type} onChange={(next) => { setValue(next); update({ value: next }); }} />}
         </Flex>
       )}
-    </Space>
+    </Flex>
   );
 }

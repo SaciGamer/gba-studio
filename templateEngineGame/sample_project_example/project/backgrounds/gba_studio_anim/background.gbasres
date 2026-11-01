@@ -1,0 +1,12 @@
+{
+  "_resourceType": "background",
+  "id": "f89d1930-3dcd-4828-a9f3-bdd9738beb0d",
+  "autoColor": false,
+  "name": "gba_studio_anim",
+  "filename": "gba_studio_anim.bmp",
+  "imageWidth": 24960,
+  "imageHeight": 160,
+  "hd": true,
+  "tileColors": "",
+  "_deleted": false
+}

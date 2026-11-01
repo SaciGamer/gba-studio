@@ -3,6 +3,7 @@ import { Flex, Layout, Splitter, theme, Tooltip, Typography } from 'antd';
 import React, { ReactNode } from 'react';
 
 interface ResourceEditorShellProps {
+  assetKind?: string;
   title: string;
   library: ReactNode;
   children: ReactNode;
@@ -11,10 +12,12 @@ interface ResourceEditorShellProps {
   searchOpen?: boolean;
   onToggleSearch?: () => void;
   hideLibrary?: boolean;
+  hideHeader?: boolean;
   customPanels?: boolean;
+  onLibraryBackgroundClick?: (event: React.MouseEvent<HTMLDivElement>) => void;
 }
 
-export default function ResourceEditorShell({ title, library, children, inspector, libraryActions, searchOpen = false, onToggleSearch, hideLibrary = false, customPanels = false }: ResourceEditorShellProps) {
+export default function ResourceEditorShell({ assetKind, title, library, children, inspector, libraryActions, searchOpen = false, onToggleSearch, hideLibrary = false, hideHeader = false, customPanels = false, onLibraryBackgroundClick }: ResourceEditorShellProps) {
   const { token } = theme.useToken();
   const panelStyle: React.CSSProperties = {
     backgroundColor: token.colorBorder,
@@ -24,22 +27,22 @@ export default function ResourceEditorShell({ title, library, children, inspecto
   };
 
   return (
-    <Layout style={{ height: '100%', minHeight: 0, background: token.colorBgBase }}>
+    <Layout data-asset-kind={assetKind} style={{ height: '100%', minHeight: 0, background: token.colorBgBase }}>
       {customPanels ? (
         <Splitter style={{ flex: 1, minHeight: 0, background: token.colorBgBase }}>
           {children}
         </Splitter>
       ) : hideLibrary ? (
         <Flex vertical style={{ flex: 1, minHeight: 0 }}>
-          <Flex align="center" justify="space-between" gap={8} style={{ ...panelStyle, paddingInline: 12 }}>
+          {!hideHeader && <Flex align="center" justify="space-between" gap={8} style={{ ...panelStyle, paddingInline: 12 }}>
             <Typography.Text strong ellipsis style={{ color: '#fff', minWidth: 0 }}>{title.toUpperCase()}</Typography.Text>
             <Flex align="center" gap={8} onClick={event => event.stopPropagation()}>
               {library}
-              {onToggleSearch && <Tooltip placement="right" title="Search" color={token.colorBorder}><SearchOutlined style={{ padding: 4, borderRadius: token.borderRadius, backgroundColor: searchOpen ? token.colorPrimary : 'transparent', cursor: 'pointer' }} onClick={onToggleSearch} /></Tooltip>}
               {libraryActions}
+              {onToggleSearch && <Tooltip placement="right" title="Search" color={token.colorBorder}><SearchOutlined style={{ padding: 4, borderRadius: token.borderRadius, backgroundColor: searchOpen ? token.colorPrimary : 'transparent', cursor: 'pointer' }} onClick={onToggleSearch} /></Tooltip>}
             </Flex>
-          </Flex>
-          <main style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: 'auto', padding: 16 }}>{children}</main>
+          </Flex>}
+          <main style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: hideHeader ? 'hidden' : 'auto', padding: hideHeader ? 0 : 16, background: token.colorBgContainer }}>{children}</main>
         </Flex>
       ) : (
         <Splitter style={{ flex: 1, minHeight: 0, background: token.colorBgBase }}>
@@ -48,11 +51,11 @@ export default function ResourceEditorShell({ title, library, children, inspecto
             <Flex align="center" justify="space-between" gap={4} style={{ ...panelStyle, paddingInline: 12 }}>
               <Typography.Text strong ellipsis style={{ color: '#fff', minWidth: 0 }}>{title.toUpperCase()}</Typography.Text>
               <Flex align="center" gap={2} onClick={event => event.stopPropagation()}>
-                {onToggleSearch && <Tooltip placement="right" title="Search" color={token.colorBorder}><SearchOutlined style={{ padding: 4, borderRadius: token.borderRadius, backgroundColor: searchOpen ? token.colorPrimary : 'transparent', cursor: 'pointer' }} onClick={onToggleSearch} /></Tooltip>}
                 {libraryActions}
+                {onToggleSearch && <Tooltip placement="right" title="Search" color={token.colorBorder}><SearchOutlined style={{ padding: 4, borderRadius: token.borderRadius, backgroundColor: searchOpen ? token.colorPrimary : 'transparent', cursor: 'pointer' }} onClick={onToggleSearch} /></Tooltip>}
               </Flex>
             </Flex>
-            <div style={{ height: 'calc(100% - 40px)', overflow: 'auto', padding: '8px 16px' }}>{library}</div>
+            <div onClick={onLibraryBackgroundClick} style={{ height: 'calc(100% - 40px)', overflow: 'auto', padding: '8px 16px' }}>{library}</div>
             </aside>
           </Splitter.Panel>
           <Splitter.Panel min={360}>

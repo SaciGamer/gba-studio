@@ -40,3 +40,24 @@ export function drawLadderCollisionIcon(context: CanvasRenderingContext2D, x: nu
   context.stroke();
   context.restore();
 }
+
+export function drawUnknownCollisionReference(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number): void {
+  context.save();
+  context.strokeStyle = '#ff4d4f';
+  context.fillStyle = '#ff4d4f';
+  context.lineWidth = 1;
+  context.strokeRect(x + 0.5, y + 0.5, Math.max(0, width - 1), Math.max(0, height - 1));
+
+  const spacing = 12;
+  const columns = Math.max(1, Math.floor(width / spacing));
+  const rows = Math.max(1, Math.floor(height / spacing));
+  context.font = `${Math.max(8, Math.min(12, spacing))}px sans-serif`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      context.fillText('?', x + ((column + 0.5) * width) / columns, y + ((row + 0.5) * height) / rows);
+    }
+  }
+  context.restore();
+}

@@ -1,10 +1,6 @@
 import { IBaseSettings } from "./IBaseSettings";
 
 // Interface centralizada
-export enum EColorMode {
-    Mono = "mono",
-    Mixed = "mixed",
-}
 
 export interface ISpriteAnimation {
     id: string;
@@ -57,9 +53,10 @@ export interface IMainSettings extends IBaseSettings {
     startMoveSpeed: number | string;
     startAnimSpeed: number;
     startDirection: 'up' | 'down' | 'left' | 'right';
-    colorMode: EColorMode;
     fadeDirection: 0 | 1;
     inputMap?: Record<string, string[]>;
+    inputMapsBySceneType?: import('../../../../../../shared/inputMap').SceneInputMaps;
+    inputGroups?: import('../../../../../../shared/inputGroups').InputGroups;
     combatConfig?: {
         maxProjectiles?: number;
         maxEnemies?: number;
@@ -78,6 +75,7 @@ export interface IMainSettings extends IBaseSettings {
     };
     controls?: Object[];
     demoShowFPS?: boolean;
+    demoShowCPU?: boolean;
     demoFilter?: string;
     demoAudioVolume?: number;
     demoAudioMuted?: boolean;
@@ -106,6 +104,7 @@ export interface IMainSettings extends IBaseSettings {
     playerAnimationStates?: ISpriteAnimationState[];
     palettes?: IPaletteDefinition[];
     paletteIds?: string[];
+    colorPaletteIds?: Array<string | null | undefined>;
     /** Project-wide auto-tile definitions shared by all scenes. */
     autoTileSlots?: Array<{ autoTileId?: string; name?: string; tileSize?: 8 | 16 | 32; parts: Array<number | null> }>;
     /** Blob mask index order used by saved auto-tile part arrays. */

@@ -6,13 +6,14 @@ import { chromium } from 'playwright';
 
 const frontend = path.resolve('src/renderer/frontend/src');
 const bundle = await build({ stdin: { resolveDir: frontend, loader: 'tsx', contents: `
-  import React, { useRef, useState } from 'react';
+  import React, { useEffect, useRef, useState } from 'react';
   import { createRoot } from 'react-dom/client';
   import RightPanelScroll from './components/RightPanelScroll';
   function Fixture() {
     const [id, setId] = useState('a'), [settings, setSettings] = useState({}), [mount, setMount] = useState(0);
     const [object, setObject] = useState(null), [short, setShort] = useState(false);
     const ref = useRef(settings); ref.current = settings;
+    useEffect(() => { window.settingsWrites = (window.settingsWrites ?? 0) + 1; }, [settings]);
     window.testContext = { scenes: [{id:'a'}, {id:'b'}], elementSelected: {id},
       settingUtils: {projectPathFile:'project', activeSceneObject:object}, userSettingsRef:ref, setUserSettings:setSettings };
     window.saved = settings;
@@ -60,7 +61,26 @@ try {
   await page.getByRole('button', {name:'Deferred A', exact:true}).click();
   await page.waitForFunction(() => document.querySelector('[data-testid="right-panel-scroll"]').scrollTop === 620);
   assert.equal(await page.evaluate(() => window.saved.rightPanelScrollPositions.a), 620);
-  console.log('Right panel scroll: independent scenes, object views, remount and deferred content restoration passed.');
+  const writes = await page.evaluate(() => window.settingsWrites);
+  const duringScroll = await panel.evaluate(async element => {
+    for (const top of [630,640,650]) {
+      element.scrollTop = top;
+      element.dispatchEvent(new Event('scroll'));
+      await new Promise(resolve => setTimeout(resolve, 40));
+    }
+    return window.settingsWrites;
+  });
+  assert.equal(duringScroll, writes, 'Scrolling must not rerender settings on every scroll event');
+  await page.waitForFunction(() => window.saved.rightPanelScrollPositions.a === 650);
+  assert.equal(await page.evaluate(() => window.settingsWrites), writes + 1);
+  await panel.evaluate(element => { element.scrollTop = 700; element.dispatchEvent(new Event('scroll')); });
+  await page.getByRole('button', {name:'B', exact:true}).click();
+  await page.getByRole('button', {name:'A', exact:true}).click();
+  assert.equal(await panel.evaluate(element => element.scrollTop), 700, 'Switching scenes flushes the pending position');
+  await panel.evaluate(element => { element.scrollTop = 730; element.dispatchEvent(new Event('scroll')); });
+  await page.getByRole('button', {name:'Remount', exact:true}).click();
+  assert.equal(await panel.evaluate(element => element.scrollTop), 730, 'Remounting flushes the pending position before restoration');
+  console.log('Right panel scroll: batched settings updates, pending-position flush, independent scenes/objects, remount and deferred content restoration passed.');
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));

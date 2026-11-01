@@ -17,6 +17,20 @@
 
 #include "utils.h"
 
+#if GBA_STUDIO_FEATURE_BACKGROUND_TRANSFORM
+bool run_background_transform(const void* args, int operation) {
+    if(!args) return false;
+    const auto& data = *static_cast<const BackgroundTransformEventData*>(args);
+    return GraphicsManager::instance().transform_background(data.layer_id, operation, data.x, data.y);
+}
+#endif
+
+#if GBA_STUDIO_FEATURE_BACKGROUND_ANIMATION
+bool run_background_animation(const void* args) {
+    return args && GraphicsManager::instance().animate_background(*static_cast<const BackgroundAnimationEventData*>(args));
+}
+#endif
+
 bool run_change_layer(const void* args, const bn::string<64> scene_id) {
     if(!args) return true;
     return run_change_layer(*static_cast<const LayerChangeEventData*>(args), scene_id);

@@ -8,7 +8,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
 import { v4 as uuidv4 } from 'uuid';
 import FloatButtons, { IActions, SubMenuType } from './FloatButtons';
-import { getSceneCollisionColor, getSceneCollisionFill, getCollisionSideForScene, drawLadderCollisionIcon } from '@/utils/collisionColors';
+import { getSceneCollisionColor, getSceneCollisionFill, getCollisionSideForScene, drawLadderCollisionIcon, drawUnknownCollisionReference } from '@/utils/collisionColors';
 
 type Tool = 'move' | 'brush' | 'stamp' | 'fill' | 'erase' | 'collision' | 'trigger' | 'actor' | 'spawn';
 type Overlay = 'tiles' | 'collisions' | 'triggers' | 'objects';
@@ -101,7 +101,17 @@ export default function TileCanvasEditor({ scene, resetPanelSize, setShowFloatBu
       for (let y = 0; y <= height; y += grid) { context.moveTo(0, y + .5); context.lineTo(width, y + .5); }
       context.stroke();
     }
-    active.collisions?.forEach(shape => { context.fillStyle = getSceneCollisionFill(shape.collisionSide, .7); context.strokeStyle = getSceneCollisionColor(shape.collisionSide); context.fillRect(shape.x, shape.y, shape.width, shape.height); context.strokeRect(shape.x + .5, shape.y + .5, shape.width - 1, shape.height - 1); if (shape.collisionSide === 'ladder') drawLadderCollisionIcon(context, shape.x, shape.y, shape.width, shape.height); });
+    active.collisions?.forEach(shape => {
+      if (shape.collisionSide === 'ladder' && active.sceneType !== 'Platformer') {
+        drawUnknownCollisionReference(context, shape.x, shape.y, shape.width, shape.height);
+        return;
+      }
+      context.fillStyle = getSceneCollisionFill(shape.collisionSide, .7);
+      context.strokeStyle = getSceneCollisionColor(shape.collisionSide);
+      context.fillRect(shape.x, shape.y, shape.width, shape.height);
+      context.strokeRect(shape.x + .5, shape.y + .5, shape.width - 1, shape.height - 1);
+      if (shape.collisionSide === 'ladder') drawLadderCollisionIcon(context, shape.x, shape.y, shape.width, shape.height);
+    });
     active.triggers?.forEach(shape => { context.fillStyle = 'rgba(82,196,26,.22)'; context.strokeStyle = '#52c41a'; context.fillRect(shape.x, shape.y, shape.width, shape.height); context.strokeRect(shape.x + .5, shape.y + .5, shape.width - 1, shape.height - 1); });
     active.actors?.forEach(actor => { context.fillStyle = '#1677ff'; context.fillRect(actor.x, actor.y, actor.width || grid, actor.height || grid); context.fillStyle = '#fff'; context.font = '9px sans-serif'; context.fillText('A', actor.x + 4, actor.y + 11); });
     active.spawnPoints?.forEach(point => { context.fillStyle = '#faad14'; context.beginPath(); context.arc(point.x + grid / 2, point.y + grid / 2, Math.max(4, grid / 3), 0, Math.PI * 2); context.fill(); });
@@ -109,7 +119,7 @@ export default function TileCanvasEditor({ scene, resetPanelSize, setShowFloatBu
       context.fillStyle = tool === 'trigger' ? 'rgba(82,196,26,.35)' : getSceneCollisionFill(settingUtils.collisionSide, .7);
       context.fillRect(Math.min(start.col, pointer.col) * grid, Math.min(start.row, pointer.row) * grid, (Math.abs(start.col - pointer.col) + 1) * grid, (Math.abs(start.row - pointer.row) + 1) * grid);
     }
-  }, [active.actors, active.collisions, active.spawnPoints, active.triggers, grid, height, map, pointer, settingUtils.collisionSide, showGrid, start, tileset, token.colorBgContainer, tool, width]);
+  }, [active.actors, active.collisions, active.sceneType, active.spawnPoints, active.triggers, grid, height, map, pointer, settingUtils.collisionSide, showGrid, start, tileset, token.colorBgContainer, tool, width]);
 
   const getCell = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current; if (!canvas) return null;

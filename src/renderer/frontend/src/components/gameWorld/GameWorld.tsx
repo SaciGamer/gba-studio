@@ -1,6 +1,11 @@
+import useWorldOverlayPosition from './useWorldOverlayPosition';
+import { createSceneFadeIn } from '@/utils/createSceneFadeIn';
+import { suspendInspectorHover } from '../../utils/sceneDragInteraction';
+import { getChangeSceneMarkerPosition } from './changeScenePreviewGeometry';
+import { isModalOpen } from '@/utils/isModalOpen';
 import { DndContext, DragEndEvent, DragMoveEvent } from '@dnd-kit/core';
 import { App, Button, FloatButton, Layout, Progress, Tooltip } from 'antd';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { AntdToken } from '../common/AntDToken';
 import GameElement from './GameElement';
@@ -19,12 +24,29 @@ import { Spin } from 'antd/lib';
 import { joinLocalAssetPath } from '@/utils/localAssetUrl';
 import { countDistinctImageTiles } from '@/utils/tileCount';
 import { useI18n } from '@/i18n/I18n';
+import { matchesSceneSearch, sceneSearchAfterSelection } from '@/utils/sceneSearch';
 import { deleteCachedSceneCanvas } from '@/utils/sceneRenderCache';
+import { clearDeletedEventReferences, clearDeletedSceneReferences, disableDeletedActorReferences } from '../../../../../shared/events/sceneReferenceCleanup';
 
 enum SubMenuType {
   TOOLTIP = 'tooltip',
   POPOVER = 'popover',
   DROPDOWN = 'dropdown',
+}
+
+type SceneObjectClipboard = { type: 'actor' | 'trigger'; object: any };
+let sceneObjectClipboard: SceneObjectClipboard | null = null;
+
+function cloneScriptEvents(events: IScriptsElement[] | undefined): IScriptsElement[] | undefined {
+  return events?.map(event => ({
+    ...event,
+    id: uuidv4(),
+    children: event.children ? {
+      ...event.children,
+      then: cloneScriptEvents(event.children.then) ?? [],
+      else: cloneScriptEvents(event.children.else),
+    } : undefined,
+  }));
 }
 
 interface IActions {
@@ -61,6 +83,8 @@ interface ChangeScenePreview {
   x: number;
   y: number;
   direction: string;
+  xUnit?: 'tiles' | 'pixels';
+  yUnit?: 'tiles' | 'pixels';
 }
 
 interface ChangeSceneTrace {
@@ -157,12 +181,11 @@ const calculateSceneVram = (scene: ISceneSettings, backgrounds: any[], sprites: 
   return graphicTiles.size * bytesPerTile + mapTiles * 2 + spriteBytes + 512 + 512;
 };
 
-const getChangeSceneTracePath = (source: ISceneSettings, target: ISceneSettings, preview: ChangeScenePreview): string => {
+const getChangeSceneTracePath = (source: ISceneSettings, target: ISceneSettings, preview: ChangeScenePreview, marker = getChangeSceneMarkerPosition(target, preview)): string => {
   const startX = source.x;
   const startY = source.y;
-  const targetMarkerSize = 16;
-  const endX = target.x + preview.x * 16 + targetMarkerSize / 2;
-  const endY = target.y + preview.y * 16 + targetMarkerSize / 2;
+  const endX = marker.centerX;
+  const endY = marker.centerY;
   const distance = Math.hypot(endX - startX, endY - startY);
   const arc = Math.max(48, Math.min(160, distance * 0.3));
   const direction = endX >= startX ? 1 : -1;
@@ -196,14 +219,16 @@ const collectChangeScenePreviews = (scene: ISceneSettings): ChangeScenePreview[]
       visited.add(event.id);
       if(event.command === 'EVENT_CHANGE_SCENE' && !event.args?.__comment)
       {
-        const args = event.args as { sceneId?: string; x?: unknown; y?: unknown; direction?: string };
+        const args = event.args as { sceneId?: string; x?: unknown; y?: unknown; direction?: string; xUnit?: 'tiles' | 'pixels'; yUnit?: 'tiles' | 'pixels' };
         if(args.sceneId)
         {
           previews.push({
             id: event.id,
             targetSceneId: args.sceneId,
-            x: getTileCoordinate(args.x),
-            y: getTileCoordinate(args.y),
+            x: getTileCoordinate(args.x) / (args.xUnit === 'pixels' ? 16 : 1),
+            y: getTileCoordinate(args.y) / (args.yUnit === 'pixels' ? 16 : 1),
+            xUnit: args.xUnit,
+            yUnit: args.yUnit,
             direction: args.direction ?? 'right',
           });
         }
@@ -229,7 +254,7 @@ const collectCameraPreviews = (scene: ISceneSettings, activePreview: CameraPrevi
   const walk = (events: IScriptsElement[] | undefined) => events?.forEach(event => {
     if(visited.has(event.id)) return;
     visited.add(event.id);
-    if(event.command === 'EVENT_PAN_CAMERA' && event.id === activePreview.eventId)
+    if(['EVENT_PAN_CAMERA', 'EVENT_CAMERA_MOVE_TO'].includes(event.command) && event.id === activePreview.eventId)
     {
       previews.push({ id: event.id, x: activePreview.x, y: activePreview.y });
     }
@@ -254,7 +279,12 @@ const updateChangeSceneEvent = (
 ): IScriptsElement[] | undefined => events?.map(event => ({
   ...event,
   args: event.id === eventId
-    ? { ...event.args, sceneId: targetSceneId, x: { type: 'number', value: x }, y: { type: 'number', value: y } } as IScriptsElement['args']
+    ? { ...event.args, sceneId: targetSceneId,
+        xUnit: (event.args as any)?.xUnit === 'pixels' || !Number.isInteger(x) ? 'pixels' : 'tiles',
+        yUnit: (event.args as any)?.yUnit === 'pixels' || !Number.isInteger(y) ? 'pixels' : 'tiles',
+        x: { type: 'number', value: Math.round(x * ((event.args as any)?.xUnit === 'pixels' || !Number.isInteger(x) ? 16 : 1)) },
+        y: { type: 'number', value: Math.round(y * ((event.args as any)?.yUnit === 'pixels' || !Number.isInteger(y) ? 16 : 1)) },
+      } as IScriptsElement['args']
     : event.args,
   children: event.children
     ? {
@@ -302,7 +332,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   const { token } = AntdToken();
   const { message, notification, modal } = App.useApp();
   const { 
-    scenes, setScenes, scenesRef, scripts, spriteResources, setScripts, setVariables,
+    scenes, setScenes, scenesRef, scripts, spriteResources, setSpriteResources, setScripts, setVariables,
     backgrounds, setBackgrounds, 
     settings, setSettings,
     settingUtils, setSettingUtils, settingUtilsRef,
@@ -319,9 +349,11 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   const zoomLevel = Math.max(0.25, Math.min(16, finiteNumber(userSettings.zoom, 100) / 100));
   const [panInertia, setPanInertia] = useState(true);
   const [sceneMovementMode, setSceneMovementMode] = useState<'free' | 'grid'>('grid');
+  const [sceneObjectSnapSize, setSceneObjectSnapSize] = useState<8 | 16>(8);
   const worldScrollX = finiteNumber(userSettings.worldScrollX, 0);
   const worldScrollY = finiteNumber(userSettings.worldScrollY, 0);
   const [gridTransform, setGridTransform] = useState({ x: worldScrollX, y: worldScrollY, scale: zoomLevel });
+  const worldPanningRef = useRef(false);
   const worldViewportRef = useRef<HTMLDivElement | null>(null);
   const [worldCursorPosition, setWorldCursorPosition] = useState<{ x: number; y: number } | null>(null);
 
@@ -330,24 +362,102 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   const [draggingSceneOffset, setDraggingSceneOffset] = useState<{ id: string; x: number; y: number } | null>(null);
   const [activeCameraPreview, setActiveCameraPreview] = useState<CameraPreview | null>(null);
   const [actorPositionPreview, setActorPositionPreview] = useState<{ eventId: string; sceneId: string; actorId: string; x: number; y: number } | null>(null);
-  const [sceneMousePosition, setSceneMousePosition] = useState<{ scene: string; x: number; y: number } | null>(null);
-  const [worldOverlayPosition, setWorldOverlayPosition] = useState({ left: 12, top: 12, right: 12, bottom: 12, width: 0, height: 0, measured: false });
+  const [sceneMousePosition, setSceneMousePosition] = useState<{ sceneId: string; scene: string; x: number; y: number } | null>(null);
+  const sceneMousePositionRef = useRef<{ sceneId: string; scene: string; x: number; y: number } | null>(null);
   const [isMiniMapDragging, setIsMiniMapDragging] = useState(false);
   const miniMapRef = useRef<SVGSVGElement | null>(null);
   const miniMapDragBoundsRef = useRef<{ minX: number; minY: number; width: number; height: number } | null>(null);
   const [romUsage, setRomUsage] = useState<ResourceUsage>({ binary: 0, engine: 0, graphics: 0, audio: 0, scripts: 0, total: 0, source: 'assets' });
   const [loading, setLoading] = useState(true);
   const selectedScene = scenes.find(scene => !scene._deleted && scene.id === elementSelected?.id);
-  const selectedSceneIds = settingUtils.selectedSceneIds ?? (selectedScene ? [selectedScene.id] : []);
-  const movingSceneIds = draggingSceneOffset
+  const worldOverlayPosition = useWorldOverlayPosition(worldViewportRef, loading, Boolean(selectedScene));
+  const previousSelectedSceneId = useRef(selectedScene?.id);
+  useEffect(() => {
+    if (previousSelectedSceneId.current === selectedScene?.id) return;
+    previousSelectedSceneId.current = selectedScene?.id;
+    if (!selectedScene) return;
+    setSettingUtils(previous => {
+      const search = sceneSearchAfterSelection(previous.worldSceneSearch, selectedScene);
+      return search === (previous.worldSceneSearch ?? '') ? previous : { ...previous, worldSceneSearch: search };
+    });
+  }, [selectedScene?.id, setSettingUtils]);
+  const selectedSceneIds = useMemo(() => settingUtils.selectedSceneIds ?? (selectedScene ? [selectedScene.id] : []), [settingUtils.selectedSceneIds, selectedScene?.id]);
+  const movingSceneIds = useMemo(() => draggingSceneOffset
     ? new Set(selectedSceneIds.includes(draggingSceneOffset.id) ? selectedSceneIds : [draggingSceneOffset.id])
-    : null;
+    : null, [draggingSceneOffset, selectedSceneIds]);
   const tileEditSceneId = settingUtils.tileEditSceneId;
-  const selectedScenePreviews = selectedScene ? collectChangeScenePreviews(selectedScene) : [];
-  const selectedCameraPreviews = selectedScene ? collectCameraPreviews(selectedScene, activeCameraPreview) : [];
+  const selectedScenePreviews = useMemo(() => selectedScene ? collectChangeScenePreviews(selectedScene) : [], [selectedScene]);
+  const selectedCameraPreviews = useMemo(() => selectedScene ? collectCameraPreviews(selectedScene, activeCameraPreview) : [], [selectedScene, activeCameraPreview]);
   const [selectedSceneVram, setSelectedSceneVram] = useState(0);
   const [pendingScenePlacement, setPendingScenePlacement] = useState<{ id: string; mode: 'copy' | 'cut' } | null>(null);
   const [clipboardSceneId, setClipboardSceneId] = useState<string | null>(null);
+  const [availableSpriteFileIds, setAvailableSpriteFileIds] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setAvailableSpriteFileIds(null);
+    const refreshSpriteFiles = async () => {
+      try {
+        const response = await window.electronAPI.fetchImages('sprites');
+        if (cancelled || response?.status !== 'success' || !Array.isArray(response.fileImages)) return;
+        setAvailableSpriteFileIds(response.fileImages
+          .filter((filename: string) => /\.(png|bmp|gif|jpe?g)$/i.test(filename))
+          .map((filename: string) => filename.replace(/\.[^/.]+$/, '').toLowerCase().replace(/[ -]/g, '_')));
+      } catch (error) {
+        console.warn('Unable to refresh sprite sheets:', error);
+      }
+    };
+    void refreshSpriteFiles();
+    window.addEventListener('gba-studio:assets-reloaded', refreshSpriteFiles);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('gba-studio:assets-reloaded', refreshSpriteFiles);
+    };
+  }, [settingUtils.projectPathFile, settingUtils.localImagePath]);
+
+  useEffect(() => {
+    if (!availableSpriteFileIds) return;
+    const available = new Set(availableSpriteFileIds);
+    const spriteKeys = (sprite: any) => [
+      String(sprite.id ?? '').split(/[\\/]/).pop()?.replace(/\.[^/.]+$/, '').toLowerCase().replace(/[ -]/g, '_') ?? '',
+      String(sprite.filename ?? '').split(/[\\/]/).pop()?.replace(/\.[^/.]+$/, '').toLowerCase().replace(/[ -]/g, '_') ?? '',
+    ];
+    const hasFile = (sprite: any) => spriteKeys(sprite).some(key => key && available.has(key));
+    const missing = spriteResources.filter(sprite => !sprite._deleted && !sprite._pendingAssetRefresh && !hasFile(sprite));
+    const missingIds = new Set(missing.map(sprite => sprite.id));
+    const deletedResourceIds = new Set(spriteResources.filter(sprite => sprite._deleted).map(sprite => sprite.id));
+    const availableResourceIds = new Set(spriteResources.filter(sprite => !sprite._deleted && hasFile(sprite)).map(sprite => sprite.id));
+    const pendingAssetResourceIds = new Set(spriteResources.filter(sprite => !sprite._deleted && sprite._pendingAssetRefresh).map(sprite => sprite.id));
+    const hasSpriteSheet = (spriteId: string) => !deletedResourceIds.has(spriteId)
+      && (available.has(spriteId.toLowerCase().replace(/[ -]/g, '_')) || availableResourceIds.has(spriteId) || pendingAssetResourceIds.has(spriteId));
+    const confirmedPendingIds = new Set(spriteResources.filter(sprite => sprite._pendingAssetRefresh && hasFile(sprite)).map(sprite => sprite.id));
+    if (missing.length || confirmedPendingIds.size) setSpriteResources(previous => previous.map(sprite => {
+      if (missingIds.has(sprite.id)) return { ...sprite, _deleted: true, _saved: false };
+      if (confirmedPendingIds.has(sprite.id)) {
+        const { _pendingAssetRefresh: _pending, ...confirmedSprite } = sprite;
+        return confirmedSprite;
+      }
+      return sprite;
+    }));
+    if (settings?.playerSpriteId && !hasSpriteSheet(settings.playerSpriteId)) {
+      setSettings(previous => ({ ...previous, playerSpriteId: '', _saved: false }));
+    }
+    setScenes(previous => {
+      let scenesChanged = false;
+      const next = previous.map(scene => {
+        let changed = false;
+        const actors = (scene.actors ?? []).map(actor => {
+          const referencedSpriteId = actor.spriteId;
+          if (!referencedSpriteId || hasSpriteSheet(referencedSpriteId)) return actor;
+          changed = true;
+          return { ...actor, spriteId: '' };
+        });
+        scenesChanged ||= changed;
+        return changed ? { ...scene, actors, _saved: false } : scene;
+      });
+      return scenesChanged ? next : previous;
+    });
+  }, [availableSpriteFileIds, scenes, setScenes, setSettings, setSpriteResources, settings?.playerSpriteId, spriteResources]);
 
   useEffect(() => {
     let cancelled = false;
@@ -435,9 +545,10 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     const withDraggingOffset = (scene: ISceneSettings) => isMovingInPreview(scene.id) && liveOffset
       ? { ...scene, x: scene.x + liveOffset.x, y: scene.y + liveOffset.y }
       : scene;
+    const marker = getChangeSceneMarkerPosition(withDraggingOffset(targetScene), preview, spriteResources.find(item => item.id === settings?.playerSpriteId));
     return [...traces, {
       id: preview.id,
-      path: getChangeSceneTracePath(withDraggingOffset(selectedScene), withDraggingOffset(targetScene), preview),
+      path: getChangeSceneTracePath(withDraggingOffset(selectedScene), withDraggingOffset(targetScene), preview, marker),
     }];
   }, []);
 
@@ -453,20 +564,37 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       setElementSelected((current: ISceneSettings | null) => current?.id === selectedScene.id ? updatedSourceScene : current);
       return previous.map(scene => scene.id === selectedScene.id ? updatedSourceScene : scene);
     });
-  }, [selectedScene, setScenes, setElementSelected]);
+  }, [selectedScene?.id, setScenes, setElementSelected]);
 
   const wrapperRef = useRef<ReactZoomPanPinchRef | null>(null);
   const sceneDragScaleRef = useRef<number | null>(null);
+  const inspectorHoverCleanup = useRef<(() => void) | null>(null);
+  const restoreInspectorHover = () => {
+    inspectorHoverCleanup.current?.();
+    inspectorHoverCleanup.current = null;
+  };
+  useEffect(() => () => inspectorHoverCleanup.current?.(), []);
+  const previousTileEditSceneIdRef = useRef(settingUtils.tileEditSceneId);
+  const recenterPreferencesRef = useRef({ enabled: true, scenes: true, actors: true, triggers: true });
+  const [canvasPreferencesLoaded, setCanvasPreferencesLoaded] = useState(false);
 
   useEffect(() => {
-    const applyPreferences = (preferences: { gameWorldPanInertia?: boolean; gameWorldMovementMode?: 'free' | 'grid' } | null | undefined) => {
+    const applyPreferences = (preferences: { gameWorldPanInertia?: boolean; gameWorldMovementMode?: 'free' | 'grid'; sceneObjectSnapSize?: 8 | 16; gameWorldRecenterEnabled?: boolean; gameWorldRecenterScenes?: boolean; gameWorldRecenterActors?: boolean; gameWorldRecenterTriggers?: boolean } | null | undefined) => {
       setPanInertia(preferences?.gameWorldPanInertia !== false);
       setSceneMovementMode(preferences?.gameWorldMovementMode === 'free' ? 'free' : 'grid');
+      setSceneObjectSnapSize(preferences?.sceneObjectSnapSize === 16 ? 16 : 8);
+      recenterPreferencesRef.current = {
+        enabled: preferences?.gameWorldRecenterEnabled !== false,
+        scenes: preferences?.gameWorldRecenterScenes !== false,
+        actors: preferences?.gameWorldRecenterActors !== false,
+        triggers: preferences?.gameWorldRecenterTriggers !== false,
+      };
+      setCanvasPreferencesLoaded(true);
     };
     let cancelled = false;
     void window.electronAPI.loadPreferences?.().then((preferences: any) => {
       if (!cancelled) applyPreferences(preferences);
-    }).catch((error: unknown) => console.warn('Unable to load Game World preferences:', error));
+    }).catch((error: unknown) => { console.warn('Unable to load Game World preferences:', error); if (!cancelled) applyPreferences(undefined); });
     const onPreferencesChanged = (event: Event) => applyPreferences((event as CustomEvent).detail);
     window.addEventListener('gba-studio:game-world-preferences', onPreferencesChanged);
     return () => {
@@ -474,40 +602,6 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       window.removeEventListener('gba-studio:game-world-preferences', onPreferencesChanged);
     };
   }, []);
-
-  useEffect(() => {
-    const updateOverlayPosition = () => {
-      const viewport = worldViewportRef.current?.querySelector<HTMLElement>('.react-transform-wrapper');
-      if (!viewport) return;
-      const rect = viewport.getBoundingClientRect();
-      setWorldOverlayPosition({
-        left: Math.round(rect.left + 12),
-        top: Math.round(rect.top + 15),
-        right: Math.max(12, Math.round(window.innerWidth - rect.right + 12)),
-        bottom: Math.max(12, Math.round(window.innerHeight - rect.bottom + 12)),
-        width: Math.round(rect.width),
-        height: Math.round(rect.height),
-        measured: true,
-      });
-    };
-    // The game viewport is created after the initial loading screen.  Reading
-    // it only on mount leaves fixed overlays at the old window coordinates
-    // after maximize/restore, so wait for the committed layout as well.
-    const frame = requestAnimationFrame(updateOverlayPosition);
-    const timer = window.setTimeout(updateOverlayPosition, 100);
-    const settledTimer = window.setTimeout(updateOverlayPosition, 300);
-    const observer = new ResizeObserver(updateOverlayPosition);
-    const viewport = worldViewportRef.current?.querySelector<HTMLElement>('.react-transform-wrapper');
-    if (viewport) observer.observe(viewport);
-    window.addEventListener('resize', updateOverlayPosition);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.clearTimeout(timer);
-      window.clearTimeout(settledTimer);
-      observer.disconnect();
-      window.removeEventListener('resize', updateOverlayPosition);
-    };
-  }, [loading]);
 
   const isDeleting = useRef(false);
   const enterObjectPlacementMode = (kind: 'Actor' | 'Trigger') => {
@@ -750,11 +844,68 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || isModalOpen()) return;
       const target = event.target as HTMLElement | null;
       const activeElement = document.activeElement as HTMLElement | null;
       const isEditingField = (element: HTMLElement | null) => Boolean(element?.closest('input, textarea, [contenteditable="true"]'));
 
       if (isEditingField(target) || isEditingField(activeElement)) return;
+
+      const hasClipboardModifier = (event.ctrlKey || event.metaKey) && !event.altKey;
+      const clipboardKey = event.key.toLowerCase();
+      const selectedObject = settingUtils.activeSceneObject;
+      if (event.key === 'Escape' && selectedObject) {
+        event.preventDefault();
+        const ownerScene = scenes.find(scene => scene.id === selectedObject.sceneId && !scene._deleted);
+        if (ownerScene) setElementSelected(ownerScene);
+        setSettingUtils(previous => ({
+          ...previous,
+          activeButton: 'select',
+          activeSubButton: '',
+          activeSceneObject: null,
+          activeTriggerId: null,
+          ...(ownerScene ? { selectedSceneIds: [ownerScene.id] } : {}),
+        }));
+        return;
+      }
+      if (hasClipboardModifier && (clipboardKey === 'c' || clipboardKey === 'x') && selectedObject) {
+        const sourceScene = scenes.find(scene => scene.id === selectedObject.sceneId && !scene._deleted);
+        const sourceCollection = selectedObject.type === 'actor' ? sourceScene?.actors : sourceScene?.triggers;
+        const object = sourceCollection?.find(item => item.id === selectedObject.id);
+        if (sourceScene && object) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          sceneObjectClipboard = { type: selectedObject.type, object: JSON.parse(JSON.stringify(object)) };
+          if (clipboardKey === 'x') {
+            const collectionKey = selectedObject.type === 'actor' ? 'actors' : 'triggers';
+            const updated = { ...sourceScene, [collectionKey]: sourceCollection?.filter(item => item.id !== selectedObject.id), _saved: false };
+            setScenes(previous => previous.map(scene => scene.id === sourceScene.id ? updated : scene));
+            if (elementSelected?.id === sourceScene.id) setElementSelected(updated);
+            setSettingUtils(previous => ({ ...previous, activeSceneObject: null, activeTriggerId: null }));
+          }
+          return;
+        }
+      }
+      if (hasClipboardModifier && clipboardKey === 'v' && sceneObjectClipboard && selectedScene) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const { type, object } = sceneObjectClipboard;
+        const id = uuidv4();
+        const mousePosition = sceneMousePositionRef.current?.sceneId === selectedScene.id ? sceneMousePositionRef.current : null;
+        const positioned = mousePosition ? {
+          x: Math.max(0, Math.round(mousePosition.x / 8) * 8),
+          y: Math.max(0, Math.round(mousePosition.y / 8) * 8),
+        } : { x: object.x, y: object.y };
+        const clone = type === 'actor'
+          ? { ...object, ...positioned, id, actorId: id, onInteractScript: cloneScriptEvents(object.onInteractScript), onInitScript: cloneScriptEvents(object.onInitScript), onUpdateScript: cloneScriptEvents(object.onUpdateScript) }
+          : { ...object, ...positioned, id, sceneId: selectedScene.id, script: cloneScriptEvents(object.script), onEnterScript: cloneScriptEvents(object.onEnterScript), onLeaveScript: cloneScriptEvents(object.onLeaveScript), onInteractScript: cloneScriptEvents(object.onInteractScript), onInitScript: cloneScriptEvents(object.onInitScript), onUpdateScript: cloneScriptEvents(object.onUpdateScript) };
+        const collectionKey = type === 'actor' ? 'actors' : 'triggers';
+        const updated = { ...selectedScene, [collectionKey]: [...((selectedScene as any)[collectionKey] ?? []), clone], _saved: false };
+        setScenes(previous => previous.map(scene => scene.id === selectedScene.id ? updated : scene));
+        setElementSelected(updated);
+        setSettingUtils(previous => ({ ...previous, tileEditSceneId: selectedScene.id, tileEditLayerId: 4, activeSceneObject: { sceneId: selectedScene.id, type, id }, activeTriggerId: type === 'trigger' ? id : null }));
+        return;
+      }
 
       if (settingUtils.tileEditSceneId && ['1', '2', '3', '4', '5'].includes(event.key)) {
         const editingScene = scenes.find(scene => scene.id === settingUtils.tileEditSceneId);
@@ -800,23 +951,36 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       window.electronAPI?.removeListener?.('scene-delete', deleteSelection);
       window.removeEventListener('gba-studio:scene-delete', deleteSceneById);
     };
-  }, [elementSelected, scenes, settings, settingUtils.activeButton, settingUtils.activeSceneObject, settingUtils.activeSubButton, settingUtils.selectedSceneIds, settingUtils.tileEditSceneId]);
+  }, [elementSelected, scenes, selectedScene, settings, settingUtils.activeButton, settingUtils.activeSceneObject, settingUtils.activeSubButton, settingUtils.selectedSceneIds, settingUtils.tileEditSceneId]);
 
   const showConfirmSceneObject = (selectedObject: { sceneId: string; type: 'actor' | 'trigger'; id: string }) => {
     const scene = scenes.find(item => item.id === selectedObject.sceneId);
     const collection = selectedObject.type === 'actor' ? scene?.actors : scene?.triggers;
     const object = collection?.find(item => item.id === selectedObject.id);
     if (!scene || !object) { isDeleting.current = false; return; }
-    setScenes(previous => previous.map(item => item.id !== scene.id ? item : {
-      ...item,
-      [selectedObject.type === 'actor' ? 'actors' : 'triggers']: (selectedObject.type === 'actor' ? item.actors : item.triggers)?.filter(entry => entry.id !== selectedObject.id),
-      _saved: false,
-    }));
-    setElementSelected({
-      ...scene,
-      [selectedObject.type === 'actor' ? 'actors' : 'triggers']: collection?.filter(entry => entry.id !== selectedObject.id),
-      _saved: false,
+    const removedName = object.name || selectedObject.id;
+    const nextScenes = scenes.map(item => {
+      const withoutObject = item.id !== scene.id ? item : {
+        ...item,
+        [selectedObject.type === 'actor' ? 'actors' : 'triggers']: collection?.filter(entry => entry.id !== selectedObject.id),
+      };
+      if (selectedObject.type !== 'actor') return item.id === scene.id ? { ...withoutObject, _saved: false } : item;
+      const cleaned = disableDeletedActorReferences(withoutObject, selectedObject.id, removedName);
+      return cleaned.changed || item.id === scene.id ? { ...cleaned.value, _saved: false } : item;
     });
+    setScenes(nextScenes);
+    const updatedScene = nextScenes.find(item => item.id === scene.id) ?? scene;
+    setElementSelected(updatedScene);
+    if (selectedObject.type === 'actor') {
+      let globalScriptsChanged = false;
+      const nextGlobalScripts = scripts.scripts.map(script => {
+        const cleaned = disableDeletedActorReferences(script, selectedObject.id, removedName);
+        if (!cleaned.changed) return script;
+        globalScriptsChanged = true;
+        return { ...cleaned.value, _saved: false };
+      });
+      if (globalScriptsChanged) setScripts({ ...scripts, scripts: nextGlobalScripts, _saved: false });
+    }
     setSettingUtils(previous => ({ ...previous, activeSceneObject: null, activeTriggerId: null, selectedSceneIds: [scene.id] }));
     isDeleting.current = false;
   };
@@ -826,12 +990,55 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     const idsToDelete = sceneIds?.length ? sceneIds : [elementDelete.id];
     const resourceType = elementDelete._resourceType;
     if (resourceType === 'script') {
-      setScripts(previous => ({ ...previous, scripts: previous.scripts.map(script => script.id === elementDelete.id ? { ...script, _saved: false, _deleted: true } : script), _saved: false }));
+      const deletedId = String(elementDelete.id);
+      setScenes(previous => previous.map(scene => {
+        const cleaned = clearDeletedEventReferences(scene, 'scriptId', deletedId, 'Script');
+        return cleaned.changed ? { ...cleaned.value, _saved: false } : scene;
+      }));
+      setScripts(previous => {
+        let changed = false;
+        const nextScripts = previous.scripts.map(script => {
+        const cleaned = clearDeletedEventReferences(script, 'scriptId', deletedId, 'Script');
+        const isDeleted = script.id === elementDelete.id;
+        changed ||= cleaned.changed || isDeleted;
+        return cleaned.changed || isDeleted ? { ...cleaned.value, ...(isDeleted ? { _deleted: true } : {}), _saved: false } : script;
+        });
+        return changed ? { ...previous, scripts: nextScripts, _saved: false } : previous;
+      });
     } else if (resourceType === 'variables') {
+      const deletedId = String(elementDelete.id);
+      setScenes(previous => previous.map(scene => {
+        const cleaned = clearDeletedEventReferences(scene, 'variableId', deletedId, 'Variable');
+        return cleaned.changed ? { ...cleaned.value, _saved: false } : scene;
+      }));
+      setScripts(previous => {
+        let changed = false;
+        const nextScripts = previous.scripts.map(script => {
+          const cleaned = clearDeletedEventReferences(script, 'variableId', deletedId, 'Variable');
+          changed ||= cleaned.changed;
+          return cleaned.changed ? { ...cleaned.value, _saved: false } : script;
+        });
+        return changed ? { ...previous, scripts: nextScripts, _saved: false } : previous;
+      });
       setVariables(previous => ({ ...previous, variables: previous.variables.map(variable => variable.id === elementDelete.id ? { ...variable, _saved: false, _deleted: true } : variable), _saved: false }));
     } else {
       idsToDelete.forEach(deleteCachedSceneCanvas);
-      setScenes(previous => previous.map(scene => idsToDelete.includes(scene.id) ? { ...scene, _saved: false, _deleted: true } : scene));
+      const deletedIds = new Set(idsToDelete);
+      setScenes(previous => previous.map(scene => {
+        const cleared = clearDeletedSceneReferences(scene, deletedIds);
+        if (idsToDelete.includes(scene.id)) return { ...cleared.value, _saved: false, _deleted: true };
+        return cleared.changed ? { ...cleared.value, _saved: false } : scene;
+      }));
+      setScripts(previous => {
+        let changed = false;
+        const nextScripts = previous.scripts.map(script => {
+          const cleared = clearDeletedSceneReferences(script, deletedIds);
+          if (!cleared.changed) return script;
+          changed = true;
+          return { ...cleared.value, _saved: false };
+        });
+        return changed ? { ...previous, scripts: nextScripts, _saved: false } : previous;
+      });
       if (idsToDelete.includes(settings.startSceneId)) {
         const nextStartSceneId = scenes.find(scene => !scene._deleted && !idsToDelete.includes(scene.id))?.id ?? '';
         setSettings(previous => ({ ...previous, startSceneId: nextStartSceneId, _saved: false }));
@@ -853,15 +1060,20 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   // Lógica selecionar Objeto
   const handleSelect = useCallback((scene: ISceneSettings, event?: React.MouseEvent) => {
     const current = settingUtils.selectedSceneIds ?? (elementSelected?.id ? [elementSelected.id] : []);
-    const shouldRecenter = !current.includes(scene.id);
+    // Canvas tools (Erase, Collision, painting, etc.) bubble their final click
+    // to the scene container. Keep the current viewport when that happens
+    // inside the scene already being edited, even if the multi-selection list
+    // has temporarily fallen out of sync with the selected scene.
+    const isEditingThisScene = settingUtils.tileEditSceneId === scene.id;
+    const shouldRecenter = !isEditingThisScene && !current.includes(scene.id);
     const ids = event?.shiftKey
       ? (current.includes(scene.id) ? current.filter(id => id !== scene.id) : [...current, scene.id])
       : [scene.id];
     const activeId = event?.shiftKey && current.includes(scene.id) ? ids.at(-1) : scene.id;
-    setSettingUtils(previous => ({ ...previous, selectedSceneIds: ids }));
     const activeScene = scenes.find(item => item.id === activeId);
+    setSettingUtils(previous => ({ ...previous, selectedSceneIds: ids, worldSceneSearch: sceneSearchAfterSelection(previous.worldSceneSearch, activeScene) }));
     setElementSelected(activeScene ? { ...activeScene, _recenter: shouldRecenter || undefined } : null);
-  }, [elementSelected?.id, scenes, setElementSelected, setSettingUtils, settingUtils.selectedSceneIds]);
+  }, [elementSelected?.id, scenes, setElementSelected, setSettingUtils, settingUtils.selectedSceneIds, settingUtils.tileEditSceneId]);
 
   const selectAllScenes = useCallback(() => {
     const activeScenes = scenes.filter(scene => !scene._deleted);
@@ -896,6 +1108,8 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
 
   // Movendo tela de trabalho
   const handleMoveBackStart = () => {
+    restoreInspectorHover();
+    inspectorHoverCleanup.current = suspendInspectorHover();
     sceneDragScaleRef.current = getWorldScale();
     setDraggingSceneOffset(null);
     setIsMovedBackground(true);
@@ -950,7 +1164,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   // Lógica arranste do elemento
   const handleDragEnd = (event: DragEndEvent) =>{
     const { active, delta } = event;
-    const draggedElement = scenes.find(el => el.id === active.id);
+    const draggedElement = scenesRef.current.find(el => el.id === active.id);
     if (draggedElement) {
       // Persist the exact same world-space delta that is used for the live
       // dnd transform. Raw pointer pixels are incorrect whenever the world
@@ -973,12 +1187,25 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
 
       // Ajusta a posição do elemento arrastado
       const ids = selectedSceneIds.includes(String(active.id)) ? selectedSceneIds : [String(active.id)];
+      const movedPositions = new Map(scenesRef.current.filter(scene => ids.includes(scene.id)).map(scene => [scene.id, {
+        x: scene.id === active.id ? clampedX : scene.x + movement.x,
+        y: scene.id === active.id ? clampedY : scene.y + movement.y,
+      }]));
       setScenes(prev => prev.map(el => {
         if (!ids.includes(el.id)) return el;
         const x = el.id === active.id ? clampedX : el.x + movement.x;
         const y = el.id === active.id ? clampedY : el.y + movement.y;
         return { ...el, x, y, editorPosition: { x, y }, _saved: false };
       }));
+      // The inspector edits the selection snapshot. Keep its world position
+      // in sync so a later field edit cannot write the pre-drag position back.
+      setElementSelected(current => {
+        if (!current || !ids.includes(current.id)) return current;
+        const position = movedPositions.get(current.id);
+        if (!position) return current;
+        const { x, y } = position;
+        return { ...current, x, y, editorPosition: { x, y }, _saved: false };
+      });
 
       const newWorld = calculateWorldSize([
         ...scenes.map(el => {
@@ -997,6 +1224,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
     }
     setDraggingSceneOffset(null);
     sceneDragScaleRef.current = null;
+    restoreInspectorHover();
   };
 
   const handleImageUpload = async (file: File) => {
@@ -1086,10 +1314,10 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
         _saved: false,
         _deleted: false,
         name: 'SCENE ' + index,
-        backgroundId: defaultBackground?.id,
         background: background, // caminho da imagem
         backgrounds: [{
-          layerId: 2,
+          // Start behind actors; layers 2 and 3 are foreground layers.
+          layerId: 0,
           backgroundId: defaultBackground?.id
         }],
         x: relativeX,
@@ -1098,6 +1326,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
         height: initialHeight,
         cameraPosition: { x: 0, y: 0 },
         sceneType: ETypeScene.TOPDOWN,
+        script: [createSceneFadeIn()],
       };
 
       setScenes((prev) => [...prev, newElement]);
@@ -1289,19 +1518,47 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   }, [worldScrollX, worldScrollY, zoomLevel]);
 
   useEffect(() => {
-    if (elementSelected && elementSelected._recenter) {
-      const el = document.getElementById(elementSelected.id);
-      if (el && wrapperRef.current) {
-        // centraliza o elemento na viewport
-        wrapperRef.current.zoomToElement(el, zoomLevel);
-        setTimeout(() => {
-          const transformState = wrapperRef.current?.instance.transformState;
-          if (!transformState) return;
-          handleChangeTransform({ x: transformState.positionX, y: transformState.positionY, zoom: transformState.scale });
-        }, 600); // tempo da animação
-      }
+    const recenterTarget = elementSelected?._recenterTarget;
+    // Scene edits commit through setElementSelected on pointer-up. Never let
+    // a pending scene-level selection request move the viewport while the
+    // selected scene is actively being edited.
+    if (!elementSelected || !elementSelected._recenter || recenterTarget
+      || settingUtils.tileEditSceneId === elementSelected.id) return;
+    if (!canvasPreferencesLoaded || !recenterPreferencesRef.current.enabled || !recenterPreferencesRef.current.scenes) return;
+    const el = document.getElementById(elementSelected.id);
+    if (el && wrapperRef.current) {
+      // centraliza o elemento na viewport
+      wrapperRef.current.zoomToElement(el, zoomLevel);
+      setTimeout(() => {
+        const transformState = wrapperRef.current?.instance.transformState;
+        if (!transformState) return;
+        handleChangeTransform({ x: transformState.positionX, y: transformState.positionY, zoom: transformState.scale });
+      }, 600); // tempo da animação
     }
-  }, [elementSelected?.id, elementSelected?._recenter]);
+  // Recenter only when the selected scene/target changes. Zoom changes update
+  // zoomLevel too, but should preserve the current viewport center instead of
+  // replaying the selection animation and jumping back to the scene.
+  }, [elementSelected?.id, elementSelected?._recenter, settingUtils.tileEditSceneId, canvasPreferencesLoaded]);
+
+  useEffect(() => {
+    const recenterTarget = elementSelected?._recenterTarget;
+    if (!elementSelected || !recenterTarget) return;
+    const preferences = recenterPreferencesRef.current;
+    if (!canvasPreferencesLoaded || !preferences.enabled
+      || (recenterTarget.type === 'actor' ? !preferences.actors : !preferences.triggers)) return;
+    const target = document.getElementById(`scene-edit-target-${elementSelected.id}-${recenterTarget.id}`);
+    if (!target || !wrapperRef.current) return;
+    const enteringObjectEdit = previousTileEditSceneIdRef.current !== elementSelected.id;
+    const animationDuration = enteringObjectEdit ? 900 : 600;
+    wrapperRef.current.zoomToElement(target, zoomLevel, animationDuration, 'easeOut');
+    window.setTimeout(() => {
+      const transform = wrapperRef.current?.instance.transformState;
+      if (transform) handleChangeTransform({ x: transform.positionX, y: transform.positionY, zoom: transform.scale });
+    }, animationDuration + 50);
+  }, [elementSelected?.id, elementSelected?._recenterTarget?.type, elementSelected?._recenterTarget?.id, settingUtils.tileEditSceneId, canvasPreferencesLoaded]);
+  useEffect(() => {
+    previousTileEditSceneIdRef.current = settingUtils.tileEditSceneId;
+  }, [settingUtils.tileEditSceneId]);
   // ZOOOM END ------------------------------------------
 
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(
@@ -1310,6 +1567,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
 
   // MOUSE ---------------------------------------------
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (worldPanningRef.current || (e.buttons & 4)) return;
     const worldPosition = getWorldPositionFromClient(e.clientX, e.clientY);
     setWorldCursorPosition({ x: Math.round(worldPosition.x), y: Math.round(worldPosition.y) });
     // console.log('..: handleMouseMove activeSubButton:', activeSubButton);
@@ -1513,6 +1771,73 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
   //   });
   // }
 
+  // Pan/zoom and cursor HUD updates must not rerender the scene canvases and event previews.
+  const sceneElements = useMemo(() => scenes.map(scene => (
+                  !scene._deleted ?
+                    <GameElement
+                      key={scene.id}
+                      sceneElement={scene}
+                      sceneObjectSnapSize={sceneObjectSnapSize}
+                      matchesSearch={matchesSceneSearch(scene, settingUtils.worldSceneSearch)}
+                      isClipboardSource={clipboardSceneId === scene.id}
+                    isSelected={selectedSceneIds.includes(scene.id)}
+                    isSecondarySelected={selectedSceneIds.includes(scene.id) && scene.id !== elementSelected?.id}
+                      changeScenePreviews={selectedScenePreviews
+                        .filter(preview => preview.targetSceneId === scene.id)
+                        .map(({ id, x, y, direction, xUnit, yUnit }) => ({ id, x, y, direction, xUnit, yUnit }))}
+                      changeScenePreviewLayer={changeScenePreviewLayer}
+                      changeScenePreviewOffset={draggingSceneOffset && movingSceneIds?.has(scene.id)
+                        ? { x: draggingSceneOffset.x, y: draggingSceneOffset.y }
+                        : undefined}
+                      sceneDragOffset={draggingSceneOffset && movingSceneIds?.has(scene.id)
+                        ? { x: draggingSceneOffset.x, y: draggingSceneOffset.y }
+                        : undefined}
+                      cameraPreviews={scene.id === selectedScene?.id ? selectedCameraPreviews : []}
+                      actorPositionPreview={scene.id === selectedScene?.id && scene.id === actorPositionPreview?.sceneId ? actorPositionPreview : null}
+                      onMoveChangeScenePreview={handleMoveChangeScenePreview}
+                      onSelect={(_, event) => {
+                        const isObjectPlacement = settingUtils.activeButton === 'add' && (settingUtils.activeSubButton === 'Actor' || settingUtils.activeSubButton === 'Trigger');
+                        // Placement tools always take ownership of the scene
+                        // clicked, even when another scene was being edited.
+                        if (!tileEditSceneId || tileEditSceneId === scene.id || isObjectPlacement || event?.shiftKey) handleSelect(scene, event);
+                        if (isObjectPlacement) {
+                          setSettingUtils(previous => ({ ...previous, tileEditSceneId: scene.id, tileEditLayerId: 4 }));
+                        }
+                      }}
+                      onEditTiles={(target) => {
+                        setElementSelected(target);
+                        setSettingUtils(previous => ({
+                          ...previous,
+                          worldSceneSearch: sceneSearchAfterSelection(previous.worldSceneSearch, target),
+                          tileEditSceneId: target.id,
+                          tileEditLayerId: 4,
+                          activeButton: 'select',
+                          activeSubButton: '',
+                        }));
+                      }}
+                      selectedObject={settingUtils.activeSceneObject?.sceneId === scene.id ? settingUtils.activeSceneObject : null}
+                      onSelectObject={(type, id) => {
+                        setElementSelected(scene);
+                        setSettingUtils(previous => ({ ...previous, worldSceneSearch: sceneSearchAfterSelection(previous.worldSceneSearch, scene), tileEditSceneId: scene.id, tileEditLayerId: 4, activeSceneObject: { sceneId: scene.id, type, id }, activeTriggerId: type === 'trigger' ? id : null }));
+                      }}
+                      onSceneMouseMove={(target, x, y) => {
+                        if (worldPanningRef.current) return;
+                        const current = sceneMousePositionRef.current;
+                        if (current?.sceneId === target.id && current.x === x && current.y === y) return;
+                        const position = { sceneId: target.id, scene: target.name, x, y };
+                        sceneMousePositionRef.current = position;
+                        setSceneMousePosition(position);
+                      }}
+                      onSceneMouseLeave={() => {
+                        sceneMousePositionRef.current = null;
+                        setSceneMousePosition(null);
+                      }}
+                      isDimmed={Boolean(tileEditSceneId && tileEditSceneId !== scene.id)}
+                      // onElementHovered={(isHovered: boolean) => handleElementHovered(isHovered)}
+                    />
+                  : null
+                )), [scenes, sceneObjectSnapSize, settingUtils.worldSceneSearch, clipboardSceneId, selectedSceneIds, elementSelected?.id, selectedScenePreviews, changeScenePreviewLayer, draggingSceneOffset, movingSceneIds, selectedScene?.id, selectedCameraPreviews, actorPositionPreview, handleMoveChangeScenePreview, settingUtils.activeButton, settingUtils.activeSubButton, tileEditSceneId, handleSelect, setSettingUtils, setElementSelected, settingUtils.activeSceneObject]);
+
   if (loading) {
     return (
       <Layout style={{
@@ -1526,11 +1851,13 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
 
   return (
     <DndContext
+      autoScroll={false}
       onDragStart={handleMoveBackStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => { setDraggingSceneOffset(null); sceneDragScaleRef.current = null; setIsMovedBackground(false); }}
+      onDragCancel={() => { setDraggingSceneOffset(null); sceneDragScaleRef.current = null; setIsMovedBackground(false); restoreInspectorHover(); }}
     >
+      <div ref={worldOverlayPosition.overlayRef} data-testid="game-world-overlays" style={{ visibility: worldOverlayPosition.measured ? 'visible' : 'hidden' }}>
       <div style={{ display: worldOverlayPosition.measured && worldOverlayPosition.width < 180 ? 'none' : undefined }}>
           <FloatButttons 
             actions={actions} 
@@ -1540,9 +1867,9 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
             floatingPosition={{ left: worldOverlayPosition.left, top: worldOverlayPosition.top }}
           />
       </div>
-        <FloatButton.Group shape="square" style={{ position: 'fixed', left: worldOverlayPosition.left, right: 'auto', bottom: worldOverlayPosition.bottom, zIndex: 100, pointerEvents: 'none', width: 'max-content', minWidth: 126, maxWidth: 'calc(100vw - 24px)', height: 'auto', minHeight: 16, maxHeight: 'none', padding: 0, overflow: 'visible', display: 'block' }}>
-          <Content data-testid="scene-tile-position" style={{ width: 'max-content', minWidth: '100%', height: 'auto', minHeight: 16, padding: '0 7px', boxSizing: 'border-box', display: 'flex', alignItems: 'center', borderRadius: token.borderRadius, background: token.colorBgElevated, color: token.colorTextSecondary, boxShadow: token.boxShadowSecondary, fontSize: 11, lineHeight: '16px', whiteSpace: 'nowrap' }}>
-            {`${sceneMousePosition ? `${sceneMousePosition.scene} · Tile X: ${Math.floor(sceneMousePosition.x / (userSettings.tileEditorGridSize ?? 8))}, Y: ${Math.floor(sceneMousePosition.y / (userSettings.tileEditorGridSize ?? 8))}` : worldCursorPosition ? `World X: ${worldCursorPosition.x}, Y: ${worldCursorPosition.y}` : 'Game World'} · ${Math.round(gridTransform.scale * 100)}% · Snap 16×16`}
+        <FloatButton.Group shape="square" style={{ position: 'fixed', left: `var(--gba-world-left, ${worldOverlayPosition.left}px)`, right: 'auto', bottom: `var(--gba-world-bottom, ${worldOverlayPosition.bottom}px)`, zIndex: 100, pointerEvents: 'none', width: 'max-content', minWidth: 0, maxWidth: 'var(--gba-hud-info-width, 0px)', height: 'auto', minHeight: 16, maxHeight: 'none', padding: 0, overflow: 'visible', display: 'var(--gba-hud-info-display, none)' }}>
+          <Content data-testid="scene-tile-position" style={{ width: '100%', minWidth: 0, maxWidth: 'var(--gba-hud-info-width, 0px)', overflow: 'hidden', textOverflow: 'ellipsis', height: 'auto', minHeight: 16, padding: '0 7px', boxSizing: 'border-box', display: 'block', borderRadius: token.borderRadius, background: token.colorBgElevated, color: token.colorTextSecondary, boxShadow: token.boxShadowSecondary, fontSize: 11, lineHeight: '16px', whiteSpace: 'nowrap' }}>
+            {`${sceneMousePosition ? `${sceneMousePosition.scene} · Tile X: ${Math.floor(sceneMousePosition.x / (userSettings.tileEditorGridSize ?? 8))}, Y: ${Math.floor(sceneMousePosition.y / (userSettings.tileEditorGridSize ?? 8))}` : worldCursorPosition ? `World X: ${worldCursorPosition.x}, Y: ${worldCursorPosition.y}` : 'Game World'} · ${Math.round(gridTransform.scale * 100)}% · ${sceneMousePosition ? `Snap ${sceneObjectSnapSize}×${sceneObjectSnapSize}` : sceneMovementMode === 'grid' ? 'Snap 16×16' : 'Snap Free'}`}
           </Content>
         </FloatButton.Group>
       <div
@@ -1551,11 +1878,12 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
         aria-label={t('world.minimap')}
         style={{
           position: 'fixed',
-          right: worldOverlayPosition.right,
-          bottom: worldOverlayPosition.bottom + (worldOverlayPosition.width < 390 ? (selectedScene ? 128 : 62) : 62),
+          right: `var(--gba-world-right, ${worldOverlayPosition.right}px)`,
+          bottom: `calc(var(--gba-world-bottom, ${worldOverlayPosition.bottom}px) + var(--gba-hud-minimap-bottom, 0px))`,
           zIndex: 101,
-          width: 192,
-          maxWidth: 'calc(100vw - 24px)',
+          display: 'var(--gba-hud-minimap-display, none)',
+          width: 'var(--gba-hud-minimap-width, 192px)',
+          boxSizing: 'border-box',
           padding: 8,
           borderRadius: token.borderRadius,
           background: token.colorBgElevated,
@@ -1601,7 +1929,8 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
           style={{
             display: 'block',
             width: '100%',
-            height: 94,
+            height: 'var(--gba-hud-minimap-height, 94px)',
+            boxSizing: 'border-box',
             borderRadius: Math.max(0, token.borderRadius - 2),
             background: token.colorBgContainer,
             border: `1px solid ${token.colorBorderSecondary}`,
@@ -1612,11 +1941,14 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
           {scenes.filter(scene => !scene._deleted).map(scene => {
             const isPrimarySelected = scene.id === elementSelected?.id;
             const isSecondarySelected = !isPrimarySelected && selectedSceneIds.includes(scene.id);
+            const matchesSearch = matchesSceneSearch(scene, settingUtils.worldSceneSearch);
             const previewOffset = draggingSceneOffset && movingSceneIds?.has(scene.id) ? draggingSceneOffset : null;
             return <rect
               key={scene.id}
               data-testid={`game-world-minimap-scene-${scene.id}`}
               data-selection={isPrimarySelected ? 'primary' : isSecondarySelected ? 'secondary' : 'none'}
+              data-search-match={matchesSearch ? 'true' : 'false'}
+              style={{ opacity: matchesSearch ? 1 : .72, filter: matchesSearch ? undefined : 'brightness(.82)' }}
               x={scene.x + (previewOffset?.x ?? 0)}
               y={scene.y + (previewOffset?.y ?? 0)}
               width={Math.max(1, scene.width)}
@@ -1643,31 +1975,30 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
       </div>
       <div data-testid="resource-usage-bars" style={{
         position: 'fixed',
-        right: worldOverlayPosition.right,
-        bottom: worldOverlayPosition.bottom,
+        right: `var(--gba-world-right, ${worldOverlayPosition.right}px)`,
+        bottom: `var(--gba-world-bottom, ${worldOverlayPosition.bottom}px)`,
         zIndex: 100,
-        // Keep the global ROM indicator available during the first layout
-        // frame; only hide it when a measured viewport is genuinely too small.
-        display: worldOverlayPosition.measured && worldOverlayPosition.width < 220 ? 'none' : 'flex',
+        display: 'var(--gba-hud-usage-display, none)',
         flexDirection: worldOverlayPosition.width < 390 ? 'column-reverse' : 'row',
         alignItems: 'flex-end',
         gap: 10,
         pointerEvents: 'none',
       }}>
         <Tooltip title={`ROM estimada: ${formatBytes(romUsage.total)} de 32 MB (${romUsage.source === 'build' ? 'recursos do build' : 'estimativa pelos assets'}). Engine: ${formatBytes(romUsage.engine)}, gráficos: ${formatBytes(romUsage.graphics)}, áudio: ${formatBytes(romUsage.audio)}, scripts: ${formatBytes(romUsage.scripts)}.${romUsage.binary ? ` ROM confirmada no último Build: ${formatBytes(romUsage.binary)}.` : ' Execute Build para confirmar com o .gba.'}`}>
-          <div style={{ order: 2, width: Math.max(110, Math.min(168, worldOverlayPosition.width - 92)), padding: '4px 8px', borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadowSecondary }}>
+          <div style={{ order: 2, width: Math.max(110, Math.min(168, worldOverlayPosition.width - 92)), boxSizing: 'border-box', padding: '4px 8px', borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadowSecondary }}>
             <div style={{ fontSize: 11, color: token.colorTextSecondary, marginBottom: 2 }}>ROM estimada</div>
             <Progress percent={Math.min(100, Number((romUsage.total / ROM_LIMIT_BYTES * 100).toFixed(1)))} size="small" status={romUsage.total > ROM_LIMIT_BYTES ? 'exception' : 'normal'} format={percent => `${percent}%`} />
           </div>
         </Tooltip>
         {selectedScene && <Tooltip title={`Estimativa de VRAM da cena, incluindo fundos, mapas, player e sprites dos actors: ${formatBytes(selectedSceneVram)} de 96 KB.`}>
-          <div data-testid="scene-vram-usage" style={{ order: 1, width: Math.max(110, Math.min(168, worldOverlayPosition.width - 92)), padding: '4px 8px', borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadowSecondary }}>
+          <div data-testid="scene-vram-usage" style={{ order: 1, width: Math.max(110, Math.min(168, worldOverlayPosition.width - 92)), boxSizing: 'border-box', padding: '4px 8px', borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadowSecondary }}>
             <div style={{ fontSize: 11, color: token.colorTextSecondary, marginBottom: 2 }}>VRAM cena</div>
             <Progress percent={Math.min(100, Number((selectedSceneVram / VRAM_LIMIT_BYTES * 100).toFixed(1)))} size="small" status={selectedSceneVram > VRAM_LIMIT_BYTES ? 'exception' : 'normal'} format={percent => `${percent}%`} />
           </div>
         </Tooltip>}
       </div>
 
+      </div>
       <div data-testid="game-world-viewport" data-world-x={gridTransform.x} data-world-y={gridTransform.y} data-world-scale={gridTransform.scale} data-scene-movement-mode={sceneMovementMode} data-pan-inertia={panInertia} ref={worldViewportRef} onWheelCapture={handleWorldWheelCapture} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} onClick={handleMouseClick} onDragOver={event => event.preventDefault()} onDrop={handleDropOrCreate} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
       {(() => {
         const scale = gridTransform.scale;
@@ -1713,7 +2044,15 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
           allowMiddleClickPan: true,
           allowRightClickPan: false,
         }}
-        onPanningStop={e => handleChangeTransform({ x: e.state.positionX, y: e.state.positionY, zoom: e.state.scale })}
+        onPanningStart={() => {
+          worldPanningRef.current = true;
+          window.dispatchEvent(new CustomEvent('gba-studio:world-pan', { detail: { paused: true } }));
+        }}
+        onPanningStop={e => {
+          worldPanningRef.current = false;
+          window.dispatchEvent(new CustomEvent('gba-studio:world-pan', { detail: { paused: false } }));
+          handleChangeTransform({ x: e.state.positionX, y: e.state.positionY, zoom: e.state.scale });
+        }}
         pinch={{ disabled: true }}
       >
         <TransformComponent wrapperStyle={{ width: "100%", height: "100%", overflow: "hidden" }} 
@@ -1779,58 +2118,7 @@ const GameWorld: React.FC<IGameWorld> = ({ resetPanelSize, setShowFloatButton, s
                   </svg>
                 )}
                 <div ref={setChangeScenePreviewLayer} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 11 }} />
-                {scenesRef.current.map(scene => (
-                  !scene._deleted ? 
-                    <GameElement
-                      key={scene.id}
-                      sceneElement={scene}
-                      isClipboardSource={clipboardSceneId === scene.id}
-                    isSelected={selectedSceneIds.includes(scene.id)}
-                    isSecondarySelected={selectedSceneIds.includes(scene.id) && scene.id !== elementSelected?.id}
-                      changeScenePreviews={selectedScenePreviews
-                        .filter(preview => preview.targetSceneId === scene.id)
-                        .map(({ id, x, y, direction }) => ({ id, x, y, direction }))}
-                      changeScenePreviewLayer={changeScenePreviewLayer}
-                      changeScenePreviewOffset={draggingSceneOffset && movingSceneIds?.has(scene.id)
-                        ? { x: draggingSceneOffset.x, y: draggingSceneOffset.y }
-                        : undefined}
-                      sceneDragOffset={draggingSceneOffset && movingSceneIds?.has(scene.id)
-                        ? { x: draggingSceneOffset.x, y: draggingSceneOffset.y }
-                        : undefined}
-                      cameraPreviews={scene.id === selectedScene?.id ? selectedCameraPreviews : []}
-                      actorPositionPreview={scene.id === selectedScene?.id && scene.id === actorPositionPreview?.sceneId ? actorPositionPreview : null}
-                      onMoveChangeScenePreview={handleMoveChangeScenePreview}
-                      onSelect={(_, event) => {
-                        const isObjectPlacement = settingUtils.activeButton === 'add' && (settingUtils.activeSubButton === 'Actor' || settingUtils.activeSubButton === 'Trigger');
-                        // Placement tools always take ownership of the scene
-                        // clicked, even when another scene was being edited.
-                        if (!tileEditSceneId || tileEditSceneId === scene.id || isObjectPlacement || event?.shiftKey) handleSelect(scene, event);
-                        if (isObjectPlacement) {
-                          setSettingUtils(previous => ({ ...previous, tileEditSceneId: scene.id, tileEditLayerId: 4 }));
-                        }
-                      }}
-                      onEditTiles={(target) => {
-                        setElementSelected(target);
-                        setSettingUtils(previous => ({
-                          ...previous,
-                          tileEditSceneId: target.id,
-                          tileEditLayerId: 4,
-                          activeButton: 'select',
-                          activeSubButton: '',
-                        }));
-                      }}
-                      selectedObject={settingUtils.activeSceneObject?.sceneId === scene.id ? settingUtils.activeSceneObject : null}
-                      onSelectObject={(type, id) => {
-                        setElementSelected(scene);
-                        setSettingUtils(previous => ({ ...previous, tileEditSceneId: scene.id, tileEditLayerId: 4, activeSceneObject: { sceneId: scene.id, type, id }, activeTriggerId: type === 'trigger' ? id : null }));
-                      }}
-                      onSceneMouseMove={(target, x, y) => setSceneMousePosition({ scene: target.name, x, y })}
-                      onSceneMouseLeave={() => setSceneMousePosition(null)}
-                      isDimmed={Boolean(tileEditSceneId && tileEditSceneId !== scene.id)}
-                      // onElementHovered={(isHovered: boolean) => handleElementHovered(isHovered)}
-                    /> 
-                  : null
-                ))}
+                {sceneElements}
               </Content>
             </Content>
             

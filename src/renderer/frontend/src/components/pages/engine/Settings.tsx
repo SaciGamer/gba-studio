@@ -1,15 +1,18 @@
+import { getSettingsSectionAttention } from '@/utils/editorAttention';
+import { loadPaletteLibrary } from '../../resourceEditors/paletteLibrary';
+import { WarningField } from '../../WarningIndicator';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Dropdown, Layout, Menu, Switch, Radio, Select, Typography, Button, Space, Input, message, Divider, Row, Col, Slider, Tooltip, Flex } from 'antd';
 import { LoadingOutlined, PictureOutlined } from '@ant-design/icons';
 import useAppContexts from '@/providers/contexts/AppContexts';
 import { AntdToken } from '../../common/AntDToken';
-import { loadPaletteLibrary } from '../../resourceEditors/paletteLibrary';
 import { getPaletteIndexZeroColor, loadPaletteTransparentImage } from '@/utils/paletteTransparency';
 import { fontCharacterWidth, fontGlyphIndex, PREVIEW_FONTS, type PreviewFontId } from '@/utils/fontMetrics';
 import { InputMapEditor } from '../../RightPanelGWSettings';
 import cartridgeShell from '@/img/CartuchoGBASemFundo.png';
 import { useI18n } from '@/i18n/I18n';
 import DemoControlsEditor from './DemoControlsEditor';
+import InputGroupsTable from './InputGroupsTable';
 import TilesetAutoTileView from '../../TilesetAutoTileView';
 import { loadAutoTileAssets } from '@/utils/autoTileAssets';
 
@@ -33,6 +36,37 @@ const demoFilterOptions = [
   { value: "bicubic", label: "Bicubic scaling for general smoothing" },
   { value: "mix-frames", label: "Frame blending for smoother motion" }
 ];
+
+const demoFilterPreviewStyles: Record<string, { filter?: string; overlay?: string; ghost?: boolean }> = {
+  "2xScaleHQ.glslp": { filter: 'contrast(1.12) saturate(1.12)' },
+  "4xScaleHQ.glslp": { filter: 'contrast(1.08) saturate(1.08) blur(.2px)' },
+  "crt-aperture.glslp": { filter: 'contrast(1.2) saturate(1.2)', overlay: 'repeating-linear-gradient(90deg, #0005 0 1px, transparent 1px 3px), repeating-linear-gradient(0deg, #0005 0 1px, transparent 1px 3px)' },
+  "crt-beam": { filter: 'contrast(1.35) brightness(.88) saturate(1.15)', overlay: 'repeating-linear-gradient(0deg, #06102099 0 1px, transparent 1px 3px)' },
+  "crt-caligari": { filter: 'contrast(1.65) saturate(1.4) brightness(.9)', overlay: 'radial-gradient(ellipse, transparent 45%, #050714bb 100%), repeating-linear-gradient(0deg, #0005 0 1px, transparent 1px 3px)' },
+  "crt-easymode.glslp": { filter: 'contrast(1.15) saturate(1.15)', overlay: 'repeating-linear-gradient(0deg, #0003 0 1px, transparent 1px 3px)' },
+  "crt-geom.glslp": { filter: 'contrast(1.25) saturate(1.15)', overlay: 'radial-gradient(ellipse, transparent 58%, #050714cc 100%), repeating-linear-gradient(0deg, #0004 0 1px, transparent 1px 3px)' },
+  "crt-lottes": { filter: 'contrast(1.35) saturate(1.25)', overlay: 'repeating-linear-gradient(0deg, #0007 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, #00102266 0 1px, transparent 1px 4px)' },
+  "crt-mattias.glslp": { filter: 'contrast(1.12) saturate(1.1) blur(.25px)', overlay: 'repeating-linear-gradient(0deg, #0004 0 1px, transparent 1px 4px)' },
+  "crt-yeetron": { filter: 'contrast(1.35) saturate(1.8) hue-rotate(-8deg)', overlay: 'repeating-linear-gradient(0deg, #0005 0 1px, transparent 1px 3px)' },
+  "crt-zfast": { filter: 'contrast(1.2) saturate(1.15)', overlay: 'repeating-linear-gradient(0deg, #0005 0 1px, transparent 1px 4px)' },
+  sabr: { filter: 'contrast(1.2) saturate(1.1)' },
+  bicubic: { filter: 'blur(.35px) saturate(1.05)' },
+  "mix-frames": { ghost: true },
+};
+
+const renderDemoFilterPreview = (value: string) => {
+  const style = demoFilterPreviewStyles[value] ?? {};
+  return <span aria-hidden="true" style={{ position: 'relative', display: 'inline-flex', flex: '0 0 72px', width: 72, height: 40, overflow: 'hidden', borderRadius: 4, border: '1px solid #ffffff35', background: '#18233a' }}>
+    {style.ghost && <span style={{ position: 'absolute', inset: 0, transform: 'translateX(-3px)', opacity: .38, background: 'linear-gradient(90deg, transparent 35%, #ff6480 35% 61%, transparent 61%)' }} />}
+    <span style={{ position: 'absolute', inset: 0, filter: style.filter, background: 'linear-gradient(#4bb8e8 0 58%, #466eb3 58% 100%)' }}>
+      <span style={{ position: 'absolute', width: 13, height: 13, borderRadius: '50%', left: 9, top: 6, background: '#ffe57a' }} />
+      <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 17, background: 'linear-gradient(135deg, transparent 0 18%, #52a76a 18% 51%, transparent 51%), linear-gradient(45deg, #347b58 0 43%, transparent 43%)' }} />
+      <span style={{ position: 'absolute', left: 43, bottom: 7, width: 15, height: 18, background: '#bd5b67', boxShadow: 'inset 3px 0 #e9a56a, inset -3px 0 #813e63' }} />
+      <span style={{ position: 'absolute', left: 47, bottom: 11, width: 3, height: 3, background: '#f5e6a4', boxShadow: '6px 0 #f5e6a4' }} />
+    </span>
+    {style.overlay && <span style={{ position: 'absolute', inset: 0, background: style.overlay }} />}
+  </span>;
+};
 
 const contentStyle: React.CSSProperties = {
   height: 'calc(100vh - 42px)',
@@ -171,6 +205,7 @@ const Settings: React.FC = () => {
     });
     return () => { mounted = false; };
   }, [commonFontImages, fontImages, fontImagesPath]);
+  const sectionAttention = getSettingsSectionAttention(settings, palettes.palettes.length ? palettes.palettes : loadPaletteLibrary());
   const menuItems = [
     { key: 'project-options', label: t('settings.projectOptions') },
     { key: 'auto-tiles', label: t('tiles.viewAutoTiles') },
@@ -179,7 +214,7 @@ const Settings: React.FC = () => {
     { key: 'controls', label: 'Controls' },
     { key: 'ui-elements', label: 'UI Elements' },
     { key: 'demo', label: t('settings.demoConfiguration') },
-  ];
+  ].map(item => ({ ...item, label: <WarningField overlay warning={Boolean(sectionAttention[item.key])} message={t('events.hierarchyWarning')} style={{ paddingRight: 12 }}>{item.label}</WarningField> }));
 
   const matchesContent = (label: string, description: string) => {
     const normalized = contentFilter.trim().toLowerCase();
@@ -342,7 +377,7 @@ const Settings: React.FC = () => {
       onMouseEnter={() => setCartridgeHover(true)}
       onMouseLeave={() => setCartridgeHover(false)}
       onClick={cartridgeAssets.length === 0 ? () => { void pickCartridgeImage(); } : undefined}
-      style={{ position: 'absolute', left: '14.41%', top: '23.91%', width: '72.03%', height: '63.04%', padding: 0, minWidth: 0, border: 0, borderRadius: 5, overflow: 'hidden', background: 'transparent', boxShadow: 'none' }}
+      style={{ position: 'absolute', left: '14.41%', top: '23.91%', width: '72.03%', height: '63.04%', padding: 0, minWidth: 0, border: 0, borderRadius: 0, overflow: 'hidden', background: 'transparent', boxShadow: 'none' }}
     >
       {cartridgePreviewContent}
     </Button>
@@ -421,10 +456,10 @@ const Settings: React.FC = () => {
                   <Space direction="vertical" size={8}>
                     <Typography.Text>{t('settings.cartridgeCover')}</Typography.Text>
                     <div style={{ position: 'relative', width: 'min(100%, 236px)', aspectRatio: '236 / 138', lineHeight: 0 }}>
-                      <img src={cartridgeShell} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
                       {cartridgeAssets.length > 0
                         ? <Dropdown trigger={['click']} menu={{ items: cartridgeMenuItems, onClick: handleCartridgeMenuClick }}>{cartridgePickerButton}</Dropdown>
                         : cartridgePickerButton}
+                      <img src={cartridgeShell} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
                     </div>
                     <Typography.Text type="secondary" style={{ maxWidth: 300 }}>{t('settings.cartridgeCoverHint')}</Typography.Text>
                   </Space>
@@ -480,7 +515,8 @@ const Settings: React.FC = () => {
               {Array.from({ length: 16 }, (_, index) => {
                 const paletteIds = Array.isArray((settings as any)?.colorPaletteIds) ? (settings as any).colorPaletteIds : Array(16).fill(undefined);
                 const availablePalettes = palettes?.palettes?.length ? palettes.palettes : loadPaletteLibrary();
-                return <Col key={index} span={6}><Space direction="vertical" size={2} style={{ width: '100%' }}><Typography.Text type="secondary">Slot {index}</Typography.Text><Tooltip title="Assign a project palette to this hardware palette slot."><Select allowClear placeholder="Select palette" value={paletteIds[index]} onChange={value => { const next = [...paletteIds]; next[index] = value; markUnsaved({ colorPaletteIds: next }); }} style={{ width: '100%' }} popupMatchSelectWidth={320} options={availablePalettes.map((palette: any) => ({ value: palette.id, label: <Space size={4}><span style={{ display: 'inline-flex', gap: 1 }}>{palette.colors.slice(0, 8).map((color: string, position: number) => <span key={position} style={{ width: 7, height: 14, background: color, border: '1px solid rgba(127,127,127,.35)' }} />)}</span>{palette.name}</Space> }))} /></Tooltip></Space></Col>;
+                const missingPalette = Boolean(paletteIds[index] && !availablePalettes.some(palette => palette.id === paletteIds[index]));
+                return <Col key={index} span={6}><Space direction="vertical" size={2} style={{ width: '100%' }}><Typography.Text type="secondary">Slot {index}</Typography.Text><WarningField warning={missingPalette} message={t('settings.missingPalette', { id: paletteIds[index] })}><Tooltip title="Assign a project palette to this hardware palette slot."><Select status={missingPalette ? 'warning' : undefined} allowClear placeholder="Select palette" value={paletteIds[index]} onChange={value => { const next = [...paletteIds]; next[index] = value; markUnsaved({ colorPaletteIds: next }); }} style={{ width: '100%' }} popupMatchSelectWidth={320} options={availablePalettes.map((palette: any) => ({ value: palette.id, label: <Space size={4}><span style={{ display: 'inline-flex', gap: 1 }}>{palette.colors.slice(0, 8).map((color: string, position: number) => <span key={position} style={{ width: 7, height: 14, background: color, border: '1px solid rgba(127,127,127,.35)' }} />)}</span>{palette.name}</Space> }))} /></Tooltip></WarningField></Space></Col>;
               })}
             </Row>
           </Content>}
@@ -488,7 +524,14 @@ const Settings: React.FC = () => {
             <Content ref={controlsRef} style={{ padding: 16, borderRadius: token.borderRadius, background: token.colorBgElevated, boxShadow: token.boxShadow, marginBottom: 16 }}>
               <Title level={4}>Controls</Title>
               <Paragraph>Setting of the values buttons to map controller of game.</Paragraph>
-              <InputMapEditor settings={settings} setSettings={setSettings} />
+              <Flex gap={32} align="start" wrap>
+                <div style={{ flex: '0 1 360px', minWidth: 280, maxWidth: '100%' }}>
+                  <InputMapEditor settings={settings} setSettings={setSettings} />
+                </div>
+                <div style={{ flex: '1 1 440px', minWidth: 0 }}>
+                  <InputGroupsTable value={settings.inputGroups} onChange={inputGroups => markUnsaved({ inputGroups })} />
+                </div>
+              </Flex>
             </Content>
           )}
           {matchesContent('UI Elements Fonts UI', 'Select the cursor and dialogue frame images from the ui folder. Customize the mapped fonts used by the project.') && (
@@ -530,13 +573,27 @@ const Settings: React.FC = () => {
                   <Tooltip title="Choose the display filter used by the demo emulator.">
                     <Select
                       style={{ width: 300 }}
+                      popupMatchSelectWidth={420}
                       value={(settings && settings.demoFilter) || demoFilterOptions[0].value}
                       onChange={(v) => markUnsaved({ demoFilter: v })}
                       options={demoFilterOptions.map(option => ({ value: option.value, label: option.label }))}
+                      optionRender={option => {
+                        const value = String(option.value ?? '');
+                        const filter = demoFilterOptions.find(item => item.value === value);
+                        return <span style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44 }}>
+                          {renderDemoFilterPreview(value)}
+                          <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                            <Typography.Text>{value || 'Disabled'}</Typography.Text>
+                            <Typography.Text type="secondary" style={{ fontSize: 11, lineHeight: 1.2 }}>{filter?.label}</Typography.Text>
+                          </span>
+                        </span>;
+                      }}
                     />
                   </Tooltip>
                   <Typography.Text>Show FPS:</Typography.Text>
                   <Tooltip title="Show the current frame rate in the emulator."><Switch checked={(settings && settings.demoShowFPS) || false} onChange={(v) => markUnsaved({ demoShowFPS: v })} /></Tooltip>
+                  <Typography.Text>{t('settings.demoMonitorCPU')}:</Typography.Text>
+                  <Tooltip title={t('settings.demoMonitorCPUHint')}><Switch checked={settings?.demoShowCPU === true} onChange={value => markUnsaved({ demoShowCPU: value })} /></Tooltip>
                   <Typography.Text>Show Menu:</Typography.Text>
                   <Tooltip title="Show EmulatorJS controls in the demo."><Switch checked={(settings && settings.demoShowMenu) || false} onChange={(v) => markUnsaved({ demoShowMenu: v })} /></Tooltip>
                   {/* <Content style={{ paddingLeft: 10 }}>Show Right Click to License: </Content>

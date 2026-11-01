@@ -18,10 +18,14 @@ struct NumericRuntimeHooks {
     int (*variable)(const char*) = nullptr;
     int (*property)(const char*, int) = nullptr;
     int (*engine)(int) = nullptr;
+    bool (*write_property)(const char*, int, int) = nullptr;
+    bool (*write_engine)(int, int) = nullptr;
 };
 inline NumericRuntimeHooks numeric_runtime_hooks;
 inline uint32_t numeric_random_state = 0x9e3779b9;
 inline uint32_t numeric_frame_count = 0;
+// Reusable scripts resolve Self against the actor currently executing them.
+inline const char* numeric_self_actor_id = nullptr;
 
 inline int numeric_saturate(int64_t value) { return value < INT_MIN ? INT_MIN : value > INT_MAX ? INT_MAX : int(value); }
 inline int numeric_sqrt(int value) {

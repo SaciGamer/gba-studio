@@ -16,11 +16,13 @@ export interface IMainSettings extends IBaseSettings {
     startMoveSpeed: number;
     startAnimSpeed: number;
     startDirection: 'up' | 'down' | 'left' | 'right';
-    colorMode: string;
     fadeDirection: 0 | 1;
     inputMap?: Record<string, string[]>;
+    inputMapsBySceneType?: import('../../shared/inputMap').SceneInputMaps;
+    inputGroups?: import('../../shared/inputGroups').InputGroups;
     demoAudioVolume?: number;
     demoAudioMuted?: boolean;
+    demoShowCPU?: boolean;
     demoJoystick?: { id: string; index: number };
     playerSpriteId?: string | null;
     uiCursorImage?: string | null;

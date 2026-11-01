@@ -1,0 +1,1 @@
+{"schema":"gba-studio/sfx","version":1,"name":"title_transition","parameters":{"waveform":"sawtooth","frequency":40,"durationMs":870,"fadeInMs":144,"fadeOutMs":276,"volume":50,"sampleRate":22050,"seed":4866625},"wavSha256":"0b0dcd443b7ba6857dff9f972e69502d834c5a56ca9a179be2c4da5e41de7d9a","exportedWav":"title_transition.wav"}

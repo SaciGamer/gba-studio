@@ -12,6 +12,7 @@ class ScriptTriggerManager {
         int cooldown = 0;
         const ScriptCommandData* running_program = nullptr;
         int running_count = 0;
+        const char* owner_id = nullptr;
     };
     void advance(State& state);
     bn::string<64> scene_id;

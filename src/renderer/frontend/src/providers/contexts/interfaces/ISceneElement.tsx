@@ -1,4 +1,5 @@
 import type { NumericValue } from '../../../../../../shared/numericValues';
+import type { ScriptArgument } from '../../../../../../shared/scriptParameters';
 import { IChangeScene } from "@/components/events/interfaces/IScene";
 import { IFade, IFadeOptions } from "@/components/events/interfaces/IFade";
 import { IWait } from "@/components/events/interfaces/IWaiting";
@@ -10,6 +11,7 @@ export enum ETypeScene {
     TOPDOWN = 'Top Down',
     PLATFORM = 'Platformer',
     ADVENTURE = 'Adventure',
+    // TODO(restore-shooter-game): keep these legacy values so existing Shooter projects still deserialize; re-expose them in RightPanel sceneTypes when restoring the feature.
     SHMUP = 'Shoot Em\'Up',
     SHOOTER = 'Shoot Em\'Up',
     POINTNCLICK = 'Point Click',
@@ -60,6 +62,11 @@ export interface IArgs {
     __y?: number;
     animationSpeed?: number;
     showCamera?: boolean;
+}
+
+export interface ICallScriptArgs extends IArgs {
+    scriptId: string;
+    arguments?: ScriptArgument[];
 }
 
 export type IConditionValue =
@@ -138,6 +145,9 @@ interface IPosAndWidth {
 
 export interface ISceneTrigger extends IPosAndWidth {
     id: string;
+    prefabId?: string;
+    prefabEventsDetached?: boolean;
+    prefabEditable?: boolean;
     activation: 'enter' | 'exit' | 'stay' | 'interact' | 'touch' | 'input' | 'timer';
     enabled: boolean;
     once: boolean;
@@ -165,6 +175,14 @@ export interface IScriptGraph {
 }
 
 export interface ISceneActor extends IPosAndWidth {
+    showCollider?: boolean;
+    keepRunningWhileOffscreen?: boolean;
+    onInitScript?: IScriptsElement[];
+    onInteractScript?: IScriptsElement[];
+    onUpdateScript?: IScriptsElement[];
+    prefabId?: string;
+    prefabEventsDetached?: boolean;
+    prefabEditable?: boolean;
     actorId?: string;
     direction?: string;
     moveSpeed?: number;
@@ -186,7 +204,6 @@ interface ICameraSettings {
 }
 export interface ISceneSettings extends IResourceSettings, ICameraSettings {
     _index: number;
-    backgroundId?: string;  // REMOVER
     background?: string;    // Made optional
     backgrounds?: IBackgroundElement[];
     x: number;
@@ -227,9 +244,16 @@ export interface ISceneSettings extends IResourceSettings, ICameraSettings {
 /** Declarative regular_bg tile animation shared by editor, preview and build. */
 export interface ITileAnimation {
     id?: string;
+    name?: string;
     layerId: number;
     targetTileIndex: number;
+    targetTilesetId?: string;
     frameTileIndices: number[];
+    frameTilesetIds?: string[];
+    /** Source tileset ID for each frame tile; omitted legacy entries use the layer's selected tileset. */
+    frameTilesetIds?: string[];
+    /** Editor-only state: whether this animation card is collapsed. */
+    collapsed?: boolean;
     durationFrames: number;
     loop: boolean;
     initialFrame: number;

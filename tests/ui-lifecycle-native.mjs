@@ -10,7 +10,7 @@ const types = fs.readFileSync(path.join(template, 'include/resource_types.h'), '
 const state = header.match(/struct UiElementState \{[\s\S]*?\n    \};/)[0];
 const structs = ['UiSetTextEventData', 'UiAnimateEventData', 'UiTargetEventData', 'UiAnimationStopEventData'].map(name => types.match(new RegExp(`struct ${name} \\{[\\s\\S]*?\\n\\};`))[0]).join('\n');
 function method(name) {
-  const start = source.indexOf(`bool DialogueManager::${name}(`);
+  const start = Math.max(source.indexOf(`bool DialogueManager::${name}(`), source.indexOf(`void DialogueManager::${name}(`));
   assert.ok(start >= 0);
   const end = source.indexOf('\n}\n', start) + 2;
   return source.slice(start, end);
@@ -28,6 +28,7 @@ const cpp = `
 #include <string>
 #include <vector>
 #include <iostream>
+#define GBA_STUDIO_FEATURE_UI_ANIMATION 1
 #define BN_LOG(...) do {} while(false)
 namespace bn {
   template<int N> using string = std::string;
@@ -52,9 +53,10 @@ public:
   bool stop_ui_animation(const UiAnimationStopEventData& data);
   bool set_ui_hidden(const UiTargetEventData& data, bool hidden);
   bool destroy_ui(const UiTargetEventData& data);
+  void release_ui_sprites(UiElementState& state);
   void advance() { [[maybe_unused]] bool has_ui = false, trace_ui_render = false; ${animations} }
 };
-${['set_ui_text', 'animate_ui', 'stop_ui_animation', 'set_ui_hidden', 'destroy_ui'].map(method).join('\n')}
+${['set_ui_text', 'animate_ui', 'stop_ui_animation', 'set_ui_hidden', 'release_ui_sprites', 'destroy_ui'].map(method).join('\n')}
 int main() {
   DialogueManager manager;
   assert(manager.set_ui_text({ "first", "A", 0, 0, "fixed8x16" }));
@@ -73,16 +75,17 @@ int main() {
   std::weak_ptr<bn::sprite_ptr::state> destroyed = manager.ui_rendered_sprites[2].value;
   std::weak_ptr<bn::sprite_ptr::state> last = manager.ui_rendered_sprites[4].value;
   assert(manager.set_ui_hidden({ "middle" }, true));
-  assert(!manager.ui_rendered_sprites[2].value->visible && !destroyed.expired());
+  assert(destroyed.expired() && manager.ui_rendered_sprites.size() == 4);
+  assert(!middle.rendered && middle.sprite_count == 0 && manager.ui_elements[2].sprite_start == 2);
   assert(middle.move_active && middle.blink_active && middle.storage == "Owned text");
   manager.advance();
   assert(middle.text.x == 11 && middle.move_elapsed == 1 && middle.blink_elapsed == 1);
-  assert(!manager.ui_rendered_sprites[2].value->visible);
+  assert(middle.sprite_count == 0 && middle.dirty);
   assert(manager.set_ui_hidden({ "middle" }, false));
-  assert(manager.ui_rendered_sprites[2].value->visible);
+  assert(!middle.hidden && !middle.rendered); // Recreated by the next render.
   middle.blink_visible = false;
   assert(manager.set_ui_hidden({ "middle" }, false));
-  assert(!manager.ui_rendered_sprites[2].value->visible); // Respect blink phase.
+  assert(middle.sprite_count == 0 && middle.dirty); // Respect blink phase.
   assert(manager.destroy_ui({ "middle" }));
   assert(destroyed.expired() && !first.expired() && !last.expired());
   assert(manager.ui_rendered_sprites.size() == 4 && manager.ui_elements[2].sprite_start == 2);
