@@ -44,6 +44,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Generated TypeScript build caches and project backup files are excluded from
+  version control.
 - Game Data Save and Game Data Load execute their own action branches; the
   separate legacy On Load event is no longer offered for new scripts.
 - Reset All Variables restores configured global defaults; local variables and
@@ -72,6 +74,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The Boy Picture sample uses zero-based menu results consistently in its While
+  condition and Switch branches.
 - Local variable selections no longer disappear during automatic reference repair.
 - Deleted variables and scripts are excluded from hierarchy and event selectors,
   and removed from project files when saving.

@@ -79,7 +79,7 @@
       "args": {
         "left": {
           "kind": "formula",
-          "source": "($variable_5 == 0) || ($variable_5 == 3)",
+          "source": "($variable_5 == 0) || ($variable_5 == 2)",
           "variables": {
             "aa7333a7-5485-42bb-9951-321e569a3063": "aa7333a7-5485-42bb-9951-321e569a3063",
             "variable_0": "aa7333a7-5485-42bb-9951-321e569a3063",
@@ -213,7 +213,7 @@
                     "value": {
                       "kind": "literal",
                       "type": "number",
-                      "value": 1
+                      "value": 0
                     },
                     "__collapse": true
                   },
@@ -241,7 +241,7 @@
                         }
                       }
                     ],
-                    "thenCollapsed": true
+                    "thenCollapsed": false
                   }
                 },
                 {
@@ -251,7 +251,7 @@
                     "value": {
                       "kind": "literal",
                       "type": "number",
-                      "value": 2
+                      "value": 1
                     },
                     "__collapse": true
                   },
@@ -289,7 +289,7 @@
                     "value": {
                       "kind": "literal",
                       "type": "number",
-                      "value": 3
+                      "value": 2
                     },
                     "__collapse": true
                   },
@@ -334,7 +334,7 @@
                   }
                 }
               ],
-              "thenCollapsed": true,
+              "thenCollapsed": false,
               "elseCollapsed": false
             }
           }
