@@ -8,224 +8,100 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Actor main-state switching through `EVENT_ACTOR_SET_STATE`, with player/NPC
-  selectors, typed generated payloads, and native runtime support.
-- Scripted actor movement with bounded pathfinding, collision-aware movement,
-  platform physics, ladders, and configurable movement/animation speeds.
-- Reusable numeric-value inputs with variables, actor/player properties,
-  constants, formulas, nested math/boolean/comparison/bitwise operations,
-  and expression copy/paste backed by generated runtime instructions.
-- Autotile asset selection and configuration, Blob-47 terrain painting, and
-  complete mixed tileset/autotile selections for copy, cut, paste, and move.
-- Sprite canvas preparation that assembles editable pieces into generated
-  animation frames without modifying the source spritesheets.
-- Runtime resource-monitor window integrated with the emulator and template
-  telemetry, plus native ELF memory-placement and headroom verification.
-- Required-input warning indicators on events, script descriptions displayed
-  by Call Script, and direct navigation to referenced scene actors/triggers.
-- Localized compiler/transcode stage logs, asset and sprite preparation
-  messages, and live Butano graphics/audio/header generation output.
-- Shooter, combat, spawner, rumble, save/load, and UI lifecycle runtime
-  implementations with generated-resource and native regression coverage.
-- Scene settings now expose an explicit Shooter scene type and per-scene
-  logical controls, with runtime fallback to the project input map.
-- Generated script tables now use per-table EWRAM sections, preventing valid
-  sample projects from overflowing IWRAM during linking; the sample ROM was
-  rebuilt successfully with the editable Butano template.
-- World preview transform input now rejects non-finite wheel coordinates and
-  sanitizes invalid zoom state before applying transforms.
-- Fixed tracker music preview hook ordering, ignored internal preview-image
-  drops in asset editors, opened the selected sprite animation state, and
-  generated directional sprite frames using the original sheet geometry.
-- Change Scene coordinates are now controlled and clamped to the selected
-  destination scene; world placement uses the live transform scale when zoomed.
-- The reconstructed shooter now starts through authored Intro and Title scenes
-  with fade/music/button flow before entering Stage 1, and its verifier checks
-  generated event UUIDs for uniqueness.
-- `EVENT_MENU_OPEN` now supports a bounded list of menu options while retaining
-  the legacy two-option format, including runtime cursor navigation and result
-  selection; the shooter Title menu now routes to Start, How to Play, Credits,
-  and Rumble actions.
-- Menu cursor movement now respects the actual up/down direction instead of
-  advancing for both buttons.
-- The reconstructed shooter now includes authored How to Play and Credits
-  scenes using the engine dialogue/credits events and returns to the Title menu.
-- Shooter game scene resources now include the editor position/grid/render defaults
-  and complete sprite animation-state previews, preventing scene selection from
-  failing when the reconstructed project is opened in the editor.
-- Optional generated-template ROM compilation with `node tools/verify-generated-template.mjs --build` and an installed devkitPro toolchain.
-- Typed event catalog, graph compiler, runtime event panels, and coverage checks.
-- Independent script instances, scene triggers, input bindings, actor, camera,
-  dialogue, audio, and resource-management services in the Butano template.
-- Asset-library editors for music, sound effects, palettes, and dialogue review.
-- Tracker-module inspection for MOD/XM/S3M/IT assets, including format, channel,
-  order, pattern, instrument, speed and tempo metadata without misleading
-  browser PCM playback.
-- Tracker previews support MOD/XM/S3M/IT sample and pattern decoding with
-  bounded Web Audio scheduling and compatibility reporting; supported effects
-  vary by format rather than claiming full tracker-player emulation.
-- Tracker pattern/sample editing includes undo/redo, export of edited copies,
-  project-asset saving, and retained per-channel mute, volume, and pan settings.
-- MOD preview now exposes per-channel mute controls and a compact pattern-row
-  view, making channel structure inspectable without exporting or rewriting the
-  source module.
-- MOD pattern cells can now be edited in the preview (period, sample, effect
-  and parameter) and exported as a new `.mod` copy; the source asset remains
-  untouched.
-- MOD preview handles pattern flow (`Bxx`/`Dxx`) and per-event volume (`Cxx`)
-  in addition to speed/tempo changes.
-- MOD preview also honors `9xx` sample offsets when scheduling a note.
-- Added an executable MOD parser/editor contract fixture covering channel/event
-  decoding, binary cell updates and source-copy immutability.
-- XM pattern headers and packed events are now decoded for channel
-  visualization, with a native parser fixture.
-- S3M packed events are now decoded for the first-pattern view, and IT metadata
-  counts use the correct order/instrument/sample/pattern header offsets.
-- IT pattern masks and channel events are now decoded for the first-pattern
-  view, with a native parser fixture.
-- Sprite and tile editing, palette-index-transparent previews, font metrics,
-  history/undo support, localization, credits, and update services.
-- Generated-template, sample-project, scheduler, trigger, manager, and editor
-  contract tests.
-- Scene tile-animation editor with layer/destination/frame/duration/loop controls
-  and a Butano-oriented frame-timeline preview.
-- Added typed `EVENT_INPUT_ENABLE` and `EVENT_INPUT_DISABLE` events for gameplay,
-  menu, interaction, and all-input groups, with cooperative template runtime
-  blocking and native/build contract fixtures.
-- Added editable settings `InputMap` bindings with build validation, generated
-  `InputBinding` ABI, template startup loading, logical action queries, and a
-  game-settings editor.
-- Added blocking `EVENT_WAIT_INPUT` for logical InputMap actions with optional
-  frame timeout, typed generated ABI, cooperative per-script runtime state, and
-  build/native contract tests.
-- Added InputMap action creation/removal controls with name/capacity validation
-  and accessible editor labels.
-- Migrated default player movement, input snapshots, and menu handling to
-  logical InputMap actions with physical-button compatibility aliases.
-- Added typed `EVENT_ACTOR_SET_ANIMATION` for data-driven actor appearance
-  control, reusing the fixed-capacity animation manager.
-- Added typed `EVENT_ACTOR_SET_POSITION` for data-driven actor placement,
-  reusing the existing position manager and X/Y editor controls.
+- Eight numeric local variables (Local A-H) per actor or trigger, shared across
+  the instance's event tabs, with a Reset Local Variables event.
+- Reusable script parameters with typed values and reference arguments.
+- Variables Save and Variables Load events for selected or all global variables,
+  independently of scene and player restoration.
+- Independent Input Map configuration for each scene type and editable Gameplay,
+  Menu and Interaction input groups; All always includes every button.
+- Actor direction, main state, animation, position, visibility, rotation, scale
+  and timed color-overlay controls, including player and Self targets.
+- Actor-facing conditions with independent X/Y checks, distance limits and a
+  scene preview, plus controls for actors that keep running while offscreen.
+- Separate physics events for movement settings and vertical motion, alongside
+  Stop Physics, collision-aware actor movement, pathfinding and ladder support.
+- Pixel/tile unit selection for coordinate inputs, including Change Scene,
+  Pan Camera and Scroll Background.
+- Numeric inputs supporting variables, actor/player properties, constants,
+  formulas, nested mathematical and logical operations, and expression copy/paste.
+- Dialogue and UI text variable insertion with resolved initial-value previews.
+- SFX generation and custom volume, speed and pan dials in Play Sound, with sound
+  group selection in Stop Sounds and descriptions of priority and channel limits.
+- Tracker composition tools with pattern, piano-roll, score, sample and instrument
+  editing, envelopes, effect controls, undo/redo and project music saving.
+- MOD/XM/S3M/IT inspection, format-aware previews, edited module export and
+  Maxmod playback verification through the emulator.
+- Runtime resource-monitor window integrated with the emulator.
+- Autotile selection, Blob-47 terrain painting, mixed tileset/autotile editing
+  and regular-background tile animation controls with timeline previews.
+- Sprite canvas preparation that assembles editable pieces into animation frames
+  without modifying the source spritesheets.
+- Required-input indicators, script descriptions in Call Script and navigation
+  to referenced scene actors and triggers.
+- Shooter, combat, spawner, rumble and UI lifecycle events, plus expanded bundled
+  sample and shooter projects with authored menus, credits and scene flow.
 
 ### Changed
 
-- Moved bundled projects into `templateEngineGame`, expanded the sample
-  project, and added the reconstructed shooter template and build verifiers.
-- Standardized dark asset selectors and tree panels across scenes, scripts,
-  variables, sprites, animation states, images, music, sounds, and palettes.
-  Panel resize/collapse and tree expansion states persist per project/sprite.
-- Sprite Editor opens with 800% preview zoom, retains the 100% reset action,
-  and selects sprite pieces only through explicit preview interaction.
-- Right-panel scroll positions are retained per scene/object; script references
-  open the owning scene in edit mode with the actor or trigger selected.
-- Camera and actor movement share speed controls and destination-aware titles;
-  camera speed offers the same presets and Custom input as actor movement.
-- Dialogue: Show now advances the script immediately and remains visible until
-  explicitly closed; player interaction cannot reveal or dismiss its text.
-- Scroll Background uses the shared layer selector and aligned X/Y controls.
-- Regular-background scene previews repeat images across the scene area;
-  selector hover and Image position editing outline the original image and
-  show its replicas in grayscale, excluding Logo and Point Click scenes.
-- Layer-image generation uses bounded parallel jobs according to the configured
-  Threads value while retaining deterministic resource order and output.
-- Removed warning-only casts and unused template variables/parameters without
-  changing generated ABI or runtime behavior; retained the single benign warning
-  in empty generated audio registries.
-- Standardized X/Y/W/H numeric controls on the existing `Space.Addon` visual
-  pattern across sprite, scene, layer, and runtime event editors.
-- Added a dark, labeled Sprite Preview control header for playback, animation
-  speed, tile counts, and grid controls.
-- Ignored generated Playwright `test-results/` artifacts.
-- Scene, actor, player, camera, event graph, build/transcoding, and asset
-  pipelines now share stronger validation and typed resource contracts.
-- The sample project now exercises expanded scenes, triggers, collisions,
-  scripts, assets, palettes, fonts, sprites, and audio.
-- Emulator integration, launcher, settings, menus, and responsive editor
-  layout were refined for the expanded workflow.
+- Game Data Save and Game Data Load execute their own action branches; the
+  separate legacy On Load event is no longer offered for new scripts.
+- Reset All Variables restores configured global defaults; local variables and
+  reusable script parameters are unaffected.
+- Dialogue: Show continues the script immediately and remains visible until
+  explicitly hidden; player interaction does not reveal or dismiss its text.
+- Dialogue and menu initial selections display zero-based values, matching the
+  value stored in the result variable.
+- Settings places Input Map and Input Groups alongside each other and exposes
+  scene-specific actions through the scene-type selector.
+- Nested event previews take precedence over parent previews during hover,
+  scrolling and interaction with child controls.
+- Sprite and state names use the same hover editing outline as scene and project
+  names; offscreen behavior descriptions are shown in tooltips.
+- Camera and actor movement share speed presets and destination-aware titles;
+  coordinate, layer and asset selectors use consistent controls.
+- Sprite Effect is hidden from new-event menus; existing scripts remain supported
+  alongside the separate actor effect events.
+- Bundled projects live under templateEngineGame; cartridge artwork is packaged
+  with the application.
+- Panel sizes, expansion states, per-object scroll positions and sprite preview
+  settings persist across editing sessions.
+- Build preparation uses project-specific native modules, validates references
+  and reports localized asset and compiler stages.
+- Current event and runtime-monitor contracts consistently use schema version 1.
 
 ### Fixed
 
-- Empty and editor-only event arguments now generate valid null payloads,
-  fixing undeclared `ARGS_*` references for Hide/Show All Sprites.
-- Hide/Show All Sprites now include the player as well as scene actors.
-- Build targets are sanitized for Make, and ROM discovery checks the expected
-  target instead of accepting stale output; a successful make without a ROM
-  is reported as a compilation failure rather than starting Run Live.
-- Actor/player property-based coordinate expressions preserve pixel/tile units
-  and apply offsets correctly instead of forcing the editor field to pixels.
-- Scripted movement keeps the full actor within scene bounds, attempts an
-  obstacle jump once, and finishes when no traversable path remains.
-- Climbing animations reverse when descending and retain their current frame
-  while paused, including lateral movement on ladders.
-- Deleting an actor/trigger preserves scene edit mode instead of deselecting
-  the scene; Add Event clears its search every time it opens.
-- Panel heights update after project loading and restore, resize/collapse
-  persist consistently, and splitter movement no longer shifts adjacent titles.
-- Variable menus expose True/False with boolean prefixes, distinguish assignment
-  presets, restrict actor properties to the current scene, and match numeric
-  prefix colors to the shared input style.
-- Autotile hover highlights remain visible for the entire hover, and Slot Name
-  uses the tab name as its placeholder; mouse tile coordinates use the editor grid.
-- Selecting a smaller background preserves an existing painted scene's map
-  dimensions instead of shrinking the scene to the source image.
-- Scene UI and variable-text overlays follow Show Camera on View visibility.
-- Large graphics/script manager states remain in EWRAM to protect IWRAM stack
-  headroom; generated-build verification checks the actual ELF memory layout.
-- Regular-background dimension handling preserves logical scene coordinates,
-  palette indices, transparent padding, and source assets when fitting images
-  to the hardware-supported map dimensions.
-- Normalize persisted Game World zoom and pan values before passing them to
-  `react-zoom-pan-pinch`, reject invalid wheel coordinates before propagation,
-  and guard recenter/zoom callbacks against non-finite transform state to avoid
-  `No mouse or touch offset found` and `Detected NaN set state values` errors.
-- Use compiled instruction counts for trigger and actor programs, including
-  nested branches and commented events. Correct loop exits/state-slot mapping,
-  emit CONTINUE payloads, accept FOR schema v2 and diagnose loop-state overflow.
-  Generated-program native tests and the expanded ROM fixture cover these paths.
-- Correct scheduler tail-call returns, FOR iteration values and per-call loop
-  state; keep button branch boundaries local to their program and preserve
-  other scenes' input overrides during cancellation. A native test executes
-  the production scheduler, WAIT, variable manager and trigger manager.
-- Stop the game frame when a scene transition starts or loads, cancel stale
-  continuations on in-handler scene cancellation, reset trigger state on
-  same-ID reloads, and preserve target OnInit for the following frame. Native
-  scene-lifecycle coverage exercises OnInit, actor and trigger transitions.
-- Separate regular-background hardware `priority` from background-only
-  `z_order`; legacy layers default to priority 3 with distinct z-order values,
-  while explicit foreground values are preserved and clamped.
-- Added declarative regular-background tile animations to generated scenes:
-  destination tile, frame indices, duration, initial frame and loop policy,
-  with 4/8 bpp source stride handling and validation of the 32-animation,
-  32-frame and tile-index limits.
-- Connected the scene editor to the same `tileAnimations` schema used by the
-  ResourceBuilder, including bounded inputs, removal/addition, playback pause,
-  initial-frame handling, and a 60 Hz duration preview.
-- Tile-animation builds now inspect generated Butano regular-BG headers to
-  validate logical tile counts, 4/8 bpp stride, tile compression and map
-  compression before producing the registry.
-- Reject duplicate tile-animation destinations and show the same ambiguity in
-  the scene editor before build.
-- Separate regular-background hardware `priority` from background-only
-  `z_order`; legacy layers default to priority 3 with distinct z-order values,
-  while explicit foreground values are preserved and clamped.
-- Stop the game frame when a scene transition starts or loads, cancel stale
-  continuations on in-handler scene cancellation, reset trigger state on
-  same-ID reloads, and preserve target OnInit for the following frame. Native
-  scene-lifecycle coverage exercises OnInit, actor and trigger transitions.
-- Resume running trigger scripts every frame independently of once/cooldown
-  and activation conditions; ignore retriggers while running and release
-  completed scheduler slots. Covered by a native production-manager test with
-  a scheduler test double.
-- Removed the stale JavaScript event catalog; tests now execute the shared
-  TypeScript source. Catalog types cover array payloads and schema version 2.
-- Creation-menu coverage explicitly checks Show/Hide Actor as the supported
-  creation paths for the retained Visible Actor command, ignoring commented entries.
-- Validate scene and background references in trigger enter/leave and actor
-  interaction scripts, including nested branches, before generating the registry.
-- Use the tracked sample music asset for generated-template verification.
-- Corrected generated-template lifecycle, scene cleanup, script execution
-  budget, trigger handling, layer/palette changes, and audio reference checks.
-- Improved preview fidelity for indexed assets and mapped variable-width fonts.
+- Local variable selections no longer disappear during automatic reference repair.
+- Deleted variables and scripts are excluded from hierarchy and event selectors,
+  and removed from project files when saving.
+- Prefab events cannot be edited from scene instances unless editing is enabled
+  or the instance is detached.
+- Variable interpolation identifiers do not consume dialogue/UI text capacity;
+  previews account for the resolved variable value instead.
+- Hide Dialogue closes the active dialogue, including when called from triggers.
+- Play Sound group typing no longer updates the shared group list on every keypress.
+- Emulator FPS/CPU indicators do not leave black placeholders before measurements.
+- Change Scene passes independent X/Y units correctly; coordinate expressions
+  preserve pixel/tile conversions and property offsets.
+- Actor interaction uses configured collider contact, while collider preview
+  visibility persists with each scene actor.
+- Running trigger scripts continue across waits independently of activation,
+  cooldown and once settings; actor and trigger script instances retain ownership.
+- Scene transitions cancel stale continuations and input bindings while preserving
+  the destination scene's initialization.
+- Large graphics and script state stays in EWRAM, and physics resets respect the
+  generated actor capacity instead of writing beyond the reserved arrays.
+- Generated payloads, nested branches, loop continuations and native module
+  dependencies are validated before producing the game.
+- Tracker decoding, preview timing, effects, panning, sample preparation and
+  Maxmod compatibility were corrected across supported module formats.
+- Indexed image transparency, font metrics, directional sprite frames, scene
+  overlays and background priority more closely match runtime rendering.
+- World zoom/pan rejects invalid coordinates, painted maps retain their logical
+  dimensions, and asset drops do not accidentally import internal preview images.
+- Build target discovery rejects stale ROMs and reports missing output as a
+  compilation failure; renderer builds preserve generated main-process helpers.
 
 ## [0.4.4] - 2026-09-07
 
